@@ -233,10 +233,194 @@
   margin-top: 12px;
 }
 
+.action-panel h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
 .wf-button.full {
   width: 100%;
   height: 40px;
   margin-bottom: 12px;
+}
+
+.wf-button.wide {
+  width: 100%;
+}
+
+.workflow-editor-grid {
+  display: grid;
+  grid-template-columns: 320px minmax(620px, 824px);
+  gap: 20px;
+  margin-top: 30px;
+}
+
+.editor-side,
+.editor-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.editor-detail h3 {
+  margin: -4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.editor-detail h3.large {
+  font-size: 18px;
+}
+
+.editor-detail p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.wf-field {
+  display: block;
+  width: 100%;
+}
+
+.wf-field span {
+  display: block;
+  height: 20px;
+  color: var(--mar-muted, #475569);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.wf-field input {
+  width: 100%;
+  height: 37px;
+  border: 1px solid var(--mar-border, #cbd5e1);
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: var(--mar-text, #0f172a);
+  font: inherit;
+  font-size: 12px;
+  padding: 8px 12px;
+}
+
+.task-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 32px;
+}
+
+.task-heading h2 {
+  flex: 1;
+  margin: 0;
+}
+
+.task-heading button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: var(--mar-text, #0f172a);
+  cursor: pointer;
+  font: inherit;
+}
+
+.editor-side-button {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: var(--mar-text, #0f172a);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 0 16px;
+}
+
+.editor-side-button.active {
+  background: var(--mar-primary, #2f80ff);
+  color: #fff;
+}
+
+.editor-side-button.small {
+  min-height: 32px;
+}
+
+.endpoint-heading {
+  margin-top: 0 !important;
+  font-weight: 400 !important;
+}
+
+.step-dropdown {
+  width: 100%;
+  border: 1px solid var(--mar-border, #cbd5e1);
+  border-radius: 6px;
+  background: #fff;
+  padding: 6px;
+}
+
+.step-dropdown button {
+  display: block;
+  width: 500px;
+  height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--mar-text, #0f172a);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  padding: 0 16px;
+}
+
+.step-dropdown button:hover {
+  background: #f1f5f9;
+}
+
+.step-row {
+  width: 100%;
+  color: var(--mar-text, #0f172a);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.step-row span {
+  display: block;
+  height: 40px;
+  margin-top: 10px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  font-weight: 400;
+  line-height: 40px;
+  padding: 0 16px;
+}
+
+.marker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  width: 100%;
+}
+
+.sensor-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 36px;
+  font-size: 12px;
+}
+
+.sensor-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--mar-primary, #2f80ff);
 }
 
 .workflow-actions {
@@ -286,6 +470,10 @@
   }
 
   .workflows-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-editor-grid {
     grid-template-columns: 1fr;
   }
 }

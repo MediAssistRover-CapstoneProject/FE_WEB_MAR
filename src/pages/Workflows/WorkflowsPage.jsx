@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './workflows.css';
 
 const navGroups = [
@@ -23,7 +25,24 @@ const workflows = [
   ['Robot Startup and Standby', 'WF_ROBOT_STARTUP_STANDBY', 13],
 ].map(([name, code, steps]) => ({ name, code, steps }));
 
-function Sidebar() {
+const tasks = ['Move', 'Load', 'Transport', 'Unload'];
+const stepTypes = [
+  'MOVE',
+  'INTERACT',
+  'DATA_SERVICE',
+  'AUTHENTICATE',
+  'CONTROL_HARDWARE',
+  'HANDLE_PAYLOAD',
+  'EXECUTE_SENSING',
+  'NOTIFY',
+  'WAIT',
+  'CHECK_CONDITION',
+  'SET_CONTEXT',
+  'CALL_WORKFLOW',
+];
+
+export function Sidebar() {
+  const navigate = useNavigate();
   return (
     <aside className="wf-sidebar">
       <div className="wf-brand">
@@ -35,7 +54,7 @@ function Sidebar() {
           <section key={group}>
             <h3>{group}</h3>
             {items.map((item) => (
-              <button className={item === 'Workflows' ? 'active' : ''} type="button" key={item}>
+              <button className={item === 'Workflows' ? 'active' : ''} type="button" key={item} onClick={() => navigate(item === 'Workflows' ? '/workflows' : `/admin?screen=${encodeURIComponent(item)}`)}>
                 {item}
               </button>
             ))}
@@ -50,57 +69,334 @@ function Sidebar() {
   );
 }
 
-function MarButton({ children, variant = 'primary', className = '' }) {
+export function MarButton({ children, variant = 'primary', className = '', onClick }) {
   return (
-    <button className={`wf-button ${variant} ${className}`.trim()} type="button">
+    <button className={`wf-button ${variant} ${className}`.trim()} type="button" onClick={onClick}>
       {children}
     </button>
   );
 }
 
+function Field({ label, value }) {
+  return (
+    <label className="wf-field">
+      <span>{label}</span>
+      <input value={value} readOnly />
+    </label>
+  );
+}
+
+function Tabs() {
+  const navigate = useNavigate();
+  return (
+    <div className="workflow-tabs">
+      <MarButton className="tab-button">Workflows</MarButton>
+      <MarButton className="tab-button" variant="subtle" onClick={() => navigate('/workstations')}>Workstations</MarButton>
+      <MarButton className="tab-button" variant="subtle" onClick={() => navigate('/workstations?view=jobs')}>Jobs</MarButton>
+    </div>
+  );
+}
+
+function Library({ saved, onCreate, onOpenDraft }) {
+  return (
+    <>
+      <div className="workflows-grid">
+        <section className="workflow-panel library-panel">
+          <h2>WORKFLOW TEMPLATES · 10 DEFAULTS</h2>
+          <div className="workflow-list">
+            {workflows.map((workflow) => (
+              <button className="workflow-card" type="button" key={workflow.code} onClick={onCreate}>
+                <strong>{workflow.name}</strong>
+                <span>{workflow.code}<b>·</b>{workflow.steps} steps including branches<em>→</em></span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <aside className="workflow-panel action-panel">
+          {saved ? (
+            <>
+              <h2>MY WORKFLOWS</h2>
+              <h3>New workflow</h3>
+              <p>DRAFT · 4 default tasks</p>
+              <MarButton className="full" onClick={onOpenDraft}>Open Draft</MarButton>
+              <MarButton className="full" variant="subtle" onClick={onCreate}>+ Create Workflow</MarButton>
+              <h2>10 DEFAULT TEMPLATES</h2>
+              <p>Templates remain available in the list.</p>
+            </>
+          ) : (
+            <>
+              <h2>CREATE A WORKFLOW</h2>
+              <p>Start a new workflow with four default tasks, then add steps from the library.</p>
+              <MarButton className="full" onClick={onCreate}>+ Create Workflow</MarButton>
+              <h2>DEFAULT TEMPLATES</h2>
+              <p>The 10 templates are examples. Open one to inspect its sequence.</p>
+            </>
+          )}
+        </aside>
+      </div>
+
+      <footer className="workflow-actions">
+        <MarButton className="create" onClick={onCreate}>Create Workflow</MarButton>
+        <MarButton className="back" variant="subtle">Back to Workflows</MarButton>
+        <p>Scroll inside panels to view all content.</p>
+      </footer>
+    </>
+  );
+}
+
+function EditorSide({ activeTask, screen, setScreen, setActiveTask, customTask }) {
+  const allTasks = customTask ? [...tasks, 'Confirm delivery'] : tasks;
+
+  return (
+    <section className="workflow-panel editor-side">
+      <h2>WORKFLOW</h2>
+      <Field label="Name" value="New workflow" />
+      <Field label="Description" value="Add a description..." />
+      <div className="task-heading">
+        <h2>TASKS · 4 DEFAULTS</h2>
+        {screen !== 'create' ? <button type="button" onClick={() => setScreen('add-task')}>+</button> : null}
+      </div>
+      {allTasks.map((task) => (
+        <button
+          className={activeTask === task ? 'editor-side-button active' : 'editor-side-button'}
+          type="button"
+          key={task}
+          onClick={() => {
+            setActiveTask(task);
+            setScreen(task === 'Confirm delivery' ? 'custom-task' : 'task-empty');
+          }}
+        >
+          {task}
+        </button>
+      ))}
+      <h2 className="endpoint-heading">ENDPOINT CONFIGURATION</h2>
+      <button className={screen === 'options' || screen === 'queue-exit' ? 'editor-side-button small active' : 'editor-side-button small'} type="button" onClick={() => setScreen('options')}>
+        Options ›
+      </button>
+      <button className={screen === 'marker' || screen === 'marker-sensors' ? 'editor-side-button small active' : 'editor-side-button small'} type="button" onClick={() => setScreen('marker')}>
+        Marker Options ›
+      </button>
+    </section>
+  );
+}
+
+function SelectTaskPanel() {
+  return (
+    <section className="workflow-panel editor-detail">
+      <h2>SELECT A TASK</h2>
+      <h3>Select Move, Load, Transport or Unload to build its step sequence.</h3>
+      <p>Each task has an ordered list of steps. Use + Add Step to choose from the step type library.</p>
+    </section>
+  );
+}
+
+function TaskPanel({ task, screen, setScreen }) {
+  const steps = screen === 'two-steps' ? ['MOVE', 'INTERACT'] : screen === 'one-step' ? ['MOVE'] : [];
+
+  return (
+    <section className="workflow-panel editor-detail">
+      <h2>TASK</h2>
+      <h3 className="large">{task}</h3>
+      {screen === 'step-types' ? (
+        <>
+          <MarButton className="wide" variant="subtle">Select step type ▴</MarButton>
+          <div className="step-dropdown">
+            {stepTypes.map((type, index) => (
+              <button type="button" key={type} onClick={() => setScreen(index === 1 ? 'two-steps' : 'one-step')}>
+                {type}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <h2>STEP SEQUENCE · {steps.length ? `${steps.length} ${steps.length === 1 ? 'STEP' : 'STEPS'}` : 'EMPTY'}</h2>
+          {steps.length ? (
+            <>
+              {steps.map((step, index) => (
+                <div className="step-row" key={step}>
+                  {String(index + 1).padStart(2, '0')}
+                  <span>{step}</span>
+                </div>
+              ))}
+              <p>Step type selected from the library. Configuration uses the predefined defaults.</p>
+            </>
+          ) : (
+            <p>No steps yet. Add a step from the library.</p>
+          )}
+          <MarButton className="wide" variant="subtle" onClick={() => setScreen('step-types')}>+ Add Step</MarButton>
+        </>
+      )}
+    </section>
+  );
+}
+
+function OptionsPanel({ screen, setScreen }) {
+  if (screen === 'queue-exit') {
+    return (
+      <section className="workflow-panel editor-detail">
+        <h2>OPTIONS / QUEUE & EXIT</h2>
+        <p>Endpoint template · Task sequences</p>
+        <h2>QUEUE</h2>
+        <p>Steps performed while waiting to access the endpoint.</p>
+        <MarButton className="wide" variant="subtle">+ Add Queue Step</MarButton>
+        <h2>EXIT</h2>
+        <p>Steps performed when leaving the endpoint.</p>
+        <MarButton className="wide" variant="subtle">+ Add Exit Step</MarButton>
+      </section>
+    );
+  }
+
+  return (
+    <section className="workflow-panel editor-detail">
+      <h2>OPTIONS</h2>
+      <p>Endpoint-related settings</p>
+      <MarButton className="wide" variant="subtle" onClick={() => setScreen('queue-exit')}>Queue & Exit ›</MarButton>
+      <MarButton className="wide" variant="subtle" onClick={() => setScreen('marker')}>Marker Options ›</MarButton>
+      <p>Configure how the robot waits, leaves the endpoint and approaches its marker.</p>
+    </section>
+  );
+}
+
+function MarkerPanel({ sensors, setScreen }) {
+  const fields = [
+    ['Marker type', 'Dock'],
+    ['Approach angle', '0 deg'],
+    ['Tolerance radius', '0.35 m'],
+    ['Alignment mode', 'Front camera'],
+    ['Retry limit', '3 attempts'],
+    ['Timeout', '45 sec'],
+    ['Dock offset X', '0.00 m'],
+    ['Dock offset Y', '0.00 m'],
+    ['Safety stop', 'Enabled'],
+    ['Speed limit', '0.4 m/s'],
+  ];
+
+  return (
+    <section className="workflow-panel editor-detail">
+      <h2>MARKER OPTIONS</h2>
+      <p>Endpoint template · Dock marker geometry and behavior</p>
+      <div className="marker-grid">
+        {fields.map(([label, value]) => <Field label={label} value={value} key={label} />)}
+      </div>
+      <label className="sensor-toggle">
+        <input type="checkbox" checked={sensors} readOnly />
+        Sensor monitoring
+      </label>
+      {!sensors ? <MarButton className="wide" variant="subtle" onClick={() => setScreen('marker-sensors')}>Turn Sensor Monitoring On</MarButton> : null}
+    </section>
+  );
+}
+
+function AddTaskPanel({ setScreen, setActiveTask }) {
+  return (
+    <section className="workflow-panel editor-detail">
+      <h2>NEW TASK</h2>
+      <Field label="Task name" value="Confirm delivery" />
+      <p>The task starts empty. Add steps from the same step type library.</p>
+      <MarButton className="wide" onClick={() => {
+        setActiveTask('Confirm delivery');
+        setScreen('custom-task');
+      }}>
+        Add Task
+      </MarButton>
+      <MarButton className="wide" variant="subtle" onClick={() => setScreen('create')}>Cancel</MarButton>
+    </section>
+  );
+}
+
+function ReviewPanel() {
+  return (
+    <section className="workflow-panel editor-detail">
+      <h2>WORKFLOW DRAFT</h2>
+      <Field label="Name" value="New workflow" />
+      <h2>DEFAULT TASKS</h2>
+      <h3 className="large">Move → Load → Transport → Unload</h3>
+      <h2>Selected task</h2>
+      <h3>Move</h3>
+      <h2>Selected step type</h2>
+      <h3>MOVE</h3>
+      <p>Save as a draft. Empty tasks must be completed before validation and publishing.</p>
+    </section>
+  );
+}
+
+function Editor({ screen, setScreen, setMode, setSaved }) {
+  const [activeTask, setActiveTask] = useState('Move');
+  const customTask = screen === 'custom-task';
+  let detail = <SelectTaskPanel />;
+
+  if (screen === 'task-empty' || screen === 'step-types' || screen === 'one-step' || screen === 'two-steps' || screen === 'custom-task') {
+    detail = <TaskPanel task={activeTask} screen={screen === 'custom-task' ? 'task-empty' : screen} setScreen={setScreen} />;
+  } else if (screen === 'options' || screen === 'queue-exit') {
+    detail = <OptionsPanel screen={screen} setScreen={setScreen} />;
+  } else if (screen === 'marker' || screen === 'marker-sensors') {
+    detail = <MarkerPanel sensors={screen === 'marker-sensors'} setScreen={setScreen} />;
+  } else if (screen === 'add-task') {
+    detail = <AddTaskPanel setScreen={setScreen} setActiveTask={setActiveTask} />;
+  } else if (screen === 'review') {
+    detail = <ReviewPanel />;
+  }
+
+  return (
+    <>
+      <div className="workflow-editor-grid">
+        <EditorSide activeTask={activeTask} screen={screen} setScreen={setScreen} setActiveTask={setActiveTask} customTask={customTask} />
+        {detail}
+      </div>
+      <footer className={screen === 'review' ? 'workflow-actions review-actions' : 'workflow-actions'}>
+        {screen === 'review' ? (
+          <>
+            <MarButton className="create" onClick={() => {
+              setSaved(true);
+              setMode('library');
+              setScreen('create');
+            }}>
+              Save Draft
+            </MarButton>
+            <MarButton className="back" variant="subtle" onClick={() => setScreen('create')}>Back to Editor</MarButton>
+          </>
+        ) : (
+          <>
+            <MarButton className="create" onClick={() => setScreen('review')}>Review Workflow</MarButton>
+            <MarButton className="back" variant="subtle" onClick={() => setMode('library')}>Back to Workflows</MarButton>
+          </>
+        )}
+      </footer>
+    </>
+  );
+}
+
 export default function WorkflowsPage() {
+  const [mode, setMode] = useState('library');
+  const [screen, setScreen] = useState('create');
+  const [saved, setSaved] = useState(false);
+  const creating = mode === 'create';
+
+  const openCreate = () => {
+    setMode('create');
+    setScreen('create');
+  };
+
   return (
     <div className="workflows-screen">
       <Sidebar />
       <main className="workflows-main">
         <header className="workflows-header">
-          <h1>Workflows</h1>
+          <h1>{creating ? 'Create Workflow' : 'Workflows'}</h1>
           <p className="robot-location">MAR-01 · Hospital Floor 1</p>
-          <div className="workflow-tabs">
-            <MarButton className="tab-button">Workflows</MarButton>
-            <MarButton className="tab-button" variant="subtle">Workstations</MarButton>
-            <MarButton className="tab-button" variant="subtle">Jobs</MarButton>
-          </div>
-          <p className="preview-note">Specification v1.0 · editable UI preview</p>
+          <Tabs />
+          <p className="preview-note">
+            {creating ? 'Build a workflow from tasks, or start with one of the 10 templates.' : saved ? 'Draft saved. Continue editing or create another workflow.' : 'Specification v1.0 · editable UI preview'}
+          </p>
         </header>
 
-        <div className="workflows-grid">
-          <section className="workflow-panel library-panel">
-            <h2>WORKFLOW TEMPLATES · 10 DEFAULTS</h2>
-            <div className="workflow-list">
-              {workflows.map((workflow) => (
-                <button className="workflow-card" type="button" key={workflow.code}>
-                  <strong>{workflow.name}</strong>
-                  <span>{workflow.code}<b>·</b>{workflow.steps} steps including branches<em>→</em></span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <aside className="workflow-panel action-panel">
-            <h2>CREATE A WORKFLOW</h2>
-            <p>Start a new workflow with four default tasks, then add steps from the library.</p>
-            <MarButton className="full">+ Create Workflow</MarButton>
-            <h2>DEFAULT TEMPLATES</h2>
-            <p>The 10 templates are examples. Open one to inspect its sequence.</p>
-          </aside>
-        </div>
-
-        <footer className="workflow-actions">
-          <MarButton className="create">Create Workflow</MarButton>
-          <MarButton className="back" variant="subtle">Back to Workflows</MarButton>
-          <p>Scroll inside panels to view all content.</p>
-        </footer>
+        {creating ? (
+          <Editor screen={screen} setScreen={setScreen} setMode={setMode} setSaved={setSaved} />
+        ) : (
+          <Library saved={saved} onCreate={openCreate} onOpenDraft={openCreate} />
+        )}
       </main>
     </div>
   );

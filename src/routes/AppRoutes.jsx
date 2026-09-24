@@ -5,6 +5,7 @@ import LoginPage from '../pages/Auth/LoginPage.jsx';
 import RegisterPage from '../pages/Auth/RegisterPage.jsx';
 import AdminApp from '../pages/Admin/AdminApp.jsx';
 import WorkflowsPage from '../pages/Workflows/WorkflowsPage.jsx';
+import WorkstationsPage from '../pages/Workstations/WorkstationsPage.jsx';
 
 function LandingRoute() {
   const navigate = useNavigate();
@@ -12,5 +13,5 @@ function LandingRoute() {
 }
 
 export default function AppRoutes() {
-  return <Routes><Route element={<AppLayout />}><Route path="/" element={<LandingRoute />} /><Route path="/login" element={<LoginPage />} /><Route path="/register" element={<RegisterPage />} /><Route path="/admin" element={<AdminApp onLanding={() => window.location.assign('/')} />} /><Route path="/workflows" element={<WorkflowsPage />} /></Route></Routes>;
+  return <Routes><Route element={<AppLayout />}><Route path="/" element={<LandingRoute />} /><Route path="/login" element={<LoginPage />} /><Route path="/register" element={<RegisterPage />} /><Route path="/admin" element={<AdminApp onLanding={() => window.location.assign('/')} />} /><Route path="/workflows" element={<WorkflowsPage />} /><Route path="/workstations" element={<WorkstationsPage />} /></Route></Routes>;
 }
