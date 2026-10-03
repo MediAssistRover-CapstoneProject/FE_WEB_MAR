@@ -2,6 +2,7 @@ import previewImage from '../../assets/images/mediassist-preview.png';
 import './LandingPage.css';
 import './LandingChrome.css';
 import './BrandIdentity.css';
+import './LandingRefinements.css';
 
 const features = [
   { tag: '01 / DELIVER', icon: '✦', title: <>Every delivery,<br />a clear destination.</>, text: 'Coordinate supplies from pickup to handover.', useCase: 'Pharmacy  →  Room 305', dark: true },
