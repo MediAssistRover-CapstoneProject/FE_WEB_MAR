@@ -47,19 +47,18 @@ export default function LandingPage({ onLogin, onRegister }) {
     <main>
       <section className="landing-hero" data-node-id="495:31746">
         <div className="landing-hero-copy">
-          <span className="landing-overline">Purposeful robotics. Human-centered care.</span>
-          <h1>Care in focus.<br />Everything else,<br /><em>in motion.</em></h1>
-          <p>A helping hand for every hospital journey. Connect deliveries, patient guidance and your care team in one simple workspace.</p>
+          <span className="landing-overline">The calmer way to run a busy floor</span>
+          <h1>More time for<br /><em>human care.</em></h1>
+          <p>MediAssistRover quietly takes care of the little journeys, so your team can stay present for the moments that matter.</p>
           <div className="landing-actions">
             <PrimaryButton onClick={onRegister}>Get started</PrimaryButton>
             <SecondaryButton onClick={onLogin}>Log in to workspace</SecondaryButton>
           </div>
-          <small>Built for your floor. Connected to your team.</small>
-          <div className="landing-trust"><span><b>24/7</b> operational visibility</span><span><b>100%</b> made for care teams</span></div>
+          <div className="landing-trust"><span><b>●</b> Live across your care floor</span><span><b>24/7</b> support for your team</span></div>
         </div>
         <figure className="landing-preview" data-node-id="495:31757">
           <img src={previewImage} alt="MediAssistRover concept illustration" />
-          <figcaption><i>●</i><div><b>A little assistance. A meaningful difference.</b><span>MediAssistRover · Live care coordination</span></div></figcaption>
+          <figcaption><i>✦</i><div><b>One more task, already handled.</b><span>Rover A-07 · on its way to Pharmacy</span></div></figcaption>
         </figure>
       </section>
 
