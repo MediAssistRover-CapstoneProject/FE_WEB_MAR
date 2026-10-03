@@ -2,9 +2,9 @@ import previewImage from '../../assets/images/mediassist-preview.png';
 import './LandingPage.css';
 
 const features = [
-  { tag: '01 / DELIVER', title: <>Every delivery,<br />a clear destination.</>, text: 'Coordinate supplies from pickup to handover.', useCase: 'Pharmacy  →  Room 305', dark: true },
-  { tag: '02 / GUIDE', title: <>A familiar guide<br />in an unfamiliar place.</>, text: 'Help patients find the right destination.', useCase: 'Patient guidance' },
-  { tag: '03 / CONNECT', title: <>Your operations.<br />One clear view.</>, text: 'Follow missions and robot status in one workspace.', useCase: 'Live operations', outlined: true },
+  { tag: '01 / DELIVER', icon: '✦', title: <>Every delivery,<br />a clear destination.</>, text: 'Coordinate supplies from pickup to handover.', useCase: 'Pharmacy  →  Room 305', dark: true },
+  { tag: '02 / GUIDE', icon: '⌁', title: <>A familiar guide<br />in an unfamiliar place.</>, text: 'Help patients find the right destination.', useCase: 'Patient guidance' },
+  { tag: '03 / CONNECT', icon: '◌', title: <>Your operations.<br />One clear view.</>, text: 'Follow missions and robot status in one workspace.', useCase: 'Live operations', outlined: true },
 ];
 
 const steps = [
@@ -21,9 +21,9 @@ function SecondaryButton({ children, onClick, className = '' }) {
   return <button type="button" className={`landing-secondary ${className}`} onClick={onClick}>{children}</button>;
 }
 
-function FeatureCard({ tag, title, text, useCase, dark, outlined }) {
+function FeatureCard({ tag, icon, title, text, useCase, dark, outlined }) {
   return <article className={`landing-feature ${dark ? 'landing-feature--dark' : ''} ${outlined ? 'landing-feature--outlined' : ''}`}>
-    <span>{tag}</span>
+    <div className="landing-feature-top"><span>{tag}</span><i aria-hidden="true">{icon}</i></div>
     <h3>{title}</h3>
     <p>{text}</p>
     <div>{useCase}</div>
@@ -35,7 +35,7 @@ export default function LandingPage({ onLogin, onRegister }) {
 
   return <div className="landing-page" data-node-id="529:31782">
     <header className="landing-header" data-node-id="495:31737">
-      <strong>MediAssistRover</strong>
+      <strong className="landing-logo"><i>✦</i>MediAssist<span>Rover</span></strong>
       <nav>
         <button onClick={() => scrollTo('features')}>Features</button>
         <button onClick={() => scrollTo('how-it-works')}>How it works</button>
@@ -55,10 +55,11 @@ export default function LandingPage({ onLogin, onRegister }) {
             <SecondaryButton onClick={onLogin}>Log in to workspace</SecondaryButton>
           </div>
           <small>Built for your floor. Connected to your team.</small>
+          <div className="landing-trust"><span><b>24/7</b> operational visibility</span><span><b>100%</b> made for care teams</span></div>
         </div>
         <figure className="landing-preview" data-node-id="495:31757">
           <img src={previewImage} alt="MediAssistRover concept illustration" />
-          <figcaption><b>A little assistance. A meaningful difference.</b><span>MediAssistRover · Concept illustration</span></figcaption>
+          <figcaption><i>●</i><div><b>A little assistance. A meaningful difference.</b><span>MediAssistRover · Live care coordination</span></div></figcaption>
         </figure>
       </section>
 
@@ -69,7 +70,7 @@ export default function LandingPage({ onLogin, onRegister }) {
       </section>
 
       <section id="how-it-works" className="landing-how" data-node-id="497:31740">
-        <h2>Thoughtfully connected.<br />From request to arrival.</h2>
+        <div className="landing-section-heading"><span className="landing-overline">Simple by design</span><h2>Thoughtfully connected.<br />From request to arrival.</h2></div>
         <div className="landing-steps">{steps.map(([number, title, text]) => <article key={number}><b>{number}</b><h3>{title}</h3><p>{text}</p></article>)}</div>
       </section>
 
