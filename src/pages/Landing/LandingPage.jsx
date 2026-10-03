@@ -1,5 +1,7 @@
 import previewImage from '../../assets/images/mediassist-preview.png';
 import './LandingPage.css';
+import './LandingChrome.css';
+import './BrandIdentity.css';
 
 const features = [
   { tag: '01 / DELIVER', icon: '✦', title: <>Every delivery,<br />a clear destination.</>, text: 'Coordinate supplies from pickup to handover.', useCase: 'Pharmacy  →  Room 305', dark: true },
@@ -35,8 +37,8 @@ export default function LandingPage({ onLogin, onRegister }) {
 
   return <div className="landing-page" data-node-id="529:31782">
     <header className="landing-header" data-node-id="495:31737">
-      <strong className="landing-logo"><i>✦</i>MediAssist<span>Rover</span></strong>
-      <nav>
+      <strong className="landing-logo"><span>MediAssistRover</span><small>HOSPITAL SERVICE ROBOTICS</small></strong>
+      <nav aria-label="Primary navigation">
         <button onClick={() => scrollTo('features')}>Features</button>
         <button onClick={() => scrollTo('how-it-works')}>How it works</button>
         <SecondaryButton onClick={onLogin}>Log in</SecondaryButton>
@@ -79,6 +81,12 @@ export default function LandingPage({ onLogin, onRegister }) {
       </section>
     </main>
 
-    <footer className="landing-footer" data-node-id="497:31761"><span>© 2026 MediAssistRover</span><button onClick={onLogin}>Log in to your workspace</button></footer>
+    <footer className="landing-footer" data-node-id="497:31761">
+      <div className="landing-footer-main">
+        <div className="landing-footer-brand"><strong className="landing-logo"><span>MediAssistRover</span><small>HOSPITAL SERVICE ROBOTICS</small></strong><p>A calmer, more connected way to care.</p><button className="landing-footer-login" onClick={onLogin}>Log in to your workspace →</button></div>
+        <div className="landing-footer-links"><div><b>Explore</b><button onClick={() => scrollTo('features')}>What we do</button><button onClick={() => scrollTo('how-it-works')}>How it works</button></div><div><b>Workspace</b><button onClick={onLogin}>Log in</button><button onClick={onRegister}>Create an account</button></div><div><b>Built for care teams</b><span>Purposeful robotics.<br />Human-centered care.</span></div></div>
+      </div>
+      <div className="landing-footer-bottom"><span>© 2026 MediAssistRover. All rights reserved.</span><span>Private & secure hospital workspace</span></div>
+    </footer>
   </div>;
 }
