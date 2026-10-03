@@ -1,0 +1,6 @@
+import { useState } from 'react';
+import './UsersRoles.css';
+
+const members = [['admin@hospital.com','Super Admin','Active','Today 10:12'],['ops.manager@hospital.com','Operations Manager','Active','Today 09:48'],['operator01@hospital.com','Operator','Active','Yesterday 18:24'],['nurse01@hospital.com','Viewer','Active','Yesterday 16:10']];
+export default function UsersRoles() { const [notice,setNotice]=useState(''); return <section className="users-roles"><div className="users-main"><header><b>Users</b><button onClick={()=>setNotice('Invite link copied')}>+ Add User</button></header><table><thead><tr>{['User','Role','Status','Last Login','Actions'].map(x=><th key={x}>{x}</th>)}</tr></thead><tbody>{members.map(([email,role,status,last])=><tr key={email}><td>{email}</td><td>{role}</td><td className="member-active">{status}</td><td>{last}</td><td><button className="member-edit" onClick={()=>setNotice(`Editing ${email}`)}>Edit</button></td></tr>)}</tbody></table>{notice&&<p className="member-notice">{notice}</p>}</div><aside className="roles-panel"><b>Roles & permissions</b>{[['Super Admin','Full workspace access'],['Operations Manager','Missions and robot control'],['Operator','Run assigned operations'],['Viewer','View-only access']].map(([role,copy])=><article key={role}><strong>{role}</strong><span>{copy}</span></article>)}</aside></section>;
+}
