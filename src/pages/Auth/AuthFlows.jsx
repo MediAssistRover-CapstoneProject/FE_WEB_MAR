@@ -18,17 +18,26 @@ export default function AuthFlows({ initial = 'Login', onHome, onAuthenticated }
   const [screen, setScreen] = useState(initial);
   const [values, setValues] = useState({});
   const [resendNotice, setResendNotice] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const info = screenCopy[screen];
   const isLogin = screen === 'Login' || screen === 'Error';
-  const onSubmit = () => {
+  const onSubmit = async () => {
     if (isLogin) {
-      if (values['Work email']?.trim() && values.Password?.trim()) { onAuthenticated?.(); return; }
-      setScreen('Error'); return;
+      if (!values['Work email']?.trim() || !values.Password?.trim()) { setScreen('Error'); return; }
+      setIsSubmitting(true);
+      try {
+        await onAuthenticated?.({ email: values['Work email'], password: values.Password });
+      } catch {
+        setScreen('Error');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
     }
     if (screen === 'Register') setScreen('Verify'); else if (screen === 'Forgot') setScreen('Sent'); else if (screen === 'Reset') setScreen('Updated'); else if (screen === 'Expired') setScreen('Forgot'); else setScreen('Login');
   };
   const footerAction = () => { if (isLogin) setScreen('Register'); else setScreen('Login'); };
   const workEmail = values['Work email']?.trim();
   const message = screen === 'Verify' && workEmail ? `We sent a verification link to ${workEmail}. Open the link to verify your email address.` : screen === 'Sent' && workEmail ? `If an account exists for ${workEmail}, you will receive a password reset link shortly.` : info.description;
-  return <AuthShell><main className="auth-form" data-auth-screen={screen}><button className="auth-home" onClick={onHome}>← Home</button><h2>{info.title}</h2><p className="auth-description">{message}</p>{info.fields?.map(([label, type, placeholder]) => <AuthField key={label} label={label} type={type} placeholder={placeholder} value={values[label] ?? ''} onChange={(value) => setValues((current) => ({ ...current, [label]: value }))} />)}{info.error && <p className="auth-error">{info.error}</p>}{isLogin ? <button className="auth-link" onClick={() => setScreen('Forgot')}>Forgot password?</button> : null}{info.message && <p className={info.success ? 'auth-success' : 'auth-message'}>{info.message}</p>}{resendNotice && <p className="auth-success">{resendNotice}</p>}{info.hint && <p className="auth-hint">{info.hint}</p>}{info.action && <AuthButton onClick={onSubmit}>{info.action}</AuthButton>}{info.secondary && <AuthButton secondary onClick={() => setResendNotice(`A new email has been requested for ${workEmail || 'your work email'}.`)}> {info.secondary}</AuthButton>}{info.footer && <button className="auth-link auth-footer-link" onClick={footerAction}>{info.footer}</button>}</main></AuthShell>;
+  return <AuthShell><main className="auth-form" data-auth-screen={screen}><button className="auth-home" onClick={onHome}>← Home</button><h2>{info.title}</h2><p className="auth-description">{message}</p>{info.fields?.map(([label, type, placeholder]) => <AuthField key={label} label={label} type={type} placeholder={placeholder} value={values[label] ?? ''} onChange={(value) => setValues((current) => ({ ...current, [label]: value }))} />)}{isLogin && <p className="auth-hint">Demo account: admin@gmail.com / 123456</p>}{info.error && <p className="auth-error">{info.error}</p>}{isLogin ? <button className="auth-link" onClick={() => setScreen('Forgot')}>Forgot password?</button> : null}{info.message && <p className={info.success ? 'auth-success' : 'auth-message'}>{info.message}</p>}{resendNotice && <p className="auth-success">{resendNotice}</p>}{info.hint && <p className="auth-hint">{info.hint}</p>}{info.action && <AuthButton onClick={onSubmit}>{isSubmitting ? 'Signing in…' : info.action}</AuthButton>}{info.secondary && <AuthButton secondary onClick={() => setResendNotice(`A new email has been requested for ${workEmail || 'your work email'}.`)}> {info.secondary}</AuthButton>}{info.footer && <button className="auth-link auth-footer-link" onClick={footerAction}>{info.footer}</button>}</main></AuthShell>;
 }

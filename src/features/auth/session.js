@@ -1,8 +1,8 @@
 const SESSION_KEY = 'mediassist-rover.session';
 
 // This is only a client-side route gate until the API supplies a real session.
-export function createSession() {
-  sessionStorage.setItem(SESSION_KEY, 'active');
+export function createSession(account) {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(account));
 }
 
 export function clearSession() {
@@ -10,5 +10,5 @@ export function clearSession() {
 }
 
 export function hasSession() {
-  return sessionStorage.getItem(SESSION_KEY) === 'active';
+  return Boolean(sessionStorage.getItem(SESSION_KEY));
 }
