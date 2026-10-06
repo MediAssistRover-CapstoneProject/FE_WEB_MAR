@@ -1,0 +1,21 @@
+import { apiRequest } from '../api/client.js';
+
+export function login(credentials) {
+  return apiRequest('/api/v1/auth/login', {
+    method: 'POST',
+    skipAuth: true,
+    body: { username: credentials.email, password: credentials.password, deviceInfo: navigator.userAgent },
+  });
+}
+
+export function getCurrentUser() {
+  return apiRequest('/api/v1/auth/me');
+}
+
+export function logout(refreshToken) {
+  return apiRequest('/api/v1/auth/logout', { method: 'POST', body: { refreshToken } });
+}
+
+export function changePassword({ currentPassword, newPassword }) {
+  return apiRequest('/api/v1/auth/change-password', { method: 'PUT', body: { currentPassword, newPassword } });
+}

@@ -1,8 +1,26 @@
 const SESSION_KEY = 'mediassist-rover.session';
 
-// This is only a client-side route gate until the API supplies a real session.
-export function createSession(account) {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(account));
+export function getSession() {
+  try {
+    return JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? 'null');
+  } catch {
+    clearSession();
+    return null;
+  }
+}
+
+export function createSession({ account = null, tokens }) {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ account, tokens }));
+}
+
+export function updateTokens(tokens) {
+  const session = getSession();
+  if (session) createSession({ account: session.account, tokens: { ...session.tokens, ...tokens } });
+}
+
+export function updateCurrentUser(account) {
+  const session = getSession();
+  if (session) createSession({ account, tokens: session.tokens });
 }
 
 export function clearSession() {
@@ -10,5 +28,9 @@ export function clearSession() {
 }
 
 export function hasSession() {
-  return Boolean(sessionStorage.getItem(SESSION_KEY));
+  return Boolean(getSession()?.tokens?.accessToken);
+}
+
+export function getRefreshToken() {
+  return getSession()?.tokens?.refreshToken ?? null;
 }
