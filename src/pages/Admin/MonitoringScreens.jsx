@@ -16,13 +16,15 @@ const inlineStyles = String.raw`.monitor-screen{color:#0f172a;font-family:Inter,
 /* Alerts & Notifications — Figma node 7:2 */
 .alerts-notifications__tools{align-items:center;display:flex;justify-content:space-between;margin-bottom:12px}.alerts-notifications__tools>button{font-size:11px;height:36px;padding:0 16px}.monitor-tab-list{display:flex;gap:12px}.monitor-tab-list button{background:transparent;color:#475569;font-size:10px;height:36px;min-width:82px;padding:0 13px}.monitor-tab-list button.is-selected{background:#dbeafe;color:#0f172a}.alerts-notifications__table-card{min-height:398px;padding:12px}.alerts-notifications__table-scroll{overflow-x:auto}.alerts-notifications__table-card table{border-collapse:separate;border-spacing:0 9px;min-width:800px;width:100%}.alerts-notifications__table-card th{color:#475569;font-size:8px;font-weight:500;padding:0 3px 2px;text-align:left}.alerts-notifications__table-card td{background:#f1f5f9;border-bottom:1px solid #cbd5e1;border-top:1px solid #cbd5e1;font-size:8px;padding:11px 3px}.alerts-notifications__table-card td:first-child{border-left:1px solid #cbd5e1;border-radius:4px 0 0 4px}.alerts-notifications__table-card td:last-child{border-radius:0 4px 4px 0;border-right:1px solid #cbd5e1}.alerts-notifications__table-card tr.is-selected td{background:#fff1f1}.alerts-notifications__table-card td em{font-size:8px;font-style:normal;font-weight:600;text-transform:uppercase}.alerts-notifications__table-card .is-critical{color:#b91c1c}.alerts-notifications__table-card .is-warning{color:#a16207}.alerts-notifications__table-card .is-info{color:#0e7490}.alerts-notifications__table-card td button{background:transparent;color:#2f80ff;font-size:8px;padding:0}.alerts-notifications__bottom{display:grid;gap:12px;grid-template-columns:1fr 1.05fr;margin-top:12px}.alerts-notifications__detail,.alerts-notifications__routing{min-height:105px;padding:12px}.alerts-notifications__detail h2{color:#a16207;font-size:12px;margin:7px 0 4px}.alerts-notifications__detail p{color:#475569;font-size:8px;margin:0}.alerts-notifications__detail>div:last-child{display:flex;gap:8px;margin-top:14px}.alerts-notifications__detail>div:last-child button{font-size:9px;height:25px;padding:0 11px}.alerts-notifications__routing{position:relative}.alerts-notifications__routing p{font-size:8px;margin:12px 0}.alerts-notifications__routing p b{font-weight:600}.alerts-notifications__routing button{bottom:12px;font-size:10px;height:25px;position:absolute;right:12px}
 
+.alerts-notifications__table-card .alerts-notifications__empty{color:#64748b;font-size:11px;margin:38px 4px;text-align:center}.alerts-notifications__table-card .alerts-notifications__error{color:#b91c1c}.alerts-notifications__detail .alert-status{color:#475569;font-size:8px;margin-top:5px}.alerts-notifications__detail .alert-status b{color:#0f172a}.alerts-notifications__detail .api-action{min-width:102px}.alerts-notifications__detail .api-action:disabled,.alerts-notifications__tools button:disabled{cursor:not-allowed;opacity:.65}
+
 @media(max-width:1150px){.voice-scripts__layout{grid-template-columns:260px minmax(0,1fr)}.voice-scripts__usage{grid-column:span 2;min-height:auto}.analytics-reports__metrics{grid-template-columns:repeat(3,1fr)}.history-replay__layout{grid-template-columns:minmax(190px,.75fr) minmax(340px,1.5fr)}.history-replay__right-column{grid-column:span 2;grid-template-columns:1fr 1fr;grid-template-rows:none}.history-replay__details,.history-replay__events{min-height:260px}.crowd-heatmap__layout{grid-template-columns:minmax(340px,1fr) 245px}}
 @media(max-width:820px){.voice-scripts__layout,.analytics-reports__grid,.history-replay__layout,.crowd-heatmap__layout,.alerts-notifications__bottom{grid-template-columns:1fr}.voice-scripts__usage,.history-replay__right-column{grid-column:auto}.voice-scripts__library,.voice-scripts__editor,.voice-scripts__usage{min-height:auto}.analytics-reports__metrics{grid-template-columns:repeat(2,1fr)}.analytics-reports__insights{grid-template-columns:1fr 1fr;grid-template-rows:none}.history-replay__right-column{grid-template-columns:1fr}.history-replay__map-card img{height:auto}.history-replay__player{grid-template-columns:1fr}.crowd-heatmap__side{grid-template-columns:1fr 1fr;grid-template-rows:none}.crowd-heatmap__density,.crowd-heatmap__rules{min-height:260px}.alerts-notifications__detail,.alerts-notifications__routing{min-height:150px}.monitor-notice{margin-bottom:14px}}
 @media(max-width:560px){.monitor-segmented,.monitor-tab-list{gap:6px;overflow-x:auto;padding-bottom:3px}.monitor-segmented button,.monitor-tab-list button{min-width:auto;white-space:nowrap}.analytics-reports__tools,.alerts-notifications__tools,.history-replay__tools{align-items:flex-start;gap:10px;flex-direction:column}.analytics-reports__metrics{grid-template-columns:1fr 1fr}.voice-scripts__selects{grid-template-columns:1fr}.voice-scripts__editor-actions,.alerts-notifications__detail>div:last-child{flex-wrap:wrap}.voice-scripts__variables{flex-wrap:wrap}.voice-scripts__variables button{flex:0 0 calc(50% - 3px)}.analytics-reports__insights,.crowd-heatmap__side{grid-template-columns:1fr}.history-replay__sessions,.history-replay__map-card{min-height:auto}.history-replay__transport{justify-content:flex-start}.history-replay__player-actions{justify-content:flex-start}}
 `;
 injectStyles('mediassist-style-pages-Admin-MonitoringScreens-jsx', inlineStyles);
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import analyticsMissionsChart from '../../assets/images/figma-analytics-raw-1.png';
 import analyticsBatteryChart from '../../assets/images/figma-analytics-raw-3.png';
 import historyRouteMap from '../../assets/images/figma-history-raw-3.png';
@@ -33,6 +35,7 @@ import dotViolet from '../../assets/images/figma-history-dot-4.svg';
 import dotAmber from '../../assets/images/figma-history-dot-10.svg';
 import missionIconActive from '../../assets/images/figma-history-dot-8.svg';
 import missionIconIdle from '../../assets/images/figma-history-dot-12.svg';
+import { alertsApi } from '../../features/alerts/alertsApi.js';
 
 const scriptCategories = ['Navigation', 'Delivery', 'Escort', 'Emergency', 'General', 'Error'];
 const deliveryScripts = [
@@ -47,14 +50,37 @@ const deliveryScripts = [
   'Delivery Failure',
 ];
 
-const alertRows = [
-  { time: '10:24', severity: 'Critical', title: 'SOS: Patient Fall Detected', location: 'Main Corridor', source: 'Vision', status: 'Active', detail: 'Patient fall detected', note: 'Main Corridor · 01:02 elapsed' },
-  { time: '10:20', severity: 'Warning', title: 'Obstacle Detected', location: 'Corridor A', source: 'LIDAR', status: 'Active', detail: 'Path blocked', note: 'Main Corridor · 01:02 blocked' },
-  { time: '10:18', severity: 'Warning', title: 'Battery Below 80%', location: 'Level 1', source: 'Battery', status: 'Active', detail: 'Battery needs attention', note: 'MAR-01 battery is at 72%' },
-  { time: '10:15', severity: 'Warning', title: 'Crowd Density High', location: 'Waiting Hall', source: 'Camera', status: 'Active', detail: 'Crowd density is high', note: 'Waiting Hall · 48 people detected' },
-  { time: '10:10', severity: 'Info', title: 'Mission Started M1028', location: 'Pharmacy', source: 'Mission', status: 'Info', detail: 'Mission started', note: 'Medication delivery is now in progress' },
-  { time: '09:55', severity: 'Info', title: 'Docking Completed', location: 'Charger-01', source: 'Robot', status: 'Cleared', detail: 'Docking completed', note: 'MAR-01 is ready for its next assignment' },
-];
+function titleCase(value) {
+  return String(value ?? '').toLowerCase().replace(/(^|_)([a-z])/g, (_, separator, character) => `${separator ? ' ' : ''}${character.toUpperCase()}`);
+}
+
+function alertLocation(alert) {
+  const data = alert.dataJson ?? {};
+  return data.location ?? data.locationName ?? data.zoneName ?? (alert.zoneId ? `Zone ${String(alert.zoneId).slice(0, 8)}` : 'Not specified');
+}
+
+function formatAlertTime(value) {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+}
+
+function toAlertRow(alert) {
+  const severity = titleCase(alert.severity || 'INFO');
+  const status = titleCase(alert.status || 'OPEN');
+  const source = titleCase(alert.notificationType || 'SYSTEM');
+  return {
+    id: alert.alertId,
+    time: formatAlertTime(alert.createdAt),
+    severity,
+    title: alert.message || `${source} alert`,
+    location: alertLocation(alert),
+    source,
+    status,
+    detail: alert.message || `${source} alert`,
+    note: `${alertLocation(alert)} · ${alert.requireAck ? 'Acknowledgement required' : 'No acknowledgement required'}`,
+    raw: alert,
+  };
+}
 
 function Notice({ children }) {
   return children ? <p className="monitor-notice" role="status">{children}</p> : null;
@@ -277,28 +303,88 @@ export function CrowdHeatmap() {
 
 export function AlertsNotifications() {
   const [filter, setFilter] = useState('All');
-  const [selectedId, setSelectedId] = useState('10:20');
+  const [alerts, setAlerts] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
   const [notice, setNotice] = useState('');
-  const visibleRows = useMemo(() => filter === 'All' ? alertRows : alertRows.filter((row) => row.severity === filter), [filter]);
-  const current = alertRows.find((row) => row.time === selectedId) || alertRows[1];
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  const loadAlerts = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const page = await alertsApi.list({ page: 0, size: 100 });
+      const items = (page.content ?? []).map(toAlertRow);
+      setAlerts(items);
+      setSelectedId((currentId) => items.some((item) => item.id === currentId) ? currentId : items[0]?.id ?? null);
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to load alerts.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadAlerts(); }, []);
+
+  const visibleRows = useMemo(() => filter === 'All' ? alerts : alerts.filter((row) => row.severity === filter), [alerts, filter]);
+  const current = alerts.find((row) => row.id === selectedId) ?? visibleRows[0] ?? null;
+  const totals = useMemo(() => ({
+    All: alerts.length,
+    Critical: alerts.filter((row) => row.severity === 'Critical').length,
+    Warning: alerts.filter((row) => row.severity === 'Warning').length,
+    Info: alerts.filter((row) => row.severity === 'Info').length,
+  }), [alerts]);
+
+  const updateAlert = (updated) => {
+    const next = toAlertRow(updated);
+    setAlerts((items) => items.map((item) => item.id === next.id ? next : item));
+    setSelectedId(next.id);
+    return next;
+  };
+
+  const progressAlert = async (action) => {
+    if (!current) return;
+    setSubmitting(true);
+    setNotice('');
+    try {
+      const updated = await alertsApi[action](current.id);
+      const next = updateAlert(updated);
+      setNotice(`${next.title} is now ${next.status.toLowerCase()}.`);
+    } catch (requestError) {
+      setNotice(requestError.message || `Unable to ${action} this alert.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const actionFor = (row) => {
+    if (!row) return null;
+    if (row.raw.status === 'OPEN') return ['acknowledge', 'Acknowledge'];
+    if (row.raw.status === 'ACKNOWLEDGED') return ['resolve', 'Resolve'];
+    if (row.raw.status === 'RESOLVED') return ['close', 'Close'];
+    return null;
+  };
+  const currentAction = actionFor(current);
 
   return <section className="monitor-screen alerts-notifications" aria-label="Alerts and notifications">
     <div className="alerts-notifications__tools">
       <div className="monitor-tab-list" role="tablist" aria-label="Alert filters">
-        {[['All', '12'], ['Critical', '2'], ['Warning', '4'], ['Info', '6']].map(([label, total]) => <button className={filter === label ? 'is-selected' : ''} type="button" role="tab" aria-selected={filter === label} key={label} onClick={() => { setFilter(label); setNotice(''); }}>{label} ({total})</button>)}
+        {['All', 'Critical', 'Warning', 'Info'].map((label) => <button className={filter === label ? 'is-selected' : ''} type="button" role="tab" aria-selected={filter === label} key={label} onClick={() => { setFilter(label); setNotice(''); }}>{label} ({totals[label]})</button>)}
       </div>
-      <button className="secondary" type="button" onClick={() => setNotice('All visible alerts were marked as read.')}>Mark All Read</button>
+      <button className="secondary" type="button" onClick={loadAlerts} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</button>
     </div>
     <article className="monitor-panel alerts-notifications__table-card">
       <div className="monitor-panel__head">Active alerts</div>
-      <div className="alerts-notifications__table-scroll"><table><thead><tr>{['Time', 'Severity', 'Alert', 'Location', 'Source', 'Status', 'Action'].map((label) => <th key={label}>{label}</th>)}</tr></thead><tbody>{visibleRows.map((row) => <tr className={current.time === row.time ? 'is-selected' : ''} key={row.time} onClick={() => { setSelectedId(row.time); setNotice(''); }}><td>{row.time}</td><td><em className={`is-${row.severity.toLowerCase()}`}>{row.severity}</em></td><td>{row.title}</td><td>{row.location}</td><td>{row.source}</td><td>{row.status}</td><td><button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(row.time); setNotice(`Viewing ${row.title}.`); }}>View</button></td></tr>)}</tbody></table></div>
+      <div className="alerts-notifications__table-scroll"><table><thead><tr>{['Time', 'Severity', 'Alert', 'Location', 'Source', 'Status', 'Action'].map((label) => <th key={label}>{label}</th>)}</tr></thead><tbody>{visibleRows.map((row) => <tr className={current?.id === row.id ? 'is-selected' : ''} key={row.id} onClick={() => { setSelectedId(row.id); setNotice(''); }}><td>{row.time}</td><td><em className={`is-${row.severity.toLowerCase()}`}>{row.severity}</em></td><td>{row.title}</td><td>{row.location}</td><td>{row.source}</td><td>{row.status}</td><td><button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(row.id); setNotice(`Viewing ${row.title}.`); }}>View</button></td></tr>)}</tbody></table>{loading && <p className="alerts-notifications__empty">Loading alerts…</p>}{!loading && error && <p className="alerts-notifications__empty alerts-notifications__error">{error}</p>}{!loading && !error && visibleRows.length === 0 && <p className="alerts-notifications__empty">No alerts match this filter.</p>}</div>
     </article>
     <div className="alerts-notifications__bottom">
       <article className="monitor-panel alerts-notifications__detail">
         <div className="monitor-panel__head">Alert detail preview</div>
-        <h2>{current.detail}</h2>
-        <p>{current.note}</p>
-        <div><button className="secondary" type="button" onClick={() => setNotice('Map opened for this alert.')}>View on Map</button><button className="secondary" type="button" onClick={() => setNotice('Retry started.')}>Retry</button><button className="secondary" type="button" onClick={() => setNotice('Manual Control is ready.')}>Manual Control</button><button type="button" onClick={() => setNotice('Alert acknowledged.')}>Acknowledge</button></div>
+        <h2>{current?.detail ?? 'Select an alert'}</h2>
+        <p>{current?.note ?? 'Choose an alert above to inspect its details and response status.'}</p>
+        {current && <p className="alert-status">Status: <b>{current.status}</b></p>}
+        <div><button className="secondary" type="button" disabled={!current} onClick={() => setNotice('Map view is ready for this alert.')}>View on Map</button><button className="secondary" type="button" disabled={!current} onClick={loadAlerts}>Refresh</button>{currentAction && <button className="api-action" type="button" disabled={submitting} onClick={() => progressAlert(currentAction[0])}>{submitting ? 'Saving…' : currentAction[1]}</button>}</div>
       </article>
       <article className="monitor-panel alerts-notifications__routing">
         <div className="monitor-panel__head">Notification routing</div>
