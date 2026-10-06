@@ -22,9 +22,16 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 }
 
 .wf-brand {
+  width: 100%;
+  height: auto;
+  border: 0;
+  background: transparent;
   padding: 0 12px 8px;
+  color: var(--mar-text, #0f172a);
+  cursor: pointer;
   font-size: 20px;
   font-weight: 600;
+  text-align: left;
 }
 
 .wf-brand span {
@@ -491,7 +498,7 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 injectStyles('mediassist-style-pages-Workflows-WorkflowsPage-jsx', inlineStyles);
 
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const navGroups = [
   ['Overview', ['Dashboard']],
@@ -534,18 +541,21 @@ const stepFields = { MOVE:['map_id','endpoint_id','mode','max_speed_mps'],INTERA
 
 export function Sidebar() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const activeItem = location.pathname === '/workflows' ? 'Workflows' : new URLSearchParams(location.search).get('screen');
+  const select = (item) => navigate(item === 'Workflows' ? '/workflows' : `/admin?screen=${encodeURIComponent(item)}`);
   return (
     <aside className="wf-sidebar">
-      <div className="wf-brand">
+      <button className="wf-brand" type="button" onClick={() => navigate('/admin')} aria-label="Go to MediAssistRover dashboard">
         MediAssistRover
         <span>ADMIN CONTROL CENTER</span>
-      </div>
+      </button>
       <nav>
         {navGroups.map(([group, items]) => (
           <section key={group}>
             <h3>{group}</h3>
             {items.map((item) => (
-              <button className={item === 'Workflows' ? 'active' : ''} type="button" key={item} onClick={() => navigate(item === 'Workflows' ? '/workflows' : `/admin?screen=${encodeURIComponent(item)}`)}>
+              <button className={item === activeItem ? 'active' : ''} type="button" key={item} onClick={() => select(item)}>
                 {item}
               </button>
             ))}
@@ -629,7 +639,6 @@ function Library({ saved, onCreate, onOpenDraft }) {
 
       <footer className="workflow-actions">
         <MarButton className="create" onClick={onCreate}>Create Workflow</MarButton>
-        <MarButton className="back" variant="subtle">Back to Workflows</MarButton>
         <p>Scroll inside panels to view all content.</p>
       </footer>
     </>
@@ -833,7 +842,7 @@ function Editor({ setMode, setSaved }) {
   const selected = tasks.find((task) => task.id === activeTask);
   const openTask = (task) => { taskClickTimer.current = window.setTimeout(() => { setActiveTask(task.id); setShowTypes(true); }, 220); };
   const editTask = (task) => { window.clearTimeout(taskClickTimer.current); startRename(task); };
-  return <><div className="workflow-editor-grid"><section className="workflow-panel editor-side"><h2>WORKFLOW</h2><Field label="Name" value="New workflow" /><Field label="Description" value="Add a description..." /><div className="task-heading"><h2>TASKS · {tasks.length}</h2><button type="button" onClick={addTask}>+</button></div>{tasks.length === 0 && <p className="task-empty-note">No tasks yet. Click + to create Task 1.</p>}{tasks.map((task) => <button className={activeTask === task.id ? 'editor-side-button active' : 'editor-side-button'} type="button" key={task.id} onClick={() => openTask(task)} onDoubleClick={() => editTask(task)}>{task.name}<small>{task.steps.length ? `${task.steps.length} steps` : 'No steps yet'}</small></button>)}</section>{configStep ? <StepConfigPanel step={configStep} onChange={updateConfigStep} onDone={() => setConfigStep(null)} /> : <section className="workflow-panel editor-detail workflow-steps-panel"><span className="modal-kicker">WORKFLOW STEPS</span><h2>{selected ? selected.name : 'Select a task'}</h2>{selected ? <><p>Choose a step to edit its fields.</p><div className="step-table"><div className="step-table-head"><span>#</span><span>STEP TYPE</span><span>STATUS</span></div>{selected.steps.length ? selected.steps.map((step, index) => <button className="step-table-row" key={step.id} onClick={() => setConfigStep(step)}><span>{String(index + 1).padStart(2, '0')}</span><b>{step.type}</b><em>{Object.values(step.values).some(Boolean) ? 'Configured' : 'Needs setup'}</em></button>) : <div className="step-empty-state">Click the task again to open the Step Type library.</div>}</div></> : <SelectTaskPanel />}</section>}</div>{showTypes && <div className="type-modal" onClick={() => setShowTypes(false)}><div className="type-modal-card" onClick={(event) => event.stopPropagation()}><header><div><span className="modal-kicker">MEDIASSIST ACTION LIBRARY</span><h2>Add a step to the workflow</h2><p>Choose an action to add to the open task.</p></div></header><div>{stepTypes.map((type) => <button key={type} onClick={() => addStep(type)}><i>{stepTypeCopy[type][0]}</i><span><small>{type}</small><b>{type.replace('_', ' ')}</b><em>{stepTypeCopy[type][1]}</em></span><strong>＋</strong></button>)}</div></div></div>}{renameTask && <div className="rename-backdrop" onClick={() => setRenameTask(null)}><form className="rename-dialog" onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); saveRename(); }}><span className="rename-icon">✎</span><h2>Rename task</h2><p>Use a clear name to make the workflow easier to follow.</p><label>Task name<input autoFocus value={renameValue} onChange={(event) => setRenameValue(event.target.value)} /></label><footer><button type="button" onClick={() => setRenameTask(null)}>Cancel</button><button type="submit">Save name</button></footer></form></div>}<footer className="workflow-actions"><MarButton className="create" onClick={() => { setSaved(true); setMode('library'); }}>Save Draft</MarButton><MarButton className="back" variant="subtle" onClick={() => setMode('library')}>Back to Workflows</MarButton></footer></>;
+  return <><div className="workflow-editor-grid"><section className="workflow-panel editor-side"><h2>WORKFLOW</h2><Field label="Name" value="New workflow" /><Field label="Description" value="Add a description..." /><div className="task-heading"><h2>TASKS · {tasks.length}</h2><button type="button" onClick={addTask}>+</button></div>{tasks.length === 0 && <p className="task-empty-note">No tasks yet. Click + to create Task 1.</p>}{tasks.map((task) => <button className={activeTask === task.id ? 'editor-side-button active' : 'editor-side-button'} type="button" key={task.id} onClick={() => openTask(task)} onDoubleClick={() => editTask(task)}>{task.name}<small>{task.steps.length ? `${task.steps.length} steps` : 'No steps yet'}</small></button>)}</section>{configStep ? <StepConfigPanel step={configStep} onChange={updateConfigStep} onDone={() => setConfigStep(null)} /> : <section className="workflow-panel editor-detail workflow-steps-panel"><span className="modal-kicker">WORKFLOW STEPS</span><h2>{selected ? selected.name : 'Select a task'}</h2>{selected ? <><p>Choose a step to edit its fields.</p><div className="step-table"><div className="step-table-head"><span>#</span><span>STEP TYPE</span><span>STATUS</span></div>{selected.steps.length ? selected.steps.map((step, index) => <button className="step-table-row" key={step.id} onClick={() => setConfigStep(step)}><span>{String(index + 1).padStart(2, '0')}</span><b>{step.type}</b><em>{Object.values(step.values).some(Boolean) ? 'Configured' : 'Needs setup'}</em></button>) : <div className="step-empty-state">Click the task again to open the Step Type library.</div>}</div></> : <SelectTaskPanel />}</section>}</div>{showTypes && <div className="type-modal" onClick={() => setShowTypes(false)}><div className="type-modal-card" onClick={(event) => event.stopPropagation()}><header><div><span className="modal-kicker">MEDIASSIST ACTION LIBRARY</span><h2>Add a step to the workflow</h2><p>Choose an action to add to the open task.</p></div></header><div>{stepTypes.map((type) => <button key={type} onClick={() => addStep(type)}><i>{stepTypeCopy[type][0]}</i><span><small>{type}</small><b>{type.replace('_', ' ')}</b><em>{stepTypeCopy[type][1]}</em></span><strong>＋</strong></button>)}</div></div></div>}{renameTask && <div className="rename-backdrop" onClick={() => setRenameTask(null)}><form className="rename-dialog" onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); saveRename(); }}><span className="rename-icon">✎</span><h2>Rename task</h2><p>Use a clear name to make the workflow easier to follow.</p><label>Task name<input autoFocus value={renameValue} onChange={(event) => setRenameValue(event.target.value)} /></label><footer><button type="button" onClick={() => setRenameTask(null)}>Cancel</button><button type="submit">Save name</button></footer></form></div>}<footer className="workflow-actions"><MarButton className="create" onClick={() => { setSaved(true); setMode('library'); }}>Save Draft</MarButton></footer></>;
 }
 
 export default function WorkflowsPage() {
