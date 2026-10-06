@@ -498,7 +498,9 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 injectStyles('mediassist-style-pages-Workflows-WorkflowsPage-jsx', inlineStyles);
 
 import { useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import AdminSidebar from '../../features/admin/components/AdminSidebar.jsx';
+import { clearSession } from '../../features/auth/session.js';
 
 const navGroups = [
   ['Overview', ['Dashboard']],
@@ -541,33 +543,7 @@ const stepFields = { MOVE:['map_id','endpoint_id','mode','max_speed_mps'],INTERA
 
 export function Sidebar() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const activeItem = location.pathname === '/workflows' ? 'Workflows' : new URLSearchParams(location.search).get('screen');
-  const select = (item) => navigate(item === 'Workflows' ? '/workflows' : `/admin?screen=${encodeURIComponent(item)}`);
-  return (
-    <aside className="wf-sidebar">
-      <button className="wf-brand" type="button" onClick={() => navigate('/admin')} aria-label="Go to MediAssistRover dashboard">
-        MediAssistRover
-        <span>ADMIN CONTROL CENTER</span>
-      </button>
-      <nav>
-        {navGroups.map(([group, items]) => (
-          <section key={group}>
-            <h3>{group}</h3>
-            {items.map((item) => (
-              <button className={item === activeItem ? 'active' : ''} type="button" key={item} onClick={() => select(item)}>
-                {item}
-              </button>
-            ))}
-          </section>
-        ))}
-      </nav>
-      <div className="wf-sidebar-footer">
-        <span>1 Robot Managed</span>
-        <b>MAR-01 <i /> Online</b>
-      </div>
-    </aside>
-  );
+  return <AdminSidebar active="Workflows" onSelect={(screen) => navigate(`/admin?screen=${encodeURIComponent(screen)}`)} onLogout={() => { clearSession(); navigate('/'); }} />;
 }
 
 export function MarButton({ children, variant = 'primary', className = '', onClick }) {
