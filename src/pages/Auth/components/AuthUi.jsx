@@ -1,5 +1,9 @@
+import { injectStyles } from '../../../styles/injectStyles.js';
+const inlineStyles = String.raw`.auth-logo{display:flex!important;flex-direction:column;align-items:flex-start!important;gap:3px!important;line-height:1!important;letter-spacing:0!important}.auth-logo>span{color:#163b67!important;font-size:24px;font-weight:800;letter-spacing:-.9px}.auth-logo>small{color:#6683a5;font-size:9px;font-weight:750;letter-spacing:.75px}.auth-logo i{display:none!important}@media(max-width:480px){.auth-logo>span{font-size:20px}.auth-logo>small{font-size:8px}}
+`;
+injectStyles('mediassist-style-pages-Auth-components-AuthUi-jsx', inlineStyles);
+
 import authIllustration from '../../../assets/images/mediassist-auth.png';
-import './AuthBrand.css';
 
 export function AuthButton({ secondary, children, onClick }) {
   return <button type="button" className={secondary ? 'auth-button auth-button--secondary' : 'auth-button'} onClick={onClick}>{children}</button>;
