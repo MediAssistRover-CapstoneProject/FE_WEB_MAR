@@ -25,7 +25,6 @@ const workflows = [
   ['Robot Startup and Standby', 'WF_ROBOT_STARTUP_STANDBY', 13],
 ].map(([name, code, steps]) => ({ name, code, steps }));
 
-const tasks = ['Move', 'Load', 'Transport', 'Unload'];
 const stepTypes = [
   'MOVE',
   'INTERACT',
@@ -38,7 +37,6 @@ const stepTypes = [
   'WAIT',
   'CHECK_CONDITION',
   'SET_CONTEXT',
-  'CALL_WORKFLOW',
 ];
 
 export function Sidebar() {
@@ -322,50 +320,15 @@ function ReviewPanel() {
   );
 }
 
-function Editor({ screen, setScreen, setMode, setSaved }) {
-  const [activeTask, setActiveTask] = useState('Move');
-  const customTask = screen === 'custom-task';
-  let detail = <SelectTaskPanel />;
-
-  if (screen === 'task-empty' || screen === 'step-types' || screen === 'one-step' || screen === 'two-steps' || screen === 'custom-task') {
-    detail = <TaskPanel task={activeTask} screen={screen === 'custom-task' ? 'task-empty' : screen} setScreen={setScreen} />;
-  } else if (screen === 'options' || screen === 'queue-exit') {
-    detail = <OptionsPanel screen={screen} setScreen={setScreen} />;
-  } else if (screen === 'marker' || screen === 'marker-sensors') {
-    detail = <MarkerPanel sensors={screen === 'marker-sensors'} setScreen={setScreen} />;
-  } else if (screen === 'add-task') {
-    detail = <AddTaskPanel setScreen={setScreen} setActiveTask={setActiveTask} />;
-  } else if (screen === 'review') {
-    detail = <ReviewPanel />;
-  }
-
-  return (
-    <>
-      <div className="workflow-editor-grid">
-        <EditorSide activeTask={activeTask} screen={screen} setScreen={setScreen} setActiveTask={setActiveTask} customTask={customTask} />
-        {detail}
-      </div>
-      <footer className={screen === 'review' ? 'workflow-actions review-actions' : 'workflow-actions'}>
-        {screen === 'review' ? (
-          <>
-            <MarButton className="create" onClick={() => {
-              setSaved(true);
-              setMode('library');
-              setScreen('create');
-            }}>
-              Save Draft
-            </MarButton>
-            <MarButton className="back" variant="subtle" onClick={() => setScreen('create')}>Back to Editor</MarButton>
-          </>
-        ) : (
-          <>
-            <MarButton className="create" onClick={() => setScreen('review')}>Review Workflow</MarButton>
-            <MarButton className="back" variant="subtle" onClick={() => setMode('library')}>Back to Workflows</MarButton>
-          </>
-        )}
-      </footer>
-    </>
-  );
+function Editor({ setMode, setSaved }) {
+  const [tasks, setTasks] = useState([]);
+  const [activeTask, setActiveTask] = useState(null);
+  const [showTypes, setShowTypes] = useState(false);
+  const addTask = () => { const task = { id: crypto.randomUUID(), name: `Task ${tasks.length + 1}`, steps: [] }; setTasks((value) => [...value, task]); };
+  const renameTask = (task) => { const name = window.prompt('Đổi tên task', task.name); if (name?.trim()) setTasks((value) => value.map((item) => item.id === task.id ? { ...item, name: name.trim() } : item)); };
+  const addStep = (type) => { setTasks((value) => value.map((task) => task.id === activeTask ? { ...task, steps: [...task.steps, type] } : task)); setShowTypes(false); };
+  const selected = tasks.find((task) => task.id === activeTask);
+  return <><div className="workflow-editor-grid"><section className="workflow-panel editor-side"><h2>WORKFLOW</h2><Field label="Name" value="New workflow" /><Field label="Description" value="Add a description..." /><div className="task-heading"><h2>TASKS · {tasks.length}</h2><button type="button" onClick={addTask}>+</button></div>{tasks.length === 0 && <p className="task-empty-note">Chưa có task. Nhấn dấu + để tạo Task 1.</p>}{tasks.map((task) => <button className={activeTask === task.id ? 'editor-side-button active' : 'editor-side-button'} type="button" key={task.id} onClick={() => { setActiveTask(task.id); setShowTypes(true); }} onDoubleClick={() => renameTask(task)}>{task.name}<small>{task.steps.length ? `${task.steps.length} step` : 'Chưa có step'}</small></button>)}</section><section className="workflow-panel editor-detail"><h2>{selected ? selected.name : 'TASKS'}</h2>{selected ? <><p>Click một task để chọn Step Type. Double-click để đổi tên task.</p><h2>STEP SEQUENCE · {selected.steps.length}</h2>{selected.steps.map((step, index) => <div className="step-row" key={`${step}-${index}`}>{String(index + 1).padStart(2, '0')}<span>{step}</span></div>)}<MarButton className="wide" variant="subtle" onClick={() => setShowTypes(true)}>+ Add Step</MarButton></> : <SelectTaskPanel />}</section></div>{showTypes && <div className="type-modal"><div className="type-modal-card"><header><h2>Chọn Step Type</h2><button onClick={() => setShowTypes(false)}>×</button></header><p>11 loại hành động theo đặc tả MediAssistRover.</p><div>{stepTypes.map((type) => <button key={type} onClick={() => addStep(type)}><b>{type}</b><span>＋</span></button>)}</div></div></div>}<footer className="workflow-actions"><MarButton className="create" onClick={() => { setSaved(true); setMode('library'); }}>Save Draft</MarButton><MarButton className="back" variant="subtle" onClick={() => setMode('library')}>Back to Workflows</MarButton></footer></>;
 }
 
 export default function WorkflowsPage() {
@@ -393,7 +356,7 @@ export default function WorkflowsPage() {
         </header>
 
         {creating ? (
-          <Editor screen={screen} setScreen={setScreen} setMode={setMode} setSaved={setSaved} />
+          <Editor setMode={setMode} setSaved={setSaved} />
         ) : (
           <Library saved={saved} onCreate={openCreate} onOpenDraft={openCreate} />
         )}
