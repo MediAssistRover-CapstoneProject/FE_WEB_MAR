@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dashboardFloorMap from '../../assets/images/dashboard-floor-map.png';
 import liveCamera from '../../assets/images/live-camera.png';
@@ -22,6 +22,7 @@ import { changePassword, logout } from '../../features/auth/authApi.js';
 import { isAdminScreen } from '../../features/admin/navigation.js';
 import AdminSidebar from '../../features/admin/components/AdminSidebar.jsx';
 import AdminTopbar from '../../features/admin/components/AdminTopbar.jsx';
+import { adminApi } from '../../features/admin/adminApi.js';
 
 const pageInfo = {
   'Live Operations': ['Live operations', 'Follow every active task in real time.', ['MAR-01 · Deliver medication', 'Autonomous navigation · Floor 1', 'In progress']],
@@ -44,7 +45,10 @@ const pageInfo = {
 };
 
 function Dashboard() {
-  const cards = [['Robot state', 'ACTIVE', 'Autonomous · Navigating', 'green'], ['Battery', '72%', '2h 45m estimated', ''], ['Current mission', 'Delivery', 'Pharmacy → Room 305', 'blue'], ['Active alerts', '1 Critical', '2 warnings require attention', 'red'], ['Today', '18', '94% mission success', '']];
+  const [overview, setOverview] = useState(null);
+  useEffect(() => { adminApi.getOverview().then(setOverview).catch(() => setOverview(null)); }, []);
+  const activeRobots = overview ? Object.entries(overview.robotsByStatus ?? {}).filter(([status]) => ['IDLE', 'BUSY', 'ACTIVE'].includes(status)).reduce((total, [, value]) => total + value, 0) : '—';
+  const cards = overview ? [['Robots active', String(activeRobots), 'Live fleet status', 'green'], ['Completed jobs', String(overview.succeededJobs), `${overview.terminalJobs} terminal jobs`, ''], ['Completion rate', `${overview.jobCompletionRatePercent}%`, 'Successful terminal jobs', 'blue'], ['Open alerts', String(overview.openAlerts), `${overview.activeEmergencyIncidents} emergency incidents`, 'red'], ['Jobs today', String(overview.terminalJobs), 'Operations report overview', '']] : [['Robot state', 'Loading…', 'Fetching operations report', 'green'], ['Battery', '—', 'Live robot telemetry', ''], ['Current mission', '—', 'Mission service', 'blue'], ['Active alerts', '—', 'Alert service', 'red'], ['Today', '—', 'Operations report', '']];
   return <><div className="stat-grid">{cards.map(([label, value, note, color]) => <article className="stat-card" key={label}><small>{label}</small><strong className={color}>{value}</strong><p>{note}</p></article>)}</div><div className="dashboard-grid"><article className="card map-card"><CardTitle>Live robot map — Hospital Floor 1</CardTitle><FloorMap dashboard /></article><div className="right-stack"><MissionCard /><AlertsCard /></div></div><Performance /></>;
 }
 function CardTitle({ children }) { return <h2 className="card-title">{children}</h2>; }
@@ -90,25 +94,13 @@ function Heatmap() { return <div className="heatmap"><article className="card"><
 function History() { return <article className="card data-card"><CardTitle>Mission history</CardTitle><Table columns={['Mission','Route','Duration','Outcome']} rows={[["M-1837","Pharmacy → Room 305","18m 42s","Completed"],["M-1836","Reception → Radiology","12m 14s","Completed"],["M-1835","Room 302 → Dock","9m 08s","Completed"]]} /></article>; }
 function Analytics() { return <><div className="ops-summary">{[['Mission success','94%'],['Distance','12.4 km'],['Avg mission','21m'],['Interventions','3']].map(([a,b]) => <article className="card" key={a}><small>{a}</small><strong>{b}</strong></article>)}</div><article className="card data-card analytics-chart"><CardTitle>Mission volume</CardTitle><div className="large-chart">{[35,56,42,76,65,88,58,90,72,95,78,100].map((x,i) => <i style={{height:x+'%'}} key={i} />)}</div></article></>; }
 function AutomationPage({ page }) { const voice = page === 'Voice & Scripts'; return <div className="data-page"><PageHeader title={voice ? 'Voice & scripts' : 'Workflows'} description={voice ? 'Write, preview and publish robot conversation scripts.' : 'Create repeatable, reliable automated tasks.'} action={voice ? '+ New script' : '+ New workflow'} /><article className="card data-card"><CardTitle>{voice ? 'Published scripts' : 'Workflow library'}</CardTitle><Table columns={voice ? ['Script','Language','Last updated','Status'] : ['Workflow','Trigger','Last run','Status']} rows={voice ? [['Welcome greeting','English','Today','Published'],['Pharmacy handoff','English','Yesterday','Published'],['Emergency reassurance','English','Sep 12','Draft']] : [['Medication delivery','Dispatch request','3 min ago','Active'],['Patient guidance','Reception kiosk','12 min ago','Active'],['Return to dock','Low battery','1 hour ago','Active']]} /></article></div>; }
-const auditEntries = [
-  ['10:32:18', 'admin@hospital.com', 'Map Studio', 'Published Map', 'Hospital Floor 1 v1.5', 'Success', '2026-10-03'],
-  ['10:16:42', 'ops.manager@hospital.com', 'Missions', 'Created Mission', 'Delivery M1028', 'Success', '2026-10-03'],
-  ['10:08:11', 'operator01@hospital.com', 'Map Studio', 'Edited Waypoint', 'Room 305 EP-04', 'Success', '2026-10-02'],
-  ['10:05:58', 'admin@hospital.com', 'Settings', 'Changed Emergency', 'Auto recording ON', 'Success', '2026-10-01'],
-  ['09:58:01', 'operator01@hospital.com', 'Missions', 'Canceled Mission', 'Escort M1023', 'Success', '2026-09-29'],
-  ['09:42:22', 'admin@hospital.com', 'Manual Control', 'Manual Takeover', 'MAR-01 · 44 sec', 'Success', '2026-09-27'],
-  ['09:40:04', 'system', 'Alerts', 'Incident Created', 'SOS INC-024', 'Success', '2026-09-20'],
-  ['09:31:45', 'nurse01@hospital.com', 'Emergency', 'Resolved Incident', 'INC-023', 'Success', '2026-09-01'],
-];
-
 function AuditLogs() {
-  const [action, setAction] = useState('All Actions');
-  const [dateRange, setDateRange] = useState('Today');
-  const [user, setUser] = useState('All Users');
-  const [module, setModule] = useState('All Modules');
-  const [exported, setExported] = useState(false);
-  const filtered = auditEntries.filter((entry) => { const [, entryUser, entryModule, entryAction] = entry; const entryDate = entry[6]; return (action === 'All Actions' || entryAction === action) && (user === 'All Users' || entryUser === user) && (module === 'All Modules' || entryModule === module) && (dateRange === 'Today' ? entryDate === '2026-10-03' : dateRange === 'Last 7 days' ? entryDate >= '2026-09-27' : entryDate.startsWith('2026-10')); });
-  return <section className="audit-page"><div className="audit-toolbar"><div className="audit-filters"><label><span className="sr-only">Action</span><select value={action} onChange={(event) => setAction(event.target.value)}><option>All Actions</option>{[...new Set(auditEntries.map((entry) => entry[3]))].map((value) => <option key={value}>{value}</option>)}</select></label><label><span className="sr-only">Date</span><select value={dateRange} onChange={(event) => setDateRange(event.target.value)}><option>Today</option><option>Last 7 days</option><option>This month</option></select></label><label><span className="sr-only">User</span><select value={user} onChange={(event) => setUser(event.target.value)}><option>All Users</option>{[...new Set(auditEntries.map((entry) => entry[1]))].map((value) => <option key={value}>{value}</option>)}</select></label><label><span className="sr-only">Module</span><select value={module} onChange={(event) => setModule(event.target.value)}><option>All Modules</option>{[...new Set(auditEntries.map((entry) => entry[2]))].map((value) => <option key={value}>{value}</option>)}</select></label></div><button className="secondary audit-export" onClick={() => setExported(true)}>{exported ? 'Export ready' : 'Export Logs'}</button></div><article className="audit-card"><CardTitle>Audit trail</CardTitle><div className="audit-table-wrap"><table className="audit-table"><thead><tr>{['Time', 'User', 'Module', 'Action', 'Details', 'Result'].map((heading) => <th key={heading}>{heading}</th>)}</tr></thead><tbody>{filtered.map((entry) => <tr key={entry.join('-')}>{entry.slice(0, 6).map((cell, index) => <td className={index === 5 ? 'audit-result' : ''} key={cell}>{cell}</td>)}</tr>)}</tbody></table>{filtered.length === 0 && <p className="audit-empty">No activity matches these filters.</p>}</div><p className="audit-note">All critical actions include user, timestamp, module, affected object and result.</p></article></section>;
+  const [action, setAction] = useState(''); const [user, setUser] = useState(''); const [module, setModule] = useState(''); const [entries, setEntries] = useState([]); const [message, setMessage] = useState('');
+  useEffect(() => { adminApi.listAuditLogs({ actionCode: action, entityType: module, size: 100 }).then((page) => { setEntries(page.content ?? []); setMessage(''); }).catch((error) => setMessage(error.message)); }, [action, module]);
+  const filtered = entries.filter((entry) => !user || entry.actorUsername === user);
+  const formatTime = (value) => value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' }).format(new Date(value)) : '—';
+  const details = (entry) => entry.entityId ? `${entry.entityType} · ${entry.entityId.slice(0, 8)}` : entry.entityType || 'System';
+  return <section className="audit-page"><div className="audit-toolbar"><div className="audit-filters"><label><span className="sr-only">Action</span><select value={action} onChange={(event) => setAction(event.target.value)}><option value="">All Actions</option>{[...new Set(entries.map((entry) => entry.actionCode))].map((value) => <option key={value} value={value}>{value}</option>)}</select></label><label><span className="sr-only">User</span><select value={user} onChange={(event) => setUser(event.target.value)}><option value="">All Users</option>{[...new Set(entries.map((entry) => entry.actorUsername))].map((value) => <option key={value} value={value}>{value}</option>)}</select></label><label><span className="sr-only">Module</span><select value={module} onChange={(event) => setModule(event.target.value)}><option value="">All Modules</option>{[...new Set(entries.map((entry) => entry.entityType))].map((value) => <option key={value} value={value}>{value}</option>)}</select></label></div></div><article className="audit-card"><CardTitle>Audit trail</CardTitle><div className="audit-table-wrap"><table className="audit-table"><thead><tr>{['Time', 'User', 'Module', 'Action', 'Details', 'Result'].map((heading) => <th key={heading}>{heading}</th>)}</tr></thead><tbody>{filtered.map((entry) => <tr key={entry.auditLogId}><td>{formatTime(entry.occurredAt)}</td><td>{entry.actorUsername || 'System'}</td><td>{entry.entityType || 'System'}</td><td>{entry.actionCode}</td><td>{details(entry)}</td><td className="audit-result">Recorded</td></tr>)}</tbody></table>{!message && filtered.length === 0 && <p className="audit-empty">No activity matches these filters.</p>}{message && <p className="audit-empty">{message}</p>}</div><p className="audit-note">Entries are loaded from the immutable backend audit trail.</p></article></section>;
 }
 
 function AdminPage({ page }) { return <div className="data-page">{page === 'System Settings' ? <SystemSettings /> : <UsersRoles />}</div>; }
