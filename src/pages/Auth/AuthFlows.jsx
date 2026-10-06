@@ -3,7 +3,7 @@ import './Auth.css';
 import { AuthButton, AuthField, AuthShell } from './components/AuthUi.jsx';
 
 const screenCopy = {
-  Login: { title: 'Welcome back', description: 'Sign in to your MediAssistRover workspace.', fields: [['Work email', 'email', 'name@hospital.org'], ['Password', 'password', '••••••••••••']], action: 'Log in', footer: 'New to MediAssistRover? Create an account' },
+  Login: { title: 'Welcome back', description: 'Sign in with your username or work email.', fields: [['Username or work email', 'text', 'admin or name@hospital.org'], ['Password', 'password', '••••••••••••']], action: 'Log in', footer: 'New to MediAssistRover? Create an account' },
   Register: { title: 'Create your account', description: 'Use your work email to get started.', fields: [['Full name', 'text', 'Your full name'], ['Work email', 'email', 'name@hospital.org'], ['Password', 'password', 'Create a password'], ['Confirm password', 'password', 'Re-enter your password']], hint: 'Use at least 12 characters with a mix of letters, numbers and symbols.', action: 'Create account', footer: 'Already have an account? Log in' },
   Forgot: { title: 'Forgot your password?', description: 'Enter your work email. If an account exists, we will send a password reset link.', fields: [['Work email', 'email', 'name@hospital.org']], action: 'Send reset link', footer: 'Back to login' },
   Reset: { title: 'Set a new password', description: 'Choose a new password for your workspace account.', fields: [['New password', 'password', 'Create a new password'], ['Confirm new password', 'password', 'Re-enter your new password']], hint: 'Use at least 12 characters with a mix of letters, numbers and symbols.', action: 'Update password', footer: 'Back to login' },
@@ -11,7 +11,7 @@ const screenCopy = {
   Sent: { title: 'Check your inbox', description: 'If an account exists for your work email, you will receive a password reset link shortly.', message: 'Check your spam folder if the email has not arrived.', secondary: 'Resend reset email', footer: 'Back to login' },
   Updated: { title: 'Password updated', description: 'Your password has been changed. You can now sign in with your new password.', message: 'Account recovery complete', success: true, action: 'Return to login' },
   Expired: { title: 'This link has expired', description: 'This reset link has expired or has already been used. Request a new link to continue.', action: 'Request a new link', footer: 'Back to login' },
-  Error: { title: 'Welcome back', description: 'Sign in to your MediAssistRover workspace.', fields: [['Work email', 'email', 'name@hospital.org'], ['Password', 'password', '••••••••••••']], error: 'Unable to sign in. Check your credentials and the API connection, then try again.', action: 'Try again', footer: 'Create an account' },
+  Error: { title: 'Welcome back', description: 'Sign in with your username or work email.', fields: [['Username or work email', 'text', 'admin or name@hospital.org'], ['Password', 'password', '••••••••••••']], action: 'Try again', footer: 'Create an account' },
 };
 
 export default function AuthFlows({ initial = 'Login', onHome, onAuthenticated }) {
@@ -19,15 +19,19 @@ export default function AuthFlows({ initial = 'Login', onHome, onAuthenticated }
   const [values, setValues] = useState({});
   const [resendNotice, setResendNotice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loginError, setLoginError] = useState('');
   const info = screenCopy[screen];
   const isLogin = screen === 'Login' || screen === 'Error';
   const onSubmit = async () => {
     if (isLogin) {
-      if (!values['Work email']?.trim() || !values.Password?.trim()) { setScreen('Error'); return; }
+      const identifier = values['Username or work email']?.trim();
+      if (!identifier || !values.Password?.trim()) { setLoginError('Enter your username or work email and password.'); setScreen('Error'); return; }
       setIsSubmitting(true);
       try {
-        await onAuthenticated?.({ email: values['Work email'], password: values.Password });
-      } catch {
+        setLoginError('');
+        await onAuthenticated?.({ email: identifier, password: values.Password });
+      } catch (error) {
+        setLoginError(error.message || 'Unable to sign in. Check your credentials and the API connection, then try again.');
         setScreen('Error');
       } finally {
         setIsSubmitting(false);
@@ -39,5 +43,5 @@ export default function AuthFlows({ initial = 'Login', onHome, onAuthenticated }
   const footerAction = () => { if (isLogin) setScreen('Register'); else setScreen('Login'); };
   const workEmail = values['Work email']?.trim();
   const message = screen === 'Verify' && workEmail ? `We sent a verification link to ${workEmail}. Open the link to verify your email address.` : screen === 'Sent' && workEmail ? `If an account exists for ${workEmail}, you will receive a password reset link shortly.` : info.description;
-  return <AuthShell><main className="auth-form" data-auth-screen={screen}><button className="auth-home" onClick={onHome}>← Home</button><h2>{info.title}</h2><p className="auth-description">{message}</p>{info.fields?.map(([label, type, placeholder]) => <AuthField key={label} label={label} type={type} placeholder={placeholder} value={values[label] ?? ''} onChange={(value) => setValues((current) => ({ ...current, [label]: value }))} />)}{info.error && <p className="auth-error">{info.error}</p>}{isLogin ? <button className="auth-link" onClick={() => setScreen('Forgot')}>Forgot password?</button> : null}{info.message && <p className={info.success ? 'auth-success' : 'auth-message'}>{info.message}</p>}{resendNotice && <p className="auth-success">{resendNotice}</p>}{info.hint && <p className="auth-hint">{info.hint}</p>}{info.action && <AuthButton onClick={onSubmit}>{isSubmitting ? 'Signing in…' : info.action}</AuthButton>}{info.secondary && <AuthButton secondary onClick={() => setResendNotice(`A new email has been requested for ${workEmail || 'your work email'}.`)}> {info.secondary}</AuthButton>}{info.footer && <button className="auth-link auth-footer-link" onClick={footerAction}>{info.footer}</button>}</main></AuthShell>;
+  return <AuthShell><main className="auth-form" data-auth-screen={screen}><button className="auth-home" onClick={onHome}>← Home</button><h2>{info.title}</h2><p className="auth-description">{message}</p>{info.fields?.map(([label, type, placeholder]) => <AuthField key={label} label={label} type={type} placeholder={placeholder} value={values[label] ?? ''} onChange={(value) => setValues((current) => ({ ...current, [label]: value }))} />)}{(loginError || info.error) && <p className="auth-error">{loginError || info.error}</p>}{isLogin ? <button className="auth-link" onClick={() => setScreen('Forgot')}>Forgot password?</button> : null}{info.message && <p className={info.success ? 'auth-success' : 'auth-message'}>{info.message}</p>}{resendNotice && <p className="auth-success">{resendNotice}</p>}{info.hint && <p className="auth-hint">{info.hint}</p>}{info.action && <AuthButton onClick={onSubmit}>{isSubmitting ? 'Signing in…' : info.action}</AuthButton>}{info.secondary && <AuthButton secondary onClick={() => setResendNotice(`A new email has been requested for ${workEmail || 'your work email'}.`)}> {info.secondary}</AuthButton>}{info.footer && <button className="auth-link auth-footer-link" onClick={footerAction}>{info.footer}</button>}</main></AuthShell>;
 }
