@@ -1,9 +1,61 @@
+import { injectStyles } from '../../styles/injectStyles.js';
+const inlineStyles = String.raw`.ws-screen { min-width: 0; background: #fff; }
+.ws-screen .wf-sidebar { top: 100px; bottom: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+.ws-screen .wf-sidebar button { width: 100%; }
+.ws-main { padding-top: 115px; max-width: 1600px; }
+.ws-screen h2 { font-size: 14px; font-weight: 600; line-height: 1.45; margin: 0; }
+.ws-screen p { line-height: 1.45; }
+.ws-dispatch-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 16px; margin-top: 36px; }
+.ws-panel { border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; min-width: 0; }
+.ws-controls { height: 758px; display: flex; flex-direction: column; gap: 12px; }
+.ws-scroll { height: 654px; overflow: auto; display: flex; flex-direction: column; gap: 12px; scrollbar-width: thin; }
+.ws-scroll > * { flex-shrink: 0; }
+.ws-station-entry { display: flex; flex-direction: column; gap: 12px; }
+.ws-controls footer { padding-top: 0; }
+.ws-screen .ws-action { width: 100%; min-height: 40px; height: auto; padding: 10px 16px; flex-shrink: 0; }
+.ws-screen .ws-action:focus-visible, .ws-tile:focus-visible { outline: 2px solid #2f80ff; outline-offset: 2px; }
+.ws-field { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.ws-field > span, .ws-parameter > span { color: #475569; font-size: 10px; font-weight: 500; line-height: 15px; }
+.ws-field input, .ws-field select { width: 100%; min-width: 0; height: 42px; padding: 10px 16px; border: 1px solid #cbd5e1; border-radius: 6px; color: #0f172a; background: #f1f5f9; font: 600 14px/1.45 Inter, Arial, sans-serif; }
+.ws-field input:focus, .ws-field select:focus { outline: 2px solid #93c5fd; outline-offset: 1px; }
+.ws-field [aria-invalid=true] { border-color: #dc2626; }
+.ws-field small { color: #b91c1c; }
+.ws-tile { display: flex; flex-direction: column; gap: 12px; width: 100%; margin: 0; padding: 16px; border: 0; border-radius: 6px; background: #f1f5f9; color: #0f172a; font: inherit; text-align: left; }
+button.ws-tile:hover { background: #e8eef6; }
+.ws-tile strong { font-size: 14px; font-weight: 600; line-height: 1.45; }
+.ws-tile span, .ws-scroll p { font-size: 12px; font-weight: 400; color: #475569; line-height: 1.45; margin: 0; }
+.ws-screen small { font-size: 10px; line-height: 1.45; }
+.ws-checkbox { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.ws-map { background: #f8fafc; height: 758px; display: flex; flex-direction: column; gap: 12px; }
+.ws-map-image { position: relative; aspect-ratio: 756/622; flex-shrink: 0; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 8px; }
+.ws-map-image img { position: absolute; width: 100%; height: 98.57%; top: .68%; left: 0; }
+.ws-map > small { color: #475569; }
+.ws-details-grid { display: grid; grid-template-columns: minmax(0, 824fr) minmax(270px, 320fr); gap: 20px; margin-top: 36px; }
+.ws-details-grid .ws-controls { height: 706px; }
+.ws-details-grid .ws-scroll { height: 100%; padding-right: 12px; }
+.ws-parameter { min-height: 88px; display: flex; flex-direction: column; gap: 6px; }
+.ws-parameter > div { border: 1px solid #cbd5e1; border-radius: 6px; padding: 9px 12px; background: #f1f5f9; font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+.ws-parameter > small { color: #475569; }
+.ws-details { height: 706px; overflow: auto; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.ws-details > strong { margin-top: 8px; font-size: 14px; font-weight: 600; }
+.ws-details > p { margin: 0; font-size: 12px; color: #475569; }
+.ws-details .ws-action { min-height: 36px; padding: 8px 16px; }
+.ws-blue { color: #2f80ff; }
+.ws-footer { margin-top: 20px; display: flex; gap: 12px; align-items: center; }
+.ws-footer .ws-action { width: 270px; }
+.ws-footer .ws-action + .ws-action { width: 210px; }
+.ws-footer small { color: #475569; }
+@media (max-width: 1200px) { .ws-dispatch-grid { grid-template-columns: 328px minmax(0,1fr); } .ws-map-image { height: auto; aspect-ratio: 756/622; } .ws-map { height: auto; min-height: 600px; } }
+@media (max-width: 900px) { .ws-main { margin-left: 0; padding: 28px 16px; } .ws-dispatch-grid { grid-template-columns: minmax(280px, 360px) minmax(0,1fr); } .ws-map { min-height: 0; } .ws-screen .tab-button { flex: 1; min-width: 0; } }
+@media (max-width: 650px) { .ws-dispatch-grid, .ws-details-grid { grid-template-columns: 1fr; margin-top: 24px; } .ws-controls { height: auto; min-height: 580px; } .ws-scroll { height: auto; max-height: 654px; } .ws-controls footer { margin-top: auto; } .ws-details-grid .ws-controls, .ws-details { height: auto; max-height: 706px; } .ws-footer { flex-wrap: wrap; } .ws-footer .ws-action { width: 100%; } }
+`;
+injectStyles('mediassist-style-pages-Workstations-WorkstationsPage-jsx', inlineStyles);
+
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Sidebar, MarButton } from '../Workflows/WorkflowsPage.jsx';
 import routeMap from '../../assets/images/workstation-route.png';
 import { figmaScreens } from './figmaScreens.js';
-import './workstations.css';
 
 const statusHelp = {
   CREATED: 'Đã tạo, input hợp lệ nhưng chưa đưa vào hàng đợi.',
