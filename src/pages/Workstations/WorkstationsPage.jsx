@@ -2,10 +2,11 @@ import { injectStyles } from '../../styles/injectStyles.js';
 const inlineStyles = String.raw`.ws-screen { min-width: 0; height: 100vh; overflow: hidden; background: #fff; }
 .ws-screen .wf-sidebar { top: 100px; bottom: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
 .ws-screen .wf-sidebar button { width: 100%; }
-.ws-main { height: 100vh; min-width: 0; overflow: hidden; padding-top: 115px; padding-bottom: 24px; max-width: 1600px; }
+.ws-screen .robot-location { display: none; }
+.ws-main { height: 100vh; min-width: 0; overflow: hidden; padding: 44px 28px 24px; max-width: 1600px; }
 .ws-screen h2 { font-size: 14px; font-weight: 600; line-height: 1.45; margin: 0; }
 .ws-screen p { line-height: 1.45; }
-.ws-dispatch-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 16px; height: calc(100vh - 285px); min-height: 0; margin-top: 24px; }
+.ws-dispatch-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 16px; height: calc(100vh - 230px); min-height: 0; margin-top: 24px; }
 .ws-panel { border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; min-width: 0; }
 .ws-controls { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 .ws-scroll { min-height: 0; height: auto; flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 12px; scrollbar-width: thin; }
@@ -30,7 +31,7 @@ button.ws-tile:hover { background: #e8eef6; }
 .ws-map-image { position: relative; flex: 1; min-height: 0; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 8px; }
 .ws-map-image img { position: absolute; width: 100%; height: 100%; object-fit: cover; top: 0; left: 0; }
 .ws-map > small { color: #475569; }
-.ws-details-grid { display: grid; grid-template-columns: minmax(0, 824fr) minmax(270px, 320fr); gap: 20px; height: calc(100vh - 285px); min-height: 0; margin-top: 24px; }
+.ws-details-grid { display: grid; grid-template-columns: minmax(0, 824fr) minmax(270px, 320fr); gap: 20px; height: calc(100vh - 230px); min-height: 0; margin-top: 24px; }
 .ws-details-grid .ws-controls { height: 100%; }
 .ws-details-grid .ws-scroll { height: 100%; padding-right: 12px; }
 .ws-parameter { min-height: 88px; display: flex; flex-direction: column; gap: 6px; }
@@ -39,6 +40,7 @@ button.ws-tile:hover { background: #e8eef6; }
 .ws-details { height: 100%; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
 .ws-details > strong { margin-top: 8px; font-size: 14px; font-weight: 600; }
 .ws-details > p { margin: 0; font-size: 12px; color: #475569; }
+.ws-details > strong + p { display: none; }
 .ws-details .ws-action { min-height: 36px; padding: 8px 16px; }
 .ws-blue { color: #2f80ff; }
 .ws-footer { margin-top: 20px; display: flex; gap: 12px; align-items: center; }

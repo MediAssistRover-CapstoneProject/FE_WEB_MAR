@@ -102,7 +102,7 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
   height: 100vh;
   min-width: 0;
   overflow: hidden;
-  padding: 115px 28px 24px;
+  padding: 44px 28px 24px;
 }
 
 .workflows-header {
@@ -166,7 +166,7 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
   display: grid;
   grid-template-columns: minmax(620px, 824px) 320px;
   gap: 20px;
-  height: calc(100vh - 285px);
+  height: calc(100vh - 230px);
   min-height: 0;
   margin-top: 24px;
 }
@@ -873,7 +873,6 @@ export default function WorkflowsPage() {
       <main className="workflows-main">
         <header className="workflows-header">
           <h1>{creating ? 'Create Workflow' : 'Workflows'}</h1>
-          <p className="robot-location">MAR-01 · Hospital Floor 1</p>
           <Tabs />
           <p className="preview-note">
             {creating ? 'Build a workflow from tasks, or start with one of the 10 templates.' : saved ? 'Draft saved. Continue editing or create another workflow.' : 'Specification v1.0 · editable UI preview'}
