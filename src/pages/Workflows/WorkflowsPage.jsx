@@ -2,8 +2,9 @@ import { injectStyles } from '../../styles/injectStyles.js';
 const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
 .workflows-screen {
-  min-height: 100vh;
-  min-width: 1180px;
+  height: 100vh;
+  min-width: 0;
+  overflow: hidden;
   background: var(--mar-surface, #fff);
   color: var(--mar-text, #0f172a);
   font-family: Inter, Arial, sans-serif;
@@ -98,8 +99,10 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 
 .workflows-main {
   margin-left: 220px;
-  min-height: 100vh;
-  padding: 56px 28px 32px;
+  height: 100vh;
+  min-width: 0;
+  overflow: hidden;
+  padding: 115px 28px 24px;
 }
 
 .workflows-header {
@@ -163,11 +166,14 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
   display: grid;
   grid-template-columns: minmax(620px, 824px) 320px;
   gap: 20px;
-  margin-top: 30px;
+  height: calc(100vh - 285px);
+  min-height: 0;
+  margin-top: 24px;
 }
 
 .workflow-panel {
-  height: 706px;
+  height: 100%;
+  min-height: 0;
   border: 1px solid var(--mar-border, #cbd5e1);
   border-radius: 10px;
   background: var(--mar-surface, #fff);
@@ -182,7 +188,9 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 }
 
 .workflow-list {
-  height: 636px;
+  height: auto;
+  min-height: 0;
+  flex: 1;
   overflow: auto;
   padding-right: 12px;
   display: flex;
@@ -190,6 +198,12 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
   gap: 12px;
   scrollbar-color: var(--mar-border, #cbd5e1) #fff;
   scrollbar-width: thin;
+}
+
+.library-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .workflow-card {
@@ -459,7 +473,9 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 
 @media (max-width: 900px) {
   .workflows-screen {
+    height: auto;
     min-width: 320px;
+    overflow: visible;
   }
 
   .wf-sidebar {
@@ -468,6 +484,8 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 
   .workflows-main {
     margin-left: 0;
+    height: auto;
+    overflow: visible;
     padding: 28px 16px;
   }
 
@@ -482,6 +500,7 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
   }
 
   .workflows-grid {
+    height: auto;
     grid-template-columns: 1fr;
   }
 
@@ -569,7 +588,7 @@ function Tabs() {
   return (
     <div className="workflow-tabs">
       <MarButton className="tab-button">Workflows</MarButton>
-      <MarButton className="tab-button" variant="subtle" onClick={() => navigate('/workstations')}>Workstations</MarButton>
+      <MarButton className="tab-button" variant="subtle" onClick={() => navigate('/workstations')}>Dispatch</MarButton>
       <MarButton className="tab-button" variant="subtle" onClick={() => navigate('/workstations?view=jobs')}>Jobs</MarButton>
     </div>
   );
