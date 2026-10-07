@@ -482,20 +482,20 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
   box-shadow: 0 12px 32px rgba(57, 111, 210, .08);
 }
 .simulation-studio > * { min-width: 0; }
-.sim-library, .sim-inspector { padding: 18px; overflow: auto; background: #fbfdff; }
+.sim-library, .sim-inspector { display: flex; min-height: 0; flex-direction: column; padding: clamp(11px, 1.7vh, 18px); overflow: hidden; background: #fbfdff; }
 .sim-library { border-right: 1px solid #dce7fb; }
 .sim-inspector { border-left: 1px solid #dce7fb; }
 .sim-kicker { margin: 0 0 6px; color: #477cf4; font-size: 10px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; }
 .sim-library h2, .sim-inspector h2 { margin: 0; color: #193b70; font-size: 15px; }
 .sim-library > p { margin: 7px 0 14px; color: #7188aa; font-size: 11px; line-height: 1.45; }
-.sim-workflow-list { display: grid; gap: 8px; }
+.sim-workflow-list { display: grid; flex: 1 1 auto; min-height: 0; gap: 8px; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; }
 .sim-workflow-list button { width: 100%; border: 1px solid transparent; border-radius: 9px; background: transparent; color: #334155; cursor: pointer; padding: 11px; text-align: left; transition: .18s ease; }
 .sim-workflow-list button:hover { background: #eff6ff; }
 .sim-workflow-list button.active { border-color: #bfdbfe; background: #eaf2ff; color: #1d4ed8; }
 .sim-workflow-list strong, .sim-workflow-list small { display: block; }
 .sim-workflow-list strong { font-size: 12px; line-height: 1.35; }
 .sim-workflow-list small { margin-top: 5px; color: #7188aa; font-size: 9px; }
-.sim-new-workflow { width: 100%; margin-top: 14px; }
+.sim-new-workflow { width: 100%; flex: 0 0 auto; margin-top: 12px; }
 .sim-map-column { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; background: #f8fbff; }
 .sim-map-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid #dce7fb; }
 .sim-map-head strong { color: #193b70; font-size: 14px; }
@@ -518,13 +518,13 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 .sim-speed button { border: 0; border-radius: 0; background: #fff; color: #64748b; cursor: pointer; padding: 7px 9px; font-size: 10px; }
 .sim-speed button.active { background: #eaf2ff; color: #2563eb; font-weight: 700; }
 .sim-runbar .wf-button { height: 34px; padding: 0 15px; }
-.sim-name { margin: 15px 0 4px !important; color: #193b70 !important; font-size: 17px !important; line-height: 1.35; }
+.sim-name { margin: clamp(9px, 1.5vh, 15px) 0 4px !important; color: #193b70 !important; font-size: clamp(14px, 1.6vw, 17px) !important; line-height: 1.35; }
 .sim-code { margin: 0 0 16px; color: #7188aa; font-size: 10px; }
 .sim-progress { height: 7px; margin: 14px 0 6px; overflow: hidden; border-radius: 999px; background: #dbeafe; }
 .sim-progress i { display: block; height: 100%; border-radius: inherit; background: #2f80ff; transition: width .35s ease; }
 .sim-progress-label { display: flex; justify-content: space-between; color: #7188aa; font-size: 10px; }
-.sim-steps { display: grid; gap: 8px; margin-top: 20px; }
-.sim-step { display: grid; grid-template-columns: 25px 1fr; gap: 9px; align-items: center; padding: 9px; border: 1px solid #e0e9f7; border-radius: 8px; background: #fff; }
+.sim-steps { display: grid; flex: 1 1 auto; min-height: 0; gap: clamp(5px, .9vh, 8px); margin-top: clamp(10px, 1.8vh, 20px); overflow-y: auto; padding-right: 4px; scrollbar-width: thin; }
+.sim-step { display: grid; grid-template-columns: 25px 1fr; gap: 9px; align-items: center; padding: clamp(6px, 1.1vh, 9px); border: 1px solid #e0e9f7; border-radius: 8px; background: #fff; }
 .sim-step b { display: grid; width: 23px; height: 23px; place-items: center; border-radius: 6px; background: #eaf2ff; color: #3978e8; font-size: 9px; }
 .sim-step strong, .sim-step small { display: block; }
 .sim-step strong { color: #334155; font-size: 11px; }
