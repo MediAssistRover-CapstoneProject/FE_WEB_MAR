@@ -501,7 +501,9 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 .sim-map-head strong { color: #193b70; font-size: 14px; }
 .sim-map-head span { color: #7188aa; font-size: 10px; }
 .sim-map-canvas { position: relative; min-height: 0; margin: 14px; overflow: hidden; border: 1px solid #bfd2ef; border-radius: 10px; background: #edf5ff; }
-.sim-map-canvas > img { width: 100%; height: 100%; object-fit: cover; opacity: .84; }
+.sim-map-canvas { background: #eaf2ff; }
+.sim-map-canvas .sim-map-backdrop { position: absolute; inset: -14px; width: calc(100% + 28px); height: calc(100% + 28px); object-fit: cover; filter: blur(13px); opacity: .16; }
+.sim-map-canvas .sim-map-foreground { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: contain; opacity: 1; }
 .sim-robot { position: absolute; z-index: 2; display: grid; width: 44px; height: 44px; place-items: center; border-radius: 50%; transform: translate(-50%, -50%); transition: left .45s linear, top .45s linear; }
 .sim-robot img { width: 66px; height: 66px; object-fit: contain; filter: drop-shadow(0 4px 7px #0f172a55); animation: sim-rover-float 1.25s ease-in-out infinite; }
 .sim-robot::after { content: 'MAR-01'; position: absolute; top: 42px; left: 50%; padding: 3px 6px; border-radius: 4px; background: #0f172acc; color: #fff; font-size: 9px; white-space: nowrap; transform: translateX(-50%); }
@@ -674,9 +676,11 @@ export function DispatchSimulationPreview({ onCreate, definitions, loading, erro
   const [runStatus, setRunStatus] = useState('READY');
   const [elapsed, setElapsed] = useState(0);
   const [speed, setSpeed] = useState(1);
+  const mapCanvasRef = useRef(null);
+  const [mapBounds, setMapBounds] = useState({ left: 0, top: 0, width: 1, height: 1 });
   const getKey = (workflow) => workflow.workflowId || workflow.workflowCode || workflow.code || workflow.name;
   const selected = available.find((workflow) => getKey(workflow) === selectedKey) || available[0];
-  const routePoints = [[89.6, 0], [89.6, 40], [70.5, 40], [68.2, 52.4], [62.2, 52.4], [29.2, 52.4], [29.2, 68.2], [14.8, 68.2]];
+  const routePoints = [[89.5, 18.7], [89.5, 44.3], [70.5, 44.3], [68.2, 52.4], [62.2, 52.4], [29.2, 52.4], [29.2, 60.1], [14.8, 60.1]];
   const totalSeconds = 12;
   const progress = Math.min(elapsed / totalSeconds, 1);
   const scaled = progress * (routePoints.length - 1);
@@ -684,7 +688,9 @@ export function DispatchSimulationPreview({ onCreate, definitions, loading, erro
   const segment = scaled - pointIndex;
   const [fromX, fromY] = routePoints[pointIndex];
   const [toX, toY] = routePoints[Math.min(pointIndex + 1, routePoints.length - 1)];
-  const robotPosition = { left: `${fromX + (toX - fromX) * segment}%`, top: `${fromY + (toY - fromY) * segment}%` };
+  const pointX = fromX + (toX - fromX) * segment;
+  const pointY = fromY + (toY - fromY) * segment;
+  const robotPosition = { left: (mapBounds.left + mapBounds.width * pointX / 100).toFixed(2) + 'px', top: (mapBounds.top + mapBounds.height * pointY / 100).toFixed(2) + 'px' };
   const sequence = ['AUTHENTICATE', 'MOVE', 'INTERACT', 'NOTIFY'];
   const completedSteps = Math.min(sequence.length, Math.floor(progress * sequence.length));
   const currentLabel = runStatus === 'SUCCEEDED' ? 'Simulation completed' : runStatus === 'RUNNING' ? ['Checking workflow inputs', 'Leaving Pharmacy Pickup', 'Navigating main corridor', 'Approaching destination'][Math.min(completedSteps, 3)] : 'Choose a workflow and press Run';
@@ -692,6 +698,28 @@ export function DispatchSimulationPreview({ onCreate, definitions, loading, erro
   useEffect(() => {
     if (!selectedKey && available[0]) setSelectedKey(getKey(available[0]));
   }, [available, selectedKey]);
+  useEffect(() => {
+    const canvas = mapCanvasRef.current;
+    if (!canvas) return undefined;
+
+    const updateMapBounds = () => {
+      const { width, height } = canvas.getBoundingClientRect();
+      const sourceAspectRatio = 1365 / 1152;
+      const imageWidth = Math.min(width, height * sourceAspectRatio);
+      const imageHeight = imageWidth / sourceAspectRatio;
+      setMapBounds({
+        left: (width - imageWidth) / 2,
+        top: (height - imageHeight) / 2,
+        width: imageWidth,
+        height: imageHeight,
+      });
+    };
+
+    updateMapBounds();
+    const observer = new ResizeObserver(updateMapBounds);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     if (runStatus !== 'RUNNING') return undefined;
     const timer = window.setInterval(() => setElapsed((value) => Math.min(totalSeconds, value + 0.25 * speed)), 250);
@@ -725,15 +753,16 @@ export function DispatchSimulationPreview({ onCreate, definitions, loading, erro
     </aside>
     <section className="sim-map-column">
       <header className="sim-map-head"><strong>Hospital Floor 1 · Shared simulation map</strong><span>1 robot · 8 zones</span></header>
-      <div className="sim-map-canvas">
-        <img src={workflowRouteMap} alt="Shared Hospital Floor 1 simulation map" />
+      <div className="sim-map-canvas" ref={mapCanvasRef}>
+        <img className="sim-map-backdrop" src={workflowRouteMap} alt="" aria-hidden="true" />
+        <img className="sim-map-foreground" src={workflowRouteMap} alt="Shared Hospital Floor 1 simulation map" />
         <span className={runStatus === 'READY' ? 'sim-robot is-idle' : 'sim-robot'} style={robotPosition}><img src={simulationRover} alt="" /></span>
         <span className="sim-map-caption">{runStatus === 'RUNNING' ? currentLabel : runStatus === 'SUCCEEDED' ? 'Route complete · Room 305' : 'Pharmacy Pickup → Room 305'}</span>
       </div>
       <footer className="sim-runbar">
         <div className="sim-run-status"><strong>{runStatus === 'READY' ? 'Ready to run' : currentLabel}</strong><span>{selected ? (selected.workflowName || selected.name) : 'Loading workflow definitions…'}</span></div>
         <span className="sim-time">{time}</span>
-        <div className="sim-speed" aria-label="Simulation speed">{[1, 2, 5].map((value) => <button className={speed === value ? 'active' : ''} type="button" key={value} onClick={() => setSpeed(value)}>{value}×</button>)}</div>
+        <div className="sim-speed" aria-label="Simulation speed">{[1, 2, 3, 5].map((value) => <button className={speed === value ? 'active' : ''} type="button" key={value} onClick={() => setSpeed(value)}>{value}×</button>)}</div>
         <MarButton variant="subtle" onClick={reset}>Reset</MarButton>
         <MarButton onClick={run}>{runStatus === 'RUNNING' ? 'Running…' : runStatus === 'SUCCEEDED' ? 'Run again' : '▶ Run'}</MarButton>
       </footer>
