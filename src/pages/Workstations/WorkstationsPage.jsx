@@ -4,6 +4,9 @@ const inlineStyles = String.raw`.ws-screen { min-width: 0; height: 100vh; overfl
 .ws-screen .wf-sidebar button { width: 100%; }
 .ws-screen .robot-location { display: none; }
 .ws-main { height: 100vh; min-width: 0; overflow: hidden; padding: 44px 28px 24px; max-width: 1600px; }
+.ws-main--simulation { display: flex; flex-direction: column; }
+.ws-main--simulation .workflows-header { flex: 0 0 auto; }
+.ws-main--simulation .simulation-studio { flex: 1 1 auto; height: auto; min-height: 0; margin-top: 22px; }
 .ws-screen h2 { font-size: 14px; font-weight: 600; line-height: 1.45; margin: 0; }
 .ws-screen p { line-height: 1.45; }
 .ws-dispatch-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 16px; height: calc(100vh - 230px); min-height: 0; margin-top: 24px; }
@@ -247,7 +250,7 @@ export default function WorkstationsPage() {
   if (view === 'stations') {
     return <div className="workflows-screen ws-screen" data-node-id={source?.id}>
       <Sidebar />
-      <main className="workflows-main ws-main">
+      <main className="workflows-main ws-main ws-main--simulation">
         <header className="workflows-header">
           <h1>Dispatch</h1>
           <nav className="workflow-tabs" aria-label="Automation workspace">
