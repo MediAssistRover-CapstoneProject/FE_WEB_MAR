@@ -3,18 +3,35 @@ const inlineStyles = String.raw`.missions-figma,.builder-figma{padding:8px 0}.mi
 `;
 injectStyles('mediassist-style-pages-Admin-MissionBuilder-jsx', inlineStyles);
 
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { operationsApi } from '../../features/operations/operationsApi.js';
 
 const stages = [
   ['overview', 'Missions'], ['basics', '1 Basics'], ['pickup', '2 Pickup'], ['navigation', '3 Navigation'], ['handover', '4 Handover'], ['voice', '5 Voice & actions'], ['failure', '6 Failure handling'], ['review', '7 Review & dispatch'], ['advanced', '8 Advanced workflow'],
 ];
-const missions = [['M1028', 'Delivery', 'Pharmacy → Room 305', 'Running'], ['M1029', 'Patient escort', 'Reception → Radiology', 'Queued'], ['M1030', 'Lab delivery', 'Laboratory → ICU', 'Scheduled']];
+const pageItems = (page) => Array.isArray(page) ? page : page?.content ?? [];
 
 export default function MissionBuilder() {
   const [stage, setStage] = useState('overview');
   const [saved, setSaved] = useState(false);
+  const [jobs, setJobs] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const [filter, setFilter] = useState('');
+  const load = useCallback(async () => {
+    setLoading(true); setMessage('');
+    try {
+      const [jobPage, requestPage] = await Promise.all([operationsApi.listJobs({ page: 0, size: 100 }), operationsApi.listRequests({ page: 0, size: 100 })]);
+      setJobs(pageItems(jobPage)); setRequests(pageItems(requestPage));
+    } catch (error) { setMessage(error.message || 'Unable to load missions from the API.'); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
   const current = stages.find(([key]) => key === stage)[1];
-  if (stage === 'overview') return <section className="missions-figma"><header><div><h2>Missions</h2><p>Plan, dispatch and monitor robot work.</p></div><div><button className="secondary">Templates</button><button onClick={() => setStage('basics')}>+ Create Mission</button></div></header><nav>{['Running', 'Queued', 'Scheduled', 'Completed', 'Failed'].map((tab, index) => <button className={index ? 'secondary' : 'active'} key={tab}>{tab}</button>)}</nav><div className="mission-figma-stats">{[['Running', '1'], ['Queued', '2'], ['Scheduled', '3'], ['Completed today', '18']].map(([label, value]) => <article key={label}><small>{label}</small><strong>{value}</strong></article>)}</div><article className="mission-list"><b>Mission queue</b><table><thead><tr>{['Mission', 'Type', 'Route', 'Status', 'Action'].map(x => <th key={x}>{x}</th>)}</tr></thead><tbody>{missions.map(([id,type,route,status]) => <tr key={id}><td>{id}</td><td>{type}</td><td>{route}</td><td><em>{status}</em></td><td><button onClick={() => setStage('basics')}>Open</button></td></tr>)}</tbody></table></article></section>;
+  const filteredJobs = useMemo(() => filter ? jobs.filter((job) => String(job.status || '').toLowerCase() === filter.toLowerCase()) : jobs, [jobs, filter]);
+  const stats = [['Running', jobs.filter((job) => /running|progress|assigned|dispatched/i.test(job.status || '')).length], ['Queued', jobs.filter((job) => /queued|pending|created/i.test(job.status || '')).length], ['Service requests', requests.length], ['Completed', jobs.filter((job) => /completed|succeeded/i.test(job.status || '')).length]];
+  if (stage === 'overview') return <section className="missions-figma"><header><div><h2>Missions</h2><p>Jobs and service requests from the operations API.</p></div><div><button className="secondary" onClick={load} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</button><button onClick={() => setStage('basics')}>+ Create Mission</button></div></header>{message && <p className="mission-api-message">{message}</p>}<nav>{['All', 'RUNNING', 'QUEUED', 'SCHEDULED', 'COMPLETED', 'FAILED'].map((tab) => <button className={(!filter && tab === 'All') || filter === tab ? 'active' : 'secondary'} key={tab} onClick={() => setFilter(tab === 'All' ? '' : tab)}>{tab}</button>)}</nav><div className="mission-figma-stats">{stats.map(([label, value]) => <article key={label}><small>{label}</small><strong>{value}</strong></article>)}</div><article className="mission-list"><b>Mission queue · backend jobs</b><table><thead><tr>{['Mission', 'Request', 'Robot', 'Priority', 'Status', 'Action'].map(x => <th key={x}>{x}</th>)}</tr></thead><tbody>{filteredJobs.map((job) => <tr key={job.jobId}><td>{job.jobCode || job.jobId.slice(0, 8)}</td><td>{job.serviceRequestId ? job.serviceRequestId.slice(0, 8) : '—'}</td><td>{job.robotId ? job.robotId.slice(0, 8) : 'Unassigned'}</td><td>{job.priority || '—'}</td><td><em>{job.status || '—'}</em></td><td><button onClick={() => setStage('basics')}>Configure</button></td></tr>)}</tbody></table>{!loading && filteredJobs.length === 0 && <p className="mission-api-empty">No jobs returned by the backend.</p>}</article></section>;
   return <section className="builder-figma"><header><div><small>Mission Builder — Delivery</small><h2>{current}</h2></div><div><button className="secondary" onClick={() => setStage('overview')}>← Missions</button><button className="secondary" onClick={() => setSaved(true)}>Save Draft</button><button onClick={() => setStage('review')}>Validate</button></div></header><div className="builder-layout"><aside><b>WORKFLOW STEPS</b>{stages.slice(1).map(([key,label]) => <button className={stage === key ? 'active' : ''} onClick={() => setStage(key)} key={key}>{label}</button>)}</aside><article className="builder-panel"><small>STEP {stages.findIndex(([key]) => key === stage)}</small><h3>{current}</h3><p>{copy(stage)}</p><BuilderFields stage={stage} /><footer><span>{saved ? 'Draft saved' : 'Configure this step before continuing.'}</span><button className="secondary" onClick={() => setStage(previous(stage))}>Back</button><button onClick={() => setStage(next(stage))}>{stage === 'advanced' ? 'Finish workflow' : 'Continue'}</button></footer></article></div></section>;
 }
 function BuilderFields({ stage }) { const fields = { basics:[['Mission name','Medication delivery'],['Priority','Normal']], pickup:[['Pickup location','Pharmacy Pickup'],['Pickup verification','Scan medication barcode']], navigation:[['Destination','Room 305'],['Route policy','Prefer accessible route']], handover:[['Handover method','Recipient confirmation'],['Timeout','5 minutes']], voice:[['Voice script','Your delivery has arrived.'],['On-screen action','Show handover confirmation']], failure:[['On failure','Notify operations manager'],['Retry policy','Retry once then return home']], review:[['Robot','MAR-01'],['Estimated duration','2m 16s']], advanced:[['Trigger','Manual dispatch'],['Schedule','Run when requested']] }; return <div className="builder-fields">{fields[stage].map(([label,value]) => <label key={label}>{label}<input defaultValue={value} /></label>)}</div>; }

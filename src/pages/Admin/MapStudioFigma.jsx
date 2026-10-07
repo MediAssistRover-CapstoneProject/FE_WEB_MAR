@@ -3,7 +3,7 @@ const inlineStyles = String.raw`.map-studio-figma{--ink:#0f172a;--slate:#475569;
 `;
 injectStyles('mediassist-style-pages-Admin-MapStudioFigma-jsx', inlineStyles);
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import scanLidar from '../../assets/images/map-studio/scan-1.png';
 import cleanupLidar from '../../assets/images/map-studio/cleanup-1.png';
 import semanticFloorMap from '../../assets/images/map-studio/semantic-1.png';
@@ -11,6 +11,7 @@ import endpointFloorMap from '../../assets/images/map-studio/endpoints-1.png';
 import trafficFloorMap from '../../assets/images/map-studio/traffic-3.png';
 import patrolFloorMap from '../../assets/images/map-studio/routes-1.png';
 import simulationFloorMap from '../../assets/images/map-studio/publish-1.png';
+import { facilityApi } from '../../features/facility/facilityApi.js';
 
 const workflow = [
   ['scan', 'Scan'], ['cleanup', 'Cleanup'], ['semantic', 'Semantic'], ['endpoints', 'Endpoints'],
@@ -113,15 +114,19 @@ function SemanticStage({ setStage }) {
   </>;
 }
 
-function EndpointsStage({ setStage }) {
-  const [selected, setSelected] = useState(endpointRows[2]);
+function EndpointsStage({ setStage, catalog }) {
+  const [selectedId, setSelectedId] = useState(null);
   const [notice, setNotice] = useState('');
+  const endpoints = catalog.endpoints;
+  const selected = endpoints.find((item) => item.endpointId === selectedId) ?? endpoints[0] ?? null;
+  const endpointColor = (item) => ({ PICKUP: '#3182f6', DROPOFF: '#8b5cf6', ESCORT: '#22c55e', CHARGING: '#22c55e', EMERGENCY: '#f05252' }[item?.endpointType] ?? '#f5b73d');
+  const map = catalog.maps.find((item) => item.mapId === selected?.mapId);
   return <>
-    <StageTitle title="Map Studio — Endpoints"><Button tone="primary" onClick={() => setNotice('Endpoint creation is ready')}>+ Add Endpoint</Button></StageTitle>
+    <StageTitle title="Map Studio — Endpoints"><Button tone="primary" onClick={() => setNotice('Endpoint creation requires map coordinates and a catalog entry.')}>+ Add Endpoint</Button></StageTitle>
     <div className="map-stage-layout endpoint-layout">
-      <Panel title="Locations" className="endpoint-list"><input aria-label="Search locations" placeholder="Search locations…" />{endpointRows.map(item => <button type="button" key={item[1]} className={selected[1] === item[1] ? 'selected' : ''} onClick={() => setSelected(item)}><i style={{ background: item[0] }} /><b>{item[1]}</b><span>{item[2]}</span></button>)}</Panel>
+      <Panel title="Locations" className="endpoint-list"><input aria-label="Search locations" placeholder="Search locations…" />{catalog.loading && <p className="map-notice">Loading endpoint catalog…</p>}{catalog.error && <p className="map-notice">{catalog.error}</p>}{endpoints.map((item) => <button type="button" key={item.endpointId} className={selected?.endpointId === item.endpointId ? 'selected' : ''} onClick={() => setSelectedId(item.endpointId)}><i style={{ background: endpointColor(item) }} /><b>{item.endpointName}</b><span>{item.endpointType} · {item.endpointCode}</span></button>)}{!catalog.loading && !catalog.error && endpoints.length === 0 && <p className="map-notice">No catalog endpoints are available.</p>}</Panel>
       <div className="endpoint-map-column"><Panel title="2D location map"><MapImage src={endpointFloorMap} alt="Hospital floor endpoints map" /></Panel><Panel title="Endpoint usage" className="endpoint-usage"><p>Used by 8 mission templates</p><span>• Medication Delivery</span><span>• Patient Escort</span><span>• Emergency Response</span><Button onClick={() => setNotice('Dependencies opened')}>View Dependencies</Button></Panel></div>
-      <Panel title="Endpoint details" className="endpoint-details"><h4>{selected[1]}</h4><em>{selected[2]}</em>{[['Floor', 'Level 1'], ['Coordinates', 'X 42.15 • Y 18.67'], ['Orientation', '90°'], ['Arrival Radius', '0.25 m'], ['Queueing', 'Enabled'], ['Max Queue', '2'], ['Exit Path', 'Shortest'], ['Access', 'Staff + Patient'], ['Connected Lanes', '3']].map(([label, value]) => <StatusPair key={label} label={label} value={value} />)}<Button tone="primary" onClick={() => setNotice('Endpoint edit mode enabled')}>Edit Endpoint</Button><Button>Test Navigation</Button><Button>Duplicate</Button><Button>Disable</Button><Button tone="danger" onClick={() => setNotice('Delete requires confirmation')}>Delete</Button>{notice && <p className="map-notice">{notice}</p>}<Button tone="primary" onClick={() => setStage('traffic')}>Continue to Traffic</Button></Panel>
+      <Panel title="Endpoint details" className="endpoint-details"><h4>{selected?.endpointName ?? 'Select an endpoint'}</h4><em>{selected ? `${selected.endpointType} · ${selected.endpointCode}` : 'No selection'}</em>{selected && [['Map', map?.mapName ?? String(selected.mapId).slice(0, 8)], ['Coordinates', `X ${selected.xM ?? '—'} · Y ${selected.yM ?? '—'}`], ['Orientation', `${selected.yawRad ?? '—'} rad`], ['Accessible', selected.accessible ? 'Yes' : 'No'], ['Public', selected.publicVisible ? 'Yes' : 'No'], ['Status', selected.active ? 'Active' : 'Inactive'], ['Room', selected.roomId ? String(selected.roomId).slice(0, 8) : '—'], ['Zone', selected.zoneId ? String(selected.zoneId).slice(0, 8) : '—']].map(([label, value]) => <StatusPair key={label} label={label} value={value} />)}<Button tone="primary" onClick={() => setNotice('Endpoint editing is backed by PUT /api/v1/endpoints/{id}.')}>Edit Endpoint</Button><Button onClick={() => setNotice('Navigation test requires a service request.')}>Test Navigation</Button><Button onClick={() => setNotice('Endpoint duplication is not exposed by the backend.')}>Duplicate</Button><Button onClick={() => setNotice('Use deactivate instead of deleting catalog endpoints.')}>Deactivate</Button>{notice && <p className="map-notice">{notice}</p>}<Button tone="primary" onClick={() => setStage('traffic')}>Continue to Traffic</Button></Panel>
     </div>
   </>;
 }
@@ -185,8 +190,16 @@ const stageComponents = { scan: ScanStage, cleanup: CleanupStage, semantic: Sema
 export default function MapStudioFigma({ initialStage = 'scan' }) {
   const permittedStage = useMemo(() => workflow.some(([id]) => id === initialStage) ? initialStage : 'scan', [initialStage]);
   const [stage, setStage] = useState(permittedStage);
+  const [catalog, setCatalog] = useState({ endpoints: [], maps: [], loading: true, error: '' });
+  useEffect(() => {
+    let active = true;
+    Promise.all([facilityApi.listEndpoints({ page: 0, size: 100 }), facilityApi.listMaps({ page: 0, size: 100 })]).then(([endpointPage, mapPage]) => {
+      if (active) setCatalog({ endpoints: endpointPage.content ?? [], maps: mapPage.content ?? [], loading: false, error: '' });
+    }).catch((error) => { if (active) setCatalog({ endpoints: [], maps: [], loading: false, error: error.message || 'Unable to load the facility catalog.' }); });
+    return () => { active = false; };
+  }, []);
   const Stage = stageComponents[stage];
-  return <section className="map-studio-figma"><WorkflowBar stage={stage} onStageChange={setStage} /><Stage setStage={setStage} /></section>;
+  return <section className="map-studio-figma"><WorkflowBar stage={stage} onStageChange={setStage} /><Stage setStage={setStage} catalog={catalog} /></section>;
 }
 
 export { workflow };

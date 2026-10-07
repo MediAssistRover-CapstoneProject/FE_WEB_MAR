@@ -3,13 +3,14 @@ const inlineStyles = String.raw`.r-screen{color:var(--mar-text,#0f172a);font-fam
 `;
 injectStyles('mediassist-style-pages-Admin-RobotControlScreens-jsx', inlineStyles);
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import manualTeleoperation from './assets/manual-teleoperation.png';
 import joystickRing from './assets/manual-joystick-ring.svg';
 import joystickCenter from './assets/manual-joystick-center.svg';
 import speedKnob from './assets/manual-speed-knob.svg';
 import healthRing from './assets/status-health-ring.svg';
 import healthFill from './assets/status-health-fill.svg';
+import { robotsApi } from '../../features/robots/robotsApi.js';
 
 const sensorHealth = [
   ['LiDAR', '10 Hz'],
@@ -54,7 +55,14 @@ export function RobotStatusScreen() {
   const [tab, setTab] = useState('Overview');
   const [maintenance, setMaintenance] = useState(false);
   const [notice, setNotice] = useState('');
+  const [robot, setRobot] = useState(null);
   const tabs = ['Overview', 'Navigation', 'Sensors', 'Safety', 'Network', 'Diagnostics'];
+  useEffect(() => { let current = true; robotsApi.list({ page: 0, size: 50 }).then((page) => { const list = Array.isArray(page) ? page : page?.content ?? []; if (current) setRobot(list[0] || null); }).catch((error) => { if (current) setNotice(error.message || 'Unable to load robot status.'); }); return () => { current = false; }; }, []);
+  const battery = robot?.batteryPercent ?? 0;
+  const identity = robot?.robotCode || robot?.robotName || 'No robot connected';
+  const status = robot?.status || 'Unavailable';
+  const liveTelemetry = telemetry.map(([label, value, good]) => label === 'Battery' ? [label, robot ? `${battery}%` : '—', battery >= 20] : label === 'Uptime' ? [label, robot?.lastHeartbeat ? new Date(robot.lastHeartbeat).toLocaleString() : '—'] : [label, value, good]);
+  const toggleMaintenance = async () => { if (!robot?.robotId) return setNotice('No robot is available from the backend.'); try { await robotsApi.maintenance(robot.robotId, maintenance ? 'Return to service from Robot Status' : 'Maintenance enabled from Robot Status'); setMaintenance((value) => !value); setNotice(maintenance ? 'Maintenance exit requested.' : 'Maintenance mode requested.'); } catch (error) { setNotice(error.message || 'Unable to update maintenance state.'); } };
 
   return <section className="r-screen r-status-screen" aria-label="Robot status">
     <nav className="r-tabs" aria-label="Robot status sections">
@@ -70,15 +78,15 @@ export function RobotStatusScreen() {
           <strong>92%</strong>
           <span>Overall Health</span>
         </div>
-        <h2>MAR-01</h2>
-        <p className="r-healthy-text">Autonomous · Online</p>
-        <Button className={maintenance ? 'r-button--active' : 'r-button--soft'} onClick={() => { setMaintenance(!maintenance); setNotice(maintenance ? 'Maintenance mode disabled' : 'Maintenance mode enabled'); }}>{maintenance ? 'Maintenance Mode On' : 'Maintenance Mode'}</Button>
+        <h2>{identity}</h2>
+        <p className="r-healthy-text">{status}</p>
+        <Button className={maintenance ? 'r-button--active' : 'r-button--soft'} onClick={toggleMaintenance}>{maintenance ? 'Exit Maintenance' : 'Maintenance Mode'}</Button>
       </article>
 
       <article className="r-card r-readings-card">
         <p className="r-kicker">System telemetry</p>
         <dl className="r-key-values">
-          {telemetry.map(([label, value, good]) => <div key={label}><dt>{label}</dt><dd className={good ? 'r-value--good' : ''}>{value}</dd></div>)}
+          {liveTelemetry.map(([label, value, good]) => <div key={label}><dt>{label}</dt><dd className={good ? 'r-value--good' : ''}>{value}</dd></div>)}
         </dl>
       </article>
 

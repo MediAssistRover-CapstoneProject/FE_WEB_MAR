@@ -3,14 +3,11 @@ const inlineStyles = String.raw`.patrol-routes-figma{--ink:#0f172a;--slate:#4755
 `;
 injectStyles('mediassist-style-pages-Admin-PatrolRoutesFigma-jsx', inlineStyles);
 
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import patrolRouteMap from '../../assets/images/map-studio/patrol-1.png';
+import { operationsApi } from '../../features/operations/operationsApi.js';
 
-const savedRoutes = [
-  ['Main Corridor Round', '8 pts', 'Active'],
-  ['Outpatient Safety Loop', '7 pts', 'Active'],
-  ['Emergency Area Check', '12 pts', 'Paused'],
-];
+const pageItems = (page) => Array.isArray(page) ? page : page?.content ?? [];
 
 function PatrolButton({ children, primary = false, danger = false, onClick }) {
   return <button type="button" onClick={onClick} className={`patrol-figma-button${primary ? ' primary' : ''}${danger ? ' danger' : ''}`}>{children}</button>;
@@ -24,17 +21,23 @@ function SettingPair({ label, value }) { return <p className="patrol-pair"><span
 
 /** Standalone Patrol Routes screen matching Figma node 65:2. */
 export default function PatrolRoutesFigma() {
-  const [activeRoute, setActiveRoute] = useState(savedRoutes[1][0]);
+  const [schedules, setSchedules] = useState([]);
+  const [activeId, setActiveId] = useState(null);
   const [selectedPoint, setSelectedPoint] = useState('P9 — Waiting Hall Checkpoint');
   const [notice, setNotice] = useState('');
   const [running, setRunning] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(async () => { setLoading(true); try { const page = await operationsApi.listSchedules({ page: 0, size: 100 }); const next = pageItems(page); setSchedules(next); setActiveId((current) => current && next.some((schedule) => schedule.scheduleId === current) ? current : next[0]?.scheduleId ?? null); } catch (error) { setNotice(error.message || 'Unable to load schedules.'); } finally { setLoading(false); } }, []);
+  useEffect(() => { load(); }, [load]);
+  const activeRoute = useMemo(() => schedules.find((schedule) => schedule.scheduleId === activeId) || null, [schedules, activeId]);
+  const changeSchedule = async (kind) => { if (!activeRoute) return; try { if (kind === 'activate') await operationsApi.activateSchedule(activeRoute.scheduleId); if (kind === 'pause') await operationsApi.pauseSchedule(activeRoute.scheduleId); setNotice(`Schedule ${kind}d.`); load(); } catch (error) { setNotice(error.message || 'Unable to update schedule.'); } };
   return <section className="patrol-routes-figma">
-    <header className="patrol-page-header"><h2>Patrol Routes</h2><div><span className="robot-online">MAR-01&nbsp; • &nbsp;Online</span><span>72% Battery</span><PatrolButton onClick={() => setNotice('Changes saved')}>Save Changes</PatrolButton><PatrolButton primary onClick={() => setRunning(!running)}>{running ? 'Patrol Running' : 'Run Now'}</PatrolButton></div></header>
+    <header className="patrol-page-header"><h2>Patrol Routes</h2><div><span className="robot-online">Schedule API</span><span>{schedules.length} schedules</span><PatrolButton onClick={load}>{loading ? 'Loading…' : 'Refresh'}</PatrolButton><PatrolButton primary onClick={() => setRunning(!running)}>{running ? 'Patrol previewing' : 'Run Preview'}</PatrolButton></div></header>
     <nav className="patrol-tabs" aria-label="Patrol management views">{['Route Builder', 'Point Actions', 'Schedule', 'Simulation', 'History'].map((tab, index) => <button type="button" className={index === 0 ? 'active' : ''} key={tab}>{tab}</button>)}</nav>
     <main className="patrol-screen-grid">
-      <aside className="patrol-card patrol-settings-card"><h3>Route settings</h3><Field label="Route Name" value="Outpatient Safety Patrol" /><Field label="Route Type" value="Loop" /><h4>Schedule</h4>{[['Start', '20:00'], ['End', '06:00'], ['Repeat', 'Every 30 minutes'], ['Days', 'Mon–Sun']].map(([label, value]) => <SettingPair key={label} label={label} value={value} />)}<h4>Patrol behavior</h4>{['Pause on obstacle', 'Capture snapshot at P2', 'Check crowd density at P3', 'Check restricted area at P4', 'Return Home when complete'].map(item => <p className="patrol-check" key={item}>✓ <span>{item}</span></p>)}<div className="patrol-settings-actions"><PatrolButton onClick={() => setNotice('Patrol test prepared')}>Test Patrol</PatrolButton><PatrolButton danger onClick={() => setNotice('Disable patrol requires confirmation')}>Disable Patrol</PatrolButton></div></aside>
+      <aside className="patrol-card patrol-settings-card"><h3>Schedule settings</h3><Field label="Schedule name" value={activeRoute?.scheduleName || 'Select a schedule'} /><Field label="Schedule type" value={activeRoute?.scheduleType || '—'} /><h4>Timing</h4>{[['Starts', activeRoute?.startsAt ? new Date(activeRoute.startsAt).toLocaleString() : '—'], ['Ends', activeRoute?.endsAt ? new Date(activeRoute.endsAt).toLocaleString() : '—'], ['Interval', activeRoute?.intervalSec ? `${activeRoute.intervalSec} sec` : '—'], ['Timezone', activeRoute?.timezone || '—']].map(([label, value]) => <SettingPair key={label} label={label} value={value} />)}<h4>Backend status</h4><p className="patrol-check">✓ <span>{activeRoute?.status || 'No schedule selected'}</span></p><p className="patrol-check">✓ <span>Next run: {activeRoute?.nextRunAt ? new Date(activeRoute.nextRunAt).toLocaleString() : '—'}</span></p><div className="patrol-settings-actions"><PatrolButton onClick={() => changeSchedule('activate')}>Activate Schedule</PatrolButton><PatrolButton danger onClick={() => changeSchedule('pause')}>Pause Schedule</PatrolButton></div></aside>
       <section className="patrol-card patrol-builder-card"><h3>Patrol route builder</h3><div className="patrol-route-image"><img src={patrolRouteMap} alt="Patrol route map for Hospital Floor 1" /></div><article className="selected-point"><small>Selected point action</small><h4>{selectedPoint}</h4><b>Action: Check Crowd Density</b><p>Wait 8 sec · Snapshot if density is HIGH</p><PatrolButton onClick={() => setSelectedPoint(selectedPoint === 'P9 — Waiting Hall Checkpoint' ? 'P2 — Corridor Camera Check' : 'P9 — Waiting Hall Checkpoint')}>Edit Point Action</PatrolButton></article></section>
-      <aside className="patrol-card patrol-saved-card"><h3>Saved patrol routes</h3>{savedRoutes.map(([name, points, state]) => <button type="button" key={name} className={activeRoute === name ? 'active' : ''} onClick={() => setActiveRoute(name)}><b>{name}</b><span>{points}</span><em className={state === 'Active' ? 'active-status' : 'paused-status'}>{state}</em></button>)}<div className="next-run"><small>Next scheduled run</small><h4>Today • 20:00</h4><p>Estimated duration • 14 min</p><PatrolButton onClick={() => setNotice('Schedule opened')}>Open Schedule</PatrolButton></div></aside>
+      <aside className="patrol-card patrol-saved-card"><h3>Saved schedules</h3>{schedules.map((schedule) => <button type="button" key={schedule.scheduleId} className={activeId === schedule.scheduleId ? 'active' : ''} onClick={() => setActiveId(schedule.scheduleId)}><b>{schedule.scheduleName || schedule.scheduleCode || schedule.scheduleId.slice(0, 8)}</b><span>{schedule.scheduleType || 'Schedule'}</span><em className={/active/i.test(schedule.status || '') ? 'active-status' : 'paused-status'}>{schedule.status || '—'}</em></button>)}{!loading && schedules.length === 0 && <p className="patrol-check">No schedules returned by the backend.</p>}<div className="next-run"><small>Next scheduled run</small><h4>{activeRoute?.nextRunAt ? new Date(activeRoute.nextRunAt).toLocaleString() : '—'}</h4><p>{activeRoute?.cronExpression || activeRoute?.intervalSec ? 'Backend schedule loaded' : 'Choose a schedule to inspect timing'}</p><PatrolButton onClick={load}>Refresh Schedules</PatrolButton></div></aside>
     </main>
     {notice && <p className="patrol-notice" role="status">{notice}</p>}
   </section>;

@@ -497,10 +497,11 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 `;
 injectStyles('mediassist-style-pages-Workflows-WorkflowsPage-jsx', inlineStyles);
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../features/admin/components/AdminSidebar.jsx';
 import { clearSession } from '../../features/auth/session.js';
+import { workflowApi } from '../../features/workflows/workflowApi.js';
 
 const navGroups = [
   ['Overview', ['Dashboard']],
@@ -574,19 +575,20 @@ function Tabs() {
   );
 }
 
-function Library({ saved, onCreate, onOpenDraft }) {
+function Library({ saved, onCreate, onOpenDraft, definitions, loading, error }) {
   return (
     <>
       <div className="workflows-grid">
         <section className="workflow-panel library-panel">
-          <h2>WORKFLOW TEMPLATES · 10 DEFAULTS</h2>
+          <h2>WORKFLOW DEFINITIONS · {loading ? 'LOADING' : definitions.length}</h2>
           <div className="workflow-list">
-            {workflows.map((workflow) => (
-              <button className="workflow-card" type="button" key={workflow.code} onClick={onCreate}>
-                <strong>{workflow.name}</strong>
-                <span>{workflow.code}<b>·</b>{workflow.steps} steps including branches<em>→</em></span>
+            {definitions.map((workflow) => (
+              <button className="workflow-card" type="button" key={workflow.workflowId || workflow.code} onClick={onCreate}>
+                <strong>{workflow.workflowName || workflow.name}</strong>
+                <span>{workflow.workflowCode || workflow.code}<b>·</b>{workflow.status || `${workflow.steps || 0} steps`}<em>→</em></span>
               </button>
             ))}
+            {!loading && !definitions.length && <p className="preview-note">{error || 'No workflow definitions returned by the backend.'}</p>}
           </div>
         </section>
 
@@ -825,7 +827,21 @@ export default function WorkflowsPage() {
   const [mode, setMode] = useState('library');
   const [screen, setScreen] = useState('create');
   const [saved, setSaved] = useState(false);
+  const [definitions, setDefinitions] = useState([]);
+  const [definitionError, setDefinitionError] = useState('');
+  const [definitionsLoading, setDefinitionsLoading] = useState(true);
   const creating = mode === 'create';
+
+  useEffect(() => {
+    let current = true;
+    workflowApi.list({ page: 0, size: 100 }).then((page) => {
+      if (!current) return;
+      setDefinitions(Array.isArray(page) ? page : page?.content ?? []);
+      setDefinitionError('');
+    }).catch((error) => { if (current) setDefinitionError(error.message || 'Unable to load workflow definitions.'); })
+      .finally(() => { if (current) setDefinitionsLoading(false); });
+    return () => { current = false; };
+  }, []);
 
   const openCreate = () => {
     setMode('create');
@@ -848,7 +864,7 @@ export default function WorkflowsPage() {
         {creating ? (
           <Editor setMode={setMode} setSaved={setSaved} />
         ) : (
-          <Library saved={saved} onCreate={openCreate} onOpenDraft={openCreate} />
+          <Library saved={saved} onCreate={openCreate} onOpenDraft={openCreate} definitions={definitions} loading={definitionsLoading} error={definitionError} />
         )}
       </main>
     </div>
