@@ -36,6 +36,9 @@ import dotAmber from '../../assets/images/figma-history-dot-10.svg';
 import missionIconActive from '../../assets/images/figma-history-dot-8.svg';
 import missionIconIdle from '../../assets/images/figma-history-dot-12.svg';
 import { alertsApi } from '../../features/alerts/alertsApi.js';
+import { monitoringApi } from '../../features/monitoring/monitoringApi.js';
+import { reportsApi } from '../../features/reports/reportsApi.js';
+import { voiceApi } from '../../features/voice/voiceApi.js';
 
 const scriptCategories = ['Navigation', 'Delivery', 'Escort', 'Emergency', 'General', 'Error'];
 const deliveryScripts = [
@@ -82,6 +85,40 @@ function toAlertRow(alert) {
   };
 }
 
+function reportRange(period) {
+  const to = new Date();
+  const from = new Date(to);
+  if (period === 'Today') from.setHours(0, 0, 0, 0);
+  else if (period === '30 Days') from.setDate(from.getDate() - 30);
+  else if (period === 'Custom') from.setDate(from.getDate() - 14);
+  else from.setDate(from.getDate() - 7);
+  return {
+    from: from.toISOString(),
+    to: to.toISOString(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    interval: period === 'Today' ? 'HOUR' : 'DAY',
+  };
+}
+
+function number(value, fallback = '—') {
+  return Number.isFinite(Number(value)) ? Number(value).toLocaleString() : fallback;
+}
+
+function percent(value) {
+  return Number.isFinite(Number(value)) ? `${Number(value).toFixed(1)}%` : '—';
+}
+
+function duration(value) {
+  if (!Number.isFinite(Number(value))) return '—';
+  const seconds = Math.round(Number(value));
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+function relativeTime(value) {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+}
+
 function Notice({ children }) {
   return children ? <p className="monitor-notice" role="status">{children}</p> : null;
 }
@@ -93,6 +130,22 @@ export function VoiceScripts() {
   const [volume, setVolume] = useState(80);
   const [notice, setNotice] = useState('');
   const [scripts, setScripts] = useState(deliveryScripts);
+  const [interactions, setInteractions] = useState([]);
+  const [voiceMeta, setVoiceMeta] = useState({ totalElements: 0 });
+  const [voiceError, setVoiceError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    voiceApi.listInteractions({ page: 0, size: 4 }).then((page) => {
+      if (!active) return;
+      setInteractions(page.content ?? []);
+      setVoiceMeta(page);
+      setVoiceError('');
+    }).catch((requestError) => {
+      if (active) setVoiceError(requestError.message || 'Voice history is unavailable.');
+    });
+    return () => { active = false; };
+  }, []);
 
   const createScript = () => {
     const newScript = `New delivery script ${scripts.length + 1}`;
@@ -144,17 +197,18 @@ export function VoiceScripts() {
       </article>
 
       <aside className="monitor-panel voice-scripts__usage">
-        <div className="monitor-panel__head">Script usage</div>
-        <span className="monitor-kicker">Used by</span>
-        <h2>4 Mission Templates</h2>
+        <div className="monitor-panel__head">Robot voice history</div>
+        <span className="monitor-kicker">Recorded interactions</span>
+        <h2>{voiceMeta.totalElements ? `${number(voiceMeta.totalElements)} interactions` : 'No interactions yet'}</h2>
         <div className="voice-scripts__templates">
-          {['Medication Delivery', 'Lab Sample Pickup', 'Emergency Supply', 'Patient Escort Arrival'].map((item) => <article key={item}><b>{item}</b><span>Active</span></article>)}
+          {interactions.map((item) => <article key={item.voiceInteractionId}><b>{item.detectedIntent ? titleCase(item.detectedIntent) : 'Voice interaction'}</b><span>{titleCase(item.status)} · {relativeTime(item.startedAt)}</span></article>)}
+          {!voiceError && interactions.length === 0 && <article><b>No recorded interaction</b><span>The backend has not received voice activity yet.</span></article>}
         </div>
-        <span className="monitor-kicker">Fallback script</span>
-        <p className="voice-scripts__fallback">“Tôi cần hỗ trợ. Vui lòng liên hệ nhân viên vận hành.”</p>
+        <span className="monitor-kicker">Editor scope</span>
+        <p className="voice-scripts__fallback">The backend currently exposes voice history only. Script editing remains local until a script-management API is available.</p>
         <button className="secondary voice-scripts__robot-test" type="button" onClick={() => setNotice('Test request sent to MAR-01.')}>Test on Robot</button>
+        <small>{voiceError || 'History loaded from /api/v1/voice/interactions'}</small>
         <small>Preview target: MAR-01</small>
-        <small>Audio output: Robot speaker</small>
       </aside>
     </div>
   </section>;
@@ -163,16 +217,42 @@ export function VoiceScripts() {
 export function AnalyticsReports() {
   const [period, setPeriod] = useState('7 Days');
   const [notice, setNotice] = useState('');
-  const metrics = period === 'Today'
-    ? [['Mission Success', '100%', 'green'], ['Total Missions', '18'], ['Distance', '12.4 km'], ['Avg Mission', '3m 28s'], ['Utilization', '76%', 'teal'], ['Downtime', '12m', 'amber']]
-    : [['Mission Success', '96.4%', 'green'], ['Total Missions', '182'], ['Distance', '31.4 km'], ['Avg Mission', '3m 42s'], ['Utilization', '72%', 'teal'], ['Downtime', '1h 18m', 'amber']];
+  const [report, setReport] = useState(null);
+  const [reportError, setReportError] = useState('');
+  const [loadingReport, setLoadingReport] = useState(true);
+
+  const loadReport = async () => {
+    setLoadingReport(true);
+    try {
+      const result = await reportsApi.getAnalytics(reportRange(period));
+      setReport(result);
+      setReportError('');
+    } catch (requestError) {
+      setReportError(requestError.message || 'Analytics report is unavailable.');
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
+  useEffect(() => { loadReport(); }, [period]);
+
+  const metrics = report
+    ? [
+      ['Job Success', percent(report.jobs?.successRatePercent), 'green'],
+      ['Total Jobs', number(report.jobs?.total)],
+      ['Average Job', duration(report.jobs?.averageDurationSeconds)],
+      ['Fleet Utilization', percent(report.robots?.utilizationPercent), 'teal'],
+      ['Open Alerts', number(report.incidents?.alerts), 'amber'],
+      ['Crowd Records', number(report.monitoring?.crowdDensityRecords)],
+    ]
+    : [['Job Success', '—', 'green'], ['Total Jobs', '—'], ['Average Job', '—'], ['Fleet Utilization', '—', 'teal'], ['Open Alerts', '—', 'amber'], ['Crowd Records', '—']];
 
   return <section className="monitor-screen analytics-reports" aria-label="Analytics and reports">
     <div className="analytics-reports__tools">
       <div className="monitor-segmented" aria-label="Reporting period">
         {['Today', '7 Days', '30 Days', 'Custom'].map((item) => <button className={period === item ? 'is-selected' : ''} type="button" key={item} onClick={() => { setPeriod(item); setNotice(''); }}>{item}</button>)}
       </div>
-      <button className="secondary" type="button" onClick={() => setNotice(`${period} report export is ready.`)}>Export Report</button>
+      <button className="secondary" type="button" onClick={loadReport} disabled={loadingReport}>{loadingReport ? 'Loading…' : 'Refresh Report'}</button>
     </div>
     <div className="analytics-reports__metrics">
       {metrics.map(([label, value, tone]) => <article className="monitor-panel" key={label}><span>{label}</span><strong className={tone ? `is-${tone}` : ''}>{value}</strong></article>)}
@@ -184,27 +264,27 @@ export function AnalyticsReports() {
       </div>
       <div className="analytics-reports__insights">
         <article className="monitor-panel analytics-reports__utilization">
-          <div className="monitor-panel__head">Robot utilization</div>
-          <UtilizationRow label="Navigating" value="41%" amount={41} tone="blue" />
-          <UtilizationRow label="Waiting" value="17%" amount={17} tone="amber" />
-          <UtilizationRow label="Charging" value="20%" amount={20} tone="green" />
-          <UtilizationRow label="Idle" value="18%" amount={18} tone="slate" />
-          <UtilizationRow label="Error" value="4%" amount={4} tone="red" />
+          <div className="monitor-panel__head">Live report summary</div>
+          <UtilizationRow label="Fleet utilization" value={percent(report?.robots?.utilizationPercent)} amount={Number(report?.robots?.utilizationPercent) || 0} tone="blue" />
+          <UtilizationRow label="Job success" value={percent(report?.jobs?.successRatePercent)} amount={Number(report?.jobs?.successRatePercent) || 0} tone="green" />
+          <UtilizationRow label="Delivered" value={number(report?.deliveries?.delivered)} amount={report?.deliveries?.total ? Math.round((report.deliveries.delivered / report.deliveries.total) * 100) : 0} tone="amber" />
+          <UtilizationRow label="Emergency ack" value={duration(report?.emergencies?.averageAcknowledgementSeconds)} amount={report?.emergencies?.total ? Math.round((report.emergencies.acknowledged / report.emergencies.total) * 100) : 0} tone="slate" />
+          <UtilizationRow label="Suspected falls" value={number(report?.monitoring?.suspectedFalls)} amount={Math.min(100, Number(report?.monitoring?.suspectedFalls) || 0)} tone="red" />
         </article>
         <article className="monitor-panel analytics-reports__quality">
           <div className="monitor-panel__head">Operation quality</div>
           {[
-            ['Blocked Time', '24m', '-18%'],
-            ['Crowd Delay', '12m', '-7%'],
-            ['Emergency Avg Response', '42s', '-11%'],
-            ['Navigation Failures', '3', '-25%'],
-            ['Delivery Success', '98%', '+2%'],
+            ['Failed jobs', number(report?.jobs?.failed), 'Jobs'],
+            ['Recovery required', number(report?.jobs?.recoveryRequired), 'Jobs'],
+            ['Detection events', number(report?.monitoring?.detectionEvents), 'Monitoring'],
+            ['Average persons', number(report?.monitoring?.averagePersonCount), 'Crowd'],
+            ['Max persons', number(report?.monitoring?.maximumPersonCount), 'Crowd'],
           ].map(([label, value, change]) => <div className="analytics-reports__quality-row" key={label}><span>{label}</span><b>{value}</b><em>{change}</em></div>)}
-          <button className="secondary" type="button" onClick={() => setNotice('PDF quality report is being generated.')}>Generate PDF Report</button>
+          <button className="secondary" type="button" onClick={() => setNotice(reportError || (report ? `Generated ${relativeTime(report.generatedAt)}.` : 'Analytics data is loading.'))}>Report status</button>
         </article>
       </div>
     </div>
-    <Notice>{notice}</Notice>
+    <Notice>{notice || reportError}</Notice>
   </section>;
 }
 
@@ -271,7 +351,37 @@ export function HistoryReplay() {
 export function CrowdHeatmap() {
   const [range, setRange] = useState('Live');
   const [notice, setNotice] = useState('');
-  const density = [['Reception', '23', 'Med'], ['Waiting Hall', '48', 'High'], ['Exam A', '16', 'Low'], ['Exam B', '22', 'Med'], ['Main Corridor', '55', 'High'], ['Room 305', '8', 'Low']];
+  const [records, setRecords] = useState([]);
+  const [densityError, setDensityError] = useState('');
+  const [loadingDensity, setLoadingDensity] = useState(true);
+
+  const loadDensity = async () => {
+    const period = range === 'Live' ? 'Today' : range === '1 Hour' ? 'Today' : range === 'Today' ? 'Today' : '7 Days';
+    let { from, to } = reportRange(period);
+    if (range === '1 Hour') {
+      const hour = new Date(to);
+      hour.setHours(hour.getHours() - 1);
+      from = hour.toISOString();
+    }
+    setLoadingDensity(true);
+    try {
+      const page = await monitoringApi.listCrowdDensity({ from, to, page: 0, size: 100 });
+      setRecords(page.content ?? []);
+      setDensityError('');
+    } catch (requestError) {
+      setDensityError(requestError.message || 'Crowd-density data is unavailable.');
+    } finally {
+      setLoadingDensity(false);
+    }
+  };
+
+  useEffect(() => { loadDensity(); }, [range]);
+
+  const density = useMemo(() => records.slice(0, 6).map((item) => [
+    item.metrics?.zoneName ?? item.metrics?.locationName ?? (item.zoneId ? `Zone ${String(item.zoneId).slice(0, 8)}` : 'Unassigned zone'),
+    String(item.personCount),
+    item.densityLevel === 'MEDIUM' ? 'Med' : titleCase(item.densityLevel),
+  ]), [records]);
 
   return <section className="monitor-screen crowd-heatmap" aria-label="Crowd heatmap">
     <div className="monitor-segmented crowd-heatmap__tabs" aria-label="Heatmap period">
@@ -285,8 +395,9 @@ export function CrowdHeatmap() {
       </article>
       <aside className="crowd-heatmap__side">
         <article className="monitor-panel crowd-heatmap__density">
-          <div className="monitor-panel__head">Live density</div>
+          <div className="monitor-panel__head">Recorded density</div>
           {density.map(([area, people, state]) => <p key={area}><span>{area}</span><b>{people}</b><em className={`is-${state.toLowerCase()}`}>{state}</em></p>)}
+          {!loadingDensity && density.length === 0 && <p>No crowd records for this range.</p>}
         </article>
         <article className="monitor-panel crowd-heatmap__rules">
           <div className="monitor-panel__head">Crowd-aware robot rules</div>
@@ -297,7 +408,7 @@ export function CrowdHeatmap() {
         </article>
       </aside>
     </div>
-    <Notice>{notice}</Notice>
+    <Notice>{notice || densityError}</Notice>
   </section>;
 }
 
