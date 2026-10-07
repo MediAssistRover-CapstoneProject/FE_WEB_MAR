@@ -62,7 +62,7 @@ injectStyles('mediassist-style-pages-Workstations-WorkstationsPage-jsx', inlineS
 
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Sidebar, MarButton } from '../Workflows/WorkflowsPage.jsx';
+import { DispatchSimulationPreview, Sidebar, MarButton } from '../Workflows/WorkflowsPage.jsx';
 import routeMap from '../../assets/images/workstation-route.png';
 import { figmaScreens } from './figmaScreens.js';
 import { facilityApi } from '../../features/facility/facilityApi.js';
@@ -244,5 +244,23 @@ export default function WorkstationsPage() {
     content = <><h2>CONFIGURATION & PARAMETERS</h2>{values.map(([label, value, help]) => <Parameter key={label} label={label} value={value} help={help} />)}</>;
     footer = action(view === 'queued' ? 'Preview Start' : 'Back to Jobs', () => view === 'queued' ? setStatus('ASSIGNED') : go('jobs'), true);
   }
+  if (view === 'stations') {
+    return <div className="workflows-screen ws-screen" data-node-id={source?.id}>
+      <Sidebar />
+      <main className="workflows-main ws-main">
+        <header className="workflows-header">
+          <h1>Dispatch</h1>
+          <nav className="workflow-tabs" aria-label="Automation workspace">
+            <MarButton className="tab-button" variant="subtle" onClick={() => navigate('/workflows')}>Workflows</MarButton>
+            <MarButton className="tab-button">Dispatch</MarButton>
+            <MarButton className="tab-button" variant="subtle" onClick={() => go('jobs')}>Jobs</MarButton>
+          </nav>
+          <p className="preview-note">Select a workflow definition, then run it on the shared Hospital Floor 1 simulation map.</p>
+        </header>
+        <DispatchSimulationPreview onCreate={() => newJob('delivery')} definitions={catalog.workflows} loading={catalog.loading} error={catalog.error} />
+      </main>
+    </div>;
+  }
+
   return <div className="workflows-screen ws-screen" data-node-id={source?.id}><Sidebar /><main className="workflows-main ws-main"><header className="workflows-header"><h1>{title}</h1><p className="robot-location">MAR-01 · Hospital Floor 1</p><nav className="workflow-tabs" aria-label="Automation workspace">{[['Workflows', null], ['Dispatch', 'stations'], ['Jobs', 'jobs']].map(([label, target]) => <MarButton key={label} className="tab-button" variant={(target === 'jobs' ? jobView || view === 'jobs' : target === 'stations' && !jobView && view !== 'jobs') ? 'primary' : 'subtle'} onClick={() => target ? go(target) : navigate('/workflows')}>{label}</MarButton>)}</nav><p className="preview-note">Workflow definitions, facility endpoints and dispatch inputs are loaded from the API.</p></header><div className={details ? 'ws-details-grid' : 'ws-dispatch-grid'}><section className="ws-panel ws-controls"><div className="ws-scroll">{content}</div>{!details && <footer>{footer}</footer>}</section>{details ? <aside className="ws-panel ws-details"><h2>DETAILS & ACTIONS</h2><strong>MediAssistRover</strong><p>MAR-01 · Hospital Floor 1</p>{jobView || view === 'jobs' ? <>{[['Running', 'RUNNING'], ['Waiting for Input', 'WAITING'], ['Paused', 'PAUSED'], ['Failed', 'FAILED'], ['Cancelled', 'CANCELLED']].map(([label, status]) => <MarButton key={status} className="ws-action" variant="subtle" onClick={() => setStatus(status)}>{label}</MarButton>)}{action('Queue Job', () => setStatus('QUEUED'))}{action('Assign Robot', () => setStatus('ASSIGNED'))}{action('Patient Escort Running', () => go('escort-running'))}<p>Illustrative job states. No live robot commands are sent by this prototype.</p></> : <>{action('Medical Delivery', () => newJob('delivery'))}{action('Patient Escort', () => newJob('escort'))}{action('Input Error State', () => { update('destination', ''); go('missing'); })}<p>Choose a workflow definition, provide its required inputs, then review the dispatch request.</p></>}<small className="ws-blue">DISPATCH</small><p>Configuration follows the backend workflow definition and Facility Catalog.</p></aside> : <section className="ws-panel ws-map"><h2>HOSPITAL FLOOR 1 / MAR-01</h2><div className="ws-map-image"><img src={routeMap} alt="Hospital Floor 1: MAR-01 route from Pharmacy to Room 305" /></div><small>Route preview · Pharmacy → Room 305</small></section>}</div>{details && <footer className="ws-footer">{footer}{action('Back to Workflows', () => navigate('/workflows'))}</footer>}</main></div>;
 }

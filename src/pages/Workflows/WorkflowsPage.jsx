@@ -666,7 +666,7 @@ function Tabs() {
   );
 }
 
-function Library({ onCreate, definitions, loading, error }) {
+export function DispatchSimulationPreview({ onCreate, definitions, loading, error }) {
   const available = definitions.length ? definitions : (loading ? [] : workflows);
   const [selectedKey, setSelectedKey] = useState(null);
   const [runStatus, setRunStatus] = useState('READY');
@@ -746,6 +746,28 @@ function Library({ onCreate, definitions, loading, error }) {
       <div className="sim-steps">{sequence.map((step, index) => <article className={index < completedSteps ? 'sim-step done' : index === completedSteps && runStatus === 'RUNNING' ? 'sim-step current' : 'sim-step'} key={step}><b>{index < completedSteps || runStatus === 'SUCCEEDED' ? '✓' : String(index + 1).padStart(2, '0')}</b><div><strong>{step.replace('_', ' ')}</strong><small>{index < completedSteps || runStatus === 'SUCCEEDED' ? 'Completed' : index === completedSteps && runStatus === 'RUNNING' ? 'Running now' : 'Waiting'}</small></div></article>)}</div>
     </aside>
   </section>;
+}
+
+function Library({ saved, onCreate, onOpenDraft, definitions, loading, error }) {
+  return (
+    <div className="workflows-grid">
+      <section className="workflow-panel library-panel">
+        <h2>WORKFLOW DEFINITIONS · {loading ? 'LOADING' : definitions.length}</h2>
+        <div className="workflow-list">
+          {definitions.map((workflow) => (
+            <button className="workflow-card" type="button" key={workflow.workflowId || workflow.code} onClick={onCreate}>
+              <strong>{workflow.workflowName || workflow.name}</strong>
+              <span>{workflow.workflowCode || workflow.code}<b>·</b>{workflow.status || ((workflow.steps || 0) + ' steps')}<em>→</em></span>
+            </button>
+          ))}
+          {!loading && !definitions.length && <p className="preview-note">{error || 'No workflow definitions returned by the backend.'}</p>}
+        </div>
+      </section>
+      <aside className="workflow-panel action-panel">
+        {saved ? <><h2>MY WORKFLOWS</h2><h3>New workflow</h3><p>DRAFT · New tasks</p><MarButton className="full" onClick={onOpenDraft}>Open Draft</MarButton><MarButton className="full" variant="subtle" onClick={onCreate}>+ Create Workflow</MarButton><h2>WORKFLOW DEFINITIONS</h2><p>Definitions are loaded from the backend catalog.</p></> : <><h2>CREATE A WORKFLOW</h2><p>Build a workflow, define its tasks, and configure its available step types.</p><MarButton className="full" onClick={onCreate}>+ Create Workflow</MarButton><h2>WORKFLOW DEFINITIONS</h2><p>Select an existing workflow to inspect its configuration.</p></>}
+      </aside>
+    </div>
+  );
 }
 
 function EditorSide({ activeTask, screen, setScreen, setActiveTask, customTask }) {
