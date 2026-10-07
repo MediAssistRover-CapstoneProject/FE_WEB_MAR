@@ -1,5 +1,6 @@
 import { injectStyles } from '../../styles/injectStyles.js';
-import workflowRouteMap from '../../assets/images/workstation-route.png';
+import workflowRouteMap from '../../assets/images/workflow-simulation-route.png';
+import simulationRover from '../../assets/images/simulation-rover.png';
 const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
 .workflows-screen {
@@ -500,11 +501,12 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 .sim-map-head strong { color: #193b70; font-size: 14px; }
 .sim-map-head span { color: #7188aa; font-size: 10px; }
 .sim-map-canvas { position: relative; min-height: 0; margin: 14px; overflow: hidden; border: 1px solid #bfd2ef; border-radius: 10px; background: #edf5ff; }
-.sim-map-canvas img { width: 100%; height: 100%; object-fit: cover; opacity: .84; }
-.sim-route-line { position: absolute; left: 23%; top: 28%; width: 61%; height: 55%; border: 4px dashed #2f80ff; border-left: 0; border-bottom: 0; border-radius: 0 20px 0 0; opacity: .76; }
-.sim-robot { position: absolute; z-index: 2; display: grid; width: 38px; height: 38px; place-items: center; border: 3px solid #fff; border-radius: 50%; background: #2f80ff; box-shadow: 0 0 0 3px #9fc4ff, 0 6px 18px #1d4ed866; color: #fff; font-size: 9px; font-weight: 700; transform: translate(-50%, -50%); transition: left .45s linear, top .45s linear; }
+.sim-map-canvas > img { width: 100%; height: 100%; object-fit: cover; opacity: .84; }
+.sim-robot { position: absolute; z-index: 2; display: grid; width: 44px; height: 44px; place-items: center; border-radius: 50%; transform: translate(-50%, -50%); transition: left .45s linear, top .45s linear; }
+.sim-robot img { width: 66px; height: 66px; object-fit: contain; filter: drop-shadow(0 4px 7px #0f172a55); animation: sim-rover-float 1.25s ease-in-out infinite; }
 .sim-robot::after { content: 'MAR-01'; position: absolute; top: 42px; left: 50%; padding: 3px 6px; border-radius: 4px; background: #0f172acc; color: #fff; font-size: 9px; white-space: nowrap; transform: translateX(-50%); }
-.sim-robot.is-idle { background: #64748b; box-shadow: 0 0 0 3px #cbd5e1; }
+.sim-robot.is-idle { opacity: .7; filter: grayscale(.45); }
+@keyframes sim-rover-float { 50% { transform: translateY(-3px) rotate(-1deg); } }
 .sim-map-caption { position: absolute; left: 14px; bottom: 14px; padding: 8px 10px; border: 1px solid #d7e4fb; border-radius: 7px; background: #fffffff0; color: #4d6e9c; font-size: 10px; }
 .sim-runbar { display: flex; align-items: center; gap: 12px; padding: 13px 18px; border-top: 1px solid #dce7fb; background: #fff; }
 .sim-run-status { min-width: 0; margin-right: auto; }
@@ -674,7 +676,7 @@ export function DispatchSimulationPreview({ onCreate, definitions, loading, erro
   const [speed, setSpeed] = useState(1);
   const getKey = (workflow) => workflow.workflowId || workflow.workflowCode || workflow.code || workflow.name;
   const selected = available.find((workflow) => getKey(workflow) === selectedKey) || available[0];
-  const routePoints = [[84, 22], [84, 42], [60, 64], [37, 64], [23, 79]];
+  const routePoints = [[89.6, 0], [89.6, 40], [70.5, 40], [68.2, 52.4], [62.2, 52.4], [29.2, 52.4], [29.2, 68.2], [14.8, 68.2]];
   const totalSeconds = 12;
   const progress = Math.min(elapsed / totalSeconds, 1);
   const scaled = progress * (routePoints.length - 1);
@@ -725,8 +727,7 @@ export function DispatchSimulationPreview({ onCreate, definitions, loading, erro
       <header className="sim-map-head"><strong>Hospital Floor 1 · Shared simulation map</strong><span>1 robot · 8 zones</span></header>
       <div className="sim-map-canvas">
         <img src={workflowRouteMap} alt="Shared Hospital Floor 1 simulation map" />
-        <i className="sim-route-line" />
-        <span className={runStatus === 'READY' ? 'sim-robot is-idle' : 'sim-robot'} style={robotPosition}>MAR</span>
+        <span className={runStatus === 'READY' ? 'sim-robot is-idle' : 'sim-robot'} style={robotPosition}><img src={simulationRover} alt="" /></span>
         <span className="sim-map-caption">{runStatus === 'RUNNING' ? currentLabel : runStatus === 'SUCCEEDED' ? 'Route complete · Room 305' : 'Pharmacy Pickup → Room 305'}</span>
       </div>
       <footer className="sim-runbar">
