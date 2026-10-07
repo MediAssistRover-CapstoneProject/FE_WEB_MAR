@@ -634,10 +634,6 @@ function Library({ saved, onCreate, onOpenDraft, definitions, loading, error }) 
         </aside>
       </div>
 
-      <footer className="workflow-actions">
-        <MarButton className="create" onClick={onCreate}>Create Workflow</MarButton>
-        <p>Scroll inside panels to view all content.</p>
-      </footer>
     </>
   );
 }
