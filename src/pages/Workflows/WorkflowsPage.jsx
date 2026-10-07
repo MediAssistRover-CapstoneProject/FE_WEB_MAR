@@ -1,4 +1,5 @@
 import { injectStyles } from '../../styles/injectStyles.js';
+import workflowRouteMap from '../../assets/images/workstation-route.png';
 const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
 .workflows-screen {
@@ -467,6 +468,77 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
   font-weight: 500;
 }
 
+.simulation-studio {
+  display: grid;
+  grid-template-columns: 250px minmax(480px, 1fr) 300px;
+  height: calc(100vh - 185px);
+  min-height: 560px;
+  margin-top: 22px;
+  overflow: hidden;
+  border: 1px solid #d7e4fb;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(57, 111, 210, .08);
+}
+.simulation-studio > * { min-width: 0; }
+.sim-library, .sim-inspector { padding: 18px; overflow: auto; background: #fbfdff; }
+.sim-library { border-right: 1px solid #dce7fb; }
+.sim-inspector { border-left: 1px solid #dce7fb; }
+.sim-kicker { margin: 0 0 6px; color: #477cf4; font-size: 10px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; }
+.sim-library h2, .sim-inspector h2 { margin: 0; color: #193b70; font-size: 15px; }
+.sim-library > p { margin: 7px 0 14px; color: #7188aa; font-size: 11px; line-height: 1.45; }
+.sim-workflow-list { display: grid; gap: 8px; }
+.sim-workflow-list button { width: 100%; border: 1px solid transparent; border-radius: 9px; background: transparent; color: #334155; cursor: pointer; padding: 11px; text-align: left; transition: .18s ease; }
+.sim-workflow-list button:hover { background: #eff6ff; }
+.sim-workflow-list button.active { border-color: #bfdbfe; background: #eaf2ff; color: #1d4ed8; }
+.sim-workflow-list strong, .sim-workflow-list small { display: block; }
+.sim-workflow-list strong { font-size: 12px; line-height: 1.35; }
+.sim-workflow-list small { margin-top: 5px; color: #7188aa; font-size: 9px; }
+.sim-new-workflow { width: 100%; margin-top: 14px; }
+.sim-map-column { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; background: #f8fbff; }
+.sim-map-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid #dce7fb; }
+.sim-map-head strong { color: #193b70; font-size: 14px; }
+.sim-map-head span { color: #7188aa; font-size: 10px; }
+.sim-map-canvas { position: relative; min-height: 0; margin: 14px; overflow: hidden; border: 1px solid #bfd2ef; border-radius: 10px; background: #edf5ff; }
+.sim-map-canvas img { width: 100%; height: 100%; object-fit: cover; opacity: .84; }
+.sim-route-line { position: absolute; left: 23%; top: 28%; width: 61%; height: 55%; border: 4px dashed #2f80ff; border-left: 0; border-bottom: 0; border-radius: 0 20px 0 0; opacity: .76; }
+.sim-robot { position: absolute; z-index: 2; display: grid; width: 38px; height: 38px; place-items: center; border: 3px solid #fff; border-radius: 50%; background: #2f80ff; box-shadow: 0 0 0 3px #9fc4ff, 0 6px 18px #1d4ed866; color: #fff; font-size: 9px; font-weight: 700; transform: translate(-50%, -50%); transition: left .45s linear, top .45s linear; }
+.sim-robot::after { content: 'MAR-01'; position: absolute; top: 42px; left: 50%; padding: 3px 6px; border-radius: 4px; background: #0f172acc; color: #fff; font-size: 9px; white-space: nowrap; transform: translateX(-50%); }
+.sim-robot.is-idle { background: #64748b; box-shadow: 0 0 0 3px #cbd5e1; }
+.sim-map-caption { position: absolute; left: 14px; bottom: 14px; padding: 8px 10px; border: 1px solid #d7e4fb; border-radius: 7px; background: #fffffff0; color: #4d6e9c; font-size: 10px; }
+.sim-runbar { display: flex; align-items: center; gap: 12px; padding: 13px 18px; border-top: 1px solid #dce7fb; background: #fff; }
+.sim-run-status { min-width: 0; margin-right: auto; }
+.sim-run-status strong, .sim-run-status span { display: block; }
+.sim-run-status strong { color: #193b70; font-size: 12px; }
+.sim-run-status span { margin-top: 3px; color: #7188aa; font-size: 10px; }
+.sim-time { color: #477cf4; font-size: 12px; font-weight: 600; }
+.sim-speed { display: flex; overflow: hidden; border: 1px solid #d7e4fb; border-radius: 7px; }
+.sim-speed button { border: 0; border-radius: 0; background: #fff; color: #64748b; cursor: pointer; padding: 7px 9px; font-size: 10px; }
+.sim-speed button.active { background: #eaf2ff; color: #2563eb; font-weight: 700; }
+.sim-runbar .wf-button { height: 34px; padding: 0 15px; }
+.sim-name { margin: 15px 0 4px !important; color: #193b70 !important; font-size: 17px !important; line-height: 1.35; }
+.sim-code { margin: 0 0 16px; color: #7188aa; font-size: 10px; }
+.sim-progress { height: 7px; margin: 14px 0 6px; overflow: hidden; border-radius: 999px; background: #dbeafe; }
+.sim-progress i { display: block; height: 100%; border-radius: inherit; background: #2f80ff; transition: width .35s ease; }
+.sim-progress-label { display: flex; justify-content: space-between; color: #7188aa; font-size: 10px; }
+.sim-steps { display: grid; gap: 8px; margin-top: 20px; }
+.sim-step { display: grid; grid-template-columns: 25px 1fr; gap: 9px; align-items: center; padding: 9px; border: 1px solid #e0e9f7; border-radius: 8px; background: #fff; }
+.sim-step b { display: grid; width: 23px; height: 23px; place-items: center; border-radius: 6px; background: #eaf2ff; color: #3978e8; font-size: 9px; }
+.sim-step strong, .sim-step small { display: block; }
+.sim-step strong { color: #334155; font-size: 11px; }
+.sim-step small { margin-top: 2px; color: #7188aa; font-size: 9px; }
+.sim-step.current { border-color: #86b4ff; background: #f4f8ff; }
+.sim-step.done b { background: #dcfce7; color: #15803d; }
+@media (max-width: 1180px) {
+  .simulation-studio { grid-template-columns: 220px minmax(420px, 1fr) 260px; }
+  .sim-library, .sim-inspector { padding: 14px; }
+}
+@media (max-width: 900px) {
+  .simulation-studio { grid-template-columns: 210px minmax(440px, 1fr); height: auto; overflow: visible; }
+  .sim-inspector { grid-column: span 2; border-top: 1px solid #dce7fb; border-left: 0; }
+  .sim-map-column { min-height: 560px; }
+}
+
 .task-empty-note{margin:0;color:var(--mar-muted,#475569);font-size:11px;line-height:1.45}.editor-side-button small{display:block;margin-top:3px;opacity:.7;font-size:9px}.type-modal{position:fixed;z-index:20;inset:0;display:grid;place-items:center;background:#14251d66;backdrop-filter:blur(3px)}.type-modal-card{width:min(680px,calc(100% - 32px));max-height:80vh;overflow:auto;border-radius:12px;background:#fff;padding:24px;box-shadow:0 20px 60px #0f231833}.type-modal-card header{display:flex;align-items:center;justify-content:space-between}.type-modal-card h2,.type-modal-card p{margin:0}.type-modal-card h2{font-size:19px}.type-modal-card p{margin:7px 0 17px;color:var(--mar-muted,#475569);font-size:11px}.type-modal-card header button{border:0;background:transparent;font-size:24px;cursor:pointer}.type-modal-card>div{display:grid;grid-template-columns:1fr 1fr;gap:9px}.type-modal-card>div button{display:flex;justify-content:space-between;align-items:center;min-height:49px;border:1px solid var(--mar-border,#cbd5e1);border-radius:7px;background:#fff;color:var(--mar-text,#0f172a);padding:10px 13px;text-align:left;cursor:pointer}.type-modal-card>div button:hover{background:#f0fdf4;border-color:#5faa83}.type-modal-card>div b{font-size:11px}.type-modal-card>div span{color:#368a67;font-size:19px}@media(max-width:650px){.type-modal-card>div{grid-template-columns:1fr}}
 .type-modal-close{display:grid!important;width:34px;height:34px;place-items:center;border:1px solid #d9e4dc!important;border-radius:50%;color:#4b675c;background:#f8fbf9!important;line-height:1}
 .type-modal{background:rgba(17,43,35,.45)}.type-modal-card{width:min(800px,calc(100% - 36px));padding:31px 32px;border:1px solid rgba(255,255,255,.7);border-radius:18px;box-shadow:0 28px 80px rgba(12,43,32,.28)}.type-modal-card header{align-items:flex-start;margin-bottom:24px}.type-modal-card header h2{margin:5px 0 6px;font-size:25px;letter-spacing:-.6px}.type-modal-card header p{margin:0;font-size:12px}.modal-kicker{display:block;color:#568c78!important;font-size:9px!important;font-weight:700;letter-spacing:1.3px}.type-modal-close{flex:0 0 auto;width:38px;height:38px;font-size:26px!important;transition:.18s}.type-modal-close:hover{background:#e9f5ef!important;transform:rotate(90deg)}.type-modal-card>div{gap:12px}.type-modal-card>div button{min-height:84px;padding:13px;border-color:#dce9d7;transition:.18s ease}.type-modal-card>div button:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(43,112,80,.1)}.type-modal-card>div i{display:grid;width:36px;height:36px;place-items:center;border-radius:10px;background:#eaf5ed;color:#348662;font-style:normal;font-size:19px}.type-modal-card>div span{display:grid;gap:2px;text-align:left}.type-modal-card>div small{color:#7d9d90;font-size:8px;font-weight:700;letter-spacing:.8px}.type-modal-card>div span b{font-size:12px;color:#1b3c34}.type-modal-card>div em{color:#80988d;font-size:10px;font-style:normal;line-height:1.35}.type-modal-card>div strong{margin-left:auto;color:#37916b;font-size:20px;font-weight:400}.rename-backdrop{position:fixed;z-index:25;inset:0;display:grid;place-items:center;background:rgba(17,43,35,.46);backdrop-filter:blur(4px)}.rename-dialog{width:min(390px,calc(100% - 32px));padding:28px;border:1px solid rgba(255,255,255,.8);border-radius:16px;background:#fff;box-shadow:0 28px 80px rgba(12,43,32,.3)}.rename-icon{display:grid;width:40px;height:40px;place-items:center;border-radius:11px;background:#eaf5ed;color:#2d8663;font-size:19px}.rename-dialog h2{margin:15px 0 6px;font-size:20px}.rename-dialog p{margin:0 0 20px;color:#7f968c;font-size:12px}.rename-dialog label{display:block;color:#607f73;font-size:11px;font-weight:600}.rename-dialog input{box-sizing:border-box;width:100%;margin-top:7px;border:1px solid #cfe0d4;border-radius:8px;padding:11px 12px;font:inherit;color:#22483b;outline:none}.rename-dialog input:focus{border-color:#5aac86;box-shadow:0 0 0 3px #e7f4ec}.rename-dialog footer{display:flex;justify-content:flex-end;gap:9px;margin-top:23px}.rename-dialog footer button{border:1px solid #d7e5db;border-radius:7px;padding:10px 13px;background:#fff;color:#547368;font:600 12px Inter;cursor:pointer}.rename-dialog footer button[type=submit]{border-color:#2c8968;background:#2c8968;color:#fff}
@@ -594,48 +666,86 @@ function Tabs() {
   );
 }
 
-function Library({ saved, onCreate, onOpenDraft, definitions, loading, error }) {
-  return (
-    <>
-      <div className="workflows-grid">
-        <section className="workflow-panel library-panel">
-          <h2>WORKFLOW DEFINITIONS · {loading ? 'LOADING' : definitions.length}</h2>
-          <div className="workflow-list">
-            {definitions.map((workflow) => (
-              <button className="workflow-card" type="button" key={workflow.workflowId || workflow.code} onClick={onCreate}>
-                <strong>{workflow.workflowName || workflow.name}</strong>
-                <span>{workflow.workflowCode || workflow.code}<b>·</b>{workflow.status || `${workflow.steps || 0} steps`}<em>→</em></span>
-              </button>
-            ))}
-            {!loading && !definitions.length && <p className="preview-note">{error || 'No workflow definitions returned by the backend.'}</p>}
-          </div>
-        </section>
+function Library({ onCreate, definitions, loading, error }) {
+  const available = definitions.length ? definitions : (loading ? [] : workflows);
+  const [selectedKey, setSelectedKey] = useState(null);
+  const [runStatus, setRunStatus] = useState('READY');
+  const [elapsed, setElapsed] = useState(0);
+  const [speed, setSpeed] = useState(1);
+  const getKey = (workflow) => workflow.workflowId || workflow.workflowCode || workflow.code || workflow.name;
+  const selected = available.find((workflow) => getKey(workflow) === selectedKey) || available[0];
+  const routePoints = [[84, 22], [84, 42], [60, 64], [37, 64], [23, 79]];
+  const totalSeconds = 12;
+  const progress = Math.min(elapsed / totalSeconds, 1);
+  const scaled = progress * (routePoints.length - 1);
+  const pointIndex = Math.min(Math.floor(scaled), routePoints.length - 2);
+  const segment = scaled - pointIndex;
+  const [fromX, fromY] = routePoints[pointIndex];
+  const [toX, toY] = routePoints[Math.min(pointIndex + 1, routePoints.length - 1)];
+  const robotPosition = { left: `${fromX + (toX - fromX) * segment}%`, top: `${fromY + (toY - fromY) * segment}%` };
+  const sequence = ['AUTHENTICATE', 'MOVE', 'INTERACT', 'NOTIFY'];
+  const completedSteps = Math.min(sequence.length, Math.floor(progress * sequence.length));
+  const currentLabel = runStatus === 'SUCCEEDED' ? 'Simulation completed' : runStatus === 'RUNNING' ? ['Checking workflow inputs', 'Leaving Pharmacy Pickup', 'Navigating main corridor', 'Approaching destination'][Math.min(completedSteps, 3)] : 'Choose a workflow and press Run';
 
-        <aside className="workflow-panel action-panel">
-          {saved ? (
-            <>
-              <h2>MY WORKFLOWS</h2>
-              <h3>New workflow</h3>
-              <p>DRAFT · 4 default tasks</p>
-              <MarButton className="full" onClick={onOpenDraft}>Open Draft</MarButton>
-              <MarButton className="full" variant="subtle" onClick={onCreate}>+ Create Workflow</MarButton>
-              <h2>10 DEFAULT TEMPLATES</h2>
-              <p>Templates remain available in the list.</p>
-            </>
-          ) : (
-            <>
-              <h2>CREATE A WORKFLOW</h2>
-              <p>Start a new workflow with four default tasks, then add steps from the library.</p>
-              <MarButton className="full" onClick={onCreate}>+ Create Workflow</MarButton>
-              <h2>DEFAULT TEMPLATES</h2>
-              <p>The 10 templates are examples. Open one to inspect its sequence.</p>
-            </>
-          )}
-        </aside>
+  useEffect(() => {
+    if (!selectedKey && available[0]) setSelectedKey(getKey(available[0]));
+  }, [available, selectedKey]);
+  useEffect(() => {
+    if (runStatus !== 'RUNNING') return undefined;
+    const timer = window.setInterval(() => setElapsed((value) => Math.min(totalSeconds, value + 0.25 * speed)), 250);
+    return () => window.clearInterval(timer);
+  }, [runStatus, speed]);
+  useEffect(() => {
+    if (elapsed >= totalSeconds && runStatus === 'RUNNING') setRunStatus('SUCCEEDED');
+  }, [elapsed, runStatus]);
+
+  const chooseWorkflow = (key) => { setSelectedKey(key); setElapsed(0); setRunStatus('READY'); };
+  const run = () => { if (runStatus === 'SUCCEEDED') setElapsed(0); setRunStatus('RUNNING'); };
+  const reset = () => { setElapsed(0); setRunStatus('READY'); };
+  const time = `00:${String(Math.floor(elapsed)).padStart(2, '0')}`;
+
+  return <section className="simulation-studio" aria-label="Workflow simulation workspace">
+    <aside className="sim-library">
+      <p className="sim-kicker">Workflow library</p>
+      <h2>Available workflows</h2>
+      <p>Select an existing workflow. All workflows use the same Hospital Floor 1 simulation map.</p>
+      <div className="sim-workflow-list">
+        {available.map((workflow) => {
+          const key = getKey(workflow);
+          return <button className={key === getKey(selected) ? 'active' : ''} type="button" key={key} onClick={() => chooseWorkflow(key)}>
+            <strong>{workflow.workflowName || workflow.name}</strong>
+            <small>{workflow.workflowCode || workflow.code} · {workflow.status || 'DRAFT'}</small>
+          </button>;
+        })}
+        {!loading && !available.length && <p className="preview-note">{error || 'No workflow definitions returned by the backend.'}</p>}
       </div>
-
-    </>
-  );
+      <MarButton className="sim-new-workflow" variant="subtle" onClick={onCreate}>+ Create workflow</MarButton>
+    </aside>
+    <section className="sim-map-column">
+      <header className="sim-map-head"><strong>Hospital Floor 1 · Shared simulation map</strong><span>1 robot · 8 zones</span></header>
+      <div className="sim-map-canvas">
+        <img src={workflowRouteMap} alt="Shared Hospital Floor 1 simulation map" />
+        <i className="sim-route-line" />
+        <span className={runStatus === 'READY' ? 'sim-robot is-idle' : 'sim-robot'} style={robotPosition}>MAR</span>
+        <span className="sim-map-caption">{runStatus === 'RUNNING' ? currentLabel : runStatus === 'SUCCEEDED' ? 'Route complete · Room 305' : 'Pharmacy Pickup → Room 305'}</span>
+      </div>
+      <footer className="sim-runbar">
+        <div className="sim-run-status"><strong>{runStatus === 'READY' ? 'Ready to run' : currentLabel}</strong><span>{selected ? (selected.workflowName || selected.name) : 'Loading workflow definitions…'}</span></div>
+        <span className="sim-time">{time}</span>
+        <div className="sim-speed" aria-label="Simulation speed">{[1, 2, 5].map((value) => <button className={speed === value ? 'active' : ''} type="button" key={value} onClick={() => setSpeed(value)}>{value}×</button>)}</div>
+        <MarButton variant="subtle" onClick={reset}>Reset</MarButton>
+        <MarButton onClick={run}>{runStatus === 'RUNNING' ? 'Running…' : runStatus === 'SUCCEEDED' ? 'Run again' : '▶ Run'}</MarButton>
+      </footer>
+    </section>
+    <aside className="sim-inspector">
+      <p className="sim-kicker">Workflow configuration</p>
+      <h2 className="sim-name">{selected ? (selected.workflowName || selected.name) : 'Loading workflow…'}</h2>
+      <p className="sim-code">{selected ? `${selected.workflowCode || selected.code} · ${selected.status || 'DRAFT'}` : 'Workflow definition API'}</p>
+      <div className="sim-progress"><i style={{ width: `${Math.round(progress * 100)}%` }} /></div>
+      <div className="sim-progress-label"><span>Simulation progress</span><b>{Math.round(progress * 100)}%</b></div>
+      <div className="sim-steps">{sequence.map((step, index) => <article className={index < completedSteps ? 'sim-step done' : index === completedSteps && runStatus === 'RUNNING' ? 'sim-step current' : 'sim-step'} key={step}><b>{index < completedSteps || runStatus === 'SUCCEEDED' ? '✓' : String(index + 1).padStart(2, '0')}</b><div><strong>{step.replace('_', ' ')}</strong><small>{index < completedSteps || runStatus === 'SUCCEEDED' ? 'Completed' : index === completedSteps && runStatus === 'RUNNING' ? 'Running now' : 'Waiting'}</small></div></article>)}</div>
+    </aside>
+  </section>;
 }
 
 function EditorSide({ activeTask, screen, setScreen, setActiveTask, customTask }) {
