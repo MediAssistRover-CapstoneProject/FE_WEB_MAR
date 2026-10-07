@@ -30,6 +30,13 @@ button.ws-tile:hover { background: #e8eef6; }
 .ws-map { background: #f8fafc; height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
 .ws-map-image { position: relative; flex: 1; min-height: 0; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 8px; }
 .ws-map-image img { position: absolute; width: 100%; height: 100%; object-fit: cover; top: 0; left: 0; }
+.ws-simulation-path { position: absolute; left: 23%; top: 27%; width: 61%; height: 56%; border: 3px dashed #2f80ff; border-left: 0; border-bottom: 0; border-radius: 0 18px 0 0; opacity: .72; pointer-events: none; }
+.ws-sim-robot { position: absolute; z-index: 2; display: grid; place-items: center; width: 34px; height: 34px; border: 3px solid #fff; border-radius: 50%; background: #2f80ff; box-shadow: 0 0 0 3px #93c5fd, 0 5px 16px #1d4ed866; color: #fff; font-size: 9px; font-weight: 700; transform: translate(-50%, -50%); transition: left 1s ease, top 1s ease; }
+.ws-sim-robot::after { content: 'MAR-01'; position: absolute; top: 38px; left: 50%; padding: 3px 6px; border-radius: 4px; background: #0f172acc; color: #fff; font-size: 9px; white-space: nowrap; transform: translateX(-50%); }
+.ws-simulation-progress { height: 8px; overflow: hidden; border-radius: 999px; background: #dbeafe; }
+.ws-simulation-progress i { display: block; height: 100%; border-radius: inherit; background: #2f80ff; transition: width 1s ease; }
+.ws-screen[data-node-id="571:52018"] .ws-map-image::after { content: 'MAR-01'; position: absolute; z-index: 2; left: 84%; top: 23%; display: grid; width: 34px; height: 34px; place-items: center; border: 3px solid #fff; border-radius: 50%; background: #2f80ff; box-shadow: 0 0 0 3px #93c5fd, 0 5px 16px #1d4ed866; color: #fff; font-size: 8px; font-weight: 700; transform: translate(-50%, -50%); animation: ws-simulate-route 5.6s ease-in-out forwards; }
+@keyframes ws-simulate-route { 0% { left:84%; top:23%; } 25% { left:84%; top:42%; } 55% { left:60%; top:64%; } 78% { left:37%; top:64%; } 100% { left:23%; top:79%; } }
 .ws-map > small { color: #475569; }
 .ws-details-grid { display: grid; grid-template-columns: minmax(0, 824fr) minmax(270px, 320fr); gap: 20px; height: calc(100vh - 230px); min-height: 0; margin-top: 24px; }
 .ws-details-grid .ws-controls { height: 100%; }
@@ -78,7 +85,14 @@ const initialHistory = [
   { id: 'JOB-ESC-102', type: 'escort', destination: 'Outpatient Clinic', status: 'SUCCEEDED' },
   { id: 'JOB-DEL-101', type: 'delivery', destination: 'Room 305', status: 'CANCELLED' },
 ];
-const titles = { stations: 'Dispatch', configuration: 'Dispatch — Configuration', ready: 'Dispatch — Pharmacy Counter', disabled: 'Dispatch — Disabled', manual: 'Manual Dispatch', delivery: 'Dispatch — New Job', request: 'Dispatch — Delivery Request', escort: 'Manual Dispatch — New Escort Job', 'review-delivery': 'Dispatch — Review Delivery', 'review-escort': 'Dispatch — Review Escort', missing: 'Dispatch — Missing Input', jobs: 'Dispatch — Jobs', button: 'Dispatch — Workflow Button', working: 'Dispatch — Pharmacy Counter', prompt: 'Dispatch — Pharmacy Counter', history: 'Dispatch — Pharmacy Counter', 'escort-running': 'Job — Patient Escort Running' };
+const simulationStages = [
+  { label: 'Validating workflow inputs', left: '84%', top: '23%' },
+  { label: 'Leaving Pharmacy Pickup', left: '84%', top: '42%' },
+  { label: 'Navigating the main corridor', left: '60%', top: '64%' },
+  { label: 'Approaching destination', left: '37%', top: '64%' },
+  { label: 'Delivery completed', left: '23%', top: '79%' },
+];
+const titles = { stations: 'Dispatch', configuration: 'Dispatch — Configuration', ready: 'Dispatch — Pharmacy Counter', disabled: 'Dispatch — Disabled', delivery: 'Dispatch — New Job', request: 'Dispatch — Delivery Request', escort: 'Dispatch — New Escort Job', 'review-delivery': 'Dispatch — Review Delivery', 'review-escort': 'Dispatch — Review Escort', missing: 'Dispatch — Missing Input', jobs: 'Dispatch — Jobs', button: 'Dispatch — Workflow Button', working: 'Dispatch — Workflow Simulation', prompt: 'Dispatch — Pharmacy Counter', history: 'Dispatch — Pharmacy Counter', 'escort-running': 'Job — Patient Escort Running' };
 const storageKey = 'mediassist-workstations-v1';
 function readSaved() { try { return JSON.parse(localStorage.getItem(storageKey)) || {}; } catch { return {}; } }
 
@@ -109,6 +123,7 @@ export default function WorkstationsPage() {
   const [search, setSearch] = useState('');
   const [errors, setErrors] = useState({});
   const [sequence, setSequence] = useState(saved.sequence || 104);
+  const [simulationStep, setSimulationStep] = useState(0);
   const [catalog, setCatalog] = useState({ endpoints: [], rooms: [], workflows: [], loading: true, error: '' });
   useEffect(() => {
     let active = true;
@@ -118,6 +133,22 @@ export default function WorkstationsPage() {
     return () => { active = false; };
   }, []);
   useEffect(() => { try { localStorage.setItem(storageKey, JSON.stringify({ station, stations, button, activeJob, history, sequence })); } catch { /* UI remains usable if storage is unavailable. */ } }, [station, stations, button, activeJob, history, sequence]);
+  useEffect(() => {
+    if (view !== 'working' || activeJob.status !== 'RUNNING') return undefined;
+    setSimulationStep(0);
+    const timer = window.setInterval(() => {
+      setSimulationStep((current) => {
+        const next = current + 1;
+        if (next >= simulationStages.length) {
+          window.clearInterval(timer);
+          setActiveJob((job) => ({ ...job, status: 'SUCCEEDED' }));
+          return simulationStages.length - 1;
+        }
+        return next;
+      });
+    }, 1400);
+    return () => window.clearInterval(timer);
+  }, [view, activeJob.id, activeJob.status]);
   const endpointOptions = catalog.endpoints.filter((item) => item.active && item.accessible).map((item) => ({ value: item.endpointId, label: `${item.endpointCode} · ${item.endpointName}` }));
   const destinationOptions = [...catalog.rooms.filter((item) => item.active).map((item) => ({ value: item.roomId, label: `${item.roomCode} · ${item.roomName}` })), ...endpointOptions];
   const dispatchDefinitions = catalog.workflows.map((item) => ({ id: item.workflowId, code: item.workflowCode, name: item.workflowName, status: item.status, label: `${item.workflowCode} · ${item.workflowName}` }));
@@ -127,7 +158,7 @@ export default function WorkstationsPage() {
   const go = next => { setSearch(''); setErrors({}); setParams(next === 'stations' ? {} : { view: next }); };
   function saveStation(value) { setStation(value); setStations(items => [...items.filter(item => item.id !== value.id), value]); }
   const editStation = () => { setStationDraft(station); go('configuration'); };
-  const newJob = type => { setJob({ ...initialJob, type, description: type === 'escort' ? 'Escort patient to Room 305' : initialJob.description }); go(type); };
+  const newJob = type => { setSimulationStep(0); setJob({ ...initialJob, type, description: type === 'escort' ? 'Escort patient to Room 305' : initialJob.description }); go(type); };
   const update = (key, value) => setJob(previous => ({ ...previous, [key]: value }));
   const action = (label, onClick, primary = false) => <MarButton variant={primary ? 'primary' : 'subtle'} className="ws-action" onClick={onClick}>{label}</MarButton>;
   const fields = (data, setter, schema) => schema.map(([key, label, options, type]) => <Field key={key} label={label} value={data[key]} options={options} type={type} onChange={value => setter(previous => ({ ...previous, [key]: value }))} error={errors[key]} />);
@@ -146,7 +177,7 @@ export default function WorkstationsPage() {
     if (!validate()) return;
     const id = `JOB-${job.type === 'escort' ? 'ESC' : 'DEL'}-${sequence + 1}`;
     const next = { ...job, id, status: immediate ? 'RUNNING' : 'CREATED' };
-    setSequence(sequence + 1); setActiveJob(next);
+    setSequence(sequence + 1); setSimulationStep(0); setActiveJob(next);
     go(immediate ? 'working' : 'created');
   }
   function setStatus(status) {
@@ -165,7 +196,7 @@ export default function WorkstationsPage() {
     const matches = dispatchDefinitions.filter((item) => `${item.code} ${item.name}`.toLowerCase().includes(search.toLowerCase()));
     const dispatch = (definition) => { setButton((current) => ({ ...current, workflow: definition.id })); setJob({ ...initialJob, type: /escort/i.test(definition.label) ? 'escort' : 'delivery', description: `Dispatch ${definition.name}` }); go('delivery'); };
     content = <><h2>DISPATCH</h2><p>Select a workflow definition, configure the required inputs, then dispatch it to an available robot.</p>{action('+ New dispatch', () => newJob('delivery'), true)}<Field label="Search workflow definitions" value={search} onChange={setSearch} />{catalog.error && <p>{catalog.error}</p>}{catalog.loading && <p>Loading workflow definitions…</p>}{matches.map((definition) => <div className="ws-station-entry" key={definition.id}><Tile title={definition.name}>{definition.code}<br />Status · {definition.status || 'DRAFT'}</Tile>{action('Configure & dispatch', () => dispatch(definition), true)}{action('Dispatch settings', () => { setButton((current) => ({ ...current, workflow: definition.id })); setStationDraft(station); go('configuration'); })}</div>)}{!catalog.loading && !matches.length && <p>No workflow definitions returned by the backend.</p>}</>;
-    footer = action('Open manual dispatch', () => newJob('delivery'), true);
+    footer = null;
   } else if (view === 'configuration') {
     content = <><h2>DISPATCH PROFILE</h2>{catalog.error && <p>{catalog.error}</p>}{fields(stationDraft, setStationDraft, [['name', 'Dispatch profile name'], ['location', 'Location type', ['Endpoint', 'Location']], ['endpoint', 'Endpoint', endpointOptions.length ? includeCurrent(endpointOptions, stationDraft.endpoint) : [{ value: stationDraft.endpoint, label: catalog.loading ? 'Loading endpoints…' : stationDraft.endpoint }]], ['subscription', 'Prompt subscription', ['This dispatch profile', 'All dispatch profiles']]])}<h2>WORKFLOW CONFIGURATION</h2>{action('Configure workflow dispatch', () => { setButtonDraft(button); go('button'); })}<label className="ws-checkbox"><input type="checkbox" checked={stationDraft.enabled} onChange={e => setStationDraft(s => ({ ...s, enabled: e.target.checked }))} />Dispatch profile enabled</label>{action('Cancel', () => go('stations'))}</>;
     footer = action('Save dispatch profile', () => { if (!stationDraft.name.trim()) { setErrors({ name: 'Enter a dispatch profile name.' }); return; } saveStation({ ...stationDraft, name: stationDraft.name.trim() }); go(stationDraft.enabled ? 'ready' : 'disabled'); }, true);
@@ -184,22 +215,22 @@ export default function WorkstationsPage() {
   } else if (view === 'request') {
     content = <><h2>PRECONFIGURED WORKSTATION DISPATCH</h2>{[['Button', button.label], ['Pickup', job.pickup], ['Destination', job.destination], ['Workflow version', `${button.workflow} · 1.0.0`], ['Robot', job.robot]].map(([label, value]) => <Field key={label} label={label} value={value} readOnly />)}{action('Review dispatch inputs', review)}{action('Back to workstation', () => go('ready'))}</>;
     footer = action('Dispatch Job', () => createJob(true), true);
-  } else if (view === 'manual') {
-    content = <><h2>WORK</h2>{action('+ New Job', () => newJob('delivery'), true)}{action('History', () => go('history'))}<Field label="Search jobs" value={search} onChange={setSearch} />{['FAILED', 'WAITING', 'RUNNING'].map(status => <Tile key={status} title={`${status} (${activeJob.status === status ? 1 : 0})`} onClick={activeJob.status === status ? () => go(status.toLowerCase()) : undefined}>{activeJob.status === status && `${activeJob.type === 'escort' ? 'Patient Escort' : 'Medical Delivery'} · ${activeJob.id}`}</Tile>)}{action('View Running Job', () => go('working'))}</>;
-    footer = action('Create Job', () => newJob('delivery'), true);
   } else if (view === 'working') {
-    content = <><Tile title="↑ Working">Robot is completing its assigned job.</Tile><Tile title="Job: Executing">{activeJob.type === 'escort' ? 'Patient Escort' : 'Medical Delivery'} · {activeJob.id}<br />{activeJob.pickup} → {activeJob.destination}</Tile><Tile title="✓ Pickup complete">Payload verified · Compartment locked</Tile><Tile title={`→ Move to ${activeJob.destination}`}>Executing · MAR-01</Tile><Tile title="Receiver authentication">Pending</Tile>{action('View Operator Prompt', () => { setActiveJob(a => ({ ...a, status: 'SUCCEEDED' })); go('prompt'); })}</>;
-    footer = action('View Job Details', () => go(activeJob.type === 'escort' ? 'escort-running' : 'running'));
+    const activeStage = simulationStages[simulationStep];
+    const percent = Math.round(((simulationStep + 1) / simulationStages.length) * 100);
+    const complete = activeJob.status === 'SUCCEEDED';
+    content = <><h2>{complete ? 'SIMULATION COMPLETED' : 'WORKFLOW SIMULATION'}</h2><Tile title={complete ? '✓ Job completed' : `Running · ${percent}%`}>{complete ? 'The simulated robot has reached its destination.' : activeStage.label}<br />{activeJob.type === 'escort' ? 'Patient Escort' : 'Medical Delivery'} · {activeJob.id}</Tile><Tile title="Route">{activeJob.pickup} → {activeJob.destination}<br />MAR-01 · Browser simulation only</Tile><div className="ws-simulation-progress" aria-label={`Simulation progress: ${percent}%`}><i style={{ width: `${percent}%` }} /></div><p>{complete ? 'The result is recorded as succeeded. You can review the job or create another dispatch.' : 'The robot advances automatically through this workflow. No manual control or live robot command is used.'}</p></>;
+    footer = complete ? action('View Job Details', () => go(activeJob.type === 'escort' ? 'escort-running' : 'succeeded'), true) : action('Restart simulation', () => { setActiveJob((job) => ({ ...job, status: 'RUNNING' })); setSimulationStep(0); }, true);
   } else if (view === 'prompt') {
     content = <><h2>OPERATOR PROMPT</h2><Tile title="Delivery completed">{activeJob.destination} · {activeJob.id}<br />Would you like to dispatch this workflow again?</Tile>{action('Repeat Delivery', () => createJob(true), true)}{action('Finish — Do Not Repeat', () => { const complete = { ...activeJob, status: 'SUCCEEDED' }; setHistory(h => [complete, ...h.filter(j => j.id !== complete.id)]); setActiveJob(complete); go('ready'); })}<small>Shown when the button repeat rule is Ask user.</small></>;
     footer = action('Close', () => go('ready'));
   } else if (view === 'history') {
     const filtered = history.filter(item => `${item.id} ${item.type} ${item.destination} ${item.status}`.toLowerCase().includes(search.toLowerCase()));
     content = <><h2>WORK HISTORY</h2><Field label="Search" value={search} onChange={setSearch} />{filtered.map(item => <Tile key={item.id} title={`${item.status === 'SUCCEEDED' ? '✓ ' : ''}${item.type === 'escort' ? 'Patient Escort' : 'Medical Delivery'}`} onClick={() => { setActiveJob({ ...initialJob, ...item }); go(item.status.toLowerCase()); }}>{item.status} · {item.destination}<br />MAR-01 · {item.id}</Tile>)}{!filtered.length && <p>No jobs found.</p>}</>;
-    footer = action('Back to Work Monitor', () => go('manual'));
+    footer = action('Back to Dispatch', () => go('stations'));
   } else if (view === 'jobs') {
     content = <><h2>OVERVIEW</h2>{Object.entries(statusHelp).map(([status, help]) => <Tile title={status} key={status} onClick={() => go(status.toLowerCase())}>{help}</Tile>)}</>;
-    footer = action('New Manual Dispatch', () => go('manual'), true);
+    footer = action('New dispatch', () => newJob('delivery'), true);
   } else if (view === 'missing') {
     content = <><h2>OVERVIEW</h2><Tile title="Job not created">Required inputs must be valid before creating a job.</Tile>{fields(job, setJob, job.type === 'escort' ? [['destination', 'dropoff_location_id'], ['session', 'Patient session']] : [['destination', 'dropoff_location_id'], ['payload', 'payload_id'], ['pickup', 'Pickup']])}</>;
     footer = action('Complete Required Inputs', review, true);

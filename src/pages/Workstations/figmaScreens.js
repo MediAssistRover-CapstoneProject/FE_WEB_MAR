@@ -21,13 +21,8 @@ export const figmaScreens = [
     "view": "disabled"
   },
   {
-    "id": "571:51499",
-    "name": "SPEC v1 / 44 / Manual Dispatch",
-    "view": "manual"
-  },
-  {
     "id": "571:51537",
-    "name": "SPEC v1 / 45 / Manual Dispatch — Delivery",
+    "name": "SPEC v1 / 45 / Workflow Dispatch — Delivery",
     "view": "delivery"
   },
   {
@@ -37,7 +32,7 @@ export const figmaScreens = [
   },
   {
     "id": "571:51621",
-    "name": "SPEC v1 / 47 / Manual Dispatch — Patient Escort",
+    "name": "SPEC v1 / 47 / Workflow Dispatch — Patient Escort",
     "view": "escort"
   },
   {

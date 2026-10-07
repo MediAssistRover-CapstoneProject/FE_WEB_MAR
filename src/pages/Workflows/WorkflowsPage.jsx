@@ -526,7 +526,7 @@ const navGroups = [
   ['Overview', ['Dashboard']],
   ['Operations', ['Live Operations', 'Emergency Center', 'Missions', 'Patrol']],
   ['Map & Navigation', ['Map Studio']],
-  ['Robot', ['Robot Status', 'Manual Control', 'Charging']],
+  ['Robot', ['Robot Status', 'Charging']],
   ['Monitoring', ['Alerts', 'Crowd Heatmap', 'History & Replay', 'Analytics']],
   ['Automation', ['Workflows', 'Voice & Scripts']],
   ['Administration', ['Users & Roles', 'System Settings', 'Audit Logs']],

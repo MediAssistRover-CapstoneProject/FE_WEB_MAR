@@ -76,7 +76,7 @@ function ScanStage({ setStage }) {
     <div className="map-stage-layout scan-layout">
       <Panel title="Live LiDAR occupancy map" className="map-lidar-panel"><MapImage src={scanLidar} alt="Live LiDAR occupancy scan of Hospital Floor 1" /></Panel>
       <aside className="map-side-stack">
-        <Panel title="Mapping status" className="mapping-status"><strong className={paused ? 'warning-text' : 'recording'}>● {paused ? 'PAUSED' : 'RECORDING'}</strong><StatusPair label="Elapsed" value="08:42" /><StatusPair label="Mapped Area" value="418 m²" /><StatusPair label="LiDAR" value="Healthy" good /><StatusPair label="Localization" value="Good" good /><StatusPair label="Loop Closure" value="Detected" good /><StatusPair label="Resolution" value="0.05 m" /><Button>Manual Drive</Button><Button>Set Robot Pose</Button></Panel>
+        <Panel title="Mapping status" className="mapping-status"><strong className={paused ? 'warning-text' : 'recording'}>● {paused ? 'PAUSED' : 'RECORDING'}</strong><StatusPair label="Elapsed" value="08:42" /><StatusPair label="Mapped Area" value="418 m²" /><StatusPair label="LiDAR" value="Healthy" good /><StatusPair label="Localization" value="Good" good /><StatusPair label="Loop Closure" value="Detected" good /><StatusPair label="Resolution" value="0.05 m" /><Button>Run route simulation</Button><Button>Set Robot Pose</Button></Panel>
         <Panel title="Mapping checklist" className="mapping-checklist">{['LiDAR online', 'Drive slowly', 'Close mapping loop', 'Scan all corridors', 'Avoid moving crowds'].map(item => <p key={item}>✓ <span>{item}</span></p>)}<Button tone="danger" onClick={() => setDiscarded(true)}>{discarded ? 'Session discarded' : 'Discard Session'}</Button></Panel>
       </aside>
     </div>
