@@ -1,3 +1,5 @@
+import { vi } from '../../i18n/vi.js';
+import WorkspaceTabs from '../../components/WorkspaceTabs.jsx';
 import { injectStyles } from '../../styles/injectStyles.js';
 import workflowRouteMap from '../../assets/images/workflow-simulation-route.png';
 import simulationRover from '../../assets/images/simulation-rover.png';
@@ -645,7 +647,7 @@ export function Sidebar() {
 export function MarButton({ children, variant = 'primary', className = '', onClick }) {
   return (
     <button className={`wf-button ${variant} ${className}`.trim()} type="button" onClick={onClick}>
-      {children}
+      {vi(children)}
     </button>
   );
 }
@@ -653,7 +655,7 @@ export function MarButton({ children, variant = 'primary', className = '', onCli
 function Field({ label, value }) {
   return (
     <label className="wf-field">
-      <span>{label}</span>
+      <span>{vi(label)}</span>
       <input value={value} readOnly />
     </label>
   );
@@ -662,11 +664,7 @@ function Field({ label, value }) {
 function Tabs() {
   const navigate = useNavigate();
   return (
-    <div className="workflow-tabs">
-      <MarButton className="tab-button">Workflows</MarButton>
-      <MarButton className="tab-button" variant="subtle" onClick={() => navigate('/workstations')}>Dispatch</MarButton>
-      <MarButton className="tab-button" variant="subtle" onClick={() => navigate('/workstations?view=jobs')}>Jobs</MarButton>
-    </div>
+    <WorkspaceTabs label="Không gian quy trình" active="workflow" onSelect={id=>navigate(id==='workflow'?'/workflows':id==='dispatch'?'/workstations':'/workstations?view=jobs')} items={[{id:'workflow',label:'Quy trình'},{id:'dispatch',label:'Điều phối'},{id:'jobs',label:'Công việc'}]}/>
   );
 }
 
@@ -734,46 +732,46 @@ export function DispatchSimulationPreview({ onCreate, definitions, loading, erro
   const reset = () => { setElapsed(0); setRunStatus('READY'); };
   const time = `00:${String(Math.floor(elapsed)).padStart(2, '0')}`;
 
-  return <section className="simulation-studio" aria-label="Workflow simulation workspace">
+  return <section className="simulation-studio" aria-label={vi("Workflow simulation workspace")}>
     <aside className="sim-library">
-      <p className="sim-kicker">Workflow library</p>
-      <h2>Available workflows</h2>
-      <p>Select an existing workflow. All workflows use the same Hospital Floor 1 simulation map.</p>
+      <p className="sim-kicker">{vi("Workflow library")}</p>
+      <h2>{vi("Available workflows")}</h2>
+      <p>{vi("Select an existing workflow. All workflows use the same Hospital Floor 1 simulation map.")}</p>
       <div className="sim-workflow-list">
-        {available.map((workflow) => {
+        {vi(available.map((workflow) => {
           const key = getKey(workflow);
           return <button className={key === getKey(selected) ? 'active' : ''} type="button" key={key} onClick={() => chooseWorkflow(key)}>
-            <strong>{workflow.workflowName || workflow.name}</strong>
-            <small>{workflow.workflowCode || workflow.code} · {workflow.status || 'DRAFT'}</small>
+            <strong>{vi(workflow.workflowName || workflow.name)}</strong>
+            <small>{vi(workflow.workflowCode || workflow.code)}{vi(" · ")}{vi(workflow.status || 'DRAFT')}</small>
           </button>;
-        })}
-        {!loading && !available.length && <p className="preview-note">{error || 'No workflow definitions returned by the backend.'}</p>}
+        }))}
+        {vi(!loading && !available.length && <p className="preview-note">{vi(error || 'No workflow definitions returned by the backend.')}</p>)}
       </div>
-      <MarButton className="sim-new-workflow" variant="subtle" onClick={onCreate}>+ Create workflow</MarButton>
+      <MarButton className="sim-new-workflow" variant="subtle" onClick={onCreate}>{vi("+ Create workflow")}</MarButton>
     </aside>
     <section className="sim-map-column">
-      <header className="sim-map-head"><strong>Hospital Floor 1 · Shared simulation map</strong><span>1 robot · 8 zones</span></header>
+      <header className="sim-map-head"><strong>{vi("Hospital Floor 1 · Shared simulation map")}</strong><span>{vi("1 robot · 8 zones")}</span></header>
       <div className="sim-map-canvas" ref={mapCanvasRef}>
-        <img className="sim-map-backdrop" src={workflowRouteMap} alt="" aria-hidden="true" />
-        <img className="sim-map-foreground" src={workflowRouteMap} alt="Shared Hospital Floor 1 simulation map" />
-        <span className={runStatus === 'READY' ? 'sim-robot is-idle' : 'sim-robot'} style={robotPosition}><img src={simulationRover} alt="" /></span>
-        <span className="sim-map-caption">{runStatus === 'RUNNING' ? currentLabel : runStatus === 'SUCCEEDED' ? 'Route complete · Room 305' : 'Pharmacy Pickup → Room 305'}</span>
+        <img className="sim-map-backdrop" src={workflowRouteMap} alt={vi("")} aria-hidden="true" />
+        <img className="sim-map-foreground" src={workflowRouteMap} alt={vi("Shared Hospital Floor 1 simulation map")} />
+        <span className={runStatus === 'READY' ? 'sim-robot is-idle' : 'sim-robot'} style={robotPosition}><img src={simulationRover} alt={vi("")} /></span>
+        <span className="sim-map-caption">{vi(runStatus === 'RUNNING' ? currentLabel : runStatus === 'SUCCEEDED' ? 'Route complete · Room 305' : 'Pharmacy Pickup → Room 305')}</span>
       </div>
       <footer className="sim-runbar">
-        <div className="sim-run-status"><strong>{runStatus === 'READY' ? 'Ready to run' : currentLabel}</strong><span>{selected ? (selected.workflowName || selected.name) : 'Loading workflow definitions…'}</span></div>
-        <span className="sim-time">{time}</span>
-        <div className="sim-speed" aria-label="Simulation speed">{[1, 2, 3, 5].map((value) => <button className={speed === value ? 'active' : ''} type="button" key={value} onClick={() => setSpeed(value)}>{value}×</button>)}</div>
-        <MarButton variant="subtle" onClick={reset}>Reset</MarButton>
-        <MarButton onClick={run}>{runStatus === 'RUNNING' ? 'Running…' : runStatus === 'SUCCEEDED' ? 'Run again' : '▶ Run'}</MarButton>
+        <div className="sim-run-status"><strong>{vi(runStatus === 'READY' ? 'Ready to run' : currentLabel)}</strong><span>{vi(selected ? (selected.workflowName || selected.name) : 'Loading workflow definitions…')}</span></div>
+        <span className="sim-time">{vi(time)}</span>
+        <div className="sim-speed" aria-label={vi("Simulation speed")}>{vi([1, 2, 3, 5].map((value) => <button className={speed === value ? 'active' : ''} type="button" key={value} onClick={() => setSpeed(value)}>{vi(value)}{vi("×")}</button>))}</div>
+        <MarButton variant="subtle" onClick={reset}>{vi("Reset")}</MarButton>
+        <MarButton onClick={run}>{vi(runStatus === 'RUNNING' ? 'Running…' : runStatus === 'SUCCEEDED' ? 'Run again' : '▶ Run')}</MarButton>
       </footer>
     </section>
     <aside className="sim-inspector">
-      <p className="sim-kicker">Workflow configuration</p>
-      <h2 className="sim-name">{selected ? (selected.workflowName || selected.name) : 'Loading workflow…'}</h2>
-      <p className="sim-code">{selected ? `${selected.workflowCode || selected.code} · ${selected.status || 'DRAFT'}` : 'Workflow definition API'}</p>
+      <p className="sim-kicker">{vi("Workflow configuration")}</p>
+      <h2 className="sim-name">{vi(selected ? (selected.workflowName || selected.name) : 'Loading workflow…')}</h2>
+      <p className="sim-code">{vi(selected ? `${selected.workflowCode || selected.code} · ${selected.status || 'DRAFT'}` : 'Workflow definition API')}</p>
       <div className="sim-progress"><i style={{ width: `${Math.round(progress * 100)}%` }} /></div>
-      <div className="sim-progress-label"><span>Simulation progress</span><b>{Math.round(progress * 100)}%</b></div>
-      <div className="sim-steps">{sequence.map((step, index) => <article className={index < completedSteps ? 'sim-step done' : index === completedSteps && runStatus === 'RUNNING' ? 'sim-step current' : 'sim-step'} key={step}><b>{index < completedSteps || runStatus === 'SUCCEEDED' ? '✓' : String(index + 1).padStart(2, '0')}</b><div><strong>{step.replace('_', ' ')}</strong><small>{index < completedSteps || runStatus === 'SUCCEEDED' ? 'Completed' : index === completedSteps && runStatus === 'RUNNING' ? 'Running now' : 'Waiting'}</small></div></article>)}</div>
+      <div className="sim-progress-label"><span>{vi("Simulation progress")}</span><b>{vi(Math.round(progress * 100))}{vi("%")}</b></div>
+      <div className="sim-steps">{vi(sequence.map((step, index) => <article className={index < completedSteps ? 'sim-step done' : index === completedSteps && runStatus === 'RUNNING' ? 'sim-step current' : 'sim-step'} key={step}><b>{vi(index < completedSteps || runStatus === 'SUCCEEDED' ? '✓' : String(index + 1).padStart(2, '0'))}</b><div><strong>{vi(step.replace('_', ' '))}</strong><small>{vi(index < completedSteps || runStatus === 'SUCCEEDED' ? 'Completed' : index === completedSteps && runStatus === 'RUNNING' ? 'Running now' : 'Waiting')}</small></div></article>))}</div>
     </aside>
   </section>;
 }
@@ -782,19 +780,19 @@ function Library({ saved, onCreate, onOpenDraft, definitions, loading, error }) 
   return (
     <div className="workflows-grid">
       <section className="workflow-panel library-panel">
-        <h2>WORKFLOW DEFINITIONS · {loading ? 'LOADING' : definitions.length}</h2>
+        <h2>{vi("WORKFLOW DEFINITIONS · ")}{vi(loading ? 'LOADING' : definitions.length)}</h2>
         <div className="workflow-list">
-          {definitions.map((workflow) => (
+          {vi(definitions.map((workflow) => (
             <button className="workflow-card" type="button" key={workflow.workflowId || workflow.code} onClick={onCreate}>
-              <strong>{workflow.workflowName || workflow.name}</strong>
-              <span>{workflow.workflowCode || workflow.code}<b>·</b>{workflow.status || ((workflow.steps || 0) + ' steps')}<em>→</em></span>
+              <strong>{vi(workflow.workflowName || workflow.name)}</strong>
+              <span>{vi(workflow.workflowCode || workflow.code)}<b>{vi(" · ")}</b>{vi(workflow.status || ((workflow.steps || 0) + ' steps'))}<em>{vi("→")}</em></span>
             </button>
-          ))}
-          {!loading && !definitions.length && <p className="preview-note">{error || 'No workflow definitions returned by the backend.'}</p>}
+          )))}
+          {vi(!loading && !definitions.length && <p className="preview-note">{vi(error || 'No workflow definitions returned by the backend.')}</p>)}
         </div>
       </section>
       <aside className="workflow-panel action-panel">
-        {saved ? <><h2>MY WORKFLOWS</h2><h3>New workflow</h3><p>DRAFT · New tasks</p><MarButton className="full" onClick={onOpenDraft}>Open Draft</MarButton><MarButton className="full" variant="subtle" onClick={onCreate}>+ Create Workflow</MarButton><h2>WORKFLOW DEFINITIONS</h2><p>Definitions are loaded from the backend catalog.</p></> : <><h2>CREATE A WORKFLOW</h2><p>Build a workflow, define its tasks, and configure its available step types.</p><MarButton className="full" onClick={onCreate}>+ Create Workflow</MarButton><h2>WORKFLOW DEFINITIONS</h2><p>Select an existing workflow to inspect its configuration.</p></>}
+        {vi(saved ? <><h2>{vi("MY WORKFLOWS")}</h2><h3>{vi("New workflow")}</h3><p>{vi("DRAFT · New tasks")}</p><MarButton className="full" onClick={onOpenDraft}>{vi("Open Draft")}</MarButton><MarButton className="full" variant="subtle" onClick={onCreate}>{vi("+ Create Workflow")}</MarButton><h2>{vi("WORKFLOW DEFINITIONS")}</h2><p>{vi("Definitions are loaded from the backend catalog.")}</p></> : <><h2>{vi("CREATE A WORKFLOW")}</h2><p>{vi("Build a workflow, define its tasks, and configure its available step types.")}</p><MarButton className="full" onClick={onCreate}>{vi("+ Create Workflow")}</MarButton><h2>{vi("WORKFLOW DEFINITIONS")}</h2><p>{vi("Select an existing workflow to inspect its configuration.")}</p></>)}
       </aside>
     </div>
   );
@@ -805,14 +803,14 @@ function EditorSide({ activeTask, screen, setScreen, setActiveTask, customTask }
 
   return (
     <section className="workflow-panel editor-side">
-      <h2>WORKFLOW</h2>
+      <h2>{vi("WORKFLOW")}</h2>
       <Field label="Name" value="New workflow" />
       <Field label="Description" value="Add a description..." />
       <div className="task-heading">
-        <h2>TASKS · 4 DEFAULTS</h2>
-        {screen !== 'create' ? <button type="button" onClick={() => setScreen('add-task')}>+</button> : null}
+        <h2>{vi("TASKS · 4 DEFAULTS")}</h2>
+        {vi(screen !== 'create' ? <button type="button" onClick={() => setScreen('add-task')}>{vi("+")}</button> : null)}
       </div>
-      {allTasks.map((task) => (
+      {vi(allTasks.map((task) => (
         <button
           className={activeTask === task ? 'editor-side-button active' : 'editor-side-button'}
           type="button"
@@ -822,16 +820,12 @@ function EditorSide({ activeTask, screen, setScreen, setActiveTask, customTask }
             setScreen(task === 'Confirm delivery' ? 'custom-task' : 'task-empty');
           }}
         >
-          {task}
+          {vi(task)}
         </button>
-      ))}
-      <h2 className="endpoint-heading">ENDPOINT CONFIGURATION</h2>
-      <button className={screen === 'options' || screen === 'queue-exit' ? 'editor-side-button small active' : 'editor-side-button small'} type="button" onClick={() => setScreen('options')}>
-        Options ›
-      </button>
-      <button className={screen === 'marker' || screen === 'marker-sensors' ? 'editor-side-button small active' : 'editor-side-button small'} type="button" onClick={() => setScreen('marker')}>
-        Marker Options ›
-      </button>
+      )))}
+      <h2 className="endpoint-heading">{vi("ENDPOINT CONFIGURATION")}</h2>
+      <button className={screen === 'options' || screen === 'queue-exit' ? 'editor-side-button small active' : 'editor-side-button small'} type="button" onClick={() => setScreen('options')}>{vi("Options ›")}</button>
+      <button className={screen === 'marker' || screen === 'marker-sensors' ? 'editor-side-button small active' : 'editor-side-button small'} type="button" onClick={() => setScreen('marker')}>{vi("Marker Options ›")}</button>
     </section>
   );
 }
@@ -839,9 +833,9 @@ function EditorSide({ activeTask, screen, setScreen, setActiveTask, customTask }
 function SelectTaskPanel() {
   return (
     <section className="workflow-panel editor-detail">
-      <h2>SELECT A TASK</h2>
-      <h3>Select Move, Load, Transport or Unload to build its step sequence.</h3>
-      <p>Each task has an ordered list of steps. Use + Add Step to choose from the step type library.</p>
+      <h2>{vi("SELECT A TASK")}</h2>
+      <h3>{vi("Select Move, Load, Transport or Unload to build its step sequence.")}</h3>
+      <p>{vi("Each task has an ordered list of steps. Use + Add Step to choose from the step type library.")}</p>
     </section>
   );
 }
@@ -851,38 +845,38 @@ function TaskPanel({ task, screen, setScreen }) {
 
   return (
     <section className="workflow-panel editor-detail">
-      <h2>TASK</h2>
-      <h3 className="large">{task}</h3>
-      {screen === 'step-types' ? (
+      <h2>{vi("TASK")}</h2>
+      <h3 className="large">{vi(task)}</h3>
+      {vi(screen === 'step-types' ? (
         <>
-          <MarButton className="wide" variant="subtle">Select step type ▴</MarButton>
+          <MarButton className="wide" variant="subtle">{vi("Select step type ▴")}</MarButton>
           <div className="step-dropdown">
-            {stepTypes.map((type, index) => (
+            {vi(stepTypes.map((type, index) => (
               <button type="button" key={type} onClick={() => setScreen(index === 1 ? 'two-steps' : 'one-step')}>
-                {type}
+                {vi(type)}
               </button>
-            ))}
+            )))}
           </div>
         </>
       ) : (
         <>
-          <h2>STEP SEQUENCE · {steps.length ? `${steps.length} ${steps.length === 1 ? 'STEP' : 'STEPS'}` : 'EMPTY'}</h2>
+          <h2>{vi("STEP SEQUENCE · ")}{vi(steps.length ? `${steps.length} ${steps.length === 1 ? 'STEP' : 'STEPS'}` : 'EMPTY')}</h2>
           {steps.length ? (
             <>
               {steps.map((step, index) => (
                 <div className="step-row" key={step}>
-                  {String(index + 1).padStart(2, '0')}
-                  <span>{step}</span>
+                  {vi(String(index + 1).padStart(2, '0'))}
+                  <span>{vi(step)}</span>
                 </div>
               ))}
-              <p>Step type selected from the library. Configuration uses the predefined defaults.</p>
+              <p>{vi("Step type selected from the library. Configuration uses the predefined defaults.")}</p>
             </>
           ) : (
-            <p>No steps yet. Add a step from the library.</p>
+            <p>{vi("No steps yet. Add a step from the library.")}</p>
           )}
-          <MarButton className="wide" variant="subtle" onClick={() => setScreen('step-types')}>+ Add Step</MarButton>
+          <MarButton className="wide" variant="subtle" onClick={() => setScreen('step-types')}>{vi("+ Add Step")}</MarButton>
         </>
-      )}
+      ))}
     </section>
   );
 }
@@ -891,25 +885,25 @@ function OptionsPanel({ screen, setScreen }) {
   if (screen === 'queue-exit') {
     return (
       <section className="workflow-panel editor-detail">
-        <h2>OPTIONS / QUEUE & EXIT</h2>
-        <p>Endpoint template · Task sequences</p>
-        <h2>QUEUE</h2>
-        <p>Steps performed while waiting to access the endpoint.</p>
-        <MarButton className="wide" variant="subtle">+ Add Queue Step</MarButton>
-        <h2>EXIT</h2>
-        <p>Steps performed when leaving the endpoint.</p>
-        <MarButton className="wide" variant="subtle">+ Add Exit Step</MarButton>
+        <h2>{vi("OPTIONS / QUEUE & EXIT")}</h2>
+        <p>{vi("Endpoint template · Task sequences")}</p>
+        <h2>{vi("QUEUE")}</h2>
+        <p>{vi("Steps performed while waiting to access the endpoint.")}</p>
+        <MarButton className="wide" variant="subtle">{vi("+ Add Queue Step")}</MarButton>
+        <h2>{vi("EXIT")}</h2>
+        <p>{vi("Steps performed when leaving the endpoint.")}</p>
+        <MarButton className="wide" variant="subtle">{vi("+ Add Exit Step")}</MarButton>
       </section>
     );
   }
 
   return (
     <section className="workflow-panel editor-detail">
-      <h2>OPTIONS</h2>
-      <p>Endpoint-related settings</p>
-      <MarButton className="wide" variant="subtle" onClick={() => setScreen('queue-exit')}>Queue & Exit ›</MarButton>
-      <MarButton className="wide" variant="subtle" onClick={() => setScreen('marker')}>Marker Options ›</MarButton>
-      <p>Configure how the robot waits, leaves the endpoint and approaches its marker.</p>
+      <h2>{vi("OPTIONS")}</h2>
+      <p>{vi("Endpoint-related settings")}</p>
+      <MarButton className="wide" variant="subtle" onClick={() => setScreen('queue-exit')}>{vi("Queue & Exit ›")}</MarButton>
+      <MarButton className="wide" variant="subtle" onClick={() => setScreen('marker')}>{vi("Marker Options ›")}</MarButton>
+      <p>{vi("Configure how the robot waits, leaves the endpoint and approaches its marker.")}</p>
     </section>
   );
 }
@@ -930,16 +924,14 @@ function MarkerPanel({ sensors, setScreen }) {
 
   return (
     <section className="workflow-panel editor-detail">
-      <h2>MARKER OPTIONS</h2>
-      <p>Endpoint template · Dock marker geometry and behavior</p>
+      <h2>{vi("MARKER OPTIONS")}</h2>
+      <p>{vi("Endpoint template · Dock marker geometry and behavior")}</p>
       <div className="marker-grid">
-        {fields.map(([label, value]) => <Field label={label} value={value} key={label} />)}
+        {vi(fields.map(([label, value]) => <Field label={label} value={value} key={label} />))}
       </div>
       <label className="sensor-toggle">
-        <input type="checkbox" checked={sensors} readOnly />
-        Sensor monitoring
-      </label>
-      {!sensors ? <MarButton className="wide" variant="subtle" onClick={() => setScreen('marker-sensors')}>Turn Sensor Monitoring On</MarButton> : null}
+        <input type="checkbox" checked={sensors} readOnly />{vi("Sensor monitoring")}</label>
+      {vi(!sensors ? <MarButton className="wide" variant="subtle" onClick={() => setScreen('marker-sensors')}>{vi("Turn Sensor Monitoring On")}</MarButton> : null)}
     </section>
   );
 }
@@ -947,16 +939,14 @@ function MarkerPanel({ sensors, setScreen }) {
 function AddTaskPanel({ setScreen, setActiveTask }) {
   return (
     <section className="workflow-panel editor-detail">
-      <h2>NEW TASK</h2>
+      <h2>{vi("NEW TASK")}</h2>
       <Field label="Task name" value="Confirm delivery" />
-      <p>The task starts empty. Add steps from the same step type library.</p>
+      <p>{vi("The task starts empty. Add steps from the same step type library.")}</p>
       <MarButton className="wide" onClick={() => {
         setActiveTask('Confirm delivery');
         setScreen('custom-task');
-      }}>
-        Add Task
-      </MarButton>
-      <MarButton className="wide" variant="subtle" onClick={() => setScreen('create')}>Cancel</MarButton>
+      }}>{vi("Add Task")}</MarButton>
+      <MarButton className="wide" variant="subtle" onClick={() => setScreen('create')}>{vi("Cancel")}</MarButton>
     </section>
   );
 }
@@ -964,21 +954,21 @@ function AddTaskPanel({ setScreen, setActiveTask }) {
 function ReviewPanel() {
   return (
     <section className="workflow-panel editor-detail">
-      <h2>WORKFLOW DRAFT</h2>
+      <h2>{vi("WORKFLOW DRAFT")}</h2>
       <Field label="Name" value="New workflow" />
-      <h2>DEFAULT TASKS</h2>
-      <h3 className="large">Move → Load → Transport → Unload</h3>
-      <h2>Selected task</h2>
-      <h3>Move</h3>
-      <h2>Selected step type</h2>
-      <h3>MOVE</h3>
-      <p>Save as a draft. Empty tasks must be completed before validation and publishing.</p>
+      <h2>{vi("DEFAULT TASKS")}</h2>
+      <h3 className="large">{vi("Move → Load → Transport → Unload")}</h3>
+      <h2>{vi("Selected task")}</h2>
+      <h3>{vi("Move")}</h3>
+      <h2>{vi("Selected step type")}</h2>
+      <h3>{vi("MOVE")}</h3>
+      <p>{vi("Save as a draft. Empty tasks must be completed before validation and publishing.")}</p>
     </section>
   );
 }
 
 function StepConfigPanel({ step, onChange, onDone }) {
-  return <section className="workflow-panel editor-detail step-config-panel"><button className="config-back" onClick={onDone}>← Back to task</button><span className="modal-kicker">STEP CONFIGURATION</span><h2>{step.type}</h2><p>{stepTypeCopy[step.type][1]}</p><div className="inline-config-fields">{stepFields[step.type].map((field) => <label key={field}>{field}<input placeholder={`Enter ${field}`} value={step.values[field]} onChange={(event) => onChange({ ...step, values: { ...step.values, [field]: event.target.value } })} /></label>)}</div><button className="inline-config-save" onClick={onDone}>✓ Done · Back to task</button></section>;
+  return <section className="workflow-panel editor-detail step-config-panel"><button className="config-back" onClick={onDone}>{vi("← Back to task")}</button><span className="modal-kicker">{vi("STEP CONFIGURATION")}</span><h2>{vi(step.type)}</h2><p>{vi(stepTypeCopy[step.type][1])}</p><div className="inline-config-fields">{vi(stepFields[step.type].map((field) => <label key={field}>{vi(field)}<input placeholder={vi(`Enter ${field}`)} value={step.values[field]} onChange={(event) => onChange({ ...step, values: { ...step.values, [field]: event.target.value } })} /></label>))}</div><button className="inline-config-save" onClick={onDone}>{vi("✓ Done · Back to task")}</button></section>;
 }
 
 function Editor({ setMode, setSaved }) {
@@ -997,7 +987,7 @@ function Editor({ setMode, setSaved }) {
   const selected = tasks.find((task) => task.id === activeTask);
   const openTask = (task) => { taskClickTimer.current = window.setTimeout(() => { setActiveTask(task.id); setShowTypes(true); }, 220); };
   const editTask = (task) => { window.clearTimeout(taskClickTimer.current); startRename(task); };
-  return <><div className="workflow-editor-grid"><section className="workflow-panel editor-side"><h2>WORKFLOW</h2><Field label="Name" value="New workflow" /><Field label="Description" value="Add a description..." /><div className="task-heading"><h2>TASKS · {tasks.length}</h2><button type="button" onClick={addTask}>+</button></div>{tasks.length === 0 && <p className="task-empty-note">No tasks yet. Click + to create Task 1.</p>}{tasks.map((task) => <button className={activeTask === task.id ? 'editor-side-button active' : 'editor-side-button'} type="button" key={task.id} onClick={() => openTask(task)} onDoubleClick={() => editTask(task)}>{task.name}<small>{task.steps.length ? `${task.steps.length} steps` : 'No steps yet'}</small></button>)}</section>{configStep ? <StepConfigPanel step={configStep} onChange={updateConfigStep} onDone={() => setConfigStep(null)} /> : <section className="workflow-panel editor-detail workflow-steps-panel"><span className="modal-kicker">WORKFLOW STEPS</span><h2>{selected ? selected.name : 'Select a task'}</h2>{selected ? <><p>Choose a step to edit its fields.</p><div className="step-table"><div className="step-table-head"><span>#</span><span>STEP TYPE</span><span>STATUS</span></div>{selected.steps.length ? selected.steps.map((step, index) => <button className="step-table-row" key={step.id} onClick={() => setConfigStep(step)}><span>{String(index + 1).padStart(2, '0')}</span><b>{step.type}</b><em>{Object.values(step.values).some(Boolean) ? 'Configured' : 'Needs setup'}</em></button>) : <div className="step-empty-state">Click the task again to open the Step Type library.</div>}</div></> : <SelectTaskPanel />}</section>}</div>{showTypes && <div className="type-modal" onClick={() => setShowTypes(false)}><div className="type-modal-card" onClick={(event) => event.stopPropagation()}><header><div><span className="modal-kicker">MEDIASSIST ACTION LIBRARY</span><h2>Add a step to the workflow</h2><p>Choose an action to add to the open task.</p></div></header><div>{stepTypes.map((type) => <button key={type} onClick={() => addStep(type)}><i>{stepTypeCopy[type][0]}</i><span><small>{type}</small><b>{type.replace('_', ' ')}</b><em>{stepTypeCopy[type][1]}</em></span><strong>＋</strong></button>)}</div></div></div>}{renameTask && <div className="rename-backdrop" onClick={() => setRenameTask(null)}><form className="rename-dialog" onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); saveRename(); }}><span className="rename-icon">✎</span><h2>Rename task</h2><p>Use a clear name to make the workflow easier to follow.</p><label>Task name<input autoFocus value={renameValue} onChange={(event) => setRenameValue(event.target.value)} /></label><footer><button type="button" onClick={() => setRenameTask(null)}>Cancel</button><button type="submit">Save name</button></footer></form></div>}<footer className="workflow-actions"><MarButton className="create" onClick={() => { setSaved(true); setMode('library'); }}>Save Draft</MarButton></footer></>;
+  return <><div className="workflow-editor-grid"><section className="workflow-panel editor-side"><h2>{vi("WORKFLOW")}</h2><Field label="Name" value="New workflow" /><Field label="Description" value="Add a description..." /><div className="task-heading"><h2>{vi("TASKS · ")}{vi(tasks.length)}</h2><button type="button" onClick={addTask}>{vi("+")}</button></div>{vi(tasks.length === 0 && <p className="task-empty-note">{vi("No tasks yet. Click + to create Task 1.")}</p>)}{vi(tasks.map((task) => <button className={activeTask === task.id ? 'editor-side-button active' : 'editor-side-button'} type="button" key={task.id} onClick={() => openTask(task)} onDoubleClick={() => editTask(task)}>{vi(task.name)}<small>{vi(task.steps.length ? `${task.steps.length} steps` : 'No steps yet')}</small></button>))}</section>{vi(configStep ? <StepConfigPanel step={configStep} onChange={updateConfigStep} onDone={() => setConfigStep(null)} /> : <section className="workflow-panel editor-detail workflow-steps-panel"><span className="modal-kicker">{vi("WORKFLOW STEPS")}</span><h2>{vi(selected ? selected.name : 'Select a task')}</h2>{vi(selected ? <><p>{vi("Choose a step to edit its fields.")}</p><div className="step-table"><div className="step-table-head"><span>{vi("#")}</span><span>{vi("STEP TYPE")}</span><span>{vi("STATUS")}</span></div>{vi(selected.steps.length ? selected.steps.map((step, index) => <button className="step-table-row" key={step.id} onClick={() => setConfigStep(step)}><span>{vi(String(index + 1).padStart(2, '0'))}</span><b>{vi(step.type)}</b><em>{vi(Object.values(step.values).some(Boolean) ? 'Configured' : 'Needs setup')}</em></button>) : <div className="step-empty-state">{vi("Click the task again to open the Step Type library.")}</div>)}</div></> : <SelectTaskPanel />)}</section>)}</div>{showTypes && <div className="type-modal" onClick={() => setShowTypes(false)}><div className="type-modal-card" onClick={(event) => event.stopPropagation()}><header><div><span className="modal-kicker">{vi("MEDIASSIST ACTION LIBRARY")}</span><h2>{vi("Add a step to the workflow")}</h2><p>{vi("Choose an action to add to the open task.")}</p></div></header><div>{vi(stepTypes.map((type) => <button key={type} onClick={() => addStep(type)}><i>{vi(stepTypeCopy[type][0])}</i><span><small>{vi(type)}</small><b>{vi(type.replace('_', ' '))}</b><em>{vi(stepTypeCopy[type][1])}</em></span><strong>{vi("＋")}</strong></button>))}</div></div></div>}{renameTask && <div className="rename-backdrop" onClick={() => setRenameTask(null)}><form className="rename-dialog" onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); saveRename(); }}><span className="rename-icon">{vi("✎")}</span><h2>{vi("Rename task")}</h2><p>{vi("Use a clear name to make the workflow easier to follow.")}</p><label>{vi("Task name")}<input autoFocus value={renameValue} onChange={(event) => setRenameValue(event.target.value)} /></label><footer><button type="button" onClick={() => setRenameTask(null)}>{vi("Cancel")}</button><button type="submit">{vi("Save name")}</button></footer></form></div>}<footer className="workflow-actions"><MarButton className="create" onClick={() => { setSaved(true); setMode('library'); }}>{vi("Save Draft")}</MarButton></footer></>;
 }
 
 export default function WorkflowsPage() {
@@ -1030,18 +1020,18 @@ export default function WorkflowsPage() {
       <Sidebar />
       <main className="workflows-main">
         <header className="workflows-header">
-          <h1>{creating ? 'Create Workflow' : 'Workflows'}</h1>
+          <h1>{vi(creating ? 'Create Workflow' : 'Workflows')}</h1>
           <Tabs />
           <p className="preview-note">
-            {creating ? 'Build a workflow from tasks, or start with one of the 10 templates.' : saved ? 'Draft saved. Continue editing or create another workflow.' : 'Specification v1.0 · editable UI preview'}
+            {vi(creating ? 'Build a workflow from tasks, or start with one of the 10 templates.' : saved ? 'Draft saved. Continue editing or create another workflow.' : 'Specification v1.0 · editable UI preview')}
           </p>
         </header>
 
-        {creating ? (
+        {vi(creating ? (
           <Editor setMode={setMode} setSaved={setSaved} />
         ) : (
           <Library saved={saved} onCreate={openCreate} onOpenDraft={openCreate} definitions={definitions} loading={definitionsLoading} error={definitionError} />
-        )}
+        ))}
       </main>
     </div>
   );

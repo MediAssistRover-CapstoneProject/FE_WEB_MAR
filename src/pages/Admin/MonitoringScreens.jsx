@@ -1,3 +1,4 @@
+import { vi } from '../../i18n/vi.js';
 import { injectStyles } from '../../styles/injectStyles.js';
 const inlineStyles = String.raw`.monitor-screen{color:#0f172a;font-family:Inter,Arial,sans-serif;min-width:0;padding-top:8px}.monitor-screen *{box-sizing:border-box}.monitor-panel{background:#fff;border:1px solid #cbd5e1;border-radius:10px;min-width:0}.monitor-panel__head{color:#475569;font-size:13px;font-weight:500;letter-spacing:.35px;text-transform:uppercase}.monitor-panel__head--split{align-items:center;display:flex;justify-content:space-between;gap:10px}.monitor-panel__head small{color:#64748b;font-size:9px;font-weight:500;letter-spacing:0;text-transform:none}.monitor-kicker{color:#475569;display:block;font-size:10px;margin-top:20px}.monitor-notice{color:#15803d;font-size:11px;font-weight:600;margin:12px 2px 0}.monitor-screen button{font-family:inherit;font-weight:600}.monitor-screen button.secondary{background:#f1f5f9;border:1px solid #cbd5e1;color:#0f172a}.monitor-screen button.danger{background:#f05252}.monitor-screen select,.monitor-screen textarea,.monitor-screen input{font-family:inherit}.monitor-icon-action{align-items:center;background:#2f80ff;border-radius:5px;color:#fff;display:inline-flex;font-size:18px;height:24px;justify-content:center;line-height:1;padding:0;width:24px}
 
@@ -25,8 +26,7 @@ const inlineStyles = String.raw`.monitor-screen{color:#0f172a;font-family:Inter,
 injectStyles('mediassist-style-pages-Admin-MonitoringScreens-jsx', inlineStyles);
 
 import { useEffect, useMemo, useState } from 'react';
-import analyticsMissionsChart from '../../assets/images/figma-analytics-raw-1.png';
-import analyticsBatteryChart from '../../assets/images/figma-analytics-raw-3.png';
+import ReportChart from './ReportChart.jsx';
 import historyRouteMap from '../../assets/images/figma-history-raw-3.png';
 import crowdHeatmapMap from '../../assets/images/figma-heatmap-raw-1.png';
 import dotBlue from '../../assets/images/figma-history-dot-6.svg';
@@ -64,7 +64,7 @@ function alertLocation(alert) {
 
 function formatAlertTime(value) {
   if (!value) return '—';
-  return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+  return new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 }
 
 function toAlertRow(alert) {
@@ -101,7 +101,7 @@ function reportRange(period) {
 }
 
 function number(value, fallback = '—') {
-  return Number.isFinite(Number(value)) ? Number(value).toLocaleString() : fallback;
+  return Number.isFinite(Number(value)) ? Number(value).toLocaleString('vi-VN') : fallback;
 }
 
 function percent(value) {
@@ -116,11 +116,11 @@ function duration(value) {
 
 function relativeTime(value) {
   if (!value) return '—';
-  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+  return new Intl.DateTimeFormat('vi-VN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 }
 
 function Notice({ children }) {
-  return children ? <p className="monitor-notice" role="status">{children}</p> : null;
+  return children ? <p className="monitor-notice" role="status">{vi(children)}</p> : null;
 }
 
 export function VoiceScripts() {
@@ -154,61 +154,61 @@ export function VoiceScripts() {
     setNotice('A new delivery script is ready to edit.');
   };
 
-  return <section className="monitor-screen voice-scripts" aria-label="Voice and scripts workspace">
+  return <section className="monitor-screen voice-scripts" aria-label={vi("Voice and scripts workspace")}>
     <div className="voice-scripts__layout">
       <aside className="monitor-panel voice-scripts__library">
         <div className="monitor-panel__head monitor-panel__head--split">
-          <span>Script library</span>
-          <button className="monitor-icon-action" onClick={createScript} type="button" aria-label="Create script">+</button>
+          <span>{vi("Script library")}</span>
+          <button className="monitor-icon-action" onClick={createScript} type="button" aria-label={vi("Create script")}>{vi("+")}</button>
         </div>
-        <div className="voice-scripts__categories" aria-label="Script categories">
-          {scriptCategories.map((item) => <button className={category === item ? 'is-selected' : ''} key={item} onClick={() => { setCategory(item); setNotice(''); }}>{item}</button>)}
+        <div className="voice-scripts__categories" aria-label={vi("Script categories")}>
+          {vi(scriptCategories.map((item) => <button className={category === item ? 'is-selected' : ''} key={item} onClick={() => { setCategory(item); setNotice(''); }}>{vi(item)}</button>))}
         </div>
-        <h3>Delivery scripts</h3>
+        <h3>{vi("Delivery scripts")}</h3>
         <div className="voice-scripts__script-list">
-          {scripts.map((item) => <button className={selectedScript === item ? 'is-active' : ''} onClick={() => { setSelectedScript(item); setNotice(''); }} key={item}>{item}</button>)}
+          {vi(scripts.map((item) => <button className={selectedScript === item ? 'is-active' : ''} onClick={() => { setSelectedScript(item); setNotice(''); }} key={item}>{vi(item)}</button>))}
         </div>
       </aside>
 
       <article className="monitor-panel voice-scripts__editor">
-        <div className="monitor-panel__head">Script editor</div>
-        <h2>{selectedScript}</h2>
+        <div className="monitor-panel__head">{vi("Script editor")}</div>
+        <h2>{vi(selectedScript)}</h2>
         <div className="voice-scripts__selects">
-          <label>Language<select defaultValue="Vietnamese"><option>Vietnamese</option><option>English</option></select></label>
-          <label>Voice<select defaultValue="Female 1"><option>Female 1</option><option>Female 2</option><option>Male 1</option></select></label>
+          <label>{vi("Language")}<select defaultValue="Vietnamese"><option value={"Vietnamese"}>{vi("Vietnamese")}</option><option value={"English"}>{vi("English")}</option></select></label>
+          <label>{vi("Voice")}<select defaultValue="Female 1"><option value={"Female 1"}>{vi("Female 1")}</option><option value={"Female 2"}>{vi("Female 2")}</option><option value={"Male 1"}>{vi("Male 1")}</option></select></label>
         </div>
-        <label className="voice-scripts__message">Message<textarea value={message} onChange={(event) => setMessage(event.target.value)} /></label>
-        <span className="voice-scripts__field-label">Variables</span>
+        <label className="voice-scripts__message">{vi("Message")}<textarea value={message} onChange={(event) => setMessage(event.target.value)} /></label>
+        <span className="voice-scripts__field-label">{vi("Variables")}</span>
         <div className="voice-scripts__variables">
-          {['{room}', '{item}', '{location}', '{patient_name}', '{staff_name}'].map((token) => <button key={token} type="button" onClick={() => setMessage((value) => `${value}${value.endsWith(' ') ? '' : ' '}${token}`)}>{token}</button>)}
+          {vi(['{room}', '{item}', '{location}', '{patient_name}', '{staff_name}'].map((token) => <button key={token} type="button" onClick={() => setMessage((value) => `${value}${value.endsWith(' ') ? '' : ' '}${token}`)}>{vi(token)}</button>))}
         </div>
-        <section className="voice-scripts__voice-settings" aria-label="Voice settings">
-          <h3>Voice settings</h3>
-          <label>Volume <b>{volume}%</b><input aria-label="Volume" type="range" min="0" max="100" value={volume} onChange={(event) => setVolume(Number(event.target.value))} /></label>
-          <label>Speed <select defaultValue="Normal"><option>Slow</option><option>Normal</option><option>Fast</option></select></label>
+        <section className="voice-scripts__voice-settings" aria-label={vi("Voice settings")}>
+          <h3>{vi("Voice settings")}</h3>
+          <label>{vi("Volume ")}<b>{vi(volume)}{vi("%")}</b><input aria-label={vi("Volume ")} type="range" min="0" max="100" value={volume} onChange={(event) => setVolume(Number(event.target.value))} /></label>
+          <label>{vi("Speed ")}<select defaultValue="Normal"><option value={"Slow"}>{vi("Slow")}</option><option value={"Normal"}>{vi("Normal")}</option><option value={"Fast"}>{vi("Fast")}</option></select></label>
         </section>
         <div className="voice-scripts__editor-actions">
-          <button className="secondary" type="button" onClick={() => setNotice(`Previewing “${selectedScript}” on your browser.`)}>Preview Voice</button>
-          <button type="button" onClick={() => setNotice('Script saved successfully.')}>Save Script</button>
-          <button className="secondary" type="button" onClick={() => setNotice('A duplicate script was created.')}>Duplicate</button>
-          <button className="danger" type="button" onClick={() => setNotice('Delete is available after confirming with an administrator.')}>Delete</button>
+          <button className="secondary" type="button" onClick={() => setNotice(`Previewing “${selectedScript}” on your browser.`)}>{vi("Preview Voice")}</button>
+          <button type="button" onClick={() => setNotice('Script saved successfully.')}>{vi("Save Script")}</button>
+          <button className="secondary" type="button" onClick={() => setNotice('A duplicate script was created.')}>{vi("Duplicate")}</button>
+          <button className="danger" type="button" onClick={() => setNotice('Delete is available after confirming with an administrator.')}>{vi("Delete")}</button>
         </div>
-        <Notice>{notice}</Notice>
+        <Notice>{vi(notice)}</Notice>
       </article>
 
       <aside className="monitor-panel voice-scripts__usage">
-        <div className="monitor-panel__head">Robot voice history</div>
-        <span className="monitor-kicker">Recorded interactions</span>
-        <h2>{voiceMeta.totalElements ? `${number(voiceMeta.totalElements)} interactions` : 'No interactions yet'}</h2>
+        <div className="monitor-panel__head">{vi("Robot voice history")}</div>
+        <span className="monitor-kicker">{vi("Recorded interactions")}</span>
+        <h2>{vi(voiceMeta.totalElements ? `${number(voiceMeta.totalElements)} interactions` : 'No interactions yet')}</h2>
         <div className="voice-scripts__templates">
-          {interactions.map((item) => <article key={item.voiceInteractionId}><b>{item.detectedIntent ? titleCase(item.detectedIntent) : 'Voice interaction'}</b><span>{titleCase(item.status)} · {relativeTime(item.startedAt)}</span></article>)}
-          {!voiceError && interactions.length === 0 && <article><b>No recorded interaction</b><span>The backend has not received voice activity yet.</span></article>}
+          {vi(interactions.map((item) => <article key={item.voiceInteractionId}><b>{vi(item.detectedIntent ? titleCase(item.detectedIntent) : 'Voice interaction')}</b><span>{vi(titleCase(item.status))}{vi(" · ")}{vi(relativeTime(item.startedAt))}</span></article>))}
+          {vi(!voiceError && interactions.length === 0 && <article><b>{vi("No recorded interaction")}</b><span>{vi("The backend has not received voice activity yet.")}</span></article>)}
         </div>
-        <span className="monitor-kicker">Editor scope</span>
-        <p className="voice-scripts__fallback">The backend currently exposes voice history only. Script editing remains local until a script-management API is available.</p>
-        <button className="secondary voice-scripts__robot-test" type="button" onClick={() => setNotice('Test request sent to MAR-01.')}>Test on Robot</button>
-        <small>{voiceError || 'History loaded from /api/v1/voice/interactions'}</small>
-        <small>Preview target: MAR-01</small>
+        <span className="monitor-kicker">{vi("Editor scope")}</span>
+        <p className="voice-scripts__fallback">{vi("The backend currently exposes voice history only. Script editing remains local until a script-management API is available.")}</p>
+        <button className="secondary voice-scripts__robot-test" type="button" onClick={() => setNotice('Test request sent to MAR-01.')}>{vi("Test on Robot")}</button>
+        <small>{vi(voiceError || 'History loaded from /api/v1/voice/interactions')}</small>
+        <small>{vi("Preview target: MAR-01")}</small>
       </aside>
     </div>
   </section>;
@@ -247,24 +247,24 @@ export function AnalyticsReports() {
     ]
     : [['Job Success', '—', 'green'], ['Total Jobs', '—'], ['Average Job', '—'], ['Fleet Utilization', '—', 'teal'], ['Open Alerts', '—', 'amber'], ['Crowd Records', '—']];
 
-  return <section className="monitor-screen analytics-reports" aria-label="Analytics and reports">
+  return <section className="monitor-screen analytics-reports" aria-label={vi("Analytics and reports")}>
     <div className="analytics-reports__tools">
-      <div className="monitor-segmented" aria-label="Reporting period">
-        {['Today', '7 Days', '30 Days', 'Custom'].map((item) => <button className={period === item ? 'is-selected' : ''} type="button" key={item} onClick={() => { setPeriod(item); setNotice(''); }}>{item}</button>)}
+      <div className="monitor-segmented" aria-label={vi("Reporting period")}>
+        {vi(['Today', '7 Days', '30 Days', 'Custom'].map((item) => <button className={period === item ? 'is-selected' : ''} type="button" key={item} onClick={() => { setPeriod(item); setNotice(''); }}>{vi(item)}</button>))}
       </div>
-      <button className="secondary" type="button" onClick={loadReport} disabled={loadingReport}>{loadingReport ? 'Loading…' : 'Refresh Report'}</button>
+      <button className="secondary" type="button" onClick={loadReport} disabled={loadingReport}>{vi(loadingReport ? 'Loading…' : 'Refresh Report')}</button>
     </div>
     <div className="analytics-reports__metrics">
-      {metrics.map(([label, value, tone]) => <article className="monitor-panel" key={label}><span>{label}</span><strong className={tone ? `is-${tone}` : ''}>{value}</strong></article>)}
+      {vi(metrics.map(([label, value, tone]) => <article className="monitor-panel" key={label}><span>{vi(label)}</span><strong className={tone ? `is-${tone}` : ''}>{vi(value)}</strong></article>))}
     </div>
     <div className="analytics-reports__grid">
       <div className="analytics-reports__charts">
-        <figure className="analytics-reports__chart"><img src={analyticsMissionsChart} alt="Missions per day bar chart from Monday to Sunday" /></figure>
-        <figure className="analytics-reports__chart"><img src={analyticsBatteryChart} alt="Battery history line chart across seven days" /></figure>
+        <ReportChart title="Tổng quan công việc" items={[{label:'Tổng công việc',value:report?.jobs?.total},{label:'Thất bại',value:report?.jobs?.failed,color:'#f87171'},{label:'Cần khôi phục',value:report?.jobs?.recoveryRequired,color:'#fbbf24'}]}/>
+        <ReportChart title="Hiệu suất vận hành" unit="%" items={[{label:'Thành công',value:report?.jobs?.successRatePercent,color:'#34d399'},{label:'Sử dụng robot',value:report?.robots?.utilizationPercent}]}/>
       </div>
       <div className="analytics-reports__insights">
         <article className="monitor-panel analytics-reports__utilization">
-          <div className="monitor-panel__head">Live report summary</div>
+          <div className="monitor-panel__head">{vi("Live report summary")}</div>
           <UtilizationRow label="Fleet utilization" value={percent(report?.robots?.utilizationPercent)} amount={Number(report?.robots?.utilizationPercent) || 0} tone="blue" />
           <UtilizationRow label="Job success" value={percent(report?.jobs?.successRatePercent)} amount={Number(report?.jobs?.successRatePercent) || 0} tone="green" />
           <UtilizationRow label="Delivered" value={number(report?.deliveries?.delivered)} amount={report?.deliveries?.total ? Math.round((report.deliveries.delivered / report.deliveries.total) * 100) : 0} tone="amber" />
@@ -272,24 +272,24 @@ export function AnalyticsReports() {
           <UtilizationRow label="Suspected falls" value={number(report?.monitoring?.suspectedFalls)} amount={Math.min(100, Number(report?.monitoring?.suspectedFalls) || 0)} tone="red" />
         </article>
         <article className="monitor-panel analytics-reports__quality">
-          <div className="monitor-panel__head">Operation quality</div>
-          {[
+          <div className="monitor-panel__head">{vi("Operation quality")}</div>
+          {vi([
             ['Failed jobs', number(report?.jobs?.failed), 'Jobs'],
             ['Recovery required', number(report?.jobs?.recoveryRequired), 'Jobs'],
             ['Detection events', number(report?.monitoring?.detectionEvents), 'Monitoring'],
             ['Average persons', number(report?.monitoring?.averagePersonCount), 'Crowd'],
             ['Max persons', number(report?.monitoring?.maximumPersonCount), 'Crowd'],
-          ].map(([label, value, change]) => <div className="analytics-reports__quality-row" key={label}><span>{label}</span><b>{value}</b><em>{change}</em></div>)}
-          <button className="secondary" type="button" onClick={() => setNotice(reportError || (report ? `Generated ${relativeTime(report.generatedAt)}.` : 'Analytics data is loading.'))}>Report status</button>
+          ].map(([label, value, change]) => <div className="analytics-reports__quality-row" key={label}><span>{vi(label)}</span><b>{vi(value)}</b><em>{vi(change)}</em></div>))}
+          <button className="secondary" type="button" onClick={() => setNotice(reportError || (report ? `Generated ${relativeTime(report.generatedAt)}.` : 'Analytics data is loading.'))}>{vi("Report status")}</button>
         </article>
       </div>
     </div>
-    <Notice>{notice || reportError}</Notice>
+    <Notice>{vi(notice || reportError)}</Notice>
   </section>;
 }
 
 function UtilizationRow({ label, value, amount, tone }) {
-  return <div className="analytics-reports__util-row"><span>{label}</span><div><i className={`is-${tone}`} style={{ width: `${amount}%` }} /></div><b>{value}</b></div>;
+  return <div className="analytics-reports__util-row"><span>{vi(label)}</span><div><i className={`is-${tone}`} style={{ width: `${amount}%` }} /></div><b>{vi(value)}</b></div>;
 }
 
 const historySessions = [
@@ -308,43 +308,43 @@ export function HistoryReplay() {
   const selected = historySessions[selectedSession];
   const eventDots = [dotGreen, dotBlue, dotAmber, dotViolet, dotBlue, dotBlue, dotGreen];
 
-  return <section className="monitor-screen history-replay" aria-label="History and replay">
+  return <section className="monitor-screen history-replay" aria-label={vi("History and replay")}>
     <div className="history-replay__tools">
-      <span>Mission playback &amp; event review</span>
-      <div><button className="secondary" type="button" onClick={() => setNotice('Filter menu opened.')}>Filters</button><button className="secondary" type="button" onClick={() => setNotice('Mission search is ready.')}>Search missions…</button></div>
+      <span>{vi("Mission playback &amp; event review")}</span>
+      <div><button className="secondary" type="button" onClick={() => setNotice('Filter menu opened.')}>{vi("Filters")}</button><button className="secondary" type="button" onClick={() => setNotice('Mission search is ready.')}>{vi("Search missions…")}</button></div>
     </div>
     <div className="history-replay__layout">
       <aside className="monitor-panel history-replay__sessions">
-        <div className="monitor-panel__head monitor-panel__head--split"><span>Mission / session list</span><small>48 records</small></div>
-        {historySessions.map(([title, route, state, date, duration], index) => <button className={selectedSession === index ? 'is-selected' : ''} type="button" key={title} onClick={() => { setSelectedSession(index); setProgress(64); setNotice(''); }}>
-          <img src={index === 0 ? missionIconActive : missionIconIdle} alt="" />
-          <span><b>{title}</b><small>{route}</small><em className={`is-${state.toLowerCase()}`}>{state}</em><small>{date}</small></span><i>›</i><time>{duration}</time>
-        </button>)}
-        <footer>1–5 of 48 <span><button type="button" aria-label="Previous page">‹</button><button type="button" aria-label="Next page">›</button></span></footer>
+        <div className="monitor-panel__head monitor-panel__head--split"><span>{vi("Mission / session list")}</span><small>{vi("48 records")}</small></div>
+        {vi(historySessions.map(([title, route, state, date, duration], index) => <button className={selectedSession === index ? 'is-selected' : ''} type="button" key={title} onClick={() => { setSelectedSession(index); setProgress(64); setNotice(''); }}>
+          <img src={index === 0 ? missionIconActive : missionIconIdle} alt={vi("")} />
+          <span><b>{vi(title)}</b><small>{vi(route)}</small><em className={`is-${state.toLowerCase()}`}>{vi(state)}</em><small>{vi(date)}</small></span><i>{vi("›")}</i><time>{vi(duration)}</time>
+        </button>))}
+        <footer>{vi("1–5 of 48 ")}<span><button type="button" aria-label={vi("Previous page")}>{vi("‹")}</button><button type="button" aria-label={vi("Next page")}>{vi("›")}</button></span></footer>
       </aside>
       <article className="monitor-panel history-replay__map-card">
-        <div className="monitor-panel__head monitor-panel__head--split"><span>Mission replay map</span><button className="secondary" type="button">Floor 1</button></div>
-        <img src={historyRouteMap} alt="Route replay from Pharmacy to Room 305 on Hospital Floor 1" />
+        <div className="monitor-panel__head monitor-panel__head--split"><span>{vi("Mission replay map")}</span><button className="secondary" type="button">{vi("Floor 1")}</button></div>
+        <img src={historyRouteMap} alt={vi("Route replay from Pharmacy to Room 305 on Hospital Floor 1")} />
       </article>
       <aside className="history-replay__right-column">
         <article className="monitor-panel history-replay__details">
-          <div className="monitor-panel__head monitor-panel__head--split"><span>Mission details</span><em>Completed</em></div>
-          {[
+          <div className="monitor-panel__head monitor-panel__head--split"><span>{vi("Mission details")}</span><em>{vi("Completed")}</em></div>
+          {vi([
             ['Mission Type', 'Delivery'], ['Mission ID', selectedSession === 0 ? 'M-024' : selected[0].replace(/[^A-Z0-9-]/g, '')], ['Route', selected[1]], ['Start Time', '09:12:03'], ['End Time', '09:26:50'], ['Duration', selected[4]], ['Distance', '412 m'], ['Battery Usage', '18% (90% → 72%)'], ['Replay Time', '09:21:34'], ['Current Position', 'Near Room 305'], ['Speed', '0.6 m/s'], ['Mode', 'Autonomous'],
-          ].map(([label, value]) => <p key={label}><span>{label}</span><b>{value}</b></p>)}
+          ].map(([label, value]) => <p key={label}><span>{vi(label)}</span><b>{vi(value)}</b></p>))}
         </article>
         <article className="monitor-panel history-replay__events">
-          <div className="monitor-panel__head monitor-panel__head--split"><span>Event log</span><button className="secondary" type="button" onClick={() => setNotice('Replay events exported.')}>Export Replay</button></div>
-          {['Mission started', 'Arrived at Pharmacy', 'Package verified', 'Obstacle detected', 'Replanned route', 'Arrived at Room 305', 'Delivery confirmed', 'Mission completed'].map((event, index) => <p key={event}><time>{['09:12:03', '09:14:11', '09:15:02', '09:17:33', '09:17:40', '09:21:05', '09:23:11', '09:26:50'][index]}</time><img src={eventDots[index % eventDots.length]} alt="" /><span>{event}</span></p>)}
+          <div className="monitor-panel__head monitor-panel__head--split"><span>{vi("Event log")}</span><button className="secondary" type="button" onClick={() => setNotice('Replay events exported.')}>{vi("Export Replay")}</button></div>
+          {vi(['Mission started', 'Arrived at Pharmacy', 'Package verified', 'Obstacle detected', 'Replanned route', 'Arrived at Room 305', 'Delivery confirmed', 'Mission completed'].map((event, index) => <p key={event}><time>{vi(['09:12:03', '09:14:11', '09:15:02', '09:17:33', '09:17:40', '09:21:05', '09:23:11', '09:26:50'][index])}</time><img src={eventDots[index % eventDots.length]} alt={vi("")} /><span>{vi(event)}</span></p>))}
         </article>
       </aside>
     </div>
     <footer className="monitor-panel history-replay__player">
-      <div className="history-replay__transport"><button type="button" className="secondary" aria-label="Back ten seconds" onClick={() => setProgress((value) => Math.max(0, value - 10))}>◀ 10</button><button className="history-replay__play" type="button" onClick={() => setPlaying((value) => !value)}>{isPlaying ? 'Ⅱ' : '▶'}</button><button type="button" className="secondary" aria-label="Forward ten seconds" onClick={() => setProgress((value) => Math.min(100, value + 10))}>10 ▶</button></div>
-      <div className="history-replay__timeline"><span>00:00</span><input aria-label="Replay progress" type="range" min="0" max="100" value={progress} onChange={(event) => setProgress(Number(event.target.value))} /><div aria-hidden="true">{[dotBlue, dotAmber, dotViolet, dotBlue, dotGreen].map((dot, index) => <img src={dot} alt="" key={`${dot}-${index}`} />)}</div><small>Replay uses recorded pose, mission events and saved evidence from this session.</small></div>
-      <div className="history-replay__player-actions"><button className="secondary" type="button" onClick={() => setNotice('Snapshot captured.')}>Snapshot</button><button type="button" onClick={() => setNotice('Replay export is ready.')}>Export</button></div>
+      <div className="history-replay__transport"><button type="button" className="secondary" aria-label={vi("Back ten seconds")} onClick={() => setProgress((value) => Math.max(0, value - 10))}>{vi("◀ 10")}</button><button className="history-replay__play" type="button" onClick={() => setPlaying((value) => !value)}>{vi(isPlaying ? 'Ⅱ' : '▶')}</button><button type="button" className="secondary" aria-label={vi("Forward ten seconds")} onClick={() => setProgress((value) => Math.min(100, value + 10))}>{vi("10 ▶")}</button></div>
+      <div className="history-replay__timeline"><span>{vi("00:00")}</span><input aria-label={vi("Replay progress")} type="range" min="0" max="100" value={progress} onChange={(event) => setProgress(Number(event.target.value))} /><div aria-hidden="true">{vi([dotBlue, dotAmber, dotViolet, dotBlue, dotGreen].map((dot, index) => <img src={dot} alt={vi("")} key={`${dot}-${index}`} />))}</div><small>{vi("Replay uses recorded pose, mission events and saved evidence from this session.")}</small></div>
+      <div className="history-replay__player-actions"><button className="secondary" type="button" onClick={() => setNotice('Snapshot captured.')}>{vi("Snapshot")}</button><button type="button" onClick={() => setNotice('Replay export is ready.')}>{vi("Export")}</button></div>
     </footer>
-    <Notice>{notice}</Notice>
+    <Notice>{vi(notice)}</Notice>
   </section>;
 }
 
@@ -383,32 +383,32 @@ export function CrowdHeatmap() {
     item.densityLevel === 'MEDIUM' ? 'Med' : titleCase(item.densityLevel),
   ]), [records]);
 
-  return <section className="monitor-screen crowd-heatmap" aria-label="Crowd heatmap">
-    <div className="monitor-segmented crowd-heatmap__tabs" aria-label="Heatmap period">
-      {['Live', '1 Hour', 'Today', '7 Days'].map((item) => <button className={range === item ? 'is-selected' : ''} key={item} type="button" onClick={() => { setRange(item); setNotice(''); }}>{item}</button>)}
+  return <section className="monitor-screen crowd-heatmap" aria-label={vi("Crowd heatmap")}>
+    <div className="monitor-segmented crowd-heatmap__tabs" aria-label={vi("Heatmap period")}>
+      {vi(['Live', '1 Hour', 'Today', '7 Days'].map((item) => <button className={range === item ? 'is-selected' : ''} key={item} type="button" onClick={() => { setRange(item); setNotice(''); }}>{vi(item)}</button>))}
     </div>
     <div className="crowd-heatmap__layout">
       <article className="monitor-panel crowd-heatmap__map-card">
-        <div className="monitor-panel__head">Crowd density — Hospital Floor 1</div>
-        <img src={crowdHeatmapMap} alt={`${range} crowd density map for Hospital Floor 1`} />
-        <div className="crowd-heatmap__legend"><span>Low</span><i /><i /><i /><span>High</span></div>
+        <div className="monitor-panel__head">{vi("Crowd density — Hospital Floor 1")}</div>
+        <img src={crowdHeatmapMap} alt={vi(`${range} crowd density map for Hospital Floor 1`)} />
+        <div className="crowd-heatmap__legend"><span>{vi("Low")}</span><i /><i /><i /><span>{vi("High")}</span></div>
       </article>
       <aside className="crowd-heatmap__side">
         <article className="monitor-panel crowd-heatmap__density">
-          <div className="monitor-panel__head">Recorded density</div>
-          {density.map(([area, people, state]) => <p key={area}><span>{area}</span><b>{people}</b><em className={`is-${state.toLowerCase()}`}>{state}</em></p>)}
-          {!loadingDensity && density.length === 0 && <p>No crowd records for this range.</p>}
+          <div className="monitor-panel__head">{vi("Recorded density")}</div>
+          {vi(density.map(([area, people, state]) => <p key={area}><span>{vi(area)}</span><b>{vi(people)}</b><em className={`is-${state.toLowerCase()}`}>{vi(state)}</em></p>))}
+          {vi(!loadingDensity && density.length === 0 && <p>{vi("No crowd records for this range.")}</p>)}
         </article>
         <article className="monitor-panel crowd-heatmap__rules">
-          <div className="monitor-panel__head">Crowd-aware robot rules</div>
-          {['Slow down if HIGH', 'Avoid zone if critical', 'Alert Admin > 60 people', 'Replan through low density'].map((rule) => <p key={rule}><span>{rule}</span><b>On</b></p>)}
-          <small>Current effect</small>
-          <strong>Robot speed reduced to 0.25 m/s</strong>
-          <button className="secondary" type="button" onClick={() => setNotice('Crowd rule editor opened.')}>Edit Crowd Rules</button>
+          <div className="monitor-panel__head">{vi("Crowd-aware robot rules")}</div>
+          {vi(['Slow down if HIGH', 'Avoid zone if critical', 'Alert Admin > 60 people', 'Replan through low density'].map((rule) => <p key={rule}><span>{vi(rule)}</span><b>{vi("On")}</b></p>))}
+          <small>{vi("Current effect")}</small>
+          <strong>{vi("Robot speed reduced to 0.25 m/s")}</strong>
+          <button className="secondary" type="button" onClick={() => setNotice('Crowd rule editor opened.')}>{vi("Edit Crowd Rules")}</button>
         </article>
       </aside>
     </div>
-    <Notice>{notice || densityError}</Notice>
+    <Notice>{vi(notice || densityError)}</Notice>
   </section>;
 }
 
@@ -478,32 +478,32 @@ export function AlertsNotifications() {
   };
   const currentAction = actionFor(current);
 
-  return <section className="monitor-screen alerts-notifications" aria-label="Alerts and notifications">
+  return <section className="monitor-screen alerts-notifications" aria-label={vi("Alerts and notifications")}>
     <div className="alerts-notifications__tools">
-      <div className="monitor-tab-list" role="tablist" aria-label="Alert filters">
-        {['All', 'Critical', 'Warning', 'Info'].map((label) => <button className={filter === label ? 'is-selected' : ''} type="button" role="tab" aria-selected={filter === label} key={label} onClick={() => { setFilter(label); setNotice(''); }}>{label} ({totals[label]})</button>)}
+      <div className="monitor-tab-list" role="tablist" aria-label={vi("Alert filters")}>
+        {vi(['All', 'Critical', 'Warning', 'Info'].map((label) => <button className={filter === label ? 'is-selected' : ''} type="button" role="tab" aria-selected={filter === label} key={label} onClick={() => { setFilter(label); setNotice(''); }}>{vi(label)}{vi(" (")}{vi(totals[label])}{vi(")")}</button>))}
       </div>
-      <button className="secondary" type="button" onClick={loadAlerts} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</button>
+      <button className="secondary" type="button" onClick={loadAlerts} disabled={loading}>{vi(loading ? 'Loading…' : 'Refresh')}</button>
     </div>
     <article className="monitor-panel alerts-notifications__table-card">
-      <div className="monitor-panel__head">Active alerts</div>
-      <div className="alerts-notifications__table-scroll"><table><thead><tr>{['Time', 'Severity', 'Alert', 'Location', 'Source', 'Status', 'Action'].map((label) => <th key={label}>{label}</th>)}</tr></thead><tbody>{visibleRows.map((row) => <tr className={current?.id === row.id ? 'is-selected' : ''} key={row.id} onClick={() => { setSelectedId(row.id); setNotice(''); }}><td>{row.time}</td><td><em className={`is-${row.severity.toLowerCase()}`}>{row.severity}</em></td><td>{row.title}</td><td>{row.location}</td><td>{row.source}</td><td>{row.status}</td><td><button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(row.id); setNotice(`Viewing ${row.title}.`); }}>View</button></td></tr>)}</tbody></table>{loading && <p className="alerts-notifications__empty">Loading alerts…</p>}{!loading && error && <p className="alerts-notifications__empty alerts-notifications__error">{error}</p>}{!loading && !error && visibleRows.length === 0 && <p className="alerts-notifications__empty">No alerts match this filter.</p>}</div>
+      <div className="monitor-panel__head">{vi("Active alerts")}</div>
+      <div className="alerts-notifications__table-scroll"><table><thead><tr>{vi(['Time', 'Severity', 'Alert', 'Location', 'Source', 'Status', 'Action'].map((label) => <th key={label}>{vi(label)}</th>))}</tr></thead><tbody>{vi(visibleRows.map((row) => <tr className={current?.id === row.id ? 'is-selected' : ''} key={row.id} onClick={() => { setSelectedId(row.id); setNotice(''); }}><td>{vi(row.time)}</td><td><em className={`is-${row.severity.toLowerCase()}`}>{vi(row.severity)}</em></td><td>{vi(row.title)}</td><td>{vi(row.location)}</td><td>{vi(row.source)}</td><td>{vi(row.status)}</td><td><button type="button" onClick={(event) => { event.stopPropagation(); setSelectedId(row.id); setNotice(`Viewing ${row.title}.`); }}>{vi("View")}</button></td></tr>))}</tbody></table>{vi(loading && <p className="alerts-notifications__empty">{vi("Loading alerts…")}</p>)}{vi(!loading && error && <p className="alerts-notifications__empty alerts-notifications__error">{vi(error)}</p>)}{vi(!loading && !error && visibleRows.length === 0 && <p className="alerts-notifications__empty">{vi("No alerts match this filter.")}</p>)}</div>
     </article>
     <div className="alerts-notifications__bottom">
       <article className="monitor-panel alerts-notifications__detail">
-        <div className="monitor-panel__head">Alert detail preview</div>
-        <h2>{current?.detail ?? 'Select an alert'}</h2>
-        <p>{current?.note ?? 'Choose an alert above to inspect its details and response status.'}</p>
-        {current && <p className="alert-status">Status: <b>{current.status}</b></p>}
-        <div><button className="secondary" type="button" disabled={!current} onClick={() => setNotice('Map view is ready for this alert.')}>View on Map</button><button className="secondary" type="button" disabled={!current} onClick={loadAlerts}>Refresh</button>{currentAction && <button className="api-action" type="button" disabled={submitting} onClick={() => progressAlert(currentAction[0])}>{submitting ? 'Saving…' : currentAction[1]}</button>}</div>
+        <div className="monitor-panel__head">{vi("Alert detail preview")}</div>
+        <h2>{vi(current?.detail ?? 'Select an alert')}</h2>
+        <p>{vi(current?.note ?? 'Choose an alert above to inspect its details and response status.')}</p>
+        {vi(current && <p className="alert-status">{vi("Status: ")}<b>{vi(current.status)}</b></p>)}
+        <div><button className="secondary" type="button" disabled={!current} onClick={() => setNotice('Map view is ready for this alert.')}>{vi("View on Map")}</button><button className="secondary" type="button" disabled={!current} onClick={loadAlerts}>{vi("Refresh")}</button>{vi(currentAction && <button className="api-action" type="button" disabled={submitting} onClick={() => progressAlert(currentAction[0])}>{vi(submitting ? 'Saving…' : currentAction[1])}</button>)}</div>
       </article>
       <article className="monitor-panel alerts-notifications__routing">
-        <div className="monitor-panel__head">Notification routing</div>
-        <p><b>Critical</b> → Admin + Nurse Station</p><p><b>Warnings</b> → Admin dashboard</p><p><b>Info</b> → Activity feed only</p>
-        <button className="secondary" type="button" onClick={() => setNotice('Notification routing editor opened.')}>Edit Routing</button>
+        <div className="monitor-panel__head">{vi("Notification routing")}</div>
+        <p><b>{vi("Critical")}</b>{vi(" → Admin + Nurse Station")}</p><p><b>{vi("Warnings")}</b>{vi(" → Admin dashboard")}</p><p><b>{vi("Info")}</b>{vi(" → Activity feed only")}</p>
+        <button className="secondary" type="button" onClick={() => setNotice('Notification routing editor opened.')}>{vi("Edit Routing")}</button>
       </article>
     </div>
-    <Notice>{notice}</Notice>
+    <Notice>{vi(notice)}</Notice>
   </section>;
 }
 
