@@ -1,205 +1,179 @@
+import { vi } from '../../i18n/vi.js';
+import { cloneElement, useEffect, useId, useRef, useState } from 'react';
 import { injectStyles } from '../../styles/injectStyles.js';
-const inlineStyles = String.raw`.map-studio-figma{--ink:#0f172a;--slate:#475569;--line:#cbd5e1;--cloud:#f1f5f9;--blue:#2f80ff;--blue-dark:#1d4ed8;--pale:#dbeafe;--good:#15803d;--warn:#a16207;--danger:#f05252;color:var(--ink);font-family:Inter,Arial,sans-serif;min-width:0}.map-studio-figma *{box-sizing:border-box}.map-studio-figma button,.map-studio-figma input{font:inherit}.map-stage-header{height:64px;margin:-24px -28px 8px;padding:0 38px;background:#fff;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f1f5f9}.map-stage-header h2{font-size:22px;line-height:1.2;margin:0;font-weight:600}.map-stage-header>div{display:flex;align-items:center;gap:10px}.map-figma-button{height:36px;min-width:110px;border:1px solid var(--line);border-radius:7px;padding:0 14px;background:var(--cloud);color:var(--ink);font-size:13px;font-weight:600;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease,background .16s ease}.map-figma-button:hover{transform:translateY(-1px);box-shadow:0 4px 12px #0f172a15}.map-figma-button.primary{background:var(--blue);border-color:var(--blue);color:#fff}.map-figma-button.danger{background:var(--danger);border-color:var(--danger);color:#fff}.map-workflow{height:48px;margin:0 0 10px;border:1px solid var(--line);border-radius:8px;padding:5px 8px 5px;position:relative;background:#fff}.map-workflow p{position:absolute;left:50%;top:-14px;transform:translateX(-50%);margin:0;color:var(--slate);font-size:9px;white-space:nowrap;background:#f7f9fc;padding:0 6px}.map-workflow p span{padding:0 5px}.map-workflow>div{display:grid;grid-template-columns:repeat(8,minmax(70px,1fr));gap:6px}.map-workflow button{height:24px;border-radius:6px;border:1px solid var(--line);background:var(--cloud);color:var(--slate);font-size:10px;text-align:left;padding:0 10px;cursor:pointer}.map-workflow button.active{border-color:var(--blue);background:var(--blue);color:#fff;font-weight:600}.map-stage-layout{display:grid;gap:16px;align-items:start}.map-panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}.map-panel>h3{margin:0 0 12px;color:var(--slate);font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:.15px}.map-image-frame{overflow:hidden;border:1px solid #c7d0d8;border-radius:8px;background:#e9eef5;min-width:0}.map-image-frame img{display:block;width:100%;height:100%;object-fit:cover}.map-side-stack{display:grid;gap:16px}.map-labelled-value{display:block;margin-bottom:11px}.map-labelled-value>span,.map-panel small,.route-test-panel label,.simulation-panel>label{display:block;margin-bottom:5px;color:var(--slate);font-size:9px;font-weight:500}.map-labelled-value>div{height:34px;border:1px solid var(--line);border-radius:6px;background:var(--cloud);padding:10px 11px;font-size:10px;font-weight:500;color:var(--ink)}.map-status-pair{margin:0;padding:9px 2px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:10px}.map-status-pair span{color:var(--slate)}.map-status-pair b{font-size:11px;font-weight:500;color:var(--ink)}.good{color:var(--good)!important}.warning-text{color:var(--warn)!important}.map-notice{margin:10px 0 0;padding:7px 9px;border-radius:5px;background:#eff6ff;color:var(--blue-dark);font-size:10px}.scan-layout{grid-template-columns:minmax(0,1fr) 246px}.map-lidar-panel{height:782px}.map-lidar-panel .map-image-frame{height:662px;margin:42px 18px 0}.mapping-status{min-height:430px}.mapping-status .recording{display:block;color:var(--good);font-size:13px;margin:0 0 16px}.mapping-status .warning-text{display:block;font-size:13px;margin:0 0 16px}.mapping-status>.map-figma-button{width:100%;margin-top:12px}.mapping-checklist{min-height:220px}.mapping-checklist p,.publish-checklist p{margin:0;padding:8px 2px;color:var(--good);font-size:12px;font-weight:600}.mapping-checklist p span,.publish-checklist p span{padding-left:10px;color:var(--ink);font-weight:400;font-size:10px}.mapping-checklist .map-figma-button{width:100%;margin-top:20px}.cleanup-layout{grid-template-columns:158px minmax(0,1fr) 246px}.map-tool-panel{height:782px;padding:14px 12px}.map-tool-panel button{display:block;width:100%;height:30px;border:0;border-radius:6px;background:transparent;color:var(--slate);padding:0 16px;text-align:left;font-size:11px;cursor:pointer}.map-tool-panel button:hover,.map-tool-panel button.selected{color:var(--blue-dark);background:var(--pale);font-weight:600}.cleanup-map .map-image-frame{height:630px;margin:42px 0 0}.remap-panel{min-height:218px}.remap-panel>span,.map-quality>span{display:block;color:var(--slate);font-size:10px;margin:6px 0}.remap-panel>strong{display:block;font-size:22px;margin-bottom:10px}.remap-panel p{color:var(--slate);font-size:10px;line-height:1.4;margin:8px 0 12px}.remap-panel small{margin-top:10px}.remap-panel>b{display:block;font-size:10px;margin-top:-2px}.mini-progress{height:7px;margin:5px 0 12px;border-radius:99px;background:#e2e8f0;overflow:hidden}.mini-progress i{display:block;width:78%;height:100%;background:var(--blue);border-radius:inherit}.remap-panel .map-figma-button,.map-quality .map-figma-button{width:100%;margin-top:12px}.map-quality{min-height:210px}.map-quality>strong{display:block;font-size:20px;margin:2px 0}.semantic-layout,.traffic-layout{grid-template-columns:208px minmax(0,1fr) 276px}.semantic-map,.traffic-map{height:782px}.property-panel{min-height:782px}.property-panel small{margin-top:13px}.property-panel>b{display:block;font-size:10px;margin:0 0 8px}.property-panel>.map-figma-button{width:100%;margin-top:4px}.two-buttons{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}.two-buttons .map-figma-button{min-width:0;padding:0 8px}.endpoint-layout{grid-template-columns:340px minmax(0,1fr) 276px}.endpoint-list{height:782px}.endpoint-list input{display:block;width:100%;height:36px;border:1px solid var(--line);border-radius:7px;padding:0 14px;background:var(--cloud);color:var(--ink);font-size:12px;margin:6px 0 18px}.endpoint-list button,.route-list button{position:relative;width:100%;min-height:74px;border:1px solid var(--line);border-radius:7px;background:var(--cloud);margin:0 0 12px;padding:13px 14px 10px 40px;text-align:left;cursor:pointer}.endpoint-list button.selected,.route-list button.selected{background:var(--pale);border-color:var(--line)}.endpoint-list button>i{position:absolute;left:14px;top:24px;width:10px;height:10px;border-radius:50%}.endpoint-list button b,.endpoint-list button span{display:block}.endpoint-list button b{font-size:12px;margin-bottom:5px}.endpoint-list button span{color:var(--slate);font-size:10px}.endpoint-map-column{display:grid;gap:4px}.endpoint-map-column .map-panel{padding:14px 0 0}.endpoint-map-column .map-panel>h3{padding:0 16px}.endpoint-map-column .map-image-frame{height:383px;border-radius:0 0 8px 8px}.endpoint-usage{min-height:150px;padding:14px 14px}.endpoint-usage p{font-size:10px;margin:0 0 10px}.endpoint-usage span{display:block;font-size:9px;color:var(--slate);margin:7px 0}.endpoint-usage .map-figma-button{float:right;margin-top:-44px}.endpoint-details{height:782px}.endpoint-details h4{font-size:16px;margin:0 0 3px}.endpoint-details em{display:block;color:#7c3aed;font-size:9px;font-style:normal;margin-bottom:11px}.endpoint-details .map-status-pair{padding:8px 0;font-size:9px}.endpoint-details .map-figma-button{width:100%;height:29px;margin:4px 0 0;font-size:11px}.traffic-layout{grid-template-columns:214px minmax(0,1fr) 276px}.traffic-tools{height:782px;padding:13px 12px;background:#03172e;border-color:#112a48}.traffic-tools h3{color:#cbd5e1}.traffic-tools button{display:flex;width:100%;align-items:center;gap:10px;height:36px;border:0;border-radius:6px;background:transparent;color:#cad5e3;text-align:left;font-size:11px;cursor:pointer}.traffic-tools button i{width:16px;height:3px;background:#2f80ff;border-radius:5px}.traffic-tools button:nth-of-type(2) i{background:linear-gradient(90deg,#2f80ff 50%,transparent 50%);border-top:2px solid #2f80ff}.traffic-tools button:nth-of-type(3) i{height:13px;border:1px solid #8b5cf6;background:#57438b66}.traffic-tools button:nth-of-type(4) i{height:13px;border:1px solid #f05252;background:#70252c}.traffic-tools button.selected{background:#0e3d88;color:#fff;font-weight:600}.traffic-map{background:#03172e}.routes-layout{grid-template-columns:300px minmax(0,1fr) 186px}.patrol-settings{height:782px}.patrol-settings h4,.route-list h4,.point-action h4,.validation-panel h4{font-size:11px;margin:20px 0 12px}.patrol-settings .map-status-pair{padding:8px 0}.map-check{color:var(--good);font-size:11px;font-weight:600;margin:9px 0}.map-check span{color:var(--ink);font-size:10px;font-weight:400;padding-left:10px}.patrol-settings>.map-figma-button{width:100%;margin-top:8px}.routes-map-column{display:grid;gap:8px}.routes-map-column>.map-panel{padding:14px 14px 12px}.routes-map-column .map-image-frame{height:462px}.point-action{min-height:132px}.point-action h4{margin:0 0 5px}.point-action b{color:#0e7490;font-size:10px}.point-action p{color:var(--slate);font-size:9px;margin:8px 0}.point-action .map-figma-button{float:right;margin-top:-35px}.route-list{height:782px;padding:14px 12px}.route-list button{min-height:56px;margin-bottom:12px;padding:10px 10px}.route-list button b,.route-list button span{display:block}.route-list button b{font-size:11px}.route-list button span{font-size:9px;color:var(--slate);margin-top:4px}.route-list button em{position:absolute;right:10px;bottom:10px;font-size:9px;font-style:normal}.route-list>small{display:block;color:var(--slate);font-size:9px;margin-top:40px}.route-list>h4{font-size:13px;margin:7px 0}.route-list>p{font-size:9px;color:var(--slate)}.route-list>.map-figma-button{width:100%;margin-top:12px;min-width:0;font-size:11px}.validate-layout{grid-template-columns:minmax(0,620px) minmax(300px,374px);justify-content:space-between}.validation-panel{min-height:778px}.validation-panel h4{font-size:15px;margin:4px 0 24px}.validation-score{display:flex;align-items:end;gap:24px;margin:0 0 20px}.validation-score span{font-size:10px;color:var(--slate)}.validation-score strong{font-size:24px;color:var(--good)}.validation-row{width:100%;height:48px;display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:6px;background:var(--cloud);padding:0 14px;margin:9px 0;text-align:left;cursor:pointer}.validation-row i{font-style:normal;font-size:18px}.validation-row.pass i{color:#32ca78}.validation-row.warning i{color:#f5b73d}.validation-row span{font-size:10px;flex:1}.validation-row b{font-size:9px}.validation-row.pass b{color:var(--good)}.validation-row.warning b{color:var(--warn)}.three-buttons{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:18px}.three-buttons .map-figma-button{padding:0 10px;min-width:0;font-size:11px}.versions-stack{grid-template-rows:270px 1fr}.version-list button{display:grid;width:100%;grid-template-columns:56px 1fr auto;align-items:center;height:43px;border:1px solid var(--line);border-radius:5px;background:var(--cloud);padding:0 10px;margin:9px 0;text-align:left}.version-list button.current{background:#d9fbe6;border-color:#a8e2c0}.version-list button b{font-size:11px}.version-list button em{font-style:normal;color:var(--warn);font-size:9px}.version-list button.current em{color:var(--good)}.version-list button span{color:var(--slate);font-size:9px}.publish-checklist p{padding:7px 0}.publish-checklist>em{display:block;color:var(--warn);font-size:9px;font-style:normal;margin:14px 0}.publish-checklist .map-figma-button{width:100%;margin-top:6px}.publish-layout{grid-template-columns:292px minmax(0,1fr) 198px}.route-test-panel{height:782px}.route-test-panel .map-figma-button.primary{width:100%;margin:6px 0 24px}.route-metrics{display:grid;grid-template-columns:1fr 1fr;gap:20px 12px;margin-bottom:22px}.route-metrics span,.route-metrics strong,.route-metrics b{display:block}.route-metrics span{font-size:9px;color:var(--slate);margin-bottom:7px}.route-metrics strong{font-size:17px}.route-metrics b{font-size:10px}.simulation-panel{height:782px;background:#f8fafc}.simulation-panel .map-image-frame{height:410px}.simulation-panel>label{margin:19px 0 9px}.timeline-progress{height:8px;border-radius:99px;background:#e2e8f0;overflow:hidden}.timeline-progress i{display:block;width:65%;height:100%;background:var(--blue);border-radius:inherit}.timeline-times{display:flex;justify-content:space-between;margin:7px 0 17px;color:var(--slate);font-size:9px}.timeline-times span:nth-child(2){color:var(--warn)}.simulation-panel>p{font-size:9px}.publish-validation{height:782px}.publish-validation p{color:var(--good);font-size:10px;margin:15px 0}.publish-validation p span{color:var(--ink);padding-left:10px}.warning-callout,.ready-callout{padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--cloud);display:grid;gap:3px;margin:22px 0 10px}.warning-callout b{color:var(--warn);font-size:12px}.warning-callout span,.ready-callout small{font-size:9px;color:var(--slate)}.publish-validation>.map-figma-button{width:100%;min-width:0;margin:6px 0;font-size:11px}.ready-callout{border-color:#4ade80;background:#f0fdf4;margin-top:14px}.ready-callout b{font-size:11px}.map-stage-header:has(+ .map-stage-layout){margin-bottom:8px}@media(max-width:1220px){.scan-layout{grid-template-columns:minmax(0,1fr) 220px}.endpoint-layout{grid-template-columns:280px minmax(0,1fr) 230px}.routes-layout{grid-template-columns:250px minmax(0,1fr) 168px}.map-stage-header{margin-left:-16px;margin-right:-16px;padding:0 24px}.map-workflow>div{overflow-x:auto}.map-workflow{overflow:hidden}.map-workflow>div{min-width:860px}.semantic-layout,.traffic-layout{grid-template-columns:175px minmax(0,1fr) 240px}}@media(max-width:980px){.map-stage-header{height:auto;min-height:64px;gap:10px;padding:12px 16px;align-items:flex-start}.map-stage-header h2{font-size:18px}.map-stage-header>div{flex-wrap:wrap;justify-content:flex-end}.map-stage-layout,.scan-layout,.cleanup-layout,.semantic-layout,.traffic-layout,.endpoint-layout,.routes-layout,.validate-layout,.publish-layout{grid-template-columns:1fr}.map-panel,.map-tool-panel,.map-lidar-panel,.property-panel,.endpoint-list,.endpoint-details,.traffic-tools,.patrol-settings,.route-list,.validation-panel,.route-test-panel,.simulation-panel,.publish-validation{height:auto;min-height:0}.map-lidar-panel .map-image-frame{height:min(65vw,600px);margin:15px 0 0}.cleanup-map .map-image-frame{height:min(65vw,600px)}.semantic-map,.traffic-map{height:min(75vw,700px)}.endpoint-map-column .map-image-frame,.routes-map-column .map-image-frame,.simulation-panel .map-image-frame{height:min(62vw,500px)}.map-side-stack{grid-template-columns:1fr 1fr}.versions-stack{grid-template-columns:1fr 1fr;grid-template-rows:none}.endpoint-map-column{order:2}.endpoint-details{order:3}.route-list{order:3}}@media(max-width:620px){.map-stage-header{margin-top:-16px}.map-stage-header>div{width:100%}.map-figma-button{flex:1;min-width:0;padding:0 8px;font-size:11px}.map-workflow{height:42px}.map-workflow p{display:none}.map-workflow>div{padding-top:4px}.map-side-stack,.versions-stack{grid-template-columns:1fr}.map-panel{padding:12px}.three-buttons{grid-template-columns:1fr}.endpoint-list button{min-height:60px}.map-stage-header h2{font-size:16px}.point-action .map-figma-button{float:none;margin:8px 0 0}.endpoint-usage .map-figma-button{float:none;margin:10px 0 0}}
+import LidarMap from './LidarMap.jsx';
+import WorkspaceTabs from '../../components/WorkspaceTabs.jsx';
+import EndpointGroupEditor from './EndpointGroupEditor.jsx';
+import { groupsFor } from '../../features/facility/endpointGroups.js';
+import { useNavigate } from 'react-router-dom';
+import { ZoneProperties, EndpointProperties, ZoneTypePicker } from './MapFeatureProperties.jsx';
+import { MAP } from './lidarGeometry.js';
+import { STAGES, STORAGE_KEY, ZONE_TYPES, ENDPOINT_TYPES, createDraft, loadDraft, changeDraft, stageEnabled, validPoint, zoneError, endpointError, polygonArea, mapIssues, saveMap, exportMap } from './mapStudioModel.js';
+
+const styles = String.raw`
+.workspace .content:has(.ls-studio){max-width:none;min-width:0;padding:20px 24px 28px}
+.ls-studio{color:#172b4d;font:13px/1.5 Inter,Arial,sans-serif;min-width:0;--ls-line:#dce5f0;--ls-muted:#64748b}.ls-advanced{border-top:1px solid #dce5f0;margin-top:16px;padding-top:12px}.ls-advanced summary{cursor:pointer;font-weight:650}.ls-task{padding:10px;background:#f1f5f9;border-radius:8px;margin:8px 0}.ls-studio h4{margin:12px 0 4px}
+.ls-studio *{box-sizing:border-box}.ls-studio h2,.ls-studio h3,.ls-studio p{margin:0}.ls-studio button,.ls-studio input,.ls-studio select{font:inherit}
+.ls-group-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}.ls-group-grid>form,.ls-group-grid>section{min-width:0}.ls-studio .ls-panel button.ls-btn.primary{background:#2f80ff;border-color:#2f80ff;color:white}.ls-studio .ls-panel button.ls-btn.primary:disabled{opacity:.5}@media(max-width:760px){.ls-group-grid{grid-template-columns:1fr}}
+.ls-field textarea{width:100%;min-width:0;max-width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:8px;font:inherit;resize:vertical}.ls-field input[type=checkbox]{width:auto}.ls-studio .workspace-tabs{margin:0 0 18px}.ls-source{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}.ls-source button[aria-pressed=true]{border-color:#2f80ff;color:#1d4ed8;background:#eff6ff}.facility-catalog{display:grid;gap:14px}.ls-main:has(.ls-group-area){position:static}.ls-group-area{display:grid;min-width:0}
+.ls-studio button{transform:none;box-shadow:none}.ls-studio button:disabled{opacity:.45;cursor:not-allowed}.ls-studio button:focus-visible,.ls-studio [tabindex]:focus-visible{outline:3px solid #60a5fa;outline-offset:2px}
+.ls-endpoint-tabs{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:12px;margin-bottom:16px;border-bottom:1px solid var(--ls-line)}.ls-endpoint-tabs .ls-btn{min-width:145px}.ls-endpoint-tabs .ls-btn.active{background:#eaf2ff;border-color:#93c5fd;color:#1d4ed8}
+.ls-studio .ls-notice{position:fixed;top:72px;right:24px;max-width:min(420px,calc(100vw - 32px));z-index:70;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px #172b4d1a}.ls-notice button{flex-shrink:0}
+.ls-topline{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;color:var(--ls-muted);font-size:11px}.ls-badge{color:#1d4ed8;background:#eaf2ff;padding:3px 9px;border-radius:5px}
+.ls-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:6px;border:1px solid var(--ls-line);border-radius:11px;background:#fff;margin-bottom:18px}
+.ls-nav button{display:flex;align-items:center;gap:12px;padding:12px 16px;color:#475569;background:#f8fafc;text-align:left}.ls-nav button b{display:grid;place-items:center;width:26px;height:26px;flex-shrink:0;border:1px solid #cbd5e1;border-radius:7px;font-size:12px}.ls-nav button[aria-current=step]{color:white;background:#2f80ff}.ls-nav button[aria-current=step] b{border-color:#ffffff55;background:#ffffff15}.ls-nav small{display:block;font-size:10px;opacity:.75;font-weight:400}
+.ls-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}.ls-heading h2{font-size:23px;letter-spacing:-.5px}.ls-heading p{color:var(--ls-muted);margin-top:3px;font-size:12px}.ls-actions{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+.ls-studio .ls-btn{background:#fff;border:1px solid #cbd5e1;color:#334155;padding:9px 12px;border-radius:7px;font-size:12px;font-weight:600;min-height:36px}.ls-studio .ls-btn:hover:not(:disabled){background:#eff6ff}.ls-studio .ls-btn.primary{background:#2f80ff;border-color:#2f80ff;color:white}.ls-studio .ls-btn.danger{background:#fff1f2;border-color:#fecdd3;color:#be123c;margin:0}.ls-studio .ls-btn.small{padding:4px 9px;min-height:29px;font-size:11px}.ls-studio .ls-btn.active{border-color:#2f80ff;color:#2563eb;background:#eff6ff}
+.ls-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(275px,310px);gap:16px;align-items:start}.ls-main,.ls-inspector{display:grid;gap:14px;min-width:0}.ls-main{position:sticky;top:16px}.ls-panel{background:white;border:1px solid var(--ls-line);border-radius:11px;padding:17px;min-width:0}.ls-panel h3{font-size:13px;font-weight:700;margin-bottom:13px}.ls-panel p{color:var(--ls-muted);font-size:12px;margin:8px 0}.ls-panel .ls-actions{margin-top:12px}.ls-full{width:100%;margin-top:9px}
+.ls-map{min-width:0;border:1px solid #28333f;border-radius:11px;overflow:hidden;background:#121416}.ls-map-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:13px 16px;background:#1c2229;color:#e5eaf0}.ls-map-head strong,.ls-map-head small{display:block}.ls-map-head small{font-size:10px;color:#9aa8b6;margin-top:3px}.ls-map-tools{display:flex;flex-shrink:0;border:1px solid #465260;border-radius:6px;overflow:hidden}.ls-map-tools button{border-radius:0;background:#27313b;color:#e2e8f0;padding:5px 10px;font-size:12px}
+.ls-map-layers{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 15px;color:#98a6b5;background:#161c22;border-top:1px solid #2b3540;border-bottom:1px solid #2b3540;font-size:10px}.ls-map-layers>span:nth-child(2){letter-spacing:1.1px;font-size:9px}.ls-live-dot{width:5px;height:5px;border-radius:50%;background:#69d2b8}.ls-map-layers label{display:flex;gap:5px;align-items:center;cursor:pointer}.ls-map-layers input{accent-color:#60a5fa;width:12px;height:12px;margin:0}.ls-map-layers small{margin-left:auto}
+.ls-map-viewport{position:relative;aspect-ratio:1200/680;min-height:230px;max-height:min(650px,65dvh);min-width:0;background:#121416;overflow:hidden}.ls-map-viewport>svg{width:100%;height:100%;position:absolute;inset:0;display:block}.ls-map-foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 15px;background:#1c2229;border-top:1px solid #2b3540;color:#a7b4c2;font-size:10px}.ls-map-foot>span{display:flex;gap:6px;align-items:center}.ls-map-foot i{width:7px;height:7px;border:1px solid #778491;border-radius:1px;display:inline-block;margin-left:5px}
+.ls-notice{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#1e40af;padding:10px 13px;margin-bottom:14px;overflow-wrap:anywhere}.ls-hint{padding:10px 12px;background:#f1f5f9;border-radius:7px;color:#64748b;font-size:11px;margin-top:12px}.ls-toolhint{padding:11px 14px;background:#eaf2ff;border:1px solid #c4dcff;border-radius:8px;color:#1d4ed8;display:flex;justify-content:space-between;align-items:center;gap:10px}.ls-error{font-size:11px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;padding:9px 11px;border-radius:7px;margin-top:12px}
+.ls-progress{height:5px;background:#e2e8f0;border-radius:8px;overflow:hidden;margin:12px 0}.ls-progress i{display:block;height:100%;background:#2f80ff;transition:width .2s linear}.ls-stat{display:flex;justify-content:space-between;gap:12px;padding:6px 0;font-size:12px}.ls-stat span{color:var(--ls-muted)}.ls-stat b{text-align:right;overflow-wrap:anywhere}.ls-field{display:grid;gap:5px;font-size:11px;color:#475569;margin:11px 0}.ls-field input,.ls-field select{width:100%;min-width:0;border:1px solid #cbd5e1;border-radius:6px;padding:8px 9px;background:white;color:#172b4d}.ls-field input:focus,.ls-field select:focus{outline:2px solid #93c5fd;outline-offset:1px}.ls-pair{display:grid;grid-template-columns:1fr 1fr;gap:9px}.ls-field input[type=range]{padding:0;accent-color:#2f80ff}
+.ls-item-list{display:grid;gap:6px;max-height:225px;overflow:auto}.ls-studio .ls-item{width:100%;display:flex;align-items:center;gap:10px;background:#f8fafc;color:#334155;border:1px solid transparent;border-radius:7px;padding:10px;text-align:left;font-size:12px;overflow-wrap:anywhere}.ls-studio .ls-item.selected{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}.ls-item>i{width:8px;height:8px;border-radius:2px;flex-shrink:0}.ls-item strong,.ls-item small{display:block}.ls-item small{color:var(--ls-muted);font-size:10px;margin-top:2px}.ls-item>span{min-width:0}.ls-confirm{padding:24px;border:1px solid #dce5f0;background:white;border-radius:12px;width:min(440px,calc(100vw - 32px));color:#172b4d;box-shadow:0 18px 60px #0f172a33}.ls-confirm::backdrop{background:#0f172a66}.ls-confirm p{margin:8px 0 18px;color:#64748b}
+.ls-runbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.ls-runbar small{display:block;color:var(--ls-muted);font-size:11px;margin-top:3px}.ls-empty{padding:13px;border:1px dashed #cbd5e1;border-radius:7px;color:var(--ls-muted);font-size:11px}.ls-vertices{max-height:170px;overflow:auto;margin:10px 0}.ls-vertex{display:grid;grid-template-columns:18px 1fr 1fr;gap:6px;align-items:center}.ls-vertex .ls-field{margin:4px 0}.ls-vertex input{padding:6px;font-size:11px}.ls-help-link{font-size:11px;color:#64748b;margin-top:14px}.ls-help-link a{color:#2563eb}.ls-saved{color:#15803d}
+@media(min-width:1800px){.ls-layout{grid-template-columns:minmax(0,1fr) 350px}.ls-map-viewport{max-height:800px}}
+@media(max-width:1100px){.ls-layout{grid-template-columns:minmax(0,1fr) 270px}.ls-nav small{display:none}.ls-nav button{padding:10px}}
+@media(max-width:900px){.ls-layout{grid-template-columns:1fr}.ls-main{position:static}.ls-inspector{grid-template-columns:repeat(2,minmax(0,1fr))}.workspace .content:has(.ls-studio){padding:16px}}
+@media(max-width:550px){.ls-inspector{grid-template-columns:1fr}.ls-nav button{gap:6px;font-size:11px;padding:8px 5px}.ls-nav button b{width:20px;height:20px;font-size:10px}.ls-heading h2{font-size:20px}.ls-map-head{padding:11px}.ls-map-head strong{font-size:12px}.ls-map-viewport{min-height:200px}.ls-panel{padding:14px}.ls-map-layers{gap:7px}.ls-topline{font-size:10px}}
 `;
-injectStyles('mediassist-style-pages-Admin-MapStudioFigma-jsx', inlineStyles);
-
-import { useEffect, useMemo, useState } from 'react';
-import scanLidar from '../../assets/images/map-studio/scan-1.png';
-import cleanupLidar from '../../assets/images/map-studio/cleanup-1.png';
-import semanticFloorMap from '../../assets/images/map-studio/semantic-1.png';
-import endpointFloorMap from '../../assets/images/map-studio/endpoints-1.png';
-import trafficFloorMap from '../../assets/images/map-studio/traffic-3.png';
-import patrolFloorMap from '../../assets/images/map-studio/routes-1.png';
-import simulationFloorMap from '../../assets/images/map-studio/publish-1.png';
-import { facilityApi } from '../../features/facility/facilityApi.js';
-
-const workflow = [
-  ['scan', 'Scan'], ['cleanup', 'Cleanup'], ['semantic', 'Semantic'], ['endpoints', 'Endpoints'],
-  ['traffic', 'Traffic'], ['routes', 'Routes'], ['validate', 'Validate'], ['publish', 'Publish'],
-];
-
-const endpointRows = [
-  ['#3182f6', 'Pharmacy Pickup', 'Pickup  •  EP-01'],
-  ['#22b8cf', 'Central Lab', 'Pickup  •  EP-02'],
-  ['#8b5cf6', 'Room 305', 'Drop-off  •  EP-04'],
-  ['#22c55e', 'Reception', 'Escort  •  EP-06'],
-  ['#22c55e', 'Charging Station', 'Charge  •  EP-08'],
-  ['#f5b73d', 'Waiting Hall', 'Waiting  •  EP-09'],
-  ['#f05252', 'Emergency Point', 'Emergency  •  EP-10'],
-];
-
-const validationRows = [
-  ['Map origin configured', 'pass'], ['Home endpoint configured', 'pass'], ['Charger reachable', 'pass'],
-  ['All destinations reachable', 'pass'], ['No waypoint inside restricted zone', 'pass'],
-  ['Lane LN-12 disconnected', 'warning'], ['Room 305 too close to wall', 'warning'], ['No critical validation errors', 'pass'],
-];
-
-function Button({ children, tone = 'secondary', className = '', onClick, type = 'button' }) {
-  return <button type={type} onClick={onClick} className={`map-figma-button ${tone} ${className}`}>{children}</button>;
-}
-
-function WorkflowBar({ stage, onStageChange }) {
-  return <div className="map-workflow" aria-label="Map Studio workflow">
-    <p>MAP STUDIO WORKFLOW <span>•</span> Hospital Floor 1 <span>•</span> v1.5 Draft</p>
-    <div>{workflow.map(([id, label], index) => <button type="button" key={id} onClick={() => onStageChange(id)} className={stage === id ? 'active' : ''}>{index + 1} {label}</button>)}</div>
-  </div>;
-}
-
-function StageTitle({ title, children }) {
-  return <header className="map-stage-header"><h2>{title}</h2><div>{children}</div></header>;
-}
-
-function LabelledValue({ label, value, className = '' }) {
-  return <label className={`map-labelled-value ${className}`}><span>{label}</span><div>{value}</div></label>;
-}
-
-function StatusPair({ label, value, good = false }) {
-  return <p className="map-status-pair"><span>{label}</span><b className={good ? 'good' : ''}>{value}</b></p>;
-}
-
-function MapImage({ src, alt, className = '' }) {
-  return <div className={`map-image-frame ${className}`}><img src={src} alt={alt} /></div>;
-}
-
-function Panel({ title, children, className = '' }) {
-  return <section className={`map-panel ${className}`}><h3>{title}</h3>{children}</section>;
-}
-
-function ScanStage({ setStage }) {
-  const [paused, setPaused] = useState(false);
-  const [discarded, setDiscarded] = useState(false);
-  return <>
-    <StageTitle title="Map Studio — Scan & SLAM">
-      <Button onClick={() => setPaused(!paused)}>{paused ? 'Resume Mapping' : 'Pause Mapping'}</Button>
-      <Button tone="primary" onClick={() => setStage('cleanup')}>Finish Mapping</Button>
-    </StageTitle>
-    <div className="map-stage-layout scan-layout">
-      <Panel title="Live LiDAR occupancy map" className="map-lidar-panel"><MapImage src={scanLidar} alt="Live LiDAR occupancy scan of Hospital Floor 1" /></Panel>
-      <aside className="map-side-stack">
-        <Panel title="Mapping status" className="mapping-status"><strong className={paused ? 'warning-text' : 'recording'}>● {paused ? 'PAUSED' : 'RECORDING'}</strong><StatusPair label="Elapsed" value="08:42" /><StatusPair label="Mapped Area" value="418 m²" /><StatusPair label="LiDAR" value="Healthy" good /><StatusPair label="Localization" value="Good" good /><StatusPair label="Loop Closure" value="Detected" good /><StatusPair label="Resolution" value="0.05 m" /><Button>Run route simulation</Button><Button>Set Robot Pose</Button></Panel>
-        <Panel title="Mapping checklist" className="mapping-checklist">{['LiDAR online', 'Drive slowly', 'Close mapping loop', 'Scan all corridors', 'Avoid moving crowds'].map(item => <p key={item}>✓ <span>{item}</span></p>)}<Button tone="danger" onClick={() => setDiscarded(true)}>{discarded ? 'Session discarded' : 'Discard Session'}</Button></Panel>
+injectStyles('mediassist-map-studio-lidar-v3', styles);
+const REFERENCE='https://docs.ottomotors.com/en/30495-117789-concepts--basic-map-editing.html';
+function Button({children,tone='',className='',...props}) { return <button type="button" {...props} className={'ls-btn '+tone+' '+className}>{vi(children)}</button>; }
+function Panel({title,children}) { return <section className="ls-panel"><h3>{vi(title)}</h3>{vi(children)}</section>; }
+function Stat({label,children}) { return <div className="ls-stat"><span>{vi(label)}</span><b>{vi(children)}</b></div>; }
+function Field({label,children,...props}) { const id=useId();return <label className="ls-field"><span id={id}>{vi(label)}</span>{vi(children?cloneElement(children,{'aria-labelledby':id}):<input {...props} aria-labelledby={id}/>)}</label>; }
+const emptyZone=()=>({id:'',name:'',description:'',enabled:true,type:'AREA',speed:0.3,heading:0,alignCost:-.5,antiAlignCost:0,crossCost:0,points:[]});
+const emptyEndpoint=()=>({id:'',name:'',description:'',type:'WAYPOINT',x:580,y:330,heading:0,enabled:true,placed:false});
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+export default function MapStudioFigma({initialStage='scan'}) {
+  const goTo=useNavigate();
+  const [draft,setDraft]=useState(()=>loadDraft(window.localStorage));
+  const [endpointTab,setEndpointTab]=useState('points');
+  const [groupDirty,setGroupDirty]=useState(false);
+  const [stage,setStage]=useState(()=>stageEnabled(draft,initialStage)?initialStage:'scan');
+  const [zone,setZone]=useState(emptyZone),[endpoint,setEndpoint]=useState(emptyEndpoint);
+  const [tool,setTool]=useState(''),[rectangleStart,setRectangleStart]=useState(null),[hover,setHover]=useState(null);
+  const [notice,setNotice]=useState(''),[storageError,setStorageError]=useState(false),[confirm,setConfirm]=useState(null);
+  const confirmRef=useRef(null);
+  const index=STAGES.findIndex(([id])=>id===stage);
+  const zoneType=ZONE_TYPES.find(t=>t.id===zone.type);
+  const zoneOriginal=draft.zones.find(z=>z.id===zone.id);
+  const endpointOriginal=draft.endpoints.find(e=>e.id===endpoint.id);
+  const zoneDirty=zone.points.length>0 && (!zoneOriginal || !same(zone,zoneOriginal));
+  const endpointValue=(({placed,...value})=>value)(endpoint);
+  const endpointDirty=endpoint.placed && (!endpointOriginal || !same(endpointValue,endpointOriginal));
+  const unsaved=stage==='zone'?zoneDirty:stage==='endpoint'?(endpointTab==='groups'?groupDirty:endpointDirty):false;
+  const issues=mapIssues(draft);
+  const saved=draft.saved?.revision===draft.revision;
+  const zoneProblem=zone.points.length?zoneError(draft,zone):'';
+  const endpointProblem=endpoint.placed?endpointError(draft,endpointValue):'';
+  useEffect(()=>{try{window.localStorage.setItem(STORAGE_KEY,JSON.stringify(draft));window.dispatchEvent(new Event('mediassist-map-saved'));setStorageError(false);}catch{setStorageError(true);}},[draft]);
+  useEffect(()=>{
+    if(draft.scan.status!=='running')return;
+    const timer=setInterval(()=>setDraft(current=>{if(current.scan.status!=='running')return current;const progress=Math.min(100,current.scan.progress+2);return {...current,scan:{status:progress===100?'captured':'running',progress}};}),240);
+    return ()=>clearInterval(timer);
+  },[draft.scan.status]);
+  useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(''),5000);return()=>clearTimeout(timer);},[notice]);
+  useEffect(()=>{if(confirm)confirmRef.current?.showModal();},[confirm]);
+  const update=patch=>setDraft(current=>changeDraft(current,typeof patch==='function'?patch(current):patch));
+  const cancelTool=()=>{setTool('');setRectangleStart(null);};
+  const guard=action=>{if(unsaved){setConfirm({kind:'discard-edit',action});return false;}action();return true;};
+  const navigate=target=>{
+    if(!stageEnabled(draft,target))return;
+    guard(()=>{setStage(target);setZone(emptyZone());setEndpoint(emptyEndpoint());cancelTool();setNotice('');});
+  };
+  const selectZone=id=>id===zone.id?true:guard(()=>{setZone(structuredClone(draft.zones.find(z=>z.id===id)));cancelTool();setNotice('');});
+  const selectEndpoint=id=>id===endpoint.id?true:guard(()=>{setEndpoint({...draft.endpoints.find(e=>e.id===id),placed:true});cancelTool();setNotice('');});
+  const openEndpointTab=tab=>guard(()=>{setEndpointTab(tab);setEndpoint(emptyEndpoint());cancelTool();setNotice('');});
+  const newZone=()=>guard(()=>{setZone(emptyZone());cancelTool();setNotice('');});
+  const newEndpoint=()=>guard(()=>{setEndpoint(emptyEndpoint());setTool('endpoint');setNotice('Click scanned free space to position the new endpoint.');});
+  const onPoint=point=>{
+    if(!validPoint(point))return setNotice('Choose a position inside the map.');
+    if(tool==='rectangle'){
+      if(!rectangleStart){setRectangleStart(point);return;}
+      const x=Math.min(rectangleStart.x,point.x),y=Math.min(rectangleStart.y,point.y),right=Math.max(rectangleStart.x,point.x),bottom=Math.max(rectangleStart.y,point.y);
+      setZone(current=>({...current,points:[{x,y},{x:right,y},{x:right,y:bottom},{x,y:bottom}]}));cancelTool();
+    } else if(tool==='polygon'){
+      if(zone.points.length>=24)return setNotice('A zone supports up to 24 corners. Finish the shape or undo a corner.');
+      setZone(current=>({...current,points:[...current.points,point]}));
+    } else if(tool==='endpoint'||stage==='endpoint'&&!endpoint.placed){
+      const candidate={...endpoint,...point,placed:true};
+      // Position is previewed even when invalid, so the reason stays visible.
+      setEndpoint(candidate);cancelTool();
+    } else if(tool==='heading'){
+      if(Math.hypot(point.x-endpoint.x,point.y-endpoint.y)<3)return;
+      setEndpoint(current=>({...current,heading:Math.round((Math.atan2(current.y-point.y,point.x-current.x)*180/Math.PI+360)%360)%360}));cancelTool();
+    }
+  };
+  const storeZone=event=>{
+    event.preventDefault();const value={...zone,name:zone.name.trim()};
+    const error=zoneError(draft,value);if(error)return setNotice(error);
+    value.id ||= crypto.randomUUID();
+    update(current=>({zones:[...current.zones.filter(z=>z.id!==value.id),value]}));setZone(value);cancelTool();setNotice('Zone saved. Its overlay is available in Endpoint.');
+  };
+  const storeEndpoint=event=>{
+    event.preventDefault();const value={...endpointValue,name:endpoint.name.trim(),group:endpoint.group?.trim()||''};
+    const error=endpointError(draft,value);if(error)return setNotice(error);
+    value.id ||= crypto.randomUUID();
+    update(current=>({endpoints:[...current.endpoints.filter(e=>e.id!==value.id),value]}));setEndpoint({...value,placed:true});cancelTool();setNotice('Endpoint saved with its position and arrival heading.');
+  };
+  const download=()=>{
+    const blob=new Blob([JSON.stringify(exportMap(draft),null,2)],{type:'application/json'}),url=URL.createObjectURL(blob);
+    const link=document.createElement('a');link.href=url;link.download='hospital-lidar-map.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+  const toolText={rectangle:rectangleStart?'Click the opposite corner of the rectangle.':'Click the first corner of the rectangle.',polygon:'Click each corner, then choose Finish shape.',endpoint:'Click scanned free space to place the endpoint.',heading:'Click in the direction the robot should face.'}[tool];
+  return <section className="ls-studio">
+    <WorkspaceTabs label={vi('Map Studio stages')} active={stage} onSelect={navigate} items={STAGES.map(([id,name],i)=>({id,label:`${i+1}. ${vi(name)}`,disabled:!stageEnabled(draft,id),hint:!stageEnabled(draft,id)?vi('Finish the scan first'):undefined}))}/>
+    <div className="ls-topline"><span>{draft.name}</span><span>{vi(storageError?'Storage unavailable — export your map':saved?'Map saved in this browser':'Draft autosaved in this browser')}</span></div>
+    <header className="ls-heading"><div><h2>{index+1}. {vi(STAGES[index][1])}</h2><p>{vi(STAGES[index][2])}</p></div><div className="ls-actions">{vi(index>0&&<Button onClick={()=>navigate(STAGES[index-1][0])}>{vi("← Back")}</Button>)}{vi(stage==='zone'&&<Button tone="primary" onClick={()=>navigate('endpoint')}>{vi("Continue to Endpoint →")}</Button>)}{vi(stage==='endpoint'&&<Button tone="primary" disabled={!!issues.length||unsaved||saved} onClick={()=>{setDraft(current=>saveMap(current,new Date().toISOString()));setNotice('Map saved locally with scan, zones and endpoints.');}}>{vi(saved?'Map saved':'Save map')}</Button>)}</div></header>
+    {notice&&<div className="ls-notice" role="status"><span>{vi(notice)}</span><Button className="small" aria-label="Đóng thông báo" onClick={()=>setNotice('')}>×</Button></div>}
+    {vi(confirm&&<dialog ref={confirmRef} onCancel={()=>setConfirm(null)} className="ls-confirm" role="alertdialog" aria-label={vi(confirm.kind==='reset'?'Start a new scan?':'Unsaved changes')}><strong>{vi(confirm.kind==='reset'?'Start a new scan?':'Discard unsaved changes?')}</strong><p>{vi(confirm.kind==='reset'?'The current draft will be cleared, including its zones and endpoints. Export it first if you need to keep it.':'Your saved map features will remain. Only the edits in the open form will be discarded.')}</p><div className="ls-actions"><Button autoFocus onClick={()=>setConfirm(null)}>{vi("Keep editing")}</Button><Button tone="danger" onClick={()=>{if(confirm.kind==='reset'){setDraft(createDraft());setStage('scan');setZone(emptyZone());setEndpoint(emptyEndpoint());cancelTool();setNotice('New scan ready.');}else confirm.action();setConfirm(null);}}>{vi(confirm.kind==='reset'?'Clear draft and restart':'Discard edits')}</Button></div></dialog>)}
+    {stage==='endpoint'&&<nav className="ls-endpoint-tabs" aria-label="Quản lý điểm đích"><Button className={endpointTab==='points'?'active':''} aria-pressed={endpointTab==='points'} onClick={()=>endpointTab!=='points'&&openEndpointTab('points')}>Điểm đích ({draft.endpoints.length})</Button><Button className={endpointTab==='groups'?'active':''} aria-pressed={endpointTab==='groups'} onClick={()=>endpointTab!=='groups'&&openEndpointTab('groups')}>Nhóm điểm đích ({groupsFor(draft).length})</Button></nav>}
+    {stage==='endpoint'&&endpointTab==='groups'?<EndpointGroupEditor groups={groupsFor(draft)} endpoints={draft.endpoints} onDirtyChange={setGroupDirty}
+      onSave={group=>{const value={...group,id:group.id||crypto.randomUUID()};update(current=>({endpointGroups:[...groupsFor(current).filter(g=>g.id!==value.id),value]}));return value;}}
+      onMember={(group,member)=>update(current=>({endpointGroups:groupsFor(current).map(g=>g.id===group.id?{...g,members:[...g.members.filter(m=>m.endpointId!==member.endpointId),member]}:g)}))}
+      onRemove={(group,member)=>update(current=>({endpointGroups:groupsFor(current).map(g=>g.id===group.id?{...g,members:g.members.filter(m=>m.endpointId!==member.endpointId)}:g)}))}/>:<div className="ls-layout">
+      <div className="ls-main">
+        <LidarMap draft={draft} stage={stage} tool={tool} onPoint={onPoint} zoneEdit={stage==='zone'?zone:null} endpointEdit={stage==='endpoint'?endpoint:null} onSelectZone={selectZone} onSelectEndpoint={selectEndpoint} onEditZone={setZone} onEditEndpoint={setEndpoint} rectangleStart={rectangleStart} hoverPoint={hover} onHover={setHover} zoneDirty={zoneDirty} endpointDirty={endpointDirty}/>
+        {vi(tool&&<div className="ls-toolhint"><span>{vi(toolText)}</span><Button className="small" onClick={cancelTool}>{vi("Cancel tool")}</Button></div>)}
+        {vi(stage==='scan'&&<Panel title={vi("Scan controls")}><div className="ls-runbar"><div><strong>{vi(({idle:'Ready to scan',running:'Recording LiDAR returns…',paused:'Scan paused',captured:'Scan captured',complete:'Scan complete'})[draft.scan.status])}</strong><small>{vi("Simulated recording · no sensor connected")}</small></div><div className="ls-actions">
+          {vi(!['captured','complete'].includes(draft.scan.status)&&<Button tone="primary" onClick={()=>setDraft(current=>({...current,scan:{...current.scan,status:current.scan.status==='running'?'paused':'running'}}))}>{vi(draft.scan.status==='running'?'Pause scan':draft.scan.status==='paused'?'Resume scan':'Start scan')}</Button>)}
+          {vi(draft.scan.status==='idle'&&<Button onClick={()=>update({scan:{status:'captured',progress:100}})}>{vi("Load demo scan")}</Button>)}
+          <Button tone={draft.scan.progress===100?'primary':''} disabled={draft.scan.progress<100} onClick={()=>{if(draft.scan.status!=='complete')update({scan:{status:'complete',progress:100}});setStage('zone');setNotice('Scan retained. Draw zones over the captured geometry.');}}>{vi("Finish scan → Zone")}</Button>
+        </div></div><div className="ls-progress"><i style={{width:draft.scan.progress+'%'}}/></div></Panel>)}
+        {stage!=='scan'&&<div className="ls-hint">{stage==='zone'?'Kéo bên trong vùng để di chuyển cả vùng; kéo chấm trắng để chỉnh từng đỉnh. Tọa độ cập nhật ngay.':'Kéo điểm đích trực tiếp trên bản đồ để đổi vị trí. Mũi tên chỉ hướng robot khi đến.'} Nhấn Esc để hủy lượt kéo, sau đó bấm Lưu để giữ thay đổi.</div>}
+      </div>
+      <aside className="ls-inspector">
+        {vi(stage==='scan'&&<><Panel title={vi("Scan session")}><Field label="Map name" maxLength={60} value={draft.name} onChange={e=>update({name:e.target.value})}/><Stat label="Source">{vi("Demo LiDAR scan")}</Stat><Stat label="Capture">{vi(draft.scan.progress)}{vi("%")}</Stat><Stat label="Resolution">{vi("0.05 m / cell")}</Stat><Stat label="Semantic labels">{vi("Not part of the scan")}</Stat><p>{vi("White points are occupied returns, grey is observed floor, and black is unknown space. Room names are added in Zone.")}</p><Button tone="danger" className="ls-full" disabled={draft.scan.status==='idle'} onClick={()=>setConfirm({kind:'reset'})}>{vi("New scan")}</Button></Panel><Panel title={vi("Map editing")}><p>{vi("1. Capture the physical layout.")}</p><p>{vi("2. Draw areas, exclusion zones and movement rules.")}</p><p>{vi("3. Place destinations and arrival headings.")}</p><div className="ls-help-link"><a href={REFERENCE} target="_blank" rel="noreferrer">{vi("Reference: OTTO basic map editing ↗")}</a></div></Panel></>)}
+        {vi(stage==='zone'&&<><Panel title={vi(zone.id?'Edit zone':'Create zone')}><form onSubmit={storeZone}><Field label="Zone name" required maxLength={40} placeholder={vi("e.g. Pharmacy")} value={zone.name} onChange={e=>setZone(z=>({...z,name:e.target.value}))}/><ZoneTypePicker value={zone.type} onChange={type=>setZone(z=>({...z,type}))}/><p>{vi(zoneType.help)}</p><ZoneProperties zone={zone} setZone={setZone}/>
+          {zone.type==='NO_REPLAN'&&<Field label="Thời gian chờ vật cản (giây)" type="number" min="1" max="120" required value={zone.waitTimeoutSeconds??20} onChange={e=>setZone(z=>({...z,waitTimeoutSeconds:e.target.value===''?'':Number(e.target.value)}))}/>}
+          {zone.type==='SINGLE_ROBOT'&&<p className="ls-hint">Vẽ vùng phủ đủ thân robot và lối đi hẹp. Chừa điểm chờ ngoài biên, tránh đặt điểm đỗ trong vùng làm chặn lối ra. Điều phối kiểm tra bán kính thân robot 0,4 m.</p>}
+          {zone.type==='OCCUPANCY_MONITORING'&&<p className="ls-hint">Mở Điều phối sau khi lưu bản đồ để xem nhật ký vào/ra và số robot trong vùng. Vùng này không giới hạn số robot.</p>}
+          {vi(zone.type==='SPEED_LIMIT'&&<Field label="Maximum speed (m/s)" type="number" min=".1" max="1.5" step=".05" required value={zone.speed} onChange={e=>setZone(z=>({...z,speed:e.target.value===''?'':Number(e.target.value)}))}/>)}
+          {vi(zone.type==='PREFERRED_DIRECTION'&&<Field label="Travel direction (degrees)" type="number" min="0" max="359" required value={zone.heading} onChange={e=>setZone(z=>({...z,heading:e.target.value===''?'':Number(e.target.value)}))}/>)}
+          <div className="ls-actions"><Button className={tool==='rectangle'?'active':''} onClick={()=>{setZone(z=>({...z,points:[]}));setRectangleStart(null);setTool('rectangle');}}>{vi("Draw rectangle")}</Button><Button className={tool==='polygon'?'active':''} onClick={()=>{setZone(z=>({...z,points:[]}));setRectangleStart(null);setTool('polygon');}}>{vi("Draw polygon")}</Button></div>
+          {vi(tool==='polygon'&&<div className="ls-actions"><Button className="small" disabled={!zone.points.length} onClick={()=>setZone(z=>({...z,points:z.points.slice(0,-1)}))}>{vi("Undo corner")}</Button><Button className="small" disabled={zone.points.length<3} onClick={cancelTool}>{vi("Finish shape")}</Button></div>)}
+          {vi(zone.points.length>0&&<><Stat label="Shape">{zone.points.length} đỉnh · {(polygonArea(zone.points)*MAP.resolution**2).toFixed(1)} m²</Stat><details className="ls-vertices"><summary>{vi("Edit corner coordinates")}</summary>{vi(zone.points.map((p,i)=><div className="ls-vertex" key={i}><b>{vi(i+1)}</b>{vi(['x','y'].map(axis=><Field key={axis} label={'Corner '+(i+1)+' '+axis.toUpperCase()} type="number" min="0" max={axis==='x'?1200:680} value={p[axis]} onChange={e=>setZone(z=>({...z,points:z.points.map((q,j)=>j===i?{...q,[axis]:e.target.value===''?'':Number(e.target.value)}:q)}))}/>))}</div>))}</details></>)}
+          {vi(zoneProblem&&<div className="ls-error">{vi(zoneProblem)}</div>)}
+          <Button type="submit" tone="primary" className="ls-full" disabled={!zone.points.length||!!zoneProblem||!!tool||!zoneDirty}>{vi("Save zone")}</Button>
+        </form><div className="ls-actions"><Button onClick={newZone}>{vi("New zone")}</Button>{vi(zone.id&&<Button onClick={()=>setZone(z=>({...z,id:'',name:z.name+' (bản sao)'}))}>{vi("Nhân bản vùng")}</Button>)}{vi(zone.id&&<Button tone="danger" onClick={()=>{update({zones:draft.zones.filter(z=>z.id!==zone.id)});setZone(emptyZone());cancelTool();setNotice('Zone removed.');}}>{vi("Delete zone")}</Button>)}</div></Panel><Panel title={vi('Saved zones · '+draft.zones.length)}>{vi(draft.zones.length?<div className="ls-item-list">{vi(draft.zones.map(z=><button key={z.id} type="button" className={'ls-item '+(z.id===zone.id?'selected':'')} onClick={()=>selectZone(z.id)}><i style={{background:ZONE_TYPES.find(t=>t.id===z.type)?.color}}/><span><strong>{vi(z.name)}</strong><small>{vi(ZONE_TYPES.find(t=>t.id===z.type)?.label)}</small></span></button>))}</div>:<div className="ls-empty">{vi("No zones yet. Draw a shape to label an area or add a rule.")}</div>)}</Panel></>)}
+        {vi(stage==='endpoint'&&<><Panel title={vi(endpoint.id?'Edit endpoint':'Create endpoint')}><form onSubmit={storeEndpoint}><Field label="Endpoint name" maxLength={40} required placeholder={vi("e.g. Pharmacy pickup")} value={endpoint.name} onChange={e=>setEndpoint(p=>({...p,name:e.target.value}))}/><Field label="Endpoint type"><select value={endpoint.type} onChange={e=>setEndpoint(p=>({...p,type:e.target.value}))}>{vi(ENDPOINT_TYPES.map(t=><option key={t} value={t}>{vi(t)}</option>))}</select></Field>
+          {!endpoint.placed&&<Button className={'ls-full '+(tool==='endpoint'?'active':'')} onClick={()=>setTool('endpoint')}>{vi('Place on map')}</Button>}
+          <EndpointProperties endpoint={endpoint} setEndpoint={setEndpoint} draft={draft} onOpenGroups={()=>openEndpointTab('groups')}/>
+          <details className="ls-advanced"><summary>Tọa độ & hướng đến</summary><p>Kéo điểm trên bản đồ; tọa độ bên dưới thay đổi theo vị trí.</p>
+          <div className="ls-pair">{vi(['x','y'].map(axis=><Field key={axis} label={axis.toUpperCase()+' (cells)'} type="number" min="0" max={axis==='x'?1200:680} required value={endpoint[axis]} onChange={e=>setEndpoint(p=>({...p,[axis]:e.target.value===''?'':Number(e.target.value),placed:true}))}/>))}</div>
+          <Field label="Arrival heading (degrees)" type="number" min="0" max="359" required value={endpoint.heading} onChange={e=>setEndpoint(p=>({...p,heading:e.target.value===''?'':Number(e.target.value)}))}/>
+          <Field label="Rotate arrival heading" type="range" min="0" max="359" value={endpoint.heading||0} onChange={e=>setEndpoint(p=>({...p,heading:Number(e.target.value)}))}/>
+          <Button className="ls-full" disabled={!endpoint.placed} onClick={()=>setTool('heading')}>{vi("Set heading on map")}</Button>
+          </details>
+          {vi(endpointProblem&&<div className="ls-error">{vi(endpointProblem)}</div>)}
+          <Button type="submit" tone="primary" className="ls-full" disabled={!endpoint.placed||!!endpointProblem||!!tool||!endpointDirty}>{vi("Save endpoint")}</Button>
+        </form><div className="ls-actions"><Button onClick={newEndpoint}>{vi("New endpoint")}</Button>{vi(endpoint.id&&<Button tone="danger" onClick={()=>{if(draft.endpoints.some(e=>e.queueId===endpoint.id||e.exitId===endpoint.id)||groupsFor(draft).some(g=>g.members.some(m=>m.endpointId===endpoint.id))){setNotice('Điểm đang thuộc nhóm hoặc được dùng làm điểm chờ/thoát. Hãy gỡ liên kết trước khi xóa.');return;}update({endpoints:draft.endpoints.filter(e=>e.id!==endpoint.id)});setEndpoint(emptyEndpoint());cancelTool();setNotice('Endpoint removed.');}}>{vi("Delete endpoint")}</Button>)}</div></Panel>
+        <Panel title={vi('Saved endpoints · '+draft.endpoints.length)}>{vi(draft.endpoints.length?<div className="ls-item-list">{vi(draft.endpoints.map(e=><button type="button" key={e.id} className={'ls-item '+(e.id===endpoint.id?'selected':'')} onClick={()=>selectEndpoint(e.id)}><i style={{background:'#60a5fa'}}/><span><strong>{vi(e.name)}</strong><small>{vi(e.type)}{vi(" · ")}{vi(e.heading)}{vi("°")}</small></span></button>))}</div>:<div className="ls-empty">{vi("Add at least one destination to save the map.")}</div>)}</Panel>
+        <Panel title={vi("Map configuration")}><Stat label="Zones">{vi(draft.zones.length)}</Stat><Stat label="Endpoints">{vi(draft.endpoints.length)}</Stat><Stat label="Status">{vi(saved?<span className="ls-saved">{vi("Saved locally")}</span>:'Draft')}</Stat>{vi(unsaved?<div className="ls-error">{vi("Save or discard the open endpoint edits before saving the map.")}</div>:issues.length>0&&<div className="ls-error">{vi(issues[0])}</div>)}<Button tone="primary" className="ls-full" disabled={!!issues.length||unsaved||saved} onClick={()=>{setDraft(current=>saveMap(current,new Date().toISOString()));setNotice('Map saved locally with scan, zones and endpoints.');}}>{vi(saved?'Map saved':'Save map configuration')}</Button><Button className="ls-full" disabled={!!issues.length||unsaved} onClick={download}>{vi("Export map JSON")}</Button><p>{vi("Bản đã lưu là nguồn dữ liệu cho Điều phối. Bản nháp mới không thay đổi phiên mô phỏng đang chạy. Không triển khai đến robot thật.")}</p><Button className="ls-full" tone="primary" disabled={!draft.saved||storageError||unsaved} onClick={()=>goTo('/workstations')}>{vi("Mở Điều phối với bản đã lưu →")}</Button></Panel></>)}
       </aside>
-    </div>
-  </>;
+    </div>}
+  </section>;
 }
-
-function CleanupStage({ setStage }) {
-  const tools = ['Select', 'Erase Noise', 'Restore', 'Draw Wall', 'Remove Wall', 'Fill Free Space', 'Crop', 'Rotate', 'Set Origin', 'Selective Remap'];
-  const [tool, setTool] = useState('Selective Remap');
-  const [remapping, setRemapping] = useState(false);
-  return <>
-    <StageTitle title="Map Studio — Cleanup & Remap"><Button onClick={() => setTool('Select')}>Undo</Button><Button tone="primary" onClick={() => setStage('semantic')}>Continue Setup</Button></StageTitle>
-    <div className="map-stage-layout cleanup-layout">
-      <Panel title="Cleanup tools" className="map-tool-panel">{tools.map(name => <button type="button" onClick={() => setTool(name)} className={tool === name ? 'selected' : ''} key={name}>{name}</button>)}</Panel>
-      <Panel title="Occupancy map cleanup" className="map-lidar-panel cleanup-map"><MapImage src={cleanupLidar} alt="Occupancy map ready for cleanup" /></Panel>
-      <aside className="map-side-stack">
-        <Panel title="Selective remap" className="remap-panel"><span>Selected Region</span><strong>42.8 m²</strong><p>Use selective remapping when a small area changed and the full facility does not need re-scanning.</p><small>Robot</small><b className="good">MAR-01 · Online</b><small>Region confidence</small><div className="mini-progress"><i /></div><Button tone="primary" onClick={() => setRemapping(!remapping)}>{remapping ? 'Remapping…' : 'Start Selective Remap'}</Button></Panel>
-        <Panel title="Map quality" className="map-quality"><StatusPair label="Noise remaining" value="12 points" /><StatusPair label="Disconnected walls" value="0" good /><StatusPair label="Unknown areas" value="2" /><span>Overall Quality</span><strong className="good">94%</strong><Button>Auto Detect Noise</Button></Panel>
-      </aside>
-    </div>
-  </>;
-}
-
-function SemanticStage({ setStage }) {
-  const objects = ['Select / Pan', 'Room', 'Door', 'Elevator', 'Stairs', 'POI / Location', 'Waiting Area', 'Restricted Facility', 'Label / Annotation', 'Measure'];
-  const [object, setObject] = useState('Room');
-  const [saved, setSaved] = useState(false);
-  return <>
-    <StageTitle title="Map Studio — Semantic Setup" />
-    <div className="map-stage-layout semantic-layout">
-      <Panel title="Semantic objects" className="map-tool-panel">{objects.map(name => <button type="button" onClick={() => setObject(name)} className={object === name ? 'selected' : ''} key={name}>{name}</button>)}</Panel>
-      <MapImage src={semanticFloorMap} alt="Semantic floor map of Hospital Floor 1" className="semantic-map" />
-      <Panel title="Room properties" className="property-panel"><LabelledValue label="Name" value="Pharmacy" /><LabelledValue label="Display Name" value="Pharmacy" /><LabelledValue label="Category" value="Pharmacy" /><LabelledValue label="Floor" value="Floor 1" /><LabelledValue label="Access" value="Staff + Patient" /><LabelledValue label="Navigation POI" value="Enabled" /><small>Door links</small><b className="good">Door-07 → Main Corridor</b><small>Semantic layers</small><b className="good">✓ Room  ✓ Door  ✓ POI / Labels</b><Button tone="primary" onClick={() => setSaved(true)}>{saved ? 'Room saved' : 'Save Room'}</Button><div className="two-buttons"><Button>Add Door</Button><Button>Add POI</Button></div><Button tone="primary" onClick={() => setStage('endpoints')}>Continue to Endpoints</Button></Panel>
-    </div>
-  </>;
-}
-
-function EndpointsStage({ setStage, catalog }) {
-  const [selectedId, setSelectedId] = useState(null);
-  const [notice, setNotice] = useState('');
-  const endpoints = catalog.endpoints;
-  const selected = endpoints.find((item) => item.endpointId === selectedId) ?? endpoints[0] ?? null;
-  const endpointColor = (item) => ({ PICKUP: '#3182f6', DROPOFF: '#8b5cf6', ESCORT: '#22c55e', CHARGING: '#22c55e', EMERGENCY: '#f05252' }[item?.endpointType] ?? '#f5b73d');
-  const map = catalog.maps.find((item) => item.mapId === selected?.mapId);
-  return <>
-    <StageTitle title="Map Studio — Endpoints"><Button tone="primary" onClick={() => setNotice('Endpoint creation requires map coordinates and a catalog entry.')}>+ Add Endpoint</Button></StageTitle>
-    <div className="map-stage-layout endpoint-layout">
-      <Panel title="Locations" className="endpoint-list"><input aria-label="Search locations" placeholder="Search locations…" />{catalog.loading && <p className="map-notice">Loading endpoint catalog…</p>}{catalog.error && <p className="map-notice">{catalog.error}</p>}{endpoints.map((item) => <button type="button" key={item.endpointId} className={selected?.endpointId === item.endpointId ? 'selected' : ''} onClick={() => setSelectedId(item.endpointId)}><i style={{ background: endpointColor(item) }} /><b>{item.endpointName}</b><span>{item.endpointType} · {item.endpointCode}</span></button>)}{!catalog.loading && !catalog.error && endpoints.length === 0 && <p className="map-notice">No catalog endpoints are available.</p>}</Panel>
-      <div className="endpoint-map-column"><Panel title="2D location map"><MapImage src={endpointFloorMap} alt="Hospital floor endpoints map" /></Panel><Panel title="Endpoint usage" className="endpoint-usage"><p>Used by 8 mission templates</p><span>• Medication Delivery</span><span>• Patient Escort</span><span>• Emergency Response</span><Button onClick={() => setNotice('Dependencies opened')}>View Dependencies</Button></Panel></div>
-      <Panel title="Endpoint details" className="endpoint-details"><h4>{selected?.endpointName ?? 'Select an endpoint'}</h4><em>{selected ? `${selected.endpointType} · ${selected.endpointCode}` : 'No selection'}</em>{selected && [['Map', map?.mapName ?? String(selected.mapId).slice(0, 8)], ['Coordinates', `X ${selected.xM ?? '—'} · Y ${selected.yM ?? '—'}`], ['Orientation', `${selected.yawRad ?? '—'} rad`], ['Accessible', selected.accessible ? 'Yes' : 'No'], ['Public', selected.publicVisible ? 'Yes' : 'No'], ['Status', selected.active ? 'Active' : 'Inactive'], ['Room', selected.roomId ? String(selected.roomId).slice(0, 8) : '—'], ['Zone', selected.zoneId ? String(selected.zoneId).slice(0, 8) : '—']].map(([label, value]) => <StatusPair key={label} label={label} value={value} />)}<Button tone="primary" onClick={() => setNotice('Endpoint editing is backed by PUT /api/v1/endpoints/{id}.')}>Edit Endpoint</Button><Button onClick={() => setNotice('Navigation test requires a service request.')}>Test Navigation</Button><Button onClick={() => setNotice('Endpoint duplication is not exposed by the backend.')}>Duplicate</Button><Button onClick={() => setNotice('Use deactivate instead of deleting catalog endpoints.')}>Deactivate</Button>{notice && <p className="map-notice">{notice}</p>}<Button tone="primary" onClick={() => setStage('traffic')}>Continue to Traffic</Button></Panel>
-    </div>
-  </>;
-}
-
-function TrafficStage({ setStage }) {
-  const objects = ['Lane', 'One-way Lane', 'Speed Zone', 'Restricted Zone', 'Preferred Direction', 'Narrow Corridor', 'Single Robot Zone', 'No Replan Zone', 'Occupancy Zone', 'Stop Line', 'Yield Line'];
-  const [object, setObject] = useState('Speed Zone');
-  const [valid, setValid] = useState(false);
-  return <>
-    <StageTitle title="Map Studio — Traffic Graph" />
-    <div className="map-stage-layout traffic-layout">
-      <Panel title="Traffic objects" className="traffic-tools">{objects.map(name => <button type="button" key={name} className={object === name ? 'selected' : ''} onClick={() => setObject(name)}><i />{name}</button>)}</Panel>
-      <MapImage src={trafficFloorMap} alt="Route graph and traffic overlay" className="traffic-map" />
-      <Panel title="Speed zone properties" className="property-panel"><LabelledValue label="Name" value="Waiting Hall Slow" /><LabelledValue label="Max speed" value="0.25 m/s" /><LabelledValue label="Applies to" value="MAR-01" /><LabelledValue label="Active schedule" value="Always" /><LabelledValue label="Planner behavior" value="Allow" /><LabelledValue label="Priority" value="Safety" /><LabelledValue label="Crowd override" value="0.15 m/s" /><small>Conflict check</small><b className="good">✓ No overlapping rule conflict</b><Button tone="primary">Save Rule</Button><Button>Add Stop / Yield</Button><Button tone="primary" onClick={() => setValid(true)}>{valid ? 'Traffic valid' : 'Validate Traffic'}</Button><Button tone="primary" onClick={() => setStage('routes')}>Continue to Routes</Button></Panel>
-    </div>
-  </>;
-}
-
-function RoutesStage({ setStage }) {
-  const [route, setRoute] = useState('Outpatient Loop');
-  return <>
-    <StageTitle title="Map Studio — Routes & Patrol"><Button onClick={() => setRoute('Outpatient Loop')}>Save Patrol</Button><Button tone="primary">Run Patrol Now</Button></StageTitle>
-    <div className="map-stage-layout routes-layout">
-      <Panel title="Patrol settings" className="patrol-settings"><LabelledValue label="Route Name" value="Outpatient Night Patrol" /><LabelledValue label="Route Type" value="Loop" /><h4>Schedule</h4>{[['Start', '20:00'], ['End', '06:00'], ['Repeat', 'Every 30 min'], ['Days', 'Mon–Sun']].map(([label, value]) => <StatusPair key={label} label={label} value={value} />)}<h4>Patrol behavior</h4>{['Pause on obstacle', 'Capture image at P2', 'Crowd scan at P3', 'Check restricted area P4', 'Return home when complete'].map(item => <p className="map-check" key={item}>✓ <span>{item}</span></p>)}<Button>Test Route</Button><Button tone="danger">Disable Patrol</Button></Panel>
-      <div className="routes-map-column"><Panel title="Patrol map"><MapImage src={patrolFloorMap} alt="Outpatient Night Patrol route map" /></Panel><Panel title="Patrol point action" className="point-action"><h4>P9 — Waiting Hall</h4><b>Action: Crowd Scan</b><p>Wait 8 sec · Capture snapshot if density HIGH</p><Button onClick={() => setRoute('P9 edited')}>Edit Point Action</Button></Panel></div>
-      <Panel title="Patrol routes" className="route-list">{[['Main Corridor Patrol', '8 pts', 'Active'], ['Outpatient Loop', '7 pts', 'Active'], ['Emergency Sweep', '12 pts', 'Paused']].map(([name, points, status]) => <button type="button" onClick={() => setRoute(name)} key={name} className={route === name ? 'selected' : ''}><b>{name}</b><span>{points}</span><em className={status === 'Active' ? 'good' : 'warning-text'}>{status}</em></button>)}<small>Next run</small><h4>Today 20:00</h4><p>Estimated duration 14m</p><Button>Preview Timeline</Button><Button tone="primary" onClick={() => setStage('validate')}>Validate Routes</Button></Panel>
-    </div>
-  </>;
-}
-
-function ValidateStage({ setStage }) {
-  const [focused, setFocused] = useState('');
-  return <>
-    <StageTitle title="Map Studio — Validate & Versions"><Button>Run Validation</Button><Button tone="primary" onClick={() => setStage('publish')}>Publish v1.5</Button></StageTitle>
-    <div className="map-stage-layout validate-layout">
-      <Panel title="Map validation" className="validation-panel"><h4>Hospital Floor 1 • Draft v1.5</h4><div className="validation-score"><span>Validation Score</span><strong>92%</strong></div>{validationRows.map(([label, status]) => <button type="button" onClick={() => setFocused(label)} key={label} className={`validation-row ${status}`}><i>{status === 'pass' ? '●' : '▲'}</i><span>{label}</span><b>{status.toUpperCase()}</b></button>)}<div className="three-buttons"><Button onClick={() => setFocused('Lane LN-12 disconnected')}>Focus Warning</Button><Button>Ignore Warning</Button><Button tone="primary">Revalidate</Button></div>{focused && <p className="map-notice">Reviewing: {focused}</p>}</Panel>
-      <aside className="map-side-stack versions-stack"><Panel title="Map versions" className="version-list">{[['v1.5', 'Draft', 'Today 10:32'], ['v1.4', 'Active', 'Aug 23 16:40'], ['v1.3', 'Archived', 'Aug 21 11:12'], ['v1.2', 'Archived', 'Aug 18 09:15']].map(([version,status,date], index) => <button type="button" key={version} className={index === 1 ? 'current' : ''}><b>{version}</b><em>{status}</em><span>{date}</span></button>)}</Panel><Panel title="Publish checklist" className="publish-checklist">{['Robot MAR-01 is idle', 'Validation completed', 'No critical errors', 'Charger configured', 'Home endpoint configured', 'Rollback version available'].map(item => <p key={item}>✓ <span>{item}</span></p>)}<em>Publishing makes v1.5 the active navigation map.</em><Button>Preview Changes</Button><Button tone="primary" onClick={() => setStage('publish')}>Publish Map</Button></Panel></aside>
-    </div>
-  </>;
-}
-
-function PublishStage() {
-  const [calculated, setCalculated] = useState(false);
-  const [published, setPublished] = useState(false);
-  return <>
-    <StageTitle title="Map Studio — Test & Publish" />
-    <div className="map-stage-layout publish-layout">
-      <Panel title="Route test" className="route-test-panel"><LabelledValue label="From" value="Pharmacy Pickup" /><LabelledValue label="To" value="Room 305" /><LabelledValue label="Route policy" value="Safest" /><LabelledValue label="Avoid crowds" value="Enabled" /><LabelledValue label="Blocked timeout" value="20 sec" /><LabelledValue label="Auto replan" value="Enabled" /><Button tone="primary" onClick={() => setCalculated(true)}>{calculated ? 'Route calculated' : 'Calculate Route'}</Button><div className="route-metrics"><div><span>Distance</span><strong>128.4 m</strong></div><div><span>ETA</span><strong>2m 11s</strong></div><div><span>Battery est.</span><strong className="good">2.8%</strong></div><div><span>Zones crossed</span><b className="warning-text">1 slow zone</b></div></div><div className="two-buttons"><Button>Run Simulation</Button><Button>Send Robot Test</Button></div></Panel>
-      <Panel title="Simulation preview" className="simulation-panel"><MapImage src={simulationFloorMap} alt="Route simulation between pharmacy and Room 305" /><label>Simulation timeline</label><div className="timeline-progress"><i /></div><div className="timeline-times"><span>00:00</span><span>Obstacle replan</span><span>02:11</span></div><p className="good">✓ Route reachable · Charger reachable · No restricted-zone violation</p></Panel>
-      <Panel title="Validation" className="publish-validation">{['Map origin configured', 'Home configured', 'Charger configured', 'All endpoints reachable', 'No endpoint in restricted zone', 'Lane connectivity', 'Wall clearance', 'Traffic conflicts'].map((item,index) => <p className={index === 5 || index === 6 ? 'warning-text' : 'good'} key={item}>{index === 5 || index === 6 ? '▲' : '✓'} <span>{item}</span></p>)}<div className="warning-callout"><b>2 warnings</b><span>LN-12 disconnected · EP-09 wall clearance</span></div><Button>Focus Warning</Button><Button tone="primary">Re-run Validation</Button><div className="ready-callout"><small>READY TO PUBLISH</small><b>v1.5 → v1.6</b></div><Button tone="primary" onClick={() => setPublished(true)}>{published ? 'Map v1.6 published' : 'Publish Map v1.6'}</Button></Panel>
-    </div>
-  </>;
-}
-
-const stageComponents = { scan: ScanStage, cleanup: CleanupStage, semantic: SemanticStage, endpoints: EndpointsStage, traffic: TrafficStage, routes: RoutesStage, validate: ValidateStage, publish: PublishStage };
-
-/**
- * Self-contained Figma implementation for the eight Map Studio screens.
- * Pass initialStage to open a particular screen, or leave it unset for Scan & SLAM.
- */
-export default function MapStudioFigma({ initialStage = 'scan' }) {
-  const permittedStage = useMemo(() => workflow.some(([id]) => id === initialStage) ? initialStage : 'scan', [initialStage]);
-  const [stage, setStage] = useState(permittedStage);
-  const [catalog, setCatalog] = useState({ endpoints: [], maps: [], loading: true, error: '' });
-  useEffect(() => {
-    let active = true;
-    Promise.all([facilityApi.listEndpoints({ page: 0, size: 100 }), facilityApi.listMaps({ page: 0, size: 100 })]).then(([endpointPage, mapPage]) => {
-      if (active) setCatalog({ endpoints: endpointPage.content ?? [], maps: mapPage.content ?? [], loading: false, error: '' });
-    }).catch((error) => { if (active) setCatalog({ endpoints: [], maps: [], loading: false, error: error.message || 'Unable to load the facility catalog.' }); });
-    return () => { active = false; };
-  }, []);
-  const Stage = stageComponents[stage];
-  return <section className="map-studio-figma"><WorkflowBar stage={stage} onStageChange={setStage} /><Stage setStage={setStage} catalog={catalog} /></section>;
-}
-
-export { workflow };
+export const workflow=STAGES.map(([id,label])=>[id,label]);
