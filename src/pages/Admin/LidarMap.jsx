@@ -123,12 +123,12 @@ export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit
     </Selectable>;
   };
   return <section className="ls-map" aria-label={vi("LiDAR map editor")}>
-    <header className="ls-map-head"><div><strong>{vi(raw?'LiDAR occupancy map':draft.name)}</strong><small>{vi(raw?'Unlabelled scan':'Shared scan · editable overlays')} · 0,05 m / ô</small></div><div className="ls-map-tools">
+    <header className="ls-map-head"><div><strong>{vi(raw?'LiDAR occupancy map':draft.name)}</strong><small>{vi(raw?'Unlabelled scan':'Shared scan · editable overlays')}</small></div><div className="ls-map-tools">
       <button type="button" aria-label={vi("Zoom out")} disabled={zoom<=1} onClick={()=>zoomTo(Math.max(1,zoom-.25))}>{vi("−")}</button>
       <button type="button" aria-label={vi("Fit map")} onClick={()=>{setZoom(1);setCentre({x:600,y:340});}}>{vi("Fit")}</button>
       <button type="button" aria-label={vi("Zoom in")} disabled={zoom>=3} onClick={()=>zoomTo(Math.min(3,zoom+.25))}>{vi("+")}</button>
     </div></header>
-    <div className="ls-map-layers"><span className="ls-live-dot"/> <span>{vi(raw?'OCCUPANCY':'MAP LAYERS')}</span><label><input type="checkbox" checked={grid} onChange={e=>setGrid(e.target.checked)}/>{vi("Grid")}</label>{vi(raw?<label><input type="checkbox" checked={rays} onChange={e=>setRays(e.target.checked)}/>{vi("Laser rays")}</label>:<><label><input type="checkbox" checked={zonesVisible} onChange={e=>setZonesVisible(e.target.checked)}/>{vi("Zones")}</label>{stage==='endpoint'&&<label><input type="checkbox" checked={endpointsVisible} onChange={e=>setEndpointsVisible(e.target.checked)}/>{vi("Endpoints")}</label>}</>)}<small>{vi(Math.round(zoom*100))}{vi("%")}</small></div>
+    <div className="ls-map-layers"><span className="ls-live-dot"/> <span>{vi(raw?'OCCUPANCY':'MAP LAYERS')}</span><label><input type="checkbox" checked={grid} onChange={e=>setGrid(e.target.checked)}/>Lưới hỗ trợ</label>{vi(raw?<label><input type="checkbox" checked={rays} onChange={e=>setRays(e.target.checked)}/>{vi("Laser rays")}</label>:<><label><input type="checkbox" checked={zonesVisible} onChange={e=>setZonesVisible(e.target.checked)}/>{vi("Zones")}</label>{stage==='endpoint'&&<label><input type="checkbox" checked={endpointsVisible} onChange={e=>setEndpointsVisible(e.target.checked)}/>{vi("Endpoints")}</label>}</>)}<small>{vi(Math.round(zoom*100))}{vi("%")}</small></div>
     <div className="ls-map-viewport">
       <svg ref={svgRef} viewBox={[centre.x-width/2,centre.y-height/2,width,height].join(' ')} preserveAspectRatio="xMidYMid meet" aria-label={vi("LiDAR map drawing surface")} style={{cursor:tool?'crosshair':zoom>1?'grab':'default',touchAction:zoom>1||onEditZone||onEditEndpoint?'none':'auto',userSelect:'none'}}
         onPointerDownCapture={()=>{if(!drag.current)suppressClick.current=false;}}
@@ -159,6 +159,6 @@ export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit
         <g transform={'translate('+(centre.x-width/2+22/zoom)+' '+(centre.y+height/2-26/zoom)+')'} pointerEvents="none"><path d="M0 -5V0H40V-5" fill="none" stroke="#afbbc5" strokeWidth={1/zoom}/><text x="0" y={15/zoom} fill="#afbbc5" fontSize={10/zoom}>{vi("2 m · N ↑")}</text></g>
       </svg>
     </div>
-    <footer className="ls-map-foot"><span><i style={{background:'#ecf0f1'}}/>{vi("Occupied")}<i style={{background:'#42474c'}}/>{vi("Free")}<i style={{background:'#111416'}}/>{vi("Unknown")}</span><span>{vi(hoverPoint? (hoverPoint.x*.05).toFixed(2)+' m, '+(hoverPoint.y*.05).toFixed(2)+' m':'Drag to pan when zoomed')}</span></footer>
+    <footer className="ls-map-foot"><span><i style={{background:'#ecf0f1'}}/>{vi("Occupied")}<i style={{background:'#42474c'}}/>{vi("Free")}<i style={{background:'#111416'}}/>{vi("Unknown")}</span><span>{vi('Drag to pan when zoomed')}</span></footer>
   </section>;
 }

@@ -26,6 +26,24 @@ export function loadDraft(storage) {
   } catch { return createDraft(); }
 }
 export function changeDraft(draft, changes) { return { ...draft, ...changes, revision: draft.revision + 1 }; }
+export function removeEndpointGroup(draft, id) {
+  const groups = groupsFor(draft);
+  if (!groups.some(group => group.id === id)) return draft;
+  // An explicit array also prevents deleted legacy groups being recreated on reload.
+  return changeDraft(draft, { endpointGroups: groups.filter(group => group.id !== id) });
+}
+// Local draft only. The published snapshot stays unchanged until Save map.
+export function removeEndpoint(draft, id) {
+  if (!draft.endpoints.some(e => e.id === id)) return draft;
+  const endpoints = draft.endpoints.filter(e => e.id !== id).map(e => {
+    const next = { ...e };
+    if (next.queueId === id) delete next.queueId;
+    if (next.exitId === id) delete next.exitId;
+    return next;
+  });
+  const endpointGroups = groupsFor(draft).map(g => ({ ...g, members: g.members.filter(m => m.endpointId !== id) }));
+  return changeDraft(draft, { endpoints, endpointGroups });
+}
 export function stageEnabled(draft, stage) { return stage === 'scan' || ['zone', 'endpoint'].includes(stage) && draft.scan.status === 'complete'; }
 export function freePoint(point, clearance = 8) {
   if (!validPoint(point) || !inPolygon(point, FLOOR)) return false;

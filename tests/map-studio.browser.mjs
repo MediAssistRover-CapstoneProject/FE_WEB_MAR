@@ -35,7 +35,7 @@ try {
   assert.deepEqual((await saved()).zones,[]);await shot('02-scan');
   await click('Finish scan → Zone');
   await page.getByLabel(vi('Zone name'),{exact:true}).fill('Pharmacy');
-  await page.getByText('Thuộc tính & hình học nâng cao',{exact:true}).click();
+  await page.getByText('Thông tin bổ sung',{exact:true}).click();
   await page.getByLabel('Mô tả vùng',{exact:true}).fill('Khu vực nhận thuốc, không làm thay đổi đường đi');
   await rect(660,175,220,120);
   await click('Save zone');assert.equal((await saved()).zones.length,1);
@@ -62,9 +62,9 @@ try {
     await page.mouse.move(positions[0].x,positions[0].y);await page.mouse.down();await page.mouse.move(positions[1].x,positions[1].y,{steps:10});await page.mouse.up();
   };
   await dragPoint({x:365,y:340},{x:580,y:330});
-  await page.getByText('Tọa độ & hướng đến',{exact:true}).click();
+  await page.getByText('Hướng robot khi đến',{exact:true}).click();
   await click('Set heading on map');await point(580,290);
-  assert.equal(await page.getByLabel(vi('Arrival heading (degrees)'),{exact:true}).inputValue(),'90');
+  assert.equal(await page.getByLabel(vi('Rotate arrival heading'),{exact:true}).inputValue(),'90');
   await click('Save endpoint');
   assert.equal((await saved()).endpoints.length,1);
   await click('New endpoint');
@@ -84,7 +84,7 @@ try {
   assert.ok(Math.abs(pickup.x-815)<2 && Math.abs(pickup.y-245)<2,'Placement remains aligned after zoom');
   await click('Save map');assert.equal((await saved()).saved.revision,(await saved()).revision);
   await page.getByRole('navigation',{name:'Quản lý điểm đích',exact:true}).getByRole('button',{name:/^Điểm đích/}).click();
-  await page.getByRole('button',{name:/^Nhận hàng.*Nhận hàng/}).click();
+  await page.getByRole('button',{name:/^Pickup.*Nhận hàng/}).click();
   const download=page.waitForEvent('download');await click('Export map JSON');assert.equal((await download).suggestedFilename(),'hospital-lidar-map.json');
   await shot('05-endpoints');
   await page.getByLabel(vi('Endpoint name'),{exact:true}).fill('Unsaved change');

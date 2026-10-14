@@ -21,5 +21,12 @@ export const ZONE_TYPES = [
   { id:'TUNNELING', group:'An toàn & cảm biến', label:'Lọc sàn/trần 3D', color:'#f87171', unsupported:true, help:'Cần dữ liệu 3D và đánh giá an toàn; có thể bỏ sót vật cản không được LiDAR nhìn thấy.' },
   { id:'IGNORE_DYNAMIC_OBJECTS', group:'An toàn & cảm biến', label:'Bỏ qua ước lượng vật thể động', color:'#f87171', unsupported:true, help:'Không phù hợp nơi có người/xe di chuyển. Không bật chức năng này trong bản mô phỏng bệnh viện.' },
 ];
-export const ZONE_GROUPS = [...new Set(ZONE_TYPES.map(t=>t.group))];
+// Keep legacy types readable without offering advanced robot policies as new zones.
+export const ZONE_SETUP_TYPES = ZONE_TYPES.filter(t => ['AREA', 'EXCLUSION', 'SPEED_LIMIT', 'ASSUMED_COST'].includes(t.id));
+export const ZONE_ROBOT_POLICY = {
+  AREA: 'Chỉ đặt tên khu vực, không thay đổi đường đi của robot.',
+  EXCLUSION: 'Robot cần nhận vùng cấm và xác nhận áp dụng trước khi vận hành.',
+  SPEED_LIMIT: 'Robot cần hỗ trợ giới hạn tốc độ theo vùng và xác nhận mức tốc độ đã nhận.',
+  ASSUMED_COST: 'Robot cần nhận vật cản quy ước trong bản đồ điều hướng. Quy tắc này không thay thế cảm biến tránh vật cản.',
+};
 export const blockedZone = z => z.enabled !== false && ['EXCLUSION','ASSUMED_COST'].includes(z.type);

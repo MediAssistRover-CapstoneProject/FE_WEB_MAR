@@ -28,13 +28,14 @@ try{
   await drag({x:760,y:230},{x:735,y:240});
   const moved=seed.zones[0].points.map(p=>({x:p.x-25,y:p.y+10}));
   assert.deepEqual(await corners(),moved,'First drag selects and moves the whole zone');
-  await page.getByText(vi('Edit corner coordinates'),{exact:true}).click();
-  assert.equal(await field('Corner 1 X').inputValue(),String(moved[0].x));
+  assert.equal(await field('Corner 1 X').count(),0,'Coordinate fields are hidden');
+  assert.deepEqual(await field('Loại vùng').locator('option').evaluateAll(options=>options.map(o=>o.value)),['AREA','EXCLUSION','SPEED_LIMIT','ASSUMED_COST']);
+  await page.getByRole('region',{name:'Chính sách áp dụng vùng'}).getByText('Chưa đồng bộ với robot',{exact:true}).waitFor();
   assert.deepEqual((await data()).zones[0].points,seed.zones[0].points,'Drag previews until saved');
   await drag(moved[0],{x:moved[0].x+15,y:moved[0].y+5});
   moved[0]={x:moved[0].x+15,y:moved[0].y+5};
   assert.deepEqual(await corners(),moved,'Only the dragged vertex changes');
-  assert.equal(await field('Corner 1 X').inputValue(),String(moved[0].x));
+  assert.equal(await field('Corner 1 X').count(),0);
   await click('Save zone');assert.deepEqual((await data()).zones[0].points,moved);
   await drag({x:740,y:240},{x:750,y:255},{release:false});
   await page.keyboard.press('Escape');await page.mouse.up();
@@ -47,9 +48,9 @@ try{
   for(const name of ['Trạng thái tài nguyên mô phỏng','Điểm chờ trước khi tiếp cận','Điểm thoát sau khi hoàn tất','Mẫu chức năng'])assert.equal(await page.getByLabel(name,{exact:true}).count(),0);
   assert.equal(await page.getByText('Chuỗi tác vụ tại điểm',{exact:true}).count(),0);
   await drag({x:580,y:330},{x:610,y:340});
-  await page.getByText('Tọa độ & hướng đến',{exact:true}).click();
-  assert.equal(await field('X (cells)').inputValue(),'610');assert.equal(await field('Y (cells)').inputValue(),'340');
-  assert.equal(await field('Arrival heading (degrees)').inputValue(),'90');
+  await page.getByText('Hướng robot khi đến',{exact:true}).click();
+  assert.equal(await field('X (cells)').count(),0);assert.equal(await field('Y (cells)').count(),0);
+  assert.equal(await field('Rotate arrival heading').inputValue(),'90');
   await click('Save endpoint');
   await drag({x:610,y:340},{x:450,y:180});
   assert.equal(await page.getByRole('button',{name:vi('Save endpoint'),exact:true}).isDisabled(),true,'Wall/unknown placement stays invalid');
@@ -60,9 +61,9 @@ try{
   await drag({x:440,y:400},{x:420,y:410});
   assert.notEqual(await surface().getAttribute('viewBox'),beforePan);
   await drag({x:610,y:340},{x:630,y:350});
-  assert.equal(await field('X (cells)').inputValue(),'630');assert.equal(await field('Y (cells)').inputValue(),'350');
   await click('Save endpoint');
   assert.equal((await data()).endpoints.find(e=>e.id==='home').x,630);
+  assert.equal((await data()).endpoints.find(e=>e.id==='home').y,350);
   await click('Fit map');
   // Saved point metadata is not erased by dragging or by removing its old form fields.
   await drag({x:815,y:245},{x:795,y:255});await click('Save endpoint');
@@ -70,7 +71,7 @@ try{
   await drag({x:795,y:255},{x:805,y:255});
   await page.getByRole('navigation',{name:'Quản lý điểm đích',exact:true}).getByRole('button',{name:/^Nhóm điểm đích/}).click();
   await page.getByRole('alertdialog').waitFor();await click('Keep editing');
-  assert.equal(await field('X (cells)').inputValue(),'805');await click('Save endpoint');
+  await click('Save endpoint');assert.equal((await data()).endpoints.find(e=>e.id==='pickup').x,805);
   await shot('endpoint-drag');
   await page.getByRole('navigation',{name:'Quản lý điểm đích',exact:true}).getByRole('button',{name:/^Nhóm điểm đích/}).click();
   const groups=page.getByRole('region',{name:'Quản lý nhóm điểm đích'});await groups.waitFor();
@@ -85,6 +86,23 @@ try{
   await page.getByRole('button',{name:/Vùng A.*Vùng có tên/}).click();assert.deepEqual(await corners(),moved);
   await tab('Endpoint');await drag({x:630,y:350},{x:620,y:350});await click('Save endpoint');
   assert.equal((await data()).endpoints.find(e=>e.id==='home').x,620);
+  const beforeDelete=await data();
+  await page.getByRole('button',{name:'Xóa điểm đích Nhận thuốc',exact:true}).click();
+  const dialog=page.getByRole('alertdialog',{name:'Xóa điểm đích'});
+  await dialog.getByRole('button',{name:'Hủy',exact:true}).click();
+  assert.deepEqual(await data(),beforeDelete,'Cancel preserves draft');
+  await page.getByRole('button',{name:'Xóa điểm đích Nhận thuốc',exact:true}).click();
+  assert.match(await dialog.innerText(),/gỡ khỏi 1 nhóm/);
+  await dialog.getByRole('button',{name:'Xóa điểm đích',exact:true}).click();
+  const afterDelete=await data();
+  assert.equal(afterDelete.endpoints.length,1);
+  assert.deepEqual(afterDelete.endpointGroups[0].members,[]);
+  assert.deepEqual(afterDelete.saved,beforeDelete.saved,'Saved map changes only on explicit save');
+  await click('Save map');
+  await page.reload();await tab('Endpoint');
+  assert.equal((await data()).endpoints.length,1);
+  assert.equal(await page.getByRole('button',{name:'Xóa điểm đích Nhận thuốc',exact:true}).count(),0);
+  await shot('endpoint-delete');
   assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);
-  console.log('PASS: direct zone / vertex / endpoint drag, live coordinates, zoom + pan, cancel, guards, metadata preservation, groups, persistence, responsive UI and no API writes.');
+  console.log('PASS: visual zone / vertex / endpoint drag, four zone types, robot policy, no coordinate fields, deletion confirmation and group cleanup, zoom + pan, cancel, guards, metadata preservation, persistence, responsive UI and no API writes.');
 }catch(e){await shot('failure');console.error('UI errors:',errors);console.error((await page.locator('body').innerText()).slice(-4000));throw e;}finally{await browser.close();}

@@ -5,7 +5,7 @@ Các bài kiểm tra dùng bản đồ LiDAR mô phỏng và trình duyệt cô 
 ## Kiểm tra logic
 
 ```powershell
-node --test tests/map-studio.test.mjs tests/map-feature-drag.test.mjs tests/facility-contract.test.mjs tests/dispatch.test.mjs tests/zone-traffic.test.mjs
+node --test tests/map-setup.test.mjs tests/map-studio.test.mjs tests/map-feature-drag.test.mjs tests/facility-contract.test.mjs tests/dispatch.test.mjs tests/zone-traffic.test.mjs
 ```
 
 ## Kiểm tra giao diện
@@ -15,6 +15,7 @@ Yêu cầu Chrome, Playwright và FE đang chạy tại cổng 5173. Đặt `PLA
 ```powershell
 node tests/map-studio.browser.mjs
 node tests/map-feature-drag.browser.mjs
+node tests/endpoint-group-delete.browser.mjs
 node tests/facility-catalog.browser.mjs
 node tests/dispatch.browser.mjs
 node tests/zone-traffic.browser.mjs

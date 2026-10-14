@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { groupError, SELECTION_POLICIES, API_SELECTION_POLICIES, POLICY_HELP } from '../../features/facility/endpointGroups.js';
 
 const empty = () => ({ id:'', code:'', name:'', selectionPolicy:'PRIORITY', allowFallback:false, active:true, description:'', members:[] });
-export default function EndpointGroupEditor({groups, endpoints, onSave, onMember, onRemove, onDirtyChange, busy=false, remote=false}) {
+export default function EndpointGroupEditor({groups, endpoints, onSave, onMember, onRemove, onDelete, onDirtyChange, busy=false, remote=false}) {
   const [form,setForm]=useState(empty),[member,setMember]=useState({endpointId:'',sequenceNo:1,active:true}),[error,setError]=useState('');
+  const [deleteTarget,setDeleteTarget]=useState(null),[deleting,setDeleting]=useState(false),[deleteError,setDeleteError]=useState('');
+  const deleteDialog=useRef(null);
+  useEffect(()=>{if(deleteTarget)deleteDialog.current?.showModal();},[deleteTarget]);
   const selected=groups.find(g=>g.id===form.id);
   const members=selected?.members||[];
   const baseline=selected||empty();
@@ -16,9 +19,22 @@ export default function EndpointGroupEditor({groups, endpoints, onSave, onMember
   const run=async action=>{setError('');try{await action();}catch(e){setError(e.message||'Không lưu được thay đổi.');}};
   const select=id=>{const g=groups.find(g=>g.id===id);setForm(g?structuredClone(g):empty());setMember({endpointId:'',sequenceNo:Math.max(0,...(g?.members||[]).map(m=>m.sequenceNo))+1,active:true});setError('');};
   return <section className="ls-panel" aria-label="Quản lý nhóm điểm đích"><h3>Nhóm điểm đích</h3>
-    <p>Gộp các điểm có cùng chức năng. Khi điều phối, robot chọn <strong>một điểm</strong> phù hợp theo chính sách của nhóm.</p>
-    <details className="ls-advanced"><summary>Cách thử nhóm trong Điều phối</summary><p>Ví dụ: tạo hai điểm nhận thuốc A và B → tạo nhóm “Quầy nhận thuốc” → thêm A, B làm thành viên → lưu bản đồ. Trong Điều phối, chọn “Nhóm: Quầy nhận thuốc” ở Điểm tiếp theo và chạy.</p><p>Chọn Cân bằng lượt phục vụ để thấy A/B thay phiên sau mỗi lượt hoàn tất. Với thứ tự ưu tiên, tắt thành viên A hoặc bật thử điểm kế tiếp khi A không có đường để kiểm tra chọn B.</p><p>Nhóm không phải một vùng trên bản đồ, không phải tuyến ghé tất cả các điểm và không phải cơ chế dùng chung quyền sở hữu điểm.</p></details>
-    <label className="ls-field">Nhóm đang chỉnh<select aria-label="Nhóm đang chỉnh" value={form.id} disabled={busy} onChange={e=>select(e.target.value)}><option value="">+ Tạo nhóm mới</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name}{g.active?'':' · tắt'}</option>)}</select></label>
+    <p>Gộp các điểm cùng chức năng để robot chọn một điểm phù hợp khi điều phối.</p>
+    <div className="ls-group-toolbar">
+      <label className="ls-field">Nhóm đang chỉnh<select aria-label="Nhóm đang chỉnh" value={form.id} disabled={busy} onChange={e=>select(e.target.value)}><option value="">+ Tạo nhóm mới</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name}{g.active?'':' · tắt'}</option>)}</select></label>
+      {!remote&&onDelete&&selected&&<button type="button" className="ls-btn danger" disabled={busy} onClick={()=>{setDeleteError('');setDeleteTarget(selected);}}>Xóa nhóm</button>}
+    </div>
+    {deleteTarget&&<dialog ref={deleteDialog} className="ls-confirm" role="alertdialog" aria-label="Xóa nhóm điểm đích" onCancel={e=>{if(deleting)e.preventDefault();else setDeleteTarget(null);}}>
+      <strong>Xóa nhóm “{deleteTarget.name}”?</strong>
+      <p>Chỉ xóa nhóm và liên kết thành viên. Các điểm đích trên bản đồ vẫn được giữ nguyên.</p>
+      {dirty&&<p>Thay đổi chưa lưu trong nhóm này sẽ bị bỏ.</p>}
+      <p>Bấm Lưu bản đồ sau khi xóa để cập nhật Điều phối.</p>
+      {deleteError&&<p className="ls-error" role="alert">{deleteError}</p>}
+      <div className="ls-actions"><button type="button" autoFocus className="ls-btn" disabled={deleting} onClick={()=>setDeleteTarget(null)}>Hủy</button><button type="button" className="ls-btn danger" disabled={busy||deleting} onClick={async()=>{
+        setDeleting(true);setDeleteError('');
+        try{await onDelete(deleteTarget);select('');setDeleteTarget(null);}catch(e){setDeleteError(e.message||'Không xóa được nhóm. Vui lòng thử lại.');}finally{setDeleting(false);}
+      }}>{deleting?'Đang xóa…':'Xóa nhóm'}</button></div>
+    </dialog>}
     <div className="ls-group-grid">
     <form onSubmit={e=>{e.preventDefault();run(async()=>{const candidate={...form,code:form.code.trim(),name:form.name.trim(),members};const problem=groupError(candidate,groups,endpoints);if(problem)throw Error(problem);const result=await onSave(candidate);setForm(result);});}}>
       <fieldset disabled={busy} style={{border:0,padding:0,minWidth:0}}>
