@@ -25,6 +25,8 @@ async function rect(x,y,w,h){await click('Draw rectangle');await point(x,y);awai
 try {
   await page.goto((process.env.TEST_URL||'http://127.0.0.1:5173')+'/admin?screen=Map%20Studio');
   await page.getByRole('heading',{name:/1\.\s*Quét/,exact:true}).waitFor();
+  const frame = await page.locator('.ls-map-viewport').boundingBox();
+  assert.ok(Math.abs(frame.width / frame.height - 5 / 3) < .01, 'Studio map is 5:3');
   assert.equal(await page.getByRole('navigation',{name:vi('Map Studio stages')}).getByRole('button').count(),3);
   assert.equal(await tab('Zone').isDisabled(),true);
   await shot('01-empty');

@@ -77,7 +77,8 @@ export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit
   const drag=useRef(null),svgRef=useRef(null),suppressClick=useRef(false);
   const raw=stage==='scan',progress=raw?draft.scan.progress:100,robot=scanPosition(progress);
   const beams=useMemo(()=>rayHits(robot),[robot.x,robot.y]);
-  const width=MAP.width/zoom,height=MAP.height/zoom;
+  // A 5:3 view adds a small vertical margin without stretching saved geometry.
+  const width=MAP.width/zoom,height=MAP.width*3/5/zoom;
   const clampCentre=(point,z=zoom)=>({x:Math.max(600/z,Math.min(1200-600/z,point.x)),y:Math.max(340/z,Math.min(680-340/z,point.y))});
   const zoomTo=value=>{setZoom(value);setCentre(current=>clampCentre(current,value));};
   const coordinate=event=>{const matrix=svgRef.current?.getScreenCTM();if(!matrix)return null;const p=new DOMPoint(event.clientX,event.clientY).matrixTransform(matrix.inverse());return {x:p.x,y:p.y};};
@@ -129,7 +130,7 @@ export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit
       <button type="button" aria-label={vi("Zoom in")} disabled={zoom>=3} onClick={()=>zoomTo(Math.min(3,zoom+.25))}>{vi("+")}</button>
     </div></header>
     <div className="ls-map-layers"><span className="ls-live-dot"/> <span>{vi(raw?'OCCUPANCY':'MAP LAYERS')}</span><label><input type="checkbox" checked={grid} onChange={e=>setGrid(e.target.checked)}/>Lưới hỗ trợ</label>{vi(raw?<label><input type="checkbox" checked={rays} onChange={e=>setRays(e.target.checked)}/>{vi("Laser rays")}</label>:<><label><input type="checkbox" checked={zonesVisible} onChange={e=>setZonesVisible(e.target.checked)}/>{vi("Zones")}</label>{stage==='endpoint'&&<label><input type="checkbox" checked={endpointsVisible} onChange={e=>setEndpointsVisible(e.target.checked)}/>{vi("Endpoints")}</label>}</>)}<small>{vi(Math.round(zoom*100))}{vi("%")}</small></div>
-    <div className="ls-map-viewport">
+    <div className="ls-map-frame"><div className="ls-map-viewport">
       <svg ref={svgRef} viewBox={[centre.x-width/2,centre.y-height/2,width,height].join(' ')} preserveAspectRatio="xMidYMid meet" aria-label={vi("LiDAR map drawing surface")} style={{cursor:tool?'crosshair':zoom>1?'grab':'default',touchAction:zoom>1||onEditZone||onEditEndpoint?'none':'auto',userSelect:'none'}}
         onPointerDownCapture={()=>{if(!drag.current)suppressClick.current=false;}}
         onClickCapture={e=>{if(suppressClick.current){e.stopPropagation();suppressClick.current=false;}}}
@@ -158,7 +159,7 @@ export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit
         {vi(raw&&progress===0&&<g pointerEvents="none"><circle cx="600" cy="290" r="32" fill="none" stroke="#60717f" strokeDasharray="3 6"/><path d="M580 290H620M600 270V310" stroke="#8eabb9"/><text x="600" y="353" textAnchor="middle" fill="#d3dce3" fontSize="17">{vi("Ready for a new scan")}</text><text x="600" y="380" textAnchor="middle" fill="#8b99a5" fontSize="12">{vi("Start capture or load the demo LiDAR scan")}</text></g>)}
         <g transform={'translate('+(centre.x-width/2+22/zoom)+' '+(centre.y+height/2-26/zoom)+')'} pointerEvents="none"><path d="M0 -5V0H40V-5" fill="none" stroke="#afbbc5" strokeWidth={1/zoom}/><text x="0" y={15/zoom} fill="#afbbc5" fontSize={10/zoom}>{vi("2 m · N ↑")}</text></g>
       </svg>
-    </div>
+    </div></div>
     <footer className="ls-map-foot"><span><i style={{background:'#ecf0f1'}}/>{vi("Occupied")}<i style={{background:'#42474c'}}/>{vi("Free")}<i style={{background:'#111416'}}/>{vi("Unknown")}</span><span>{vi('Drag to pan when zoomed')}</span></footer>
   </section>;
 }
