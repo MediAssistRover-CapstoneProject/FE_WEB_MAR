@@ -27,7 +27,6 @@ injectStyles('mediassist-style-pages-Admin-MonitoringScreens-jsx', inlineStyles)
 
 import { useEffect, useMemo, useState } from 'react';
 import ReportChart from './ReportChart.jsx';
-import historyRouteMap from '../../assets/images/figma-history-raw-3.png';
 import crowdHeatmapMap from '../../assets/images/figma-heatmap-raw-1.png';
 import dotBlue from '../../assets/images/figma-history-dot-6.svg';
 import dotGreen from '../../assets/images/figma-history-dot-2.svg';
@@ -38,6 +37,7 @@ import missionIconIdle from '../../assets/images/figma-history-dot-12.svg';
 import { alertsApi } from '../../features/alerts/alertsApi.js';
 import { monitoringApi } from '../../features/monitoring/monitoringApi.js';
 import { reportsApi } from '../../features/reports/reportsApi.js';
+import { operationsApi } from '../../features/operations/operationsApi.js';
 import { voiceApi } from '../../features/voice/voiceApi.js';
 
 const scriptCategories = ['Navigation', 'Delivery', 'Escort', 'Emergency', 'General', 'Error'];
@@ -112,6 +112,26 @@ function duration(value) {
   if (!Number.isFinite(Number(value))) return '—';
   const seconds = Math.round(Number(value));
   return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+function durationBetween(start, end) {
+  if (!start || !end) return '—';
+  const seconds = Math.max(0, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 1000));
+  return duration(seconds);
+}
+
+function jobStatusLabel(status) {
+  const normalized = String(status ?? '').toUpperCase();
+  if (normalized === 'COMPLETED') return 'Complete';
+  if (normalized === 'CANCELLED' || normalized === 'CANCELED') return 'Interrupted';
+  return titleCase(normalized || 'Unknown');
+}
+
+function historyStatusClass(status) {
+  const normalized = String(status ?? '').toUpperCase();
+  if (normalized === 'COMPLETED') return 'complete';
+  if (normalized === 'FAILED') return 'failed';
+  return 'interrupted';
 }
 
 function relativeTime(value) {
@@ -220,6 +240,7 @@ export function AnalyticsReports() {
   const [report, setReport] = useState(null);
   const [reportError, setReportError] = useState('');
   const [loadingReport, setLoadingReport] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   const loadReport = async () => {
     setLoadingReport(true);
@@ -235,6 +256,25 @@ export function AnalyticsReports() {
   };
 
   useEffect(() => { loadReport(); }, [period]);
+
+  const exportJobs = async () => {
+    setExporting(true);
+    setNotice('');
+    try {
+      const csv = await reportsApi.exportJobsCsv(reportRange(period));
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'mediassist-jobs-report.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+      setNotice('Job report downloaded.');
+    } catch (requestError) {
+      setNotice(requestError.message || 'Unable to export the job report.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const metrics = report
     ? [
@@ -252,7 +292,7 @@ export function AnalyticsReports() {
       <div className="monitor-segmented" aria-label={vi("Reporting period")}>
         {vi(['Today', '7 Days', '30 Days', 'Custom'].map((item) => <button className={period === item ? 'is-selected' : ''} type="button" key={item} onClick={() => { setPeriod(item); setNotice(''); }}>{vi(item)}</button>))}
       </div>
-      <button className="secondary" type="button" onClick={loadReport} disabled={loadingReport}>{vi(loadingReport ? 'Loading…' : 'Refresh Report')}</button>
+      <div style={{ display: 'flex', gap: 8 }}><button className="secondary" type="button" onClick={exportJobs} disabled={exporting}>{vi(exporting ? 'Exporting…' : 'Export CSV')}</button><button className="secondary" type="button" onClick={loadReport} disabled={loadingReport}>{vi(loadingReport ? 'Loading…' : 'Refresh Report')}</button></div>
     </div>
     <div className="analytics-reports__metrics">
       {vi(metrics.map(([label, value, tone]) => <article className="monitor-panel" key={label}><span>{vi(label)}</span><strong className={tone ? `is-${tone}` : ''}>{vi(value)}</strong></article>))}
@@ -292,59 +332,125 @@ function UtilizationRow({ label, value, amount, tone }) {
   return <div className="analytics-reports__util-row"><span>{vi(label)}</span><div><i className={`is-${tone}`} style={{ width: `${amount}%` }} /></div><b>{vi(value)}</b></div>;
 }
 
-const historySessions = [
-  ['Delivery M-024', 'Pharmacy → Room 305', 'Complete', 'May 15 · 09:12', '14m 47s'],
-  ['Escort M-018', 'Entrance → Room 201', 'Complete', 'May 15 · 07:45', '11m 32s'],
-  ['Patrol P-006', 'Main Corridor Loop', 'Complete', 'May 14 · 21:20', '29m 05s'],
-  ['Delivery M-023', 'Pharmacy → Room 102', 'Failed', 'May 14 · 18:33', '06m 21s'],
-  ['Escort M-017', 'Lab → Room 101', 'Interrupted', 'May 14 · 16:12', '08m 03s'],
-];
-
 export function HistoryReplay() {
-  const [selectedSession, setSelectedSession] = useState(0);
+  const [jobs, setJobs] = useState([]);
+  const [page, setPage] = useState({ page: 0, totalPages: 0, totalElements: 0, first: true, last: true });
+  const [selectedJobId, setSelectedJobId] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [loadingJobs, setLoadingJobs] = useState(true);
+  const [loadingEvents, setLoadingEvents] = useState(false);
+  const [requestError, setRequestError] = useState('');
   const [isPlaying, setPlaying] = useState(false);
   const [progress, setProgress] = useState(64);
   const [notice, setNotice] = useState('');
-  const selected = historySessions[selectedSession];
   const eventDots = [dotGreen, dotBlue, dotAmber, dotViolet, dotBlue, dotBlue, dotGreen];
+
+  const loadJobs = async (nextPage = 0) => {
+    setLoadingJobs(true);
+    setRequestError('');
+    try {
+      const result = await operationsApi.listJobs({ page: nextPage, size: 10 });
+      const records = result?.content ?? [];
+      setJobs(records);
+      setPage({
+        page: result?.page ?? nextPage,
+        totalPages: result?.totalPages ?? 0,
+        totalElements: result?.totalElements ?? records.length,
+        first: result?.first ?? nextPage === 0,
+        last: result?.last ?? true,
+      });
+      setSelectedJobId((current) => records.some((job) => job.jobId === current) ? current : records[0]?.jobId ?? null);
+    } catch (error) {
+      setJobs([]);
+      setSelectedJobId(null);
+      setRequestError(error.message || 'Unable to load job history.');
+    } finally {
+      setLoadingJobs(false);
+    }
+  };
+
+  useEffect(() => { loadJobs(); }, []);
+
+  useEffect(() => {
+    if (!selectedJobId) {
+      setEvents([]);
+      return undefined;
+    }
+    let active = true;
+    const loadEvents = async () => {
+      setLoadingEvents(true);
+      try {
+        const result = await operationsApi.listJobEvents(selectedJobId, { page: 0, size: 100 });
+        if (active) setEvents(result?.content ?? []);
+      } catch (error) {
+        if (active) {
+          setEvents([]);
+          setRequestError(error.message || 'Unable to load this job event log.');
+        }
+      } finally {
+        if (active) setLoadingEvents(false);
+      }
+    };
+    loadEvents();
+    return () => { active = false; };
+  }, [selectedJobId]);
+
+  const selected = jobs.find((job) => job.jobId === selectedJobId) ?? null;
+  const selectedStatus = jobStatusLabel(selected?.status);
+  const selectedStart = selected?.startedAt ?? selected?.acceptedAt ?? selected?.queuedAt;
+  const selectedEnd = selected?.endedAt;
+  const selectedDuration = durationBetween(selectedStart, selectedEnd);
+  const detailRows = selected ? [
+    ['Job code', selected.jobCode || String(selected.jobId).slice(0, 8)],
+    ['Status', selectedStatus],
+    ['Priority', String(selected.priority ?? '—')],
+    ['Queued', relativeTime(selected.queuedAt)],
+    ['Started', relativeTime(selectedStart)],
+    ['Finished', relativeTime(selectedEnd)],
+    ['Duration', selectedDuration],
+    ['Robot', selected.robotId ? String(selected.robotId).slice(0, 8) : 'Not assigned'],
+    ['Workflow', selected.workflowId ? String(selected.workflowId).slice(0, 8) : 'Not specified'],
+    ['Failure reason', selected.failureReason || '—'],
+  ] : [];
 
   return <section className="monitor-screen history-replay" aria-label={vi("History and replay")}>
     <div className="history-replay__tools">
       <span>{vi("Mission playback &amp; event review")}</span>
-      <div><button className="secondary" type="button" onClick={() => setNotice('Filter menu opened.')}>{vi("Filters")}</button><button className="secondary" type="button" onClick={() => setNotice('Mission search is ready.')}>{vi("Search missions…")}</button></div>
+      <div><button className="secondary" type="button" onClick={() => loadJobs(page.page)} disabled={loadingJobs}>{vi(loadingJobs ? 'Loading…' : 'Refresh')}</button></div>
     </div>
     <div className="history-replay__layout">
       <aside className="monitor-panel history-replay__sessions">
-        <div className="monitor-panel__head monitor-panel__head--split"><span>{vi("Mission / session list")}</span><small>{vi("48 records")}</small></div>
-        {vi(historySessions.map(([title, route, state, date, duration], index) => <button className={selectedSession === index ? 'is-selected' : ''} type="button" key={title} onClick={() => { setSelectedSession(index); setProgress(64); setNotice(''); }}>
-          <img src={index === 0 ? missionIconActive : missionIconIdle} alt={vi("")} />
-          <span><b>{vi(title)}</b><small>{vi(route)}</small><em className={`is-${state.toLowerCase()}`}>{vi(state)}</em><small>{vi(date)}</small></span><i>{vi("›")}</i><time>{vi(duration)}</time>
+        <div className="monitor-panel__head monitor-panel__head--split"><span>{vi("Mission / session list")}</span><small>{vi(`${number(page.totalElements, '0')} records`)}</small></div>
+        {vi(jobs.map((job) => <button className={selectedJobId === job.jobId ? 'is-selected' : ''} type="button" key={job.jobId} onClick={() => { setSelectedJobId(job.jobId); setProgress(64); setNotice(''); }}>
+          <img src={selectedJobId === job.jobId ? missionIconActive : missionIconIdle} alt={vi("")} />
+          <span><b>{vi(job.jobCode || String(job.jobId).slice(0, 8))}</b><small>{vi(job.robotId ? `Robot ${String(job.robotId).slice(0, 8)}` : 'No robot assigned')}</small><em className={`is-${historyStatusClass(job.status)}`}>{vi(jobStatusLabel(job.status))}</em><small>{vi(relativeTime(job.queuedAt))}</small></span><i>{vi("›")}</i><time>{vi(durationBetween(job.startedAt ?? job.acceptedAt ?? job.queuedAt, job.endedAt))}</time>
         </button>))}
-        <footer>{vi("1–5 of 48 ")}<span><button type="button" aria-label={vi("Previous page")}>{vi("‹")}</button><button type="button" aria-label={vi("Next page")}>{vi("›")}</button></span></footer>
+        {vi(!loadingJobs && !requestError && jobs.length === 0 && <p className="history-replay__empty">{vi("No jobs are recorded yet.")}</p>)}
+        <footer>{vi(`${page.totalElements === 0 ? 0 : page.page * 10 + 1}–${Math.min((page.page + 1) * 10, page.totalElements)} of ${number(page.totalElements, '0')} `)}<span><button type="button" aria-label={vi("Previous page")} disabled={page.first || loadingJobs} onClick={() => loadJobs(Math.max(0, page.page - 1))}>{vi("‹")}</button><button type="button" aria-label={vi("Next page")} disabled={page.last || loadingJobs} onClick={() => loadJobs(page.page + 1)}>{vi("›")}</button></span></footer>
       </aside>
       <article className="monitor-panel history-replay__map-card">
-        <div className="monitor-panel__head monitor-panel__head--split"><span>{vi("Mission replay map")}</span><button className="secondary" type="button">{vi("Floor 1")}</button></div>
-        <img src={historyRouteMap} alt={vi("Route replay from Pharmacy to Room 305 on Hospital Floor 1")} />
+        <div className="monitor-panel__head"><span>{vi("Mission route")}</span></div>
+        <div className="history-replay__route-unavailable" style={{ alignItems: 'center', background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 5, color: '#64748b', display: 'flex', flexDirection: 'column', height: 405, justifyContent: 'center', marginTop: 12, padding: 26, textAlign: 'center' }}><strong style={{ color: '#334155', fontSize: 12 }}>{vi("Route preview is not available")}</strong><span style={{ fontSize: 10, lineHeight: 1.5, marginTop: 8, maxWidth: 255 }}>{vi("The current API provides job records and events, but not a recorded route polyline. No sample route is shown as live data.")}</span></div>
       </article>
       <aside className="history-replay__right-column">
         <article className="monitor-panel history-replay__details">
-          <div className="monitor-panel__head monitor-panel__head--split"><span>{vi("Mission details")}</span><em>{vi("Completed")}</em></div>
-          {vi([
-            ['Mission Type', 'Delivery'], ['Mission ID', selectedSession === 0 ? 'M-024' : selected[0].replace(/[^A-Z0-9-]/g, '')], ['Route', selected[1]], ['Start Time', '09:12:03'], ['End Time', '09:26:50'], ['Duration', selected[4]], ['Distance', '412 m'], ['Battery Usage', '18% (90% → 72%)'], ['Replay Time', '09:21:34'], ['Current Position', 'Near Room 305'], ['Speed', '0.6 m/s'], ['Mode', 'Autonomous'],
-          ].map(([label, value]) => <p key={label}><span>{vi(label)}</span><b>{vi(value)}</b></p>))}
+          <div className="monitor-panel__head monitor-panel__head--split"><span>{vi("Mission details")}</span>{vi(selected && <em>{vi(selectedStatus)}</em>)}</div>
+          {vi(detailRows.map(([label, value]) => <p key={label}><span>{vi(label)}</span><b>{vi(value)}</b></p>))}
+          {vi(!selected && <p className="history-replay__empty">{vi("Select a job to view its backend details.")}</p>)}
         </article>
         <article className="monitor-panel history-replay__events">
-          <div className="monitor-panel__head monitor-panel__head--split"><span>{vi("Event log")}</span><button className="secondary" type="button" onClick={() => setNotice('Replay events exported.')}>{vi("Export Replay")}</button></div>
-          {vi(['Mission started', 'Arrived at Pharmacy', 'Package verified', 'Obstacle detected', 'Replanned route', 'Arrived at Room 305', 'Delivery confirmed', 'Mission completed'].map((event, index) => <p key={event}><time>{vi(['09:12:03', '09:14:11', '09:15:02', '09:17:33', '09:17:40', '09:21:05', '09:23:11', '09:26:50'][index])}</time><img src={eventDots[index % eventDots.length]} alt={vi("")} /><span>{vi(event)}</span></p>))}
+          <div className="monitor-panel__head monitor-panel__head--split"><span>{vi("Event log")}</span><button className="secondary" type="button" onClick={() => selectedJobId && operationsApi.listJobEvents(selectedJobId, { page: 0, size: 100 }).then((result) => { setEvents(result?.content ?? []); setNotice('Event log refreshed.'); }).catch((error) => setNotice(error.message || 'Unable to refresh events.'))} disabled={!selectedJobId || loadingEvents}>{vi(loadingEvents ? 'Loading…' : 'Refresh')}</button></div>
+          {vi(events.map((event, index) => <p key={event.jobEventId}><time>{vi(formatAlertTime(event.occurredAt))}</time><img src={eventDots[index % eventDots.length]} alt={vi("")} /><span>{vi(titleCase(event.eventType || 'Job event'))}</span></p>))}
+          {vi(!loadingEvents && selected && events.length === 0 && <p className="history-replay__empty">{vi("No recorded events for this job.")}</p>)}
         </article>
       </aside>
     </div>
     <footer className="monitor-panel history-replay__player">
-      <div className="history-replay__transport"><button type="button" className="secondary" aria-label={vi("Back ten seconds")} onClick={() => setProgress((value) => Math.max(0, value - 10))}>{vi("◀ 10")}</button><button className="history-replay__play" type="button" onClick={() => setPlaying((value) => !value)}>{vi(isPlaying ? 'Ⅱ' : '▶')}</button><button type="button" className="secondary" aria-label={vi("Forward ten seconds")} onClick={() => setProgress((value) => Math.min(100, value + 10))}>{vi("10 ▶")}</button></div>
-      <div className="history-replay__timeline"><span>{vi("00:00")}</span><input aria-label={vi("Replay progress")} type="range" min="0" max="100" value={progress} onChange={(event) => setProgress(Number(event.target.value))} /><div aria-hidden="true">{vi([dotBlue, dotAmber, dotViolet, dotBlue, dotGreen].map((dot, index) => <img src={dot} alt={vi("")} key={`${dot}-${index}`} />))}</div><small>{vi("Replay uses recorded pose, mission events and saved evidence from this session.")}</small></div>
-      <div className="history-replay__player-actions"><button className="secondary" type="button" onClick={() => setNotice('Snapshot captured.')}>{vi("Snapshot")}</button><button type="button" onClick={() => setNotice('Replay export is ready.')}>{vi("Export")}</button></div>
+      <div className="history-replay__transport"><button type="button" className="secondary" aria-label={vi("Back ten seconds")} onClick={() => setProgress((value) => Math.max(0, value - 10))} disabled={!selected}>{vi("◀ 10")}</button><button className="history-replay__play" type="button" onClick={() => setPlaying((value) => !value)} disabled={!selected}>{vi(isPlaying ? 'Ⅱ' : '▶')}</button><button type="button" className="secondary" aria-label={vi("Forward ten seconds")} onClick={() => setProgress((value) => Math.min(100, value + 10))} disabled={!selected}>{vi("10 ▶")}</button></div>
+      <div className="history-replay__timeline"><span>{vi(selectedDuration)}</span><input aria-label={vi("Replay progress")} type="range" min="0" max="100" value={progress} onChange={(event) => setProgress(Number(event.target.value))} disabled={!selected} /><div aria-hidden="true">{vi(events.slice(0, 5).map((_, index) => <img src={eventDots[index % eventDots.length]} alt={vi("")} key={index} />))}</div><small>{vi("Controls are a local event-review aid. Route playback requires a recorded route API.")}</small></div>
+      <div className="history-replay__player-actions"><button className="secondary" type="button" onClick={() => setNotice('Snapshot is not available because the backend has no route playback API.')} disabled={!selected}>{vi("Snapshot")}</button><button type="button" onClick={() => setNotice('Job events are displayed from the backend. CSV export is available from the analytics report.')} disabled={!selected}>{vi("Event data")}</button></div>
     </footer>
-    <Notice>{vi(notice)}</Notice>
+    <Notice>{vi(notice || requestError)}</Notice>
   </section>;
 }
 
