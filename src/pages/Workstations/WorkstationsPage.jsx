@@ -72,7 +72,7 @@ import MapDispatch from './MapDispatch.jsx';
 import routeMap from '../../assets/images/workstation-route.png';
 import { figmaScreens } from './figmaScreens.js';
 import { facilityApi } from '../../features/facility/facilityApi.js';
-import { workflowApi } from '../../features/workflows/workflowApi.js';
+import { latestWorkflowVersions, workflowApi } from '../../features/workflows/workflowApi.js';
 
 const statusHelp = {
   CREATED: 'Đã tạo, input hợp lệ nhưng chưa đưa vào hàng đợi.',
@@ -98,8 +98,10 @@ const simulationStages = [
   { label: 'Approaching destination', left: '37%', top: '64%' },
   { label: 'Delivery completed', left: '23%', top: '79%' },
 ];
-const titles = { stations: 'Dispatch', configuration: 'Dispatch — Configuration', ready: 'Dispatch — Pharmacy Counter', disabled: 'Dispatch — Disabled', delivery: 'Dispatch — New Job', request: 'Dispatch — Delivery Request', escort: 'Dispatch — New Escort Job', 'review-delivery': 'Dispatch — Review Delivery', 'review-escort': 'Dispatch — Review Escort', missing: 'Dispatch — Missing Input', jobs: 'Dispatch — Jobs', button: 'Dispatch — Workflow Button', working: 'Dispatch — Workflow Simulation', prompt: 'Dispatch — Pharmacy Counter', history: 'Dispatch — Pharmacy Counter', 'escort-running': 'Job — Patient Escort Running' };
+const titles = { stations: 'Dispatch', configuration: 'Dispatch — Configuration', ready: 'Dispatch — Pharmacy Counter', disabled: 'Dispatch — Disabled', delivery: 'Dispatch — New Job', request: 'Dispatch — Delivery Request', escort: 'Dispatch — New Escort Job', 'review-delivery': 'Dispatch — Review Delivery', 'review-escort': 'Dispatch — Review Escort', missing: 'Dispatch — Missing Input', button: 'Dispatch — Workflow Button', working: 'Dispatch — Workflow Simulation', prompt: 'Dispatch — Pharmacy Counter', history: 'Dispatch — Pharmacy Counter', 'escort-running': 'Job — Patient Escort Running' };
 const storageKey = 'mediassist-workstations-v1';
+const workspaceTabs = [{ id: 'workflow', label: 'Quy trình' }, { id: 'dispatch', label: 'Điều phối' }];
+const validViews = new Set([...figmaScreens.map(screen => screen.view), 'running', 'waiting', 'paused', 'succeeded', 'failed', 'cancelled']);
 function readSaved() { try { return JSON.parse(localStorage.getItem(storageKey)) || {}; } catch { return {}; } }
 
 function Field({ label, value, onChange, options, error, type = 'text', readOnly = false }) {
@@ -115,8 +117,7 @@ export default function WorkstationsPage() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const requestedView = params.get('view') || 'stations';
-  const validViews = [...figmaScreens.map(s => s.view), 'running', 'waiting', 'paused', 'succeeded', 'failed', 'cancelled'];
-  const view = validViews.includes(requestedView) ? requestedView : 'stations';
+  const view = validViews.has(requestedView) ? requestedView : 'stations';
   const [saved] = useState(readSaved);
   const [station, setStation] = useState({ ...initialStation, ...saved.station });
   const [stations, setStations] = useState(Array.isArray(saved.stations) ? saved.stations : [{ ...initialStation, ...saved.station }]);
@@ -134,11 +135,12 @@ export default function WorkstationsPage() {
   useEffect(() => {
     let active = true;
     Promise.all([facilityApi.listEndpoints({ page: 0, size: 100 }), facilityApi.listRooms({ page: 0, size: 100 }), workflowApi.list({ page: 0, size: 100 })]).then(([endpointPage, roomPage, workflowPage]) => {
-      if (active) setCatalog({ endpoints: endpointPage.content ?? [], rooms: roomPage.content ?? [], workflows: workflowPage.content ?? [], loading: false, error: '' });
+      if (active) setCatalog({ endpoints: endpointPage.content ?? [], rooms: roomPage.content ?? [], workflows: latestWorkflowVersions(Array.isArray(workflowPage) ? workflowPage : workflowPage.content ?? []), loading: false, error: '' });
     }).catch((error) => { if (active) setCatalog({ endpoints: [], rooms: [], workflows: [], loading: false, error: error.message || 'Dispatch catalog is unavailable.' }); });
     return () => { active = false; };
   }, []);
   useEffect(() => { try { localStorage.setItem(storageKey, JSON.stringify({ station, stations, button, activeJob, history, sequence })); } catch { /* UI remains usable if storage is unavailable. */ } }, [station, stations, button, activeJob, history, sequence]);
+  useEffect(() => { if (!validViews.has(requestedView)) setParams({}, { replace: true }); }, [requestedView, setParams]);
   useEffect(() => {
     if (view !== 'working' || activeJob.status !== 'RUNNING') return undefined;
     setSimulationStep(0);
@@ -162,6 +164,7 @@ export default function WorkstationsPage() {
   const selectedWorkflow = workflowOptions.find((item) => item.value === button.workflow) || workflowOptions.find((item) => /delivery/i.test(item.label)) || workflowOptions[0] || { value: button.workflow, label: button.workflow };
   const includeCurrent = (options, value) => options.some((item) => item.value === value) ? options : [{ value, label: value }, ...options];
   const go = next => { setSearch(''); setErrors({}); setParams(next === 'stations' ? {} : { view: next }); };
+  const selectWorkspaceTab = id => id === 'workflow' ? navigate('/workflows') : go('stations');
   function saveStation(value) { setStation(value); setStations(items => [...items.filter(item => item.id !== value.id), value]); }
   const editStation = () => { setStationDraft(station); go('configuration'); };
   const newJob = type => { setSimulationStep(0); setJob({ ...initialJob, type, description: type === 'escort' ? 'Escort patient to Room 305' : initialJob.description }); go(type); };
@@ -192,7 +195,7 @@ export default function WorkstationsPage() {
     go(status.toLowerCase());
   }
   const jobView = Object.keys(statusHelp).map(s => s.toLowerCase()).includes(view) || view === 'escort-running';
-  const details = jobView || ['review-delivery', 'review-escort', 'missing', 'jobs'].includes(view);
+  const details = jobView || ['review-delivery', 'review-escort', 'missing'].includes(view);
   const currentStatus = view === 'escort-running' ? 'RUNNING' : view.toUpperCase();
   const title = titles[view] || `Job — ${currentStatus}`;
   const source = figmaScreens.find(s => s.view === view);
@@ -234,9 +237,6 @@ export default function WorkstationsPage() {
     const filtered = history.filter(item => `${item.id} ${item.type} ${item.destination} ${item.status}`.toLowerCase().includes(search.toLowerCase()));
     content = <><h2>{vi("WORK HISTORY")}</h2><Field label="Search" value={search} onChange={setSearch} />{filtered.map(item => <Tile key={item.id} title={vi(`${item.status === 'SUCCEEDED' ? '✓ ' : ''}${item.type === 'escort' ? 'Patient Escort' : 'Medical Delivery'}`)} onClick={() => { setActiveJob({ ...initialJob, ...item }); go(item.status.toLowerCase()); }}>{vi(item.status)}{vi(" · ")}{vi(item.destination)}<br />{vi("MAR-01 · ")}{vi(item.id)}</Tile>)}{!filtered.length && <p>{vi("No jobs found.")}</p>}</>;
     footer = action('Back to Dispatch', () => go('stations'));
-  } else if (view === 'jobs') {
-    content = <><h2>{vi("OVERVIEW")}</h2>{Object.entries(statusHelp).map(([status, help]) => <Tile title={vi(status)} key={status} onClick={() => go(status.toLowerCase())}>{vi(help)}</Tile>)}</>;
-    footer = action('New dispatch', () => newJob('delivery'), true);
   } else if (view === 'missing') {
     content = <><h2>{vi("OVERVIEW")}</h2><Tile title={vi("Job not created")}>{vi("Required inputs must be valid before creating a job.")}</Tile>{fields(job, setJob, job.type === 'escort' ? [['destination', 'dropoff_location_id'], ['session', 'Patient session']] : [['destination', 'dropoff_location_id'], ['payload', 'payload_id'], ['pickup', 'Pickup']])}</>;
     footer = action('Complete Required Inputs', review, true);
@@ -248,7 +248,7 @@ export default function WorkstationsPage() {
   } else if (jobView) {
     const values = view === 'escort-running' ? [['Job', activeJob.type === 'escort' ? activeJob.id : 'JOB-ESC-104'], ['Workflow', 'WF_PATIENT_ESCORT / 1.0.0'], ['Current step', 'ESCORT_070 · MOVE'], ['Session', activeJob.session], ['Target', activeJob.destination]] : [['Job', activeJob.id, 'Example job'], ['Workflow version', activeJob.type === 'escort' ? 'WF_PATIENT_ESCORT / 1.0.0' : 'WF_SECURE_MEDICAL_DELIVERY / 1.0.0', 'Pinned'], ['Robot', activeJob.robot], ['Status', currentStatus, statusHelp[currentStatus]], ['Current step', ['CREATED', 'QUEUED', 'ASSIGNED'].includes(currentStatus) ? 'Not started' : `Move to ${activeJob.destination}`, 'Illustrative runtime state'], ['Safety', 'Complete hardware transition or compensation before interruption']];
     content = <><h2>{vi("CONFIGURATION & PARAMETERS")}</h2>{values.map(([label, value, help]) => <Parameter key={label} label={label} value={value} help={help} />)}</>;
-    footer = action(view === 'queued' ? 'Preview Start' : 'Back to Jobs', () => view === 'queued' ? setStatus('ASSIGNED') : go('jobs'), true);
+    footer = action(view === 'queued' ? 'Preview Start' : 'Back to Dispatch', () => view === 'queued' ? setStatus('ASSIGNED') : go('stations'), true);
   }
   if (view === 'stations') {
     return <div className="workflows-screen ws-screen" data-node-id={source?.id}>
@@ -256,7 +256,7 @@ export default function WorkstationsPage() {
       <main className="workflows-main ws-main ws-main--simulation">
         <header className="workflows-header">
           <h1>{vi("Dispatch")}</h1>
-          <WorkspaceTabs label="Không gian quy trình" active="dispatch" onSelect={id=>id==='workflow'?navigate('/workflows'):go(id==='dispatch'?'stations':'jobs')} items={[{id:'workflow',label:'Quy trình'},{id:'dispatch',label:'Điều phối'},{id:'jobs',label:'Công việc'}]}/>
+          <WorkspaceTabs label="Không gian quy trình" active="dispatch" onSelect={selectWorkspaceTab} items={workspaceTabs}/>
           <p className="preview-note">{vi("Chọn quy trình, ánh xạ các điểm đích và chạy trên bản đồ đã lưu từ Bản đồ.")}</p>
         </header>
         <MapDispatch definitions={catalog.workflows} loading={catalog.loading} error={catalog.error} />
@@ -264,5 +264,5 @@ export default function WorkstationsPage() {
     </div>;
   }
 
-  return <div className="workflows-screen ws-screen" data-node-id={source?.id}><Sidebar /><main className="workflows-main ws-main"><header className="workflows-header"><h1>{vi(title)}</h1><p className="robot-location">{vi("MAR-01 · Hospital Floor 1")}</p><WorkspaceTabs label="Không gian quy trình" active={jobView||view==='jobs'?'jobs':'dispatch'} onSelect={id=>id==='workflow'?navigate('/workflows'):go(id==='dispatch'?'stations':'jobs')} items={[{id:'workflow',label:'Quy trình'},{id:'dispatch',label:'Điều phối'},{id:'jobs',label:'Công việc'}]}/><p className="preview-note">{vi("Workflow definitions, facility endpoints and dispatch inputs are loaded from the API.")}</p></header><div className={details ? 'ws-details-grid' : 'ws-dispatch-grid'}><section className="ws-panel ws-controls"><div className="ws-scroll">{vi(content)}</div>{vi(!details && <footer>{vi(footer)}</footer>)}</section>{vi(details ? <aside className="ws-panel ws-details"><h2>{vi("DETAILS & ACTIONS")}</h2><strong>{vi("MediAssistRover")}</strong><p>{vi("MAR-01 · Hospital Floor 1")}</p>{vi(jobView || view === 'jobs' ? <>{[['Running', 'RUNNING'], ['Waiting for Input', 'WAITING'], ['Paused', 'PAUSED'], ['Failed', 'FAILED'], ['Cancelled', 'CANCELLED']].map(([label, status]) => <MarButton key={status} className="ws-action" variant="subtle" onClick={() => setStatus(status)}>{vi(label)}</MarButton>)}{action('Queue Job', () => setStatus('QUEUED'))}{action('Assign Robot', () => setStatus('ASSIGNED'))}{action('Patient Escort Running', () => go('escort-running'))}<p>{vi("Illustrative job states. No live robot commands are sent by this prototype.")}</p></> : <>{action('Medical Delivery', () => newJob('delivery'))}{action('Patient Escort', () => newJob('escort'))}{action('Input Error State', () => { update('destination', ''); go('missing'); })}<p>{vi("Choose a workflow definition, provide its required inputs, then review the dispatch request.")}</p></>)}<small className="ws-blue">{vi("DISPATCH")}</small><p>{vi("Configuration follows the backend workflow definition and Facility Catalog.")}</p></aside> : <section className="ws-panel ws-map"><h2>{vi("HOSPITAL FLOOR 1 / MAR-01")}</h2><div className="ws-map-image"><img src={routeMap} alt={vi("Hospital Floor 1: MAR-01 route from Pharmacy to Room 305")} /></div><small>{vi("Route preview · Pharmacy → Room 305")}</small></section>)}</div>{vi(details && <footer className="ws-footer">{vi(footer)}{vi(action('Back to Workflows', () => navigate('/workflows')))}</footer>)}</main></div>;
+  return <div className="workflows-screen ws-screen" data-node-id={source?.id}><Sidebar /><main className="workflows-main ws-main"><header className="workflows-header"><h1>{vi(title)}</h1><p className="robot-location">{vi("MAR-01 · Hospital Floor 1")}</p><WorkspaceTabs label="Không gian quy trình" active="dispatch" onSelect={selectWorkspaceTab} items={workspaceTabs}/><p className="preview-note">{vi("Workflow definitions, facility endpoints and dispatch inputs are loaded from the API.")}</p></header><div className={details ? 'ws-details-grid' : 'ws-dispatch-grid'}><section className="ws-panel ws-controls"><div className="ws-scroll">{vi(content)}</div>{vi(!details && <footer>{vi(footer)}</footer>)}</section>{vi(details ? <aside className="ws-panel ws-details"><h2>{vi("DETAILS & ACTIONS")}</h2><strong>{vi("MediAssistRover")}</strong><p>{vi("MAR-01 · Hospital Floor 1")}</p>{vi(jobView ? <>{[['Running', 'RUNNING'], ['Waiting for Input', 'WAITING'], ['Paused', 'PAUSED'], ['Failed', 'FAILED'], ['Cancelled', 'CANCELLED']].map(([label, status]) => <MarButton key={status} className="ws-action" variant="subtle" onClick={() => setStatus(status)}>{vi(label)}</MarButton>)}{action('Queue Job', () => setStatus('QUEUED'))}{action('Assign Robot', () => setStatus('ASSIGNED'))}{action('Patient Escort Running', () => go('escort-running'))}<p>{vi("Illustrative job states. No live robot commands are sent by this prototype.")}</p></> : <>{action('Medical Delivery', () => newJob('delivery'))}{action('Patient Escort', () => newJob('escort'))}{action('Input Error State', () => { update('destination', ''); go('missing'); })}<p>{vi("Choose a workflow definition, provide its required inputs, then review the dispatch request.")}</p></>)}<small className="ws-blue">{vi("DISPATCH")}</small><p>{vi("Configuration follows the backend workflow definition and Facility Catalog.")}</p></aside> : <section className="ws-panel ws-map"><h2>{vi("HOSPITAL FLOOR 1 / MAR-01")}</h2><div className="ws-map-image"><img src={routeMap} alt={vi("Hospital Floor 1: MAR-01 route from Pharmacy to Room 305")} /></div><small>{vi("Route preview · Pharmacy → Room 305")}</small></section>)}</div>{vi(details && <footer className="ws-footer">{vi(footer)}{vi(action('Back to Workflows', () => navigate('/workflows')))}</footer>)}</main></div>;
 }

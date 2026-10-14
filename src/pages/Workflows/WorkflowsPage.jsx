@@ -211,10 +211,14 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 }
 
 .workflow-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
   width: 100%;
-  min-height: 77px;
+  min-height: 86px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 10px;
   background: #f1f5f9;
   cursor: pointer;
   padding: 14px 16px;
@@ -224,28 +228,48 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 }
 
 .workflow-card:hover {
-  background: #e8eef6;
+  background: #e8f0ff;
 }
 
-.workflow-card strong {
+.workflow-card:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.workflow-card-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 10px;
+  background: #dbeafe;
+  color: #2563eb;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .4px;
+}
+
+.workflow-card-copy {
+  min-width: 0;
+}
+
+.workflow-card-copy strong {
   display: block;
   font-size: 14px;
   font-weight: 600;
 }
 
-.workflow-card span {
+.workflow-card-copy small {
   display: block;
-  margin-top: 12px;
+  margin-top: 5px;
   color: var(--mar-muted, #475569);
   font-size: 12px;
+  line-height: 1.4;
 }
 
-.workflow-card b {
-  margin: 0 10px;
-}
-
-.workflow-card em {
-  margin-left: 12px;
+.workflow-card-arrow {
+  color: #2563eb;
+  font-size: 18px;
   font-style: normal;
 }
 
@@ -598,7 +622,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../features/admin/components/AdminSidebar.jsx';
 import { clearSession } from '../../features/auth/session.js';
-import { workflowApi } from '../../features/workflows/workflowApi.js';
+import { latestWorkflowVersions, workflowApi } from '../../features/workflows/workflowApi.js';
 
 const navGroups = [
   ['Overview', ['Dashboard']],
@@ -622,6 +646,34 @@ const workflows = [
   ['Blocked Path Navigation Recovery', 'WF_NAVIGATION_RECOVERY', 11],
   ['Robot Startup and Standby', 'WF_ROBOT_STARTUP_STANDBY', 13],
 ].map(([name, code, steps]) => ({ name, code, steps }));
+
+const systemWorkflowCopy = {
+  WF_PATIENT_ESCORT: ['Đồng hành cùng bệnh nhân', 'Hướng dẫn và hỗ trợ bệnh nhân đến điểm đích', 'ĐH'],
+  WF_INFORMATION_ASSISTANCE: ['Hỗ trợ tra cứu thông tin', 'Tra cứu và phản hồi thông tin cho người dùng', 'TT'],
+  WF_SECURE_MEDICAL_DELIVERY: ['Giao vật tư y tế an toàn', 'Điều phối giao nhận vật tư giữa các điểm', 'YT'],
+  WF_CROWD_MONITORING: ['Giám sát mật độ khu vực', 'Theo dõi số người và cảnh báo khi cần thiết', 'GS'],
+  WF_EMERGENCY_SOS_RESPONSE: ['Ứng phó khẩn cấp SOS', 'Tiếp nhận và điều phối phản hồi khẩn cấp', 'KC'],
+  WF_FALL_RESPONSE: ['Xử lý sự kiện nghi té ngã', 'Phát hiện, xác minh và thông báo sự cố', 'AT'],
+  WF_FALL_DETECTION_RESPONSE: ['Xử lý sự kiện nghi té ngã', 'Phát hiện, xác minh và thông báo sự cố', 'AT'],
+  WF_RESTRICTED_MONITORING: ['Giám sát khu vực hạn chế', 'Theo dõi các khu vực cần kiểm soát', 'GS'],
+  WF_RESTRICTED_AREA_MONITORING: ['Giám sát khu vực hạn chế', 'Theo dõi các khu vực cần kiểm soát', 'GS'],
+  WF_AUTO_CHARGING: ['Yêu cầu sạc robot', 'Gửi yêu cầu sạc thủ công đến nhân viên', 'SR'],
+  WF_NAVIGATION_RECOVERY: ['Khôi phục điều hướng', 'Hỗ trợ robot xử lý tuyến đường bị gián đoạn', 'ĐH'],
+  WF_ROBOT_STARTUP_STANDBY: ['Kiểm tra sẵn sàng robot', 'Xác nhận robot sẵn sàng trước khi vận hành', 'RB'],
+  WF_NAVIGATION: ['Điều hướng đến điểm đích', 'Thiết lập tuyến đường và điểm đến cho robot', 'ĐH'],
+  WF_MAPPING: ['Lập và xác thực bản đồ', 'Tạo, kiểm tra và lưu bản đồ vận hành', 'BĐ'],
+};
+
+function workflowPresentation(workflow) {
+  const code = workflow.workflowCode || workflow.code;
+  const copy = systemWorkflowCopy[code];
+  if (copy) return { title: copy[0], description: copy[1], badge: copy[2] };
+  return {
+    title: workflow.workflowName || workflow.name || 'Quy trình chưa đặt tên',
+    description: 'Sẵn sàng để xem cấu hình và thiết lập điều phối.',
+    badge: 'QT',
+  };
+}
 
 const stepTypes = [
   'MOVE',
@@ -664,7 +716,7 @@ function Field({ label, value }) {
 function Tabs() {
   const navigate = useNavigate();
   return (
-    <WorkspaceTabs label="Không gian quy trình" active="workflow" onSelect={id=>navigate(id==='workflow'?'/workflows':id==='dispatch'?'/workstations':'/workstations?view=jobs')} items={[{id:'workflow',label:'Quy trình'},{id:'dispatch',label:'Điều phối'},{id:'jobs',label:'Công việc'}]}/>
+    <WorkspaceTabs label="Không gian quy trình" active="workflow" onSelect={id => navigate(id === 'workflow' ? '/workflows' : '/workstations')} items={[{ id: 'workflow', label: 'Quy trình' }, { id: 'dispatch', label: 'Điều phối' }]}/>
   );
 }
 
@@ -740,9 +792,10 @@ export function DispatchSimulationPreview({ onCreate, definitions, loading, erro
       <div className="sim-workflow-list">
         {vi(available.map((workflow) => {
           const key = getKey(workflow);
+          const presentation = workflowPresentation(workflow);
           return <button className={key === getKey(selected) ? 'active' : ''} type="button" key={key} onClick={() => chooseWorkflow(key)}>
-            <strong>{vi(workflow.workflowName || workflow.name)}</strong>
-            <small>{vi(workflow.workflowCode || workflow.code)}{vi(" · ")}{vi(workflow.status || 'DRAFT')}</small>
+            <strong>{vi(presentation.title)}</strong>
+            <small>{vi(presentation.description)}</small>
           </button>;
         }))}
         {vi(!loading && !available.length && <p className="preview-note">{vi(error || 'No workflow definitions returned by the backend.')}</p>)}
@@ -758,7 +811,7 @@ export function DispatchSimulationPreview({ onCreate, definitions, loading, erro
         <span className="sim-map-caption">{vi(runStatus === 'RUNNING' ? currentLabel : runStatus === 'SUCCEEDED' ? 'Route complete · Room 305' : 'Pharmacy Pickup → Room 305')}</span>
       </div>
       <footer className="sim-runbar">
-        <div className="sim-run-status"><strong>{vi(runStatus === 'READY' ? 'Ready to run' : currentLabel)}</strong><span>{vi(selected ? (selected.workflowName || selected.name) : 'Loading workflow definitions…')}</span></div>
+        <div className="sim-run-status"><strong>{vi(runStatus === 'READY' ? 'Ready to run' : currentLabel)}</strong><span>{vi(selected ? workflowPresentation(selected).title : 'Loading workflow definitions…')}</span></div>
         <span className="sim-time">{vi(time)}</span>
         <div className="sim-speed" aria-label={vi("Simulation speed")}>{vi([1, 2, 3, 5].map((value) => <button className={speed === value ? 'active' : ''} type="button" key={value} onClick={() => setSpeed(value)}>{vi(value)}{vi("×")}</button>))}</div>
         <MarButton variant="subtle" onClick={reset}>{vi("Reset")}</MarButton>
@@ -767,8 +820,8 @@ export function DispatchSimulationPreview({ onCreate, definitions, loading, erro
     </section>
     <aside className="sim-inspector">
       <p className="sim-kicker">{vi("Workflow configuration")}</p>
-      <h2 className="sim-name">{vi(selected ? (selected.workflowName || selected.name) : 'Loading workflow…')}</h2>
-      <p className="sim-code">{vi(selected ? `${selected.workflowCode || selected.code} · ${selected.status || 'DRAFT'}` : 'Workflow definition API')}</p>
+      <h2 className="sim-name">{vi(selected ? workflowPresentation(selected).title : 'Loading workflow…')}</h2>
+      <p className="sim-code">{vi(selected ? workflowPresentation(selected).description : 'Workflow definition API')}</p>
       <div className="sim-progress"><i style={{ width: `${Math.round(progress * 100)}%` }} /></div>
       <div className="sim-progress-label"><span>{vi("Simulation progress")}</span><b>{vi(Math.round(progress * 100))}{vi("%")}</b></div>
       <div className="sim-steps">{vi(sequence.map((step, index) => <article className={index < completedSteps ? 'sim-step done' : index === completedSteps && runStatus === 'RUNNING' ? 'sim-step current' : 'sim-step'} key={step}><b>{vi(index < completedSteps || runStatus === 'SUCCEEDED' ? '✓' : String(index + 1).padStart(2, '0'))}</b><div><strong>{vi(step.replace('_', ' '))}</strong><small>{vi(index < completedSteps || runStatus === 'SUCCEEDED' ? 'Completed' : index === completedSteps && runStatus === 'RUNNING' ? 'Running now' : 'Waiting')}</small></div></article>))}</div>
@@ -780,19 +833,21 @@ function Library({ saved, onCreate, onOpenDraft, definitions, loading, error }) 
   return (
     <div className="workflows-grid">
       <section className="workflow-panel library-panel">
-        <h2>{vi("WORKFLOW DEFINITIONS · ")}{vi(loading ? 'LOADING' : definitions.length)}</h2>
+        <h2>{vi("QUY TRÌNH CÓ SẴN · ")}{vi(loading ? 'ĐANG TẢI' : definitions.length)}</h2>
         <div className="workflow-list">
-          {vi(definitions.map((workflow) => (
-            <button className="workflow-card" type="button" key={workflow.workflowId || workflow.code} onClick={onCreate}>
-              <strong>{vi(workflow.workflowName || workflow.name)}</strong>
-              <span>{vi(workflow.workflowCode || workflow.code)}<b>{vi(" · ")}</b>{vi(workflow.status || ((workflow.steps || 0) + ' steps'))}<em>{vi("→")}</em></span>
-            </button>
-          )))}
+          {vi(definitions.map((workflow) => {
+            const presentation = workflowPresentation(workflow);
+            return <button className="workflow-card" type="button" key={workflow.workflowId || workflow.code} onClick={onCreate} aria-label={vi(`Mở ${presentation.title}`)}>
+              <span className="workflow-card-icon" aria-hidden="true">{presentation.badge}</span>
+              <span className="workflow-card-copy"><strong>{vi(presentation.title)}</strong><small>{vi(presentation.description)}</small></span>
+              <em className="workflow-card-arrow" aria-hidden="true">→</em>
+            </button>;
+          }))}
           {vi(!loading && !definitions.length && <p className="preview-note">{vi(error || 'No workflow definitions returned by the backend.')}</p>)}
         </div>
       </section>
       <aside className="workflow-panel action-panel">
-        {vi(saved ? <><h2>{vi("MY WORKFLOWS")}</h2><h3>{vi("New workflow")}</h3><p>{vi("DRAFT · New tasks")}</p><MarButton className="full" onClick={onOpenDraft}>{vi("Open Draft")}</MarButton><MarButton className="full" variant="subtle" onClick={onCreate}>{vi("+ Create Workflow")}</MarButton><h2>{vi("WORKFLOW DEFINITIONS")}</h2><p>{vi("Definitions are loaded from the backend catalog.")}</p></> : <><h2>{vi("CREATE A WORKFLOW")}</h2><p>{vi("Build a workflow, define its tasks, and configure its available step types.")}</p><MarButton className="full" onClick={onCreate}>{vi("+ Create Workflow")}</MarButton><h2>{vi("WORKFLOW DEFINITIONS")}</h2><p>{vi("Select an existing workflow to inspect its configuration.")}</p></>)}
+        {vi(saved ? <><h2>{vi("QUY TRÌNH CỦA TÔI")}</h2><h3>{vi("Quy trình mới")}</h3><p>{vi("Đang thiết kế · Nhiệm vụ mới")}</p><MarButton className="full" onClick={onOpenDraft}>{vi("Tiếp tục chỉnh sửa")}</MarButton><MarButton className="full" variant="subtle" onClick={onCreate}>{vi("+ Tạo quy trình")}</MarButton><h2>{vi("QUY TRÌNH CÓ SẴN")}</h2><p>{vi("Chọn một quy trình để xem cấu hình.")}</p></> : <><h2>{vi("TẠO QUY TRÌNH")}</h2><p>{vi("Tạo quy trình, định nghĩa tác vụ và cấu hình các loại bước.")}</p><MarButton className="full" onClick={onCreate}>{vi("+ Tạo quy trình")}</MarButton><h2>{vi("QUY TRÌNH CÓ SẴN")}</h2><p>{vi("Chọn một quy trình để xem cấu hình.")}</p></>)}
       </aside>
     </div>
   );
@@ -954,7 +1009,7 @@ function AddTaskPanel({ setScreen, setActiveTask }) {
 function ReviewPanel() {
   return (
     <section className="workflow-panel editor-detail">
-      <h2>{vi("WORKFLOW DRAFT")}</h2>
+      <h2>{vi("QUY TRÌNH ĐANG THIẾT KẾ")}</h2>
       <Field label="Name" value="New workflow" />
       <h2>{vi("DEFAULT TASKS")}</h2>
       <h3 className="large">{vi("Move → Load → Transport → Unload")}</h3>
@@ -962,7 +1017,7 @@ function ReviewPanel() {
       <h3>{vi("Move")}</h3>
       <h2>{vi("Selected step type")}</h2>
       <h3>{vi("MOVE")}</h3>
-      <p>{vi("Save as a draft. Empty tasks must be completed before validation and publishing.")}</p>
+      <p>{vi("Hoàn tất các tác vụ trước khi kiểm tra và xuất bản quy trình.")}</p>
     </section>
   );
 }
@@ -987,7 +1042,7 @@ function Editor({ setMode, setSaved }) {
   const selected = tasks.find((task) => task.id === activeTask);
   const openTask = (task) => { taskClickTimer.current = window.setTimeout(() => { setActiveTask(task.id); setShowTypes(true); }, 220); };
   const editTask = (task) => { window.clearTimeout(taskClickTimer.current); startRename(task); };
-  return <><div className="workflow-editor-grid"><section className="workflow-panel editor-side"><h2>{vi("WORKFLOW")}</h2><Field label="Name" value="New workflow" /><Field label="Description" value="Add a description..." /><div className="task-heading"><h2>{vi("TASKS · ")}{vi(tasks.length)}</h2><button type="button" onClick={addTask}>{vi("+")}</button></div>{vi(tasks.length === 0 && <p className="task-empty-note">{vi("No tasks yet. Click + to create Task 1.")}</p>)}{vi(tasks.map((task) => <button className={activeTask === task.id ? 'editor-side-button active' : 'editor-side-button'} type="button" key={task.id} onClick={() => openTask(task)} onDoubleClick={() => editTask(task)}>{vi(task.name)}<small>{vi(task.steps.length ? `${task.steps.length} steps` : 'No steps yet')}</small></button>))}</section>{vi(configStep ? <StepConfigPanel step={configStep} onChange={updateConfigStep} onDone={() => setConfigStep(null)} /> : <section className="workflow-panel editor-detail workflow-steps-panel"><span className="modal-kicker">{vi("WORKFLOW STEPS")}</span><h2>{vi(selected ? selected.name : 'Select a task')}</h2>{vi(selected ? <><p>{vi("Choose a step to edit its fields.")}</p><div className="step-table"><div className="step-table-head"><span>{vi("#")}</span><span>{vi("STEP TYPE")}</span><span>{vi("STATUS")}</span></div>{vi(selected.steps.length ? selected.steps.map((step, index) => <button className="step-table-row" key={step.id} onClick={() => setConfigStep(step)}><span>{vi(String(index + 1).padStart(2, '0'))}</span><b>{vi(step.type)}</b><em>{vi(Object.values(step.values).some(Boolean) ? 'Configured' : 'Needs setup')}</em></button>) : <div className="step-empty-state">{vi("Click the task again to open the Step Type library.")}</div>)}</div></> : <SelectTaskPanel />)}</section>)}</div>{showTypes && <div className="type-modal" onClick={() => setShowTypes(false)}><div className="type-modal-card" onClick={(event) => event.stopPropagation()}><header><div><span className="modal-kicker">{vi("MEDIASSIST ACTION LIBRARY")}</span><h2>{vi("Add a step to the workflow")}</h2><p>{vi("Choose an action to add to the open task.")}</p></div></header><div>{vi(stepTypes.map((type) => <button key={type} onClick={() => addStep(type)}><i>{vi(stepTypeCopy[type][0])}</i><span><small>{vi(type)}</small><b>{vi(type.replace('_', ' '))}</b><em>{vi(stepTypeCopy[type][1])}</em></span><strong>{vi("＋")}</strong></button>))}</div></div></div>}{renameTask && <div className="rename-backdrop" onClick={() => setRenameTask(null)}><form className="rename-dialog" onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); saveRename(); }}><span className="rename-icon">{vi("✎")}</span><h2>{vi("Rename task")}</h2><p>{vi("Use a clear name to make the workflow easier to follow.")}</p><label>{vi("Task name")}<input autoFocus value={renameValue} onChange={(event) => setRenameValue(event.target.value)} /></label><footer><button type="button" onClick={() => setRenameTask(null)}>{vi("Cancel")}</button><button type="submit">{vi("Save name")}</button></footer></form></div>}<footer className="workflow-actions"><MarButton className="create" onClick={() => { setSaved(true); setMode('library'); }}>{vi("Save Draft")}</MarButton></footer></>;
+  return <><div className="workflow-editor-grid"><section className="workflow-panel editor-side"><h2>{vi("WORKFLOW")}</h2><Field label="Name" value="New workflow" /><Field label="Description" value="Add a description..." /><div className="task-heading"><h2>{vi("TASKS · ")}{vi(tasks.length)}</h2><button type="button" onClick={addTask}>{vi("+")}</button></div>{vi(tasks.length === 0 && <p className="task-empty-note">{vi("No tasks yet. Click + to create Task 1.")}</p>)}{vi(tasks.map((task) => <button className={activeTask === task.id ? 'editor-side-button active' : 'editor-side-button'} type="button" key={task.id} onClick={() => openTask(task)} onDoubleClick={() => editTask(task)}>{vi(task.name)}<small>{vi(task.steps.length ? `${task.steps.length} steps` : 'No steps yet')}</small></button>))}</section>{vi(configStep ? <StepConfigPanel step={configStep} onChange={updateConfigStep} onDone={() => setConfigStep(null)} /> : <section className="workflow-panel editor-detail workflow-steps-panel"><span className="modal-kicker">{vi("WORKFLOW STEPS")}</span><h2>{vi(selected ? selected.name : 'Select a task')}</h2>{vi(selected ? <><p>{vi("Choose a step to edit its fields.")}</p><div className="step-table"><div className="step-table-head"><span>{vi("#")}</span><span>{vi("STEP TYPE")}</span><span>{vi("STATUS")}</span></div>{vi(selected.steps.length ? selected.steps.map((step, index) => <button className="step-table-row" key={step.id} onClick={() => setConfigStep(step)}><span>{vi(String(index + 1).padStart(2, '0'))}</span><b>{vi(step.type)}</b><em>{vi(Object.values(step.values).some(Boolean) ? 'Configured' : 'Needs setup')}</em></button>) : <div className="step-empty-state">{vi("Click the task again to open the Step Type library.")}</div>)}</div></> : <SelectTaskPanel />)}</section>)}</div>{showTypes && <div className="type-modal" onClick={() => setShowTypes(false)}><div className="type-modal-card" onClick={(event) => event.stopPropagation()}><header><div><span className="modal-kicker">{vi("MEDIASSIST ACTION LIBRARY")}</span><h2>{vi("Add a step to the workflow")}</h2><p>{vi("Choose an action to add to the open task.")}</p></div></header><div>{vi(stepTypes.map((type) => <button key={type} onClick={() => addStep(type)}><i>{vi(stepTypeCopy[type][0])}</i><span><small>{vi(type)}</small><b>{vi(type.replace('_', ' '))}</b><em>{vi(stepTypeCopy[type][1])}</em></span><strong>{vi("＋")}</strong></button>))}</div></div></div>}{renameTask && <div className="rename-backdrop" onClick={() => setRenameTask(null)}><form className="rename-dialog" onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); saveRename(); }}><span className="rename-icon">{vi("✎")}</span><h2>{vi("Rename task")}</h2><p>{vi("Use a clear name to make the workflow easier to follow.")}</p><label>{vi("Task name")}<input autoFocus value={renameValue} onChange={(event) => setRenameValue(event.target.value)} /></label><footer><button type="button" onClick={() => setRenameTask(null)}>{vi("Cancel")}</button><button type="submit">{vi("Save name")}</button></footer></form></div>}<footer className="workflow-actions"><MarButton className="create" onClick={() => { setSaved(true); setMode('library'); }}>{vi("Lưu quy trình")}</MarButton></footer></>;
 }
 
 export default function WorkflowsPage() {
@@ -1003,7 +1058,7 @@ export default function WorkflowsPage() {
     let current = true;
     workflowApi.list({ page: 0, size: 100 }).then((page) => {
       if (!current) return;
-      setDefinitions(Array.isArray(page) ? page : page?.content ?? []);
+      setDefinitions(latestWorkflowVersions(Array.isArray(page) ? page : page?.content ?? []));
       setDefinitionError('');
     }).catch((error) => { if (current) setDefinitionError(error.message || 'Unable to load workflow definitions.'); })
       .finally(() => { if (current) setDefinitionsLoading(false); });
@@ -1023,7 +1078,7 @@ export default function WorkflowsPage() {
           <h1>{vi(creating ? 'Create Workflow' : 'Workflows')}</h1>
           <Tabs />
           <p className="preview-note">
-            {vi(creating ? 'Build a workflow from tasks, or start with one of the 10 templates.' : saved ? 'Draft saved. Continue editing or create another workflow.' : 'Specification v1.0 · editable UI preview')}
+            {vi(creating ? 'Tạo quy trình từ các tác vụ, hoặc bắt đầu với một quy trình có sẵn.' : saved ? 'Đã lưu quy trình. Bạn có thể tiếp tục chỉnh sửa hoặc tạo quy trình khác.' : 'Đặc tả 1.0 · bản xem trước có thể chỉnh sửa')}
           </p>
         </header>
 

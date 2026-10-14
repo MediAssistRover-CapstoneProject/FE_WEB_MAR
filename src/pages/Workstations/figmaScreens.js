@@ -51,11 +51,6 @@ export const figmaScreens = [
     "view": "missing"
   },
   {
-    "id": "571:51765",
-    "name": "SPEC v1 / 51 / Dispatch — Jobs",
-    "view": "jobs"
-  },
-  {
     "id": "571:51822",
     "name": "SPEC v1 / 52 / Job — CREATED",
     "view": "created"
