@@ -46,7 +46,7 @@ function Panel({title,children}) { return <section className="ls-panel"><h3>{vi(
 function Stat({label,children}) { return <div className="ls-stat"><span>{vi(label)}</span><b>{vi(children)}</b></div>; }
 function Field({label,children,...props}) { const id=useId();return <label className="ls-field"><span id={id}>{vi(label)}</span>{vi(children?cloneElement(children,{'aria-labelledby':id}):<input {...props} aria-labelledby={id}/>)}</label>; }
 const emptyZone=()=>({id:'',name:'',description:'',enabled:true,type:'AREA',speed:0.3,heading:0,alignCost:-.5,antiAlignCost:0,crossCost:0,points:[]});
-const emptyEndpoint=()=>({id:'',name:'',description:'',type:'WAYPOINT',x:580,y:330,heading:0,enabled:true,placed:false});
+const emptyEndpoint=()=>({id:'',name:'',description:'',type:'WAYPOINT',x:580,y:330,enabled:true,placed:false});
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export default function MapStudioFigma({initialStage='scan'}) {
   const goTo=useNavigate();
@@ -114,9 +114,6 @@ export default function MapStudioFigma({initialStage='scan'}) {
       const candidate={...endpoint,...point,placed:true};
       // Position is previewed even when invalid, so the reason stays visible.
       setEndpoint(candidate);cancelTool();
-    } else if(tool==='heading'){
-      if(Math.hypot(point.x-endpoint.x,point.y-endpoint.y)<3)return;
-      setEndpoint(current=>({...current,heading:Math.round((Math.atan2(current.y-point.y,point.x-current.x)*180/Math.PI+360)%360)%360}));cancelTool();
     }
   };
   const storeZone=event=>{
@@ -129,13 +126,13 @@ export default function MapStudioFigma({initialStage='scan'}) {
     event.preventDefault();const value={...endpointValue,name:endpoint.name.trim(),group:endpoint.group?.trim()||''};
     const error=endpointError(draft,value);if(error)return setNotice(error);
     value.id ||= crypto.randomUUID();
-    update(current=>({endpoints:[...current.endpoints.filter(e=>e.id!==value.id),value]}));setEndpoint({...value,placed:true});cancelTool();setNotice('Endpoint saved with its position and arrival heading.');
+    update(current=>({endpoints:[...current.endpoints.filter(e=>e.id!==value.id),value]}));setEndpoint({...value,placed:true});cancelTool();setNotice('Đã lưu điểm đích.');
   };
   const download=()=>{
     const blob=new Blob([JSON.stringify(exportMap(draft),null,2)],{type:'application/json'}),url=URL.createObjectURL(blob);
     const link=document.createElement('a');link.href=url;link.download='hospital-lidar-map.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   };
-  const toolText={rectangle:rectangleStart?'Click the opposite corner of the rectangle.':'Click the first corner of the rectangle.',polygon:'Click each corner, then choose Finish shape.',endpoint:'Click scanned free space to place the endpoint.',heading:'Click in the direction the robot should face.'}[tool];
+  const toolText={rectangle:rectangleStart?'Click the opposite corner of the rectangle.':'Click the first corner of the rectangle.',polygon:'Click each corner, then choose Finish shape.',endpoint:'Click scanned free space to place the endpoint.'}[tool];
   return <section className="ls-studio">
     <WorkspaceTabs label={vi('Map Studio stages')} active={stage} onSelect={navigate} items={STAGES.map(([id,name],i)=>({id,label:`${i+1}. ${vi(name)}`,disabled:!stageEnabled(draft,id),hint:!stageEnabled(draft,id)?vi('Finish the scan first'):undefined}))}/>
     <div className="ls-topline"><span>{draft.name}</span><span>{vi(storageError?'Storage unavailable — export your map':saved?'Map saved in this browser':'Draft autosaved in this browser')}</span></div>
@@ -160,7 +157,7 @@ export default function MapStudioFigma({initialStage='scan'}) {
           {vi(draft.scan.status==='idle'&&<Button onClick={()=>update({scan:{status:'captured',progress:100}})}>{vi("Load demo scan")}</Button>)}
           <Button tone={draft.scan.progress===100?'primary':''} disabled={draft.scan.progress<100} onClick={()=>{if(draft.scan.status!=='complete')update({scan:{status:'complete',progress:100}});setStage('zone');setNotice('Scan retained. Draw zones over the captured geometry.');}}>{vi("Finish scan → Zone")}</Button>
         </div></div><div className="ls-progress"><i style={{width:draft.scan.progress+'%'}}/></div></Panel>)}
-        {stage!=='scan'&&<div className="ls-hint">{stage==='zone'?'Khoanh vùng bằng hình chữ nhật hoặc đa giác. Kéo bên trong để di chuyển, kéo chấm trắng để chỉnh đường biên.':'Kéo điểm đích trực tiếp trên bản đồ để đổi vị trí. Mũi tên chỉ hướng robot khi đến.'} Nhấn Esc để hủy lượt kéo, sau đó bấm Lưu để giữ thay đổi.</div>}
+        {stage!=='scan'&&<div className="ls-hint">{stage==='zone'?'Khoanh vùng bằng hình chữ nhật hoặc đa giác. Kéo bên trong để di chuyển, kéo chấm trắng để chỉnh đường biên.':'Kéo chấm xanh trên bản đồ để đổi vị trí điểm đích.'} Nhấn Esc để hủy lượt kéo, sau đó bấm Lưu để giữ thay đổi.</div>}
       </div>
       <aside className="ls-inspector">
         {stage==='endpoint'&&<Panel title={'Điểm đích đã lưu · '+draft.endpoints.length}>
@@ -169,7 +166,7 @@ export default function MapStudioFigma({initialStage='scan'}) {
             <Button tone="danger" className="small" aria-label={'Xóa điểm đích '+e.name} onClick={()=>requestEndpointDelete(e)}>Xóa</Button>
           </div>)}</div>:<div className="ls-empty">Chưa có điểm đích. Đặt điểm trực tiếp trên bản đồ để bắt đầu.</div>}
         </Panel>}
-        {vi(stage==='scan'&&<><Panel title={vi("Scan session")}><Field label="Map name" maxLength={60} value={draft.name} onChange={e=>update({name:e.target.value})}/><Stat label="Source">{vi("Demo LiDAR scan")}</Stat><Stat label="Capture">{vi(draft.scan.progress)}{vi("%")}</Stat><Stat label="Resolution">{vi("0.05 m / cell")}</Stat><Stat label="Semantic labels">{vi("Not part of the scan")}</Stat><p>{vi("White points are occupied returns, grey is observed floor, and black is unknown space. Room names are added in Zone.")}</p><Button tone="danger" className="ls-full" disabled={draft.scan.status==='idle'} onClick={()=>setConfirm({kind:'reset'})}>{vi("New scan")}</Button></Panel><Panel title={vi("Map editing")}><p>{vi("1. Capture the physical layout.")}</p><p>{vi("2. Draw areas, exclusion zones and movement rules.")}</p><p>{vi("3. Place destinations and arrival headings.")}</p></Panel></>)}
+        {vi(stage==='scan'&&<><Panel title={vi("Scan session")}><Field label="Map name" maxLength={60} value={draft.name} onChange={e=>update({name:e.target.value})}/><Stat label="Source">{vi("Demo LiDAR scan")}</Stat><Stat label="Capture">{vi(draft.scan.progress)}{vi("%")}</Stat><Stat label="Resolution">{vi("0.05 m / cell")}</Stat><Stat label="Semantic labels">{vi("Not part of the scan")}</Stat><p>{vi("White points are occupied returns, grey is observed floor, and black is unknown space. Room names are added in Zone.")}</p><Button tone="danger" className="ls-full" disabled={draft.scan.status==='idle'} onClick={()=>setConfirm({kind:'reset'})}>{vi("New scan")}</Button></Panel><Panel title={vi("Map editing")}><p>{vi("1. Capture the physical layout.")}</p><p>{vi("2. Draw areas, exclusion zones and movement rules.")}</p><p>{vi("3. Đặt điểm đích trên bản đồ.")}</p></Panel></>)}
         {vi(stage==='zone'&&<><Panel title={vi(zone.id?'Edit zone':'Create zone')}><form onSubmit={storeZone}><Field label="Zone name" required maxLength={40} placeholder={vi("e.g. Pharmacy")} value={zone.name} onChange={e=>setZone(z=>({...z,name:e.target.value}))}/><ZoneTypePicker value={zone.type} onChange={type=>setZone(z=>({...z,type}))}/><p>{vi(zoneType.help)}</p><ZoneProperties zone={zone} setZone={setZone}/>
           {zone.type==='NO_REPLAN'&&<Field label="Thời gian chờ vật cản (giây)" type="number" min="1" max="120" required value={zone.waitTimeoutSeconds??20} onChange={e=>setZone(z=>({...z,waitTimeoutSeconds:e.target.value===''?'':Number(e.target.value)}))}/>}
           {zone.type==='SINGLE_ROBOT'&&<p className="ls-hint">Vẽ vùng phủ đủ thân robot và lối đi hẹp. Chừa điểm chờ ngoài biên, tránh đặt điểm đỗ trong vùng làm chặn lối ra. Điều phối kiểm tra bán kính thân robot 0,4 m.</p>}
@@ -185,10 +182,6 @@ export default function MapStudioFigma({initialStage='scan'}) {
         {vi(stage==='endpoint'&&<><Panel title={vi(endpoint.id?'Edit endpoint':'Create endpoint')}><form onSubmit={storeEndpoint}><Field label="Endpoint name" maxLength={40} required placeholder={vi("e.g. Pharmacy pickup")} value={endpoint.name} onChange={e=>setEndpoint(p=>({...p,name:e.target.value}))}/><Field label="Endpoint type"><select value={endpoint.type} onChange={e=>setEndpoint(p=>({...p,type:e.target.value}))}>{vi(ENDPOINT_TYPES.map(t=><option key={t} value={t}>{vi(t)}</option>))}</select></Field>
           {!endpoint.placed&&<Button className={'ls-full '+(tool==='endpoint'?'active':'')} onClick={()=>setTool('endpoint')}>{vi('Place on map')}</Button>}
           <EndpointProperties endpoint={endpoint} setEndpoint={setEndpoint} draft={draft} onOpenGroups={()=>openEndpointTab('groups')}/>
-          <details className="ls-advanced"><summary>Hướng robot khi đến</summary><p>Bấm chọn hướng trên bản đồ hoặc xoay mũi tên bằng thanh trượt.</p>
-          <Field label="Rotate arrival heading" type="range" min="0" max="359" value={endpoint.heading||0} onChange={e=>setEndpoint(p=>({...p,heading:Number(e.target.value)}))}/>
-          <Button className="ls-full" disabled={!endpoint.placed} onClick={()=>setTool('heading')}>{vi("Set heading on map")}</Button>
-          </details>
           {vi(endpointProblem&&<div className="ls-error">{vi(endpointProblem)}</div>)}
           <Button type="submit" tone="primary" className="ls-full" disabled={!endpoint.placed||!!endpointProblem||!!tool||!endpointDirty}>{vi("Save endpoint")}</Button>
         </form><div className="ls-actions"><Button onClick={newEndpoint}>{vi("New endpoint")}</Button></div></Panel>

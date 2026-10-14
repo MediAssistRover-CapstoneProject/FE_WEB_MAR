@@ -70,7 +70,7 @@ function Direction({point,heading,color='#60a5fa',length=25}) {
   return <g transform={'translate('+point.x+' '+point.y+') rotate('+(-heading)+')'} pointerEvents="none"><path d={'M0 0H'+length+'m-7 -5 7 5-7 5'} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" /></g>;
 }
 function Endpoint({value,preview=false}) {
-  return <g opacity={preview ? 0.9 : 1}><circle cx={value.x} cy={value.y} r="13" fill="#101a2d" stroke={preview?'#fbbf24':'#60a5fa'} strokeWidth="2" strokeDasharray={preview?'3 3':undefined}/><circle cx={value.x} cy={value.y} r="4" fill={preview?'#fbbf24':'#60a5fa'}/><Direction point={value} heading={value.heading} color={preview?'#fbbf24':'#60a5fa'}/><text x={value.x} y={value.y-23} textAnchor="middle" fill="white" stroke="#111827" strokeWidth="4" paintOrder="stroke" fontSize="12">{vi(value.name || 'New endpoint')}</text></g>;
+  return <g opacity={preview ? 0.7 : 1}><title>{value.name || vi('New endpoint')}</title><circle cx={value.x} cy={value.y} r="14" fill="transparent"/><circle data-testid="endpoint-dot" cx={value.x} cy={value.y} r="4" fill="#60a5fa" pointerEvents="none"/></g>;
 }
 export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit,onSelectZone,onSelectEndpoint,onEditZone,onEditEndpoint,rectangleStart,hoverPoint,onHover,zoneDirty,endpointDirty,simulation}) {
   const [zoom,setZoom]=useState(1),[centre,setCentre]=useState({x:600,y:340}),[grid,setGrid]=useState(false),[rays,setRays]=useState(true),[zonesVisible,setZonesVisible]=useState(true),[endpointsVisible,setEndpointsVisible]=useState(true);

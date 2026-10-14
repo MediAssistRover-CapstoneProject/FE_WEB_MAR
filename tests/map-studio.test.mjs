@@ -51,11 +51,11 @@ test('speed and direction parameters are validated and persisted',()=>{
   assert.match(zoneError(d,{...zone(rectangle(330,320,80,55),'PREFERRED_DIRECTION'),heading:360}),/direction/);
   assert.equal(zoneError(d,zone(rectangle(330,320,80,55),'PREFERRED_DIRECTION')),'');
 });
-test('endpoint names, heading and separation checks catch invalid edits',()=>{
+test('endpoint names and separation are validated without requiring arrival heading',()=>{
   const d=captured();d.endpoints=[endpoint()];
   assert.match(endpointError(d,endpoint({id:'e2',name:'Home',x:400})),/already exists/);
   assert.match(endpointError(d,endpoint({id:'e2',name:'Other',x:582})),/apart/);
-  assert.match(endpointError(d,endpoint({heading:360})),/heading/);
+  assert.equal(endpointError(d,endpoint({heading:undefined})),'');
   assert.equal(endpointError(d,endpoint({name:'Updated'})),'');
 });
 test('save requires finished scan and endpoint, keeps snapshot stable after edits',()=>{

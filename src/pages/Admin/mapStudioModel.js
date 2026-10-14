@@ -6,7 +6,7 @@ export { ZONE_TYPES } from './zoneCatalog.js';
 export const STAGES = [
   ['scan', 'Scan', 'Record the physical space with LiDAR before adding map features.'],
   ['zone', 'Zone', 'Draw named areas and set where or how the robot may travel.'],
-  ['endpoint', 'Endpoint', 'Place functional destinations and choose the robot’s arrival orientation.'],
+  ['endpoint', 'Endpoint', 'Đặt điểm đích theo chức năng trên bản đồ.'],
 ];
 export const STORAGE_KEY = 'mediassist.map-studio.lidar.v3';
 export const ENDPOINT_TYPES = ['WAYPOINT', 'HOME', 'PARKING', 'PICKUP', 'DROPOFF', 'CHARGING'];
@@ -18,7 +18,7 @@ export function loadDraft(storage) {
   try {
     const d = JSON.parse(storage.getItem(STORAGE_KEY));
     if (d?.schema !== 3 || !Number.isInteger(d.revision) || typeof d.name !== 'string' || !['idle', 'running', 'paused', 'captured', 'complete'].includes(d.scan?.status) || !Number.isFinite(d.scan.progress) || d.scan.progress < 0 || d.scan.progress > 100 || !Array.isArray(d.zones) || !Array.isArray(d.endpoints)) return createDraft();
-    if (d.zones.some(z => !z || typeof z.name !== 'string' || !ZONE_TYPES.some(t => t.id === z.type) || !Array.isArray(z.points) || z.points.some(p => !validPoint(p))) || d.endpoints.some(e => !e || typeof e.name !== 'string' || !validPoint(e) || !ENDPOINT_TYPES.includes(e.type) || !Number.isFinite(e.heading))) return createDraft();
+    if (d.zones.some(z => !z || typeof z.name !== 'string' || !ZONE_TYPES.some(t => t.id === z.type) || !Array.isArray(z.points) || z.points.some(p => !validPoint(p))) || d.endpoints.some(e => !e || typeof e.name !== 'string' || !validPoint(e) || !ENDPOINT_TYPES.includes(e.type))) return createDraft();
     // A damaged saved snapshot must not crash Dispatch or discard a valid draft.
     let saved=d.saved;
     if(saved){try{if(saved.revision!==saved.snapshot?.revision||mapIssues(saved.snapshot).length)saved=null;}catch{saved=null;}}
@@ -86,7 +86,6 @@ export function endpointError(draft, endpoint) {
   if (!ENDPOINT_TYPES.includes(endpoint.type)) return 'Select an endpoint type.';
   if (!freePoint(endpoint)) return 'Place the endpoint on scanned free space, at least 0.4 m from walls and obstacles.';
   if (!pointAllowed(draft, endpoint)) return 'An endpoint cannot be placed inside an exclusion zone.';
-  if (!Number.isFinite(endpoint.heading) || endpoint.heading < 0 || endpoint.heading >= 360) return 'Set an arrival heading from 0 to 359 degrees.';
   if (draft.endpoints.some(e => e.id !== endpoint.id && e.name.toLowerCase() === endpoint.name.trim().toLowerCase())) return 'An endpoint with this name already exists.';
   if (draft.endpoints.some(e => e.id !== endpoint.id && Math.hypot(e.x - endpoint.x, e.y - endpoint.y) < 16)) return 'Keep endpoints at least 0.8 m apart.';
   for (const key of ['queueId','exitId']) if (endpoint[key] && (endpoint[key] === endpoint.id || !draft.endpoints.some(e=>e.id===endpoint[key] && e.enabled !== false && ['WAYPOINT','HOME','PARKING'].includes(e.type)))) return 'Điểm chờ/thoát phải là một điểm trung gian, bãi đỗ hoặc điểm gốc khác đang bật.';

@@ -64,11 +64,13 @@ try {
     await page.mouse.move(positions[0].x,positions[0].y);await page.mouse.down();await page.mouse.move(positions[1].x,positions[1].y,{steps:10});await page.mouse.up();
   };
   await dragPoint({x:365,y:340},{x:580,y:330});
-  await page.getByText('Hướng robot khi đến',{exact:true}).click();
-  await click('Set heading on map');await point(580,290);
-  assert.equal(await page.getByLabel(vi('Rotate arrival heading'),{exact:true}).inputValue(),'90');
+  assert.equal(await page.getByText('Hướng robot khi đến',{exact:true}).count(),0);
+  assert.equal(await button('Set heading on map').count(),0);
+  assert.equal(await page.getByLabel(vi('Rotate arrival heading'),{exact:true}).count(),0);
   await click('Save endpoint');
   assert.equal((await saved()).endpoints.length,1);
+  assert.equal(await page.getByTestId('endpoint-dot').count(),1);
+  assert.equal(await page.getByTestId('selected-endpoint').locator('path').count(),0,'No endpoint direction arrow');
   await click('New endpoint');
   await page.getByLabel(vi('Endpoint name'),{exact:true}).fill('Pickup');
   await page.getByLabel(vi('Endpoint type'),{exact:true}).selectOption('PICKUP');
@@ -113,5 +115,5 @@ try {
   await click('New scan');await click('Keep editing');assert.equal((await saved()).endpoints.length,2);
   await click('New scan');await click('Clear draft and restart');assert.deepEqual((await saved()).endpoints,[]);
   assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);
-  console.log('PASS: three-step LiDAR editor, scan pause/resume, rectangle/polygon zones, exclusion guards, heading/zoom placement, save/export, persistence, unsaved-edit confirmation and 5 viewport sizes.');
+  console.log('PASS: three-step LiDAR editor, scan pause/resume, rectangle/polygon zones, exclusion guards, dot endpoints without arrival headings, zoom placement, 5:3 viewport, save/export, persistence, unsaved-edit confirmation and 5 viewport sizes.');
 } catch(error) {await shot('failure');console.error('UI errors:',errors,'URL:',page.url());console.error((await page.locator('body').innerText()).slice(-5000));throw error;} finally {await browser.close();}

@@ -82,9 +82,11 @@ export function createDispatchPlan(map,startId,stops,options={}){
     if(!end||end.enabled===false||end.accessible===false)throw Error('Không có điểm đang hoạt động, rảnh và có thể đi đến trong lựa chọn này.');
     if(end.occupancy==='BUSY')throw Error('Điểm '+end.name+' đang bận. Chọn điểm khác hoặc nhóm điểm tương đương.');
     for(const id of [end.queueId,end.id])if(id){const p=map.endpoints.find(e=>e.id===id);if(!p||p.enabled===false||p.occupancy==='BUSY')throw Error('Điểm chờ không sẵn sàng.');move(p,p.id===end.id?'Di chuyển đến '+p.name:'Qua điểm chờ '+p.name);}
-    // Heading and endpoint ownership are applied during the endpoint task block.
-    const arrival=current;timeline.push({a:arrival,b:arrival,start:time,end:time+.3,label:'Định hướng tại '+end.name,action:'ARRIVE',heading:end.heading,speed:0});time+=.3;
-    for(const task of end.tasks??defaultTasks[end.type]??[]){timeline.push({a:arrival,b:arrival,start:time,end:time+Math.max(.1,task.seconds),label:end.name,action:task.action,heading:end.heading,speed:0});time+=Math.max(.1,task.seconds);}
+    // Keep the incoming travel direction while stopped; endpoints impose no heading.
+    const incoming=timeline.at(-1);
+    const arrivalHeading=incoming ? incoming.heading ?? ((Math.atan2(incoming.a.y-incoming.b.y,incoming.b.x-incoming.a.x)*180/Math.PI+360)%360) : 0;
+    const arrival=current;timeline.push({a:arrival,b:arrival,start:time,end:time+.3,label:'Đã đến '+end.name,action:'ARRIVE',heading:arrivalHeading,speed:0});time+=.3;
+    for(const task of end.tasks??defaultTasks[end.type]??[]){timeline.push({a:arrival,b:arrival,start:time,end:time+Math.max(.1,task.seconds),label:end.name,action:task.action,heading:arrivalHeading,speed:0});time+=Math.max(.1,task.seconds);}
     resolved.push({id:end.id,name:end.name,at:time});
     visits[end.id]=(visits[end.id]||0)+1;
     if(end.exitId){const exit=map.endpoints.find(e=>e.id===end.exitId);if(!exit||exit.enabled===false||exit.occupancy==='BUSY')throw Error('Điểm thoát không sẵn sàng.');move(exit,'Rời điểm phục vụ qua '+exit.name);}

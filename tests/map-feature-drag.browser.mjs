@@ -48,9 +48,9 @@ try{
   for(const name of ['Trạng thái tài nguyên mô phỏng','Điểm chờ trước khi tiếp cận','Điểm thoát sau khi hoàn tất','Mẫu chức năng'])assert.equal(await page.getByLabel(name,{exact:true}).count(),0);
   assert.equal(await page.getByText('Chuỗi tác vụ tại điểm',{exact:true}).count(),0);
   await drag({x:580,y:330},{x:610,y:340});
-  await page.getByText('Hướng robot khi đến',{exact:true}).click();
+  assert.equal(await page.getByText('Hướng robot khi đến',{exact:true}).count(),0);
   assert.equal(await field('X (cells)').count(),0);assert.equal(await field('Y (cells)').count(),0);
-  assert.equal(await field('Rotate arrival heading').inputValue(),'90');
+  assert.equal(await field('Rotate arrival heading').count(),0);
   await click('Save endpoint');
   await drag({x:610,y:340},{x:450,y:180});
   assert.equal(await page.getByRole('button',{name:vi('Save endpoint'),exact:true}).isDisabled(),true,'Wall/unknown placement stays invalid');
