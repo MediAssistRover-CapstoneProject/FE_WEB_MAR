@@ -29,7 +29,7 @@ try{
   const moved=seed.zones[0].points.map(p=>({x:p.x-25,y:p.y+10}));
   assert.deepEqual(await corners(),moved,'First drag selects and moves the whole zone');
   assert.equal(await field('Corner 1 X').count(),0,'Coordinate fields are hidden');
-  assert.deepEqual(await field('Loại vùng').locator('option').evaluateAll(options=>options.map(o=>o.value)),['AREA','EXCLUSION','SPEED_LIMIT','ASSUMED_COST']);
+  assert.deepEqual(await field('Loại vùng').locator('option').evaluateAll(options=>options.map(o=>o.value)),['AREA','EXCLUSION','SPEED_LIMIT','ASSUMED_COST','REST']);
   await page.getByRole('region',{name:'Chính sách áp dụng vùng'}).getByText('Chưa đồng bộ với robot',{exact:true}).waitFor();
   assert.deepEqual((await data()).zones[0].points,seed.zones[0].points,'Drag previews until saved');
   await drag(moved[0],{x:moved[0].x+15,y:moved[0].y+5});
@@ -104,5 +104,5 @@ try{
   assert.equal(await page.getByRole('button',{name:'Xóa điểm đích Nhận thuốc',exact:true}).count(),0);
   await shot('endpoint-delete');
   assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);
-  console.log('PASS: visual zone / vertex / endpoint drag, four zone types, robot policy, no coordinate fields, deletion confirmation and group cleanup, zoom + pan, cancel, guards, metadata preservation, persistence, responsive UI and no API writes.');
+  console.log('PASS: visual zone / vertex / endpoint drag, five zone types, robot policy, no coordinate fields, deletion confirmation and group cleanup, zoom + pan, cancel, guards, metadata preservation, persistence, responsive UI and no API writes.');
 }catch(e){await shot('failure');console.error('UI errors:',errors);console.error((await page.locator('body').innerText()).slice(-4000));throw e;}finally{await browser.close();}

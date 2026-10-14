@@ -54,7 +54,7 @@ try{
  }
  await page.setViewportSize({width:1440,height:1000});await page.goto('http://127.0.0.1:5173/admin?screen=Map%20Studio');
  await page.getByRole('navigation',{name:vi('Map Studio stages')}).getByRole('button',{name:/Vùng/}).click();
- const types=page.getByLabel('Loại vùng',{exact:true});assert.equal(await types.locator('option').count(),4);
+ const types=page.getByLabel('Loại vùng',{exact:true});assert.equal(await types.locator('option').count(),5);
  await page.getByRole('button',{name:/Cửa phòng.*Không lập lại đường/}).click();
  assert.equal(await types.inputValue(),'NO_REPLAN','Previously saved advanced zones remain editable');
  await page.getByLabel('Thời gian chờ vật cản (giây)',{exact:true}).fill('12');

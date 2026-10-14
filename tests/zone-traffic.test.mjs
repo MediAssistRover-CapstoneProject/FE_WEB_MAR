@@ -16,8 +16,8 @@ const single=()=>rect('single','SINGLE_ROBOT',700,310,100,45);
 const noReplan=()=>({...rect('no-replan','NO_REPLAN',780,180,125,140),waitTimeoutSeconds:10});
 const group=policy=>({id:'pickups',code:'PICKUPS',name:'Quầy nhận',selectionPolicy:policy,active:true,allowFallback:true,members:[{endpointId:'pickup',sequenceNo:1,active:true},{endpointId:'near',sequenceNo:2,active:true}]});
 
-test('all 18 OTTO concepts + named area are catalogued; unsupported features cannot be saved as working zones',()=>{
- assert.equal(ZONE_TYPES.length,19);assert.equal(new Set(ZONE_TYPES.map(t=>t.id)).size,19);
+test('zone catalog includes rest areas and rejects unsupported active policies',()=>{
+ assert.equal(ZONE_TYPES.length,20);assert.equal(new Set(ZONE_TYPES.map(t=>t.id)).size,20);
  for(const type of ZONE_TYPES){const z={...rect(type.id,type.id,700,315,100,40),heading:0,speed:.3};assert.equal(!!zoneError(base(),z),!!type.unsupported,type.id);}
 });
 test('new zone configuration survives save/reload; invalid no-replan time rejected',()=>{

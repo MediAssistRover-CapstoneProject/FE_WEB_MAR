@@ -1,6 +1,7 @@
 // Map overlays are independent of the BE facility/business zone categories.
 // Unsupported hardware/graph features are documented, not silently simulated.
 export const ZONE_TYPES = [
+  { id:'REST', group:'Định danh', label:'Trạm nghỉ', color:'#c084fc', help:'Khu vực đỗ và chờ khi robot không làm nhiệm vụ. Đặt điểm đích trong vùng để chọn làm điểm dừng trong Điều phối.' },
   { id:'AREA', group:'Định danh', label:'Vùng có tên', color:'#60a5fa', help:'Gắn tên phòng hoặc khu vực; không thay đổi quy tắc di chuyển.' },
   { id:'EXCLUSION', group:'Điều hướng', label:'Vùng cấm', color:'#fb7185', help:'Cấm robot đi vào, kể cả khi thân robot chạm biên vùng.' },
   { id:'SPEED_LIMIT', group:'Điều hướng', label:'Giới hạn tốc độ', color:'#fbbf24', help:'Giảm tốc độ di chuyển. Mô phỏng áp dụng bảo thủ từ lúc tâm robot vào vùng; không tăng tốc độ tối đa của robot.' },
@@ -22,8 +23,9 @@ export const ZONE_TYPES = [
   { id:'IGNORE_DYNAMIC_OBJECTS', group:'An toàn & cảm biến', label:'Bỏ qua ước lượng vật thể động', color:'#f87171', unsupported:true, help:'Không phù hợp nơi có người/xe di chuyển. Không bật chức năng này trong bản mô phỏng bệnh viện.' },
 ];
 // Keep legacy types readable without offering advanced robot policies as new zones.
-export const ZONE_SETUP_TYPES = ZONE_TYPES.filter(t => ['AREA', 'EXCLUSION', 'SPEED_LIMIT', 'ASSUMED_COST'].includes(t.id));
+export const ZONE_SETUP_TYPES = ['AREA', 'EXCLUSION', 'SPEED_LIMIT', 'ASSUMED_COST', 'REST'].map(id => ZONE_TYPES.find(t => t.id === id));
 export const ZONE_ROBOT_POLICY = {
+  REST: 'Đánh dấu khu vực nghỉ và các điểm đỗ. Robot chỉ đến khi được điều phối; vùng này không tự kích hoạt sạc hoặc tự về trạm.',
   AREA: 'Chỉ đặt tên khu vực, không thay đổi đường đi của robot.',
   EXCLUSION: 'Robot cần nhận vùng cấm và xác nhận áp dụng trước khi vận hành.',
   SPEED_LIMIT: 'Robot cần hỗ trợ giới hạn tốc độ theo vùng và xác nhận mức tốc độ đã nhận.',
