@@ -109,6 +109,9 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
   padding: 44px 28px 24px;
 }
 
+.workflows-screen.workflow-page { height: auto; min-height: 100vh; overflow: visible; }
+.workflows-screen.workflow-page .workflows-main { height: auto; min-height: 100vh; overflow: visible; }
+
 .workflows-header {
   position: relative;
 }
@@ -211,8 +214,7 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 }
 
 .workflow-card {
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
@@ -220,7 +222,6 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
   border: 0;
   border-radius: 10px;
   background: #f1f5f9;
-  cursor: pointer;
   padding: 14px 16px;
   text-align: left;
   color: inherit;
@@ -231,10 +232,10 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
   background: #e8f0ff;
 }
 
-.workflow-card:focus-visible {
-  outline: 3px solid #93c5fd;
-  outline-offset: 2px;
-}
+.workflow-card-open { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: center; gap: 12px; flex: 1; min-width: 0; border: 0; background: transparent; color: inherit; padding: 0; text-align: left; cursor: pointer; }
+.workflow-card-delete { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border: 1px solid #dbe4ef; border-radius: 9px; background: #fff; color: #71829b; padding: 0; transition: background .15s, color .15s, border-color .15s; }
+.workflow-card-delete:hover { border-color: #f5b6bd; background: #fff5f6; color: #c94a5b; }
+.workflow-card-delete:focus-visible,.workflow-card-open:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
 
 .workflow-card-icon {
   display: grid;
@@ -267,12 +268,6 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
   line-height: 1.4;
 }
 
-.workflow-card-arrow {
-  color: #2563eb;
-  font-size: 18px;
-  font-style: normal;
-}
-
 .action-panel p {
   margin: 0 0 12px;
   font-size: 12px;
@@ -301,7 +296,7 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 
 .workflow-editor-grid {
   display: grid;
-  grid-template-columns: 320px minmax(620px, 824px);
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
   gap: 20px;
   margin-top: 30px;
 }
@@ -311,7 +306,7 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
   display: flex;
   flex-direction: column;
   gap: 12px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .editor-detail h3 {
@@ -400,6 +395,15 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 .editor-side-button.small {
   min-height: 32px;
 }
+.editor-task-item { display: flex; gap: 6px; align-items: stretch; }
+.editor-task-item .editor-side-button { flex: 1; text-align: left; padding: 9px 12px; }
+.editor-delete-button { flex: 0 0 32px; border: 1px solid #fecaca; background: #fff; color: #b91c1c; padding: 0; }
+.editor-delete-button:hover { background: #fef2f2; }
+.editor-step-item { display: flex; align-items: stretch; border-top: 1px solid #e5eefc; }
+.editor-step-item .step-table-row { flex: 1; min-width: 0; border-top: 0; }
+.editor-step-item .editor-delete-button { margin: 8px; }
+.workflow-save-error { color: #b91c1c !important; font-size: 12px !important; }
+.wf-button:disabled { opacity: .6; cursor: not-allowed; }
 
 .endpoint-heading {
   margin-top: 0 !important;
@@ -478,6 +482,11 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
   align-items: center;
   gap: 12px;
   margin-top: 20px;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  padding: 12px 0;
+  background: #fff;
 }
 
 .workflow-actions .create {
@@ -623,6 +632,7 @@ import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../features/admin/components/AdminSidebar.jsx';
 import { clearSession } from '../../features/auth/session.js';
 import { latestWorkflowVersions, workflowApi } from '../../features/workflows/workflowApi.js';
+import { editorTasks, newWorkflowCode, stepPayload, taskPayload, workflowPayload } from '../../features/workflows/workflowDraftModel.js';
 
 const navGroups = [
   ['Overview', ['Dashboard']],
@@ -696,19 +706,19 @@ export function Sidebar() {
   return <AdminSidebar active="Workflows" onSelect={(screen) => navigate(`/admin?screen=${encodeURIComponent(screen)}`)} onLogout={() => { clearSession(); navigate('/'); }} />;
 }
 
-export function MarButton({ children, variant = 'primary', className = '', onClick }) {
+export function MarButton({ children, variant = 'primary', className = '', onClick, disabled = false }) {
   return (
-    <button className={`wf-button ${variant} ${className}`.trim()} type="button" onClick={onClick}>
+    <button className={`wf-button ${variant} ${className}`.trim()} type="button" onClick={onClick} disabled={disabled}>
       {vi(children)}
     </button>
   );
 }
 
-function Field({ label, value }) {
+function Field({ label, value, onChange, placeholder }) {
   return (
     <label className="wf-field">
       <span>{vi(label)}</span>
-      <input value={value} readOnly />
+      <input value={value} readOnly={!onChange} onChange={onChange ? (event) => onChange(event.target.value) : undefined} placeholder={placeholder ? vi(placeholder) : undefined} />
     </label>
   );
 }
@@ -829,7 +839,7 @@ export function DispatchSimulationPreview({ onCreate, definitions, loading, erro
   </section>;
 }
 
-function Library({ saved, onCreate, onOpenDraft, definitions, loading, error }) {
+function Library({ onCreate, onOpen, onRemove, definitions, loading, error }) {
   return (
     <div className="workflows-grid">
       <section className="workflow-panel library-panel">
@@ -837,17 +847,19 @@ function Library({ saved, onCreate, onOpenDraft, definitions, loading, error }) 
         <div className="workflow-list">
           {vi(definitions.map((workflow) => {
             const presentation = workflowPresentation(workflow);
-            return <button className="workflow-card" type="button" key={workflow.workflowId || workflow.code} onClick={onCreate} aria-label={vi(`Mở ${presentation.title}`)}>
-              <span className="workflow-card-icon" aria-hidden="true">{presentation.badge}</span>
-              <span className="workflow-card-copy"><strong>{vi(presentation.title)}</strong><small>{vi(presentation.description)}</small></span>
-              <em className="workflow-card-arrow" aria-hidden="true">→</em>
-            </button>;
+            return <div className="workflow-card" key={workflow.workflowId || workflow.code}>
+              <button className="workflow-card-open" type="button" onClick={() => onOpen(workflow)} aria-label={vi(`Mở ${presentation.title}`)}>
+                <span className="workflow-card-icon" aria-hidden="true">{presentation.badge}</span>
+                <span className="workflow-card-copy"><strong>{vi(presentation.title)}</strong><small>{vi(presentation.description)}</small></span>
+              </button>
+              {workflow.status === 'DRAFT' && <button className="workflow-card-delete" type="button" onClick={() => onRemove(workflow)} aria-label={`Xóa ${presentation.title}`} title="Xóa bản nháp"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 4v5m4-5v5" /></svg></button>}
+            </div>;
           }))}
           {vi(!loading && !definitions.length && <p className="preview-note">{vi(error || 'No workflow definitions returned by the backend.')}</p>)}
         </div>
       </section>
       <aside className="workflow-panel action-panel">
-        {vi(saved ? <><h2>{vi("QUY TRÌNH CỦA TÔI")}</h2><h3>{vi("Quy trình mới")}</h3><p>{vi("Đang thiết kế · Nhiệm vụ mới")}</p><MarButton className="full" onClick={onOpenDraft}>{vi("Tiếp tục chỉnh sửa")}</MarButton><MarButton className="full" variant="subtle" onClick={onCreate}>{vi("+ Tạo quy trình")}</MarButton><h2>{vi("QUY TRÌNH CÓ SẴN")}</h2><p>{vi("Chọn một quy trình để xem cấu hình.")}</p></> : <><h2>{vi("TẠO QUY TRÌNH")}</h2><p>{vi("Tạo quy trình, định nghĩa tác vụ và cấu hình các loại bước.")}</p><MarButton className="full" onClick={onCreate}>{vi("+ Tạo quy trình")}</MarButton><h2>{vi("QUY TRÌNH CÓ SẴN")}</h2><p>{vi("Chọn một quy trình để xem cấu hình.")}</p></>)}
+        <h2>{vi("TẠO QUY TRÌNH")}</h2><p>{vi("Tạo quy trình, thêm tác vụ và lưu bản nháp vào máy chủ.")}</p><MarButton className="full" onClick={onCreate}>{vi("+ Tạo quy trình")}</MarButton><h2>{vi("QUY TRÌNH CÓ SẴN")}</h2><p>{vi("Chọn bản nháp để tiếp tục chỉnh sửa. Chỉ bản nháp mới có thể xóa.")}</p>
       </aside>
     </div>
   );
@@ -1026,33 +1038,145 @@ function StepConfigPanel({ step, onChange, onDone }) {
   return <section className="workflow-panel editor-detail step-config-panel"><button className="config-back" onClick={onDone}>{vi("← Back to task")}</button><span className="modal-kicker">{vi("STEP CONFIGURATION")}</span><h2>{vi(step.type)}</h2><p>{vi(stepTypeCopy[step.type][1])}</p><div className="inline-config-fields">{vi(stepFields[step.type].map((field) => <label key={field}>{vi(field)}<input placeholder={vi(`Enter ${field}`)} value={step.values[field]} onChange={(event) => onChange({ ...step, values: { ...step.values, [field]: event.target.value } })} /></label>))}</div><button className="inline-config-save" onClick={onDone}>{vi("✓ Done · Back to task")}</button></section>;
 }
 
-function Editor({ setMode, setSaved }) {
-  const [tasks, setTasks] = useState([]);
+function Editor({ initialDetail, onSaved, onCancel }) {
+  const workflow = initialDetail?.workflow;
+  const [name, setName] = useState(workflow?.workflowName ?? '');
+  const [description, setDescription] = useState(workflow?.description ?? '');
+  const [code] = useState(() => workflow?.workflowCode ?? newWorkflowCode());
+  const [workflowId, setWorkflowId] = useState(workflow?.workflowId ?? null);
+  const [tasks, setTasks] = useState(() => editorTasks(initialDetail));
   const [activeTask, setActiveTask] = useState(null);
   const [showTypes, setShowTypes] = useState(false);
-  const [renameTask, setRenameTask] = useState(null);
-  const [renameValue, setRenameValue] = useState('');
   const [configStep, setConfigStep] = useState(null);
-  const taskClickTimer = useRef(null);
-  const addTask = () => { const task = { id: crypto.randomUUID(), name: `Task ${tasks.length + 1}`, steps: [] }; setTasks((value) => [...value, task]); };
-  const startRename = (task) => { setRenameTask(task); setRenameValue(task.name); };
-  const saveRename = () => { if (renameValue.trim()) setTasks((value) => value.map((item) => item.id === renameTask.id ? { ...item, name: renameValue.trim() } : item)); setRenameTask(null); };
-  const addStep = (type) => { const step = { id: crypto.randomUUID(), type, values: Object.fromEntries(stepFields[type].map((field) => [field, ''])) }; setTasks((value) => value.map((task) => task.id === activeTask ? { ...task, steps: [...task.steps, step] } : task)); setShowTypes(false); setConfigStep(step); };
-  const updateConfigStep = (nextStep) => { setConfigStep(nextStep); setTasks((value) => value.map((task) => task.id === activeTask ? { ...task, steps: task.steps.map((step) => step.id === nextStep.id ? nextStep : step) } : task)); };
+  const [deletedTasks, setDeletedTasks] = useState([]);
+  const [deletedSteps, setDeletedSteps] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const selected = tasks.find((task) => task.id === activeTask);
-  const openTask = (task) => { taskClickTimer.current = window.setTimeout(() => { setActiveTask(task.id); setShowTypes(true); }, 220); };
-  const editTask = (task) => { window.clearTimeout(taskClickTimer.current); startRename(task); };
-  return <><div className="workflow-editor-grid"><section className="workflow-panel editor-side"><h2>{vi("WORKFLOW")}</h2><Field label="Name" value="New workflow" /><Field label="Description" value="Add a description..." /><div className="task-heading"><h2>{vi("TASKS · ")}{vi(tasks.length)}</h2><button type="button" onClick={addTask}>{vi("+")}</button></div>{vi(tasks.length === 0 && <p className="task-empty-note">{vi("No tasks yet. Click + to create Task 1.")}</p>)}{vi(tasks.map((task) => <button className={activeTask === task.id ? 'editor-side-button active' : 'editor-side-button'} type="button" key={task.id} onClick={() => openTask(task)} onDoubleClick={() => editTask(task)}>{vi(task.name)}<small>{vi(task.steps.length ? `${task.steps.length} steps` : 'No steps yet')}</small></button>))}</section>{vi(configStep ? <StepConfigPanel step={configStep} onChange={updateConfigStep} onDone={() => setConfigStep(null)} /> : <section className="workflow-panel editor-detail workflow-steps-panel"><span className="modal-kicker">{vi("WORKFLOW STEPS")}</span><h2>{vi(selected ? selected.name : 'Select a task')}</h2>{vi(selected ? <><p>{vi("Choose a step to edit its fields.")}</p><div className="step-table"><div className="step-table-head"><span>{vi("#")}</span><span>{vi("STEP TYPE")}</span><span>{vi("STATUS")}</span></div>{vi(selected.steps.length ? selected.steps.map((step, index) => <button className="step-table-row" key={step.id} onClick={() => setConfigStep(step)}><span>{vi(String(index + 1).padStart(2, '0'))}</span><b>{vi(step.type)}</b><em>{vi(Object.values(step.values).some(Boolean) ? 'Configured' : 'Needs setup')}</em></button>) : <div className="step-empty-state">{vi("Click the task again to open the Step Type library.")}</div>)}</div></> : <SelectTaskPanel />)}</section>)}</div>{showTypes && <div className="type-modal" onClick={() => setShowTypes(false)}><div className="type-modal-card" onClick={(event) => event.stopPropagation()}><header><div><span className="modal-kicker">{vi("MEDIASSIST ACTION LIBRARY")}</span><h2>{vi("Add a step to the workflow")}</h2><p>{vi("Choose an action to add to the open task.")}</p></div></header><div>{vi(stepTypes.map((type) => <button key={type} onClick={() => addStep(type)}><i>{vi(stepTypeCopy[type][0])}</i><span><small>{vi(type)}</small><b>{vi(type.replace('_', ' '))}</b><em>{vi(stepTypeCopy[type][1])}</em></span><strong>{vi("＋")}</strong></button>))}</div></div></div>}{renameTask && <div className="rename-backdrop" onClick={() => setRenameTask(null)}><form className="rename-dialog" onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); saveRename(); }}><span className="rename-icon">{vi("✎")}</span><h2>{vi("Rename task")}</h2><p>{vi("Use a clear name to make the workflow easier to follow.")}</p><label>{vi("Task name")}<input autoFocus value={renameValue} onChange={(event) => setRenameValue(event.target.value)} /></label><footer><button type="button" onClick={() => setRenameTask(null)}>{vi("Cancel")}</button><button type="submit">{vi("Save name")}</button></footer></form></div>}<footer className="workflow-actions"><MarButton className="create" onClick={() => { setSaved(true); setMode('library'); }}>{vi("Lưu quy trình")}</MarButton></footer></>;
+
+  const addTask = () => {
+    const id = crypto.randomUUID();
+    const task = { id, code: `TASK_${id.replaceAll('-', '').slice(0, 12).toUpperCase()}`, name: `Tác vụ ${tasks.length + 1}`, steps: [] };
+    setTasks((current) => [...current, task]);
+    setActiveTask(id);
+  };
+  const removeTask = (task) => {
+    if (!window.confirm(`Xóa tác vụ “${task.name}” và các bước của nó?`)) return;
+    setDeletedSteps((current) => [...current, ...task.steps.filter((step) => step.stepId).map((step) => step.stepId)]);
+    if (task.taskId) setDeletedTasks((current) => [...current, task.taskId]);
+    setTasks((current) => current.filter((item) => item.id !== task.id));
+    if (activeTask === task.id) setActiveTask(null);
+    setConfigStep(null);
+  };
+  const addStep = (type) => {
+    const id = crypto.randomUUID();
+    const step = { id, code: `STEP_${id.replaceAll('-', '').slice(0, 12).toUpperCase()}`, type, values: Object.fromEntries(stepFields[type].map((field) => [field, ''])) };
+    setTasks((current) => current.map((task) => task.id === activeTask ? { ...task, steps: [...task.steps, step] } : task));
+    setShowTypes(false);
+    setConfigStep(step);
+  };
+  const updateConfigStep = (nextStep) => {
+    setConfigStep(nextStep);
+    setTasks((current) => current.map((task) => task.id === activeTask ? { ...task, steps: task.steps.map((step) => step.id === nextStep.id ? nextStep : step) } : task));
+  };
+  const removeStep = (step) => {
+    if (step.stepId) setDeletedSteps((current) => [...current, step.stepId]);
+    setTasks((current) => current.map((task) => task.id === activeTask ? { ...task, steps: task.steps.filter((item) => item.id !== step.id) } : task));
+    if (configStep?.id === step.id) setConfigStep(null);
+  };
+  const save = async () => {
+    if (saving) return;
+    if (!name.trim()) { setError('Nhập tên quy trình trước khi lưu.'); return; }
+    if (tasks.some((task) => !task.name.trim())) { setError('Mỗi tác vụ cần có tên.'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      const body = workflowPayload({ code, versionNo: workflow?.versionNo ?? 1, name, description, source: workflow });
+      const savedWorkflow = workflowId ? await workflowApi.update(workflowId, body) : await workflowApi.create(body);
+      const id = savedWorkflow.workflowId;
+      setWorkflowId(id);
+
+      for (const stepId of deletedSteps) {
+        await workflowApi.deleteStep(id, stepId);
+        setDeletedSteps((current) => current.filter((item) => item !== stepId));
+      }
+      for (const taskId of deletedTasks) {
+        await workflowApi.deleteTask(id, taskId);
+        setDeletedTasks((current) => current.filter((item) => item !== taskId));
+      }
+
+      let nextTaskSequence = Math.max(0, ...tasks.map((task) => task.sequenceNo ?? 0)) + 1;
+      let nextStepSequence = Math.max(0, ...tasks.flatMap((task) => task.steps.map((step) => step.sequenceNo ?? 0))) + 1;
+      for (const task of tasks) {
+        const taskBody = taskPayload(task, task.sequenceNo ?? nextTaskSequence++);
+        const savedTask = task.taskId
+          ? await workflowApi.updateTask(id, task.taskId, taskBody)
+          : await workflowApi.addTask(id, taskBody);
+        setTasks((current) => current.map((item) => item.id === task.id ? { ...item, taskId: savedTask.taskId, sequenceNo: savedTask.sequenceNo } : item));
+        for (const step of task.steps) {
+          const stepBody = stepPayload(step, savedTask.taskId, step.sequenceNo ?? nextStepSequence++);
+          const savedStep = step.stepId
+            ? await workflowApi.updateStep(id, step.stepId, stepBody)
+            : await workflowApi.addStep(id, stepBody);
+          setTasks((current) => current.map((item) => item.id === task.id ? {
+            ...item, steps: item.steps.map((part) => part.id === step.id ? { ...part, stepId: savedStep.stepId, sequenceNo: savedStep.sequenceNo } : part),
+          } : item));
+        }
+      }
+      await onSaved();
+    } catch (cause) {
+      setError(cause?.message || 'Không thể lưu quy trình. Vui lòng thử lại.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return <>
+    <div className="workflow-editor-grid">
+      <section className="workflow-panel editor-side">
+        <h2>Quy trình</h2>
+        <Field label="Tên quy trình" value={name} onChange={setName} placeholder="Nhập tên quy trình" />
+        <Field label="Mô tả" value={description} onChange={setDescription} placeholder="Mô tả ngắn" />
+        <div className="task-heading"><h2>Tác vụ · {tasks.length}</h2><button type="button" onClick={addTask} aria-label="Thêm tác vụ">+</button></div>
+        {tasks.length === 0 && <p className="task-empty-note">Chưa có tác vụ. Bấm + để thêm.</p>}
+        {tasks.map((task) => <div className="editor-task-item" key={task.id}>
+          <button className={activeTask === task.id ? 'editor-side-button active' : 'editor-side-button'} type="button" onClick={() => { setActiveTask(task.id); setConfigStep(null); }}>{task.name}<small>{task.steps.length} bước</small></button>
+          <button className="editor-delete-button" type="button" onClick={() => removeTask(task)} aria-label={`Xóa ${task.name}`}>×</button>
+        </div>)}
+      </section>
+      {configStep ? <StepConfigPanel step={configStep} onChange={updateConfigStep} onDone={() => setConfigStep(null)} /> : <section className="workflow-panel editor-detail workflow-steps-panel">
+        <span className="modal-kicker">CÁC BƯỚC QUY TRÌNH</span>
+        <h2>{selected?.name || 'Chọn tác vụ'}</h2>
+        {selected ? <><Field label="Tên tác vụ" value={selected.name} onChange={(value) => setTasks((current) => current.map((task) => task.id === selected.id ? { ...task, name: value } : task))} placeholder="Nhập tên tác vụ" /><p>Chọn bước để cấu hình hoặc thêm bước mới.</p><div className="step-table"><div className="step-table-head"><span>#</span><span>LOẠI BƯỚC</span><span>TRẠNG THÁI</span></div>{selected.steps.length ? selected.steps.map((step, index) => <div className="editor-step-item" key={step.id}><button className="step-table-row" type="button" onClick={() => setConfigStep(step)}><span>{String(index + 1).padStart(2, '0')}</span><b>{step.type}</b><em>{Object.values(step.values).some(Boolean) ? 'Đã cấu hình' : 'Chưa cấu hình'}</em></button><button className="editor-delete-button" type="button" onClick={() => removeStep(step)} aria-label={`Xóa bước ${index + 1}`}>×</button></div>) : <div className="step-empty-state">Chưa có bước nào.</div>}</div><MarButton variant="subtle" onClick={() => setShowTypes(true)}>+ Thêm bước</MarButton></> : <SelectTaskPanel />}
+      </section>}
+    </div>
+    {showTypes && <div className="type-modal" onClick={() => setShowTypes(false)}><div className="type-modal-card" onClick={(event) => event.stopPropagation()}><header><div><span className="modal-kicker">THƯ VIỆN HÀNH ĐỘNG</span><h2>Thêm bước vào tác vụ</h2><p>Chọn loại bước cần cấu hình.</p></div><button className="type-modal-close" type="button" onClick={() => setShowTypes(false)} aria-label="Đóng">×</button></header><div>{stepTypes.map((type) => <button type="button" key={type} onClick={() => addStep(type)}><i>{stepTypeCopy[type][0]}</i><span><small>{type}</small><b>{type.replaceAll('_', ' ')}</b><em>{stepTypeCopy[type][1]}</em></span><strong>＋</strong></button>)}</div></div></div>}
+    <footer className="workflow-actions"><MarButton className="create" onClick={save} disabled={saving}>{saving ? 'Đang lưu…' : 'Lưu quy trình'}</MarButton><MarButton variant="subtle" onClick={onCancel} disabled={saving}>Quay lại</MarButton>{error && <p role="alert" className="workflow-save-error">{error}</p>}</footer>
+  </>;
 }
 
 export default function WorkflowsPage() {
   const [mode, setMode] = useState('library');
-  const [screen, setScreen] = useState('create');
-  const [saved, setSaved] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [editorKey, setEditorKey] = useState(0);
+  const [pageMessage, setPageMessage] = useState('');
   const [definitions, setDefinitions] = useState([]);
   const [definitionError, setDefinitionError] = useState('');
   const [definitionsLoading, setDefinitionsLoading] = useState(true);
   const creating = mode === 'create';
+
+  const loadDefinitions = async () => {
+    setDefinitionsLoading(true);
+    try {
+      const page = await workflowApi.list({ page: 0, size: 100 });
+      setDefinitions(latestWorkflowVersions(Array.isArray(page) ? page : page?.content ?? []));
+      setDefinitionError('');
+    } catch (error) {
+      setDefinitionError(error.message || 'Không tải được danh sách quy trình.');
+    } finally {
+      setDefinitionsLoading(false);
+    }
+  };
 
   useEffect(() => {
     let current = true;
@@ -1066,26 +1190,55 @@ export default function WorkflowsPage() {
   }, []);
 
   const openCreate = () => {
+    setEditing(null);
+    setEditorKey((key) => key + 1);
+    setPageMessage('');
     setMode('create');
-    setScreen('create');
+  };
+  const openExisting = async (definition) => {
+    if (!['DRAFT', 'VALIDATED'].includes(definition.status)) {
+      setPageMessage('Quy trình đã xuất bản không thể sửa trực tiếp. Hãy tạo bản nháp mới.');
+      return;
+    }
+    try {
+      const detail = await workflowApi.get(definition.workflowId);
+      setEditing(detail);
+      setEditorKey((key) => key + 1);
+      setPageMessage('');
+      setMode('create');
+    } catch (error) { setPageMessage(error.message || 'Không mở được quy trình.'); }
+  };
+  const removeDefinition = async (definition) => {
+    if (!window.confirm(`Xóa bản nháp “${definition.workflowName}”?`)) return;
+    try {
+      await workflowApi.remove(definition.workflowId);
+      setPageMessage('Đã xóa bản nháp.');
+      await loadDefinitions();
+    } catch (error) { setPageMessage(error.message || 'Không xóa được bản nháp.'); }
+  };
+  const afterSave = async () => {
+    await loadDefinitions();
+    setPageMessage('Đã lưu quy trình vào máy chủ.');
+    setMode('library');
   };
 
   return (
-    <div className="workflows-screen">
+    <div className="workflows-screen workflow-page">
       <Sidebar />
       <main className="workflows-main">
         <header className="workflows-header">
           <h1>{vi(creating ? 'Create Workflow' : 'Workflows')}</h1>
           <Tabs />
           <p className="preview-note">
-            {vi(creating ? 'Tạo quy trình từ các tác vụ, hoặc bắt đầu với một quy trình có sẵn.' : saved ? 'Đã lưu quy trình. Bạn có thể tiếp tục chỉnh sửa hoặc tạo quy trình khác.' : 'Đặc tả 1.0 · bản xem trước có thể chỉnh sửa')}
+            {vi(creating ? 'Đặt tên, thêm tác vụ và lưu bản nháp quy trình.' : 'Chọn bản nháp để chỉnh sửa hoặc tạo quy trình mới.')}
           </p>
+          {pageMessage && <p className="preview-note" role="status">{pageMessage}</p>}
         </header>
 
         {vi(creating ? (
-          <Editor setMode={setMode} setSaved={setSaved} />
+          <Editor key={editorKey} initialDetail={editing} onSaved={afterSave} onCancel={() => { setMode('library'); loadDefinitions(); }} />
         ) : (
-          <Library saved={saved} onCreate={openCreate} onOpenDraft={openCreate} definitions={definitions} loading={definitionsLoading} error={definitionError} />
+          <Library onCreate={openCreate} onOpen={openExisting} onRemove={removeDefinition} definitions={definitions} loading={definitionsLoading} error={definitionError} />
         ))}
       </main>
     </div>
