@@ -17,6 +17,7 @@ try {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [], totalElements: 0 }) });
   });
   await page.route('**/api/v1/auth/login', async route => {
+    assert.ok(route.request().url().startsWith('http://localhost:8080/api/v1/auth/login'), 'FE should use the local backend');
     requests.push(route.request().postDataJSON());
     await new Promise(resolve => setTimeout(resolve, 150));
     if (acceptLogin) {
@@ -48,7 +49,27 @@ try {
   await page.goto('http://127.0.0.1:5173/register');
   await page.getByText('Tài khoản MediAssistRover được quản trị viên cấp.', { exact: false }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'Tạo tài khoản' }).count(), 0);
-  console.log('PASS: login sends username once, handles 401 and success, and account request does not claim to create an account.');
+
+  const demoPage = await browser.newPage();
+  const demoRequests = [];
+  await demoPage.route('**/api/v1/**', async route => {
+    demoRequests.push(route.request().url());
+    return route.abort();
+  });
+  await demoPage.goto('http://127.0.0.1:5173/login');
+  await demoPage.getByLabel('Tên đăng nhập').fill('demo');
+  await demoPage.getByLabel('Mật khẩu').fill('demo123');
+  assert.equal(await demoPage.getByLabel('Tên đăng nhập').inputValue(), 'demo');
+  await demoPage.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await demoPage.waitForURL('**/admin');
+  assert.equal(await demoPage.getByText('Chế độ demo · không kết nối BE').count(), 0);
+  assert.equal(await demoPage.evaluate(() => JSON.parse(sessionStorage.getItem('mediassist-rover.session')).mode), 'demo');
+  await demoPage.waitForTimeout(200);
+  assert.deepEqual(demoRequests, [], 'Demo mode must not call the backend');
+  await demoPage.locator('.logout-button').click();
+  await demoPage.waitForURL('http://127.0.0.1:5173/');
+  assert.deepEqual(demoRequests, [], 'Demo logout must not call the backend');
+  console.log('PASS: API login handles 401/success; demo login and logout never call the backend.');
 } finally {
   await browser.close();
 }

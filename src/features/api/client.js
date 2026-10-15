@@ -1,6 +1,6 @@
 import { clearSession, getRefreshToken, getSession, updateTokens } from '../auth/session.js';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'https://bemar-production.up.railway.app').replace(/\/$/, '');
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080').replace(/\/$/, '');
 
 export class ApiError extends Error {
   constructor(message, status, body) {
@@ -42,6 +42,19 @@ async function refreshAccessToken() {
 
 export async function apiRequest(path, { method = 'GET', body, headers = {}, skipAuth = false, retry = true } = {}) {
   const session = getSession();
+  if (session?.mode === 'demo' && !skipAuth) {
+    if (method !== 'GET' || path.includes('/export.')) {
+      throw new ApiError('Tài khoản này không thể thực hiện thao tác trên máy chủ.', 403);
+    }
+    if (path.startsWith('/api/v1/admin/reports/overview')) {
+      return {
+        robotsByStatus: {}, succeededJobs: 0, terminalJobs: 0,
+        jobCompletionRatePercent: 0, openAlerts: 0, activeEmergencyIncidents: 0,
+      };
+    }
+    if (path.startsWith('/api/v1/admin/workflows/step-types')) return [];
+    return { content: [], totalElements: 0, totalPages: 0, number: 0, size: 0 };
+  }
   const requestHeaders = { Accept: 'application/json', ...headers };
   if (body !== undefined) requestHeaders['Content-Type'] = 'application/json';
   if (!skipAuth && session?.tokens?.accessToken) requestHeaders.Authorization = `Bearer ${session.tokens.accessToken}`;

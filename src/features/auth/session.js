@@ -13,6 +13,14 @@ export function createSession({ account = null, tokens }) {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({ account, tokens }));
 }
 
+export function createDemoSession(account) {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ mode: 'demo', account }));
+}
+
+export function isDemoSession() {
+  return getSession()?.mode === 'demo';
+}
+
 export function updateTokens(tokens) {
   const session = getSession();
   if (session) createSession({ account: session.account, tokens: { ...session.tokens, ...tokens } });
@@ -28,7 +36,8 @@ export function clearSession() {
 }
 
 export function hasSession() {
-  return Boolean(getSession()?.tokens?.accessToken);
+  const session = getSession();
+  return session?.mode === 'demo' || Boolean(session?.tokens?.accessToken);
 }
 
 export function getRefreshToken() {

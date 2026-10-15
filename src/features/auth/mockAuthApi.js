@@ -1,16 +1,9 @@
-const ADMIN_ACCOUNT = {
-  email: 'admin@gmail.com',
-  password: '123456',
-  name: 'MediAssistRover Admin',
-  role: 'admin',
-};
+export const DEMO_USERNAME = 'demo';
+export const DEMO_PASSWORD = 'demo123';
 
-export async function loginWithMockApi({ email, password }) {
-  await new Promise((resolve) => window.setTimeout(resolve, 350));
-
-  if (email.trim().toLowerCase() !== ADMIN_ACCOUNT.email || password !== ADMIN_ACCOUNT.password) {
-    throw new Error('INVALID_CREDENTIALS');
+export function loginWithMockApi({ username, password }) {
+  if (username.trim().toLowerCase() !== DEMO_USERNAME || password !== DEMO_PASSWORD) {
+    throw new Error('Tên đăng nhập hoặc mật khẩu không đúng.');
   }
-
-  return { email: ADMIN_ACCOUNT.email, name: ADMIN_ACCOUNT.name, role: ADMIN_ACCOUNT.role };
+  return { username: DEMO_USERNAME, fullName: 'Người dùng', role: 'DEMO' };
 }
