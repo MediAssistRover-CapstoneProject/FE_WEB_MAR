@@ -1,6 +1,6 @@
 import { clearSession, getRefreshToken, getSession, updateTokens } from '../auth/session.js';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080').replace(/\/$/, '');
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'https://bemar-production.up.railway.app').replace(/\/$/, '');
 
 export class ApiError extends Error {
   constructor(message, status, body) {
