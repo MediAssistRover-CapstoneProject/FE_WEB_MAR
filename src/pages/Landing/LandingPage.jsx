@@ -55,7 +55,7 @@ export default function LandingPage({ onLogin, onRegister }) {
         <button onClick={() => scrollTo('features')}>{vi("Features")}</button>
         <button onClick={() => scrollTo('how-it-works')}>{vi("How it works")}</button>
         <SecondaryButton onClick={onLogin}>{vi("Log in")}</SecondaryButton>
-        <PrimaryButton onClick={onRegister}>{vi("Get started")}</PrimaryButton>
+        <PrimaryButton onClick={onRegister}>Yêu cầu tài khoản</PrimaryButton>
       </nav>
     </header>
 
@@ -66,7 +66,7 @@ export default function LandingPage({ onLogin, onRegister }) {
           <h1>{vi("More time for")}<br /><em>{vi("human care.")}</em></h1>
           <p>{vi("MediAssistRover quietly takes care of the little journeys, so your team can stay present for the moments that matter.")}</p>
           <div className="landing-actions">
-            <PrimaryButton onClick={onRegister}>{vi("Get started")}</PrimaryButton>
+            <PrimaryButton onClick={onRegister}>Yêu cầu tài khoản</PrimaryButton>
             <SecondaryButton onClick={onLogin}>{vi("Log in to workspace")}</SecondaryButton>
           </div>
           <div className="landing-trust"><span><b>{vi("●")}</b>{vi(" Live across your care floor")}</span><span><b>{vi("24/7")}</b>{vi(" support for your team")}</span></div>
@@ -90,14 +90,14 @@ export default function LandingPage({ onLogin, onRegister }) {
 
       <section className="landing-cta" data-node-id="497:31755">
         <div><h2>{vi("A better flow starts here.")}</h2><p>{vi("Give your team a workspace that moves with them.")}</p></div>
-        <SecondaryButton onClick={onRegister}>{vi("Create an account")}</SecondaryButton>
+        <SecondaryButton onClick={onRegister}>Yêu cầu tài khoản</SecondaryButton>
       </section>
     </main>
 
     <footer className="landing-footer" data-node-id="497:31761">
       <div className="landing-footer-main">
         <div className="landing-footer-brand"><strong className="landing-logo"><span>{vi("MediAssistRover")}</span><small>{vi("HOSPITAL SERVICE ROBOTICS")}</small></strong><p>{vi("A calmer, more connected way to care.")}</p><button className="landing-footer-login" onClick={onLogin}>{vi("Log in to your workspace →")}</button></div>
-        <div className="landing-footer-links"><div><b>{vi("Explore")}</b><button onClick={() => scrollTo('features')}>{vi("What we do")}</button><button onClick={() => scrollTo('how-it-works')}>{vi("How it works")}</button></div><div><b>{vi("Workspace")}</b><button onClick={onLogin}>{vi("Log in")}</button><button onClick={onRegister}>{vi("Create an account")}</button></div><div><b>{vi("Built for care teams")}</b><span>{vi("Purposeful robotics.")}<br />{vi("Human-centered care.")}</span></div></div>
+        <div className="landing-footer-links"><div><b>{vi("Explore")}</b><button onClick={() => scrollTo('features')}>{vi("What we do")}</button><button onClick={() => scrollTo('how-it-works')}>{vi("How it works")}</button></div><div><b>{vi("Workspace")}</b><button onClick={onLogin}>{vi("Log in")}</button><button onClick={onRegister}>Yêu cầu tài khoản</button></div><div><b>{vi("Built for care teams")}</b><span>{vi("Purposeful robotics.")}<br />{vi("Human-centered care.")}</span></div></div>
       </div>
       <div className="landing-footer-bottom"><span>{vi("© 2026 MediAssistRover. All rights reserved.")}</span><span>{vi("Private & secure hospital workspace")}</span></div>
     </footer>

@@ -6,8 +6,8 @@ injectStyles('mediassist-style-pages-Auth-components-AuthUi-jsx', inlineStyles);
 
 import authIllustration from '../../../assets/images/mediassist-auth.png';
 
-export function AuthButton({ secondary, children, onClick }) {
-  return <button type="button" className={secondary ? 'auth-button auth-button--secondary' : 'auth-button'} onClick={onClick}>{vi(children)}</button>;
+export function AuthButton({ secondary, children, onClick, disabled = false, type = 'button' }) {
+  return <button type={type} disabled={disabled} className={secondary ? 'auth-button auth-button--secondary' : 'auth-button'} onClick={onClick}>{vi(children)}</button>;
 }
 
 export function AuthField({ label, type, placeholder, value, onChange }) {

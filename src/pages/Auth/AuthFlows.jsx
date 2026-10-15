@@ -4,49 +4,43 @@ const inlineStyles = String.raw`.auth-flow{--sky:#1687ed;--deep:#0863ba;--ink:#1
 `;
 injectStyles('mediassist-style-pages-Auth-AuthFlows-jsx', inlineStyles);
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { AuthButton, AuthField, AuthShell } from './components/AuthUi.jsx';
 
-const screenCopy = {
-  Login: { title: 'Welcome back', description: 'Sign in with your username or work email.', fields: [['Username or work email', 'text', 'admin or name@hospital.org'], ['Password', 'password', '••••••••••••']], action: 'Log in', footer: 'New to MediAssistRover? Create an account' },
-  Register: { title: 'Create your account', description: 'Use your work email to get started.', fields: [['Full name', 'text', 'Your full name'], ['Work email', 'email', 'name@hospital.org'], ['Password', 'password', 'Create a password'], ['Confirm password', 'password', 'Re-enter your password']], hint: 'Use at least 12 characters with a mix of letters, numbers and symbols.', action: 'Create account', footer: 'Already have an account? Log in' },
-  Forgot: { title: 'Forgot your password?', description: 'Enter your work email. If an account exists, we will send a password reset link.', fields: [['Work email', 'email', 'name@hospital.org']], action: 'Send reset link', footer: 'Back to login' },
-  Reset: { title: 'Set a new password', description: 'Choose a new password for your workspace account.', fields: [['New password', 'password', 'Create a new password'], ['Confirm new password', 'password', 'Re-enter your new password']], hint: 'Use at least 12 characters with a mix of letters, numbers and symbols.', action: 'Update password', footer: 'Back to login' },
-  Verify: { title: 'Check your email', description: 'We sent a verification link to your work email. Open the link to verify your email address.', message: 'After verification, return here to sign in.', action: 'Back to login', secondary: 'Resend verification email', footer: 'Use a different email' },
-  Sent: { title: 'Check your inbox', description: 'If an account exists for your work email, you will receive a password reset link shortly.', message: 'Check your spam folder if the email has not arrived.', secondary: 'Resend reset email', footer: 'Back to login' },
-  Updated: { title: 'Password updated', description: 'Your password has been changed. You can now sign in with your new password.', message: 'Account recovery complete', success: true, action: 'Return to login' },
-  Expired: { title: 'This link has expired', description: 'This reset link has expired or has already been used. Request a new link to continue.', action: 'Request a new link', footer: 'Back to login' },
-  Error: { title: 'Welcome back', description: 'Sign in with your username or work email.', fields: [['Username or work email', 'text', 'admin or name@hospital.org'], ['Password', 'password', '••••••••••••']], action: 'Try again', footer: 'Create an account' },
-};
-
-export default function AuthFlows({ initial = 'Login', onHome, onAuthenticated }) {
-  const [screen, setScreen] = useState(initial);
-  const [values, setValues] = useState({});
-  const [resendNotice, setResendNotice] = useState('');
+export default function AuthFlows({ onHome, onAuthenticated }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState('');
-  const info = screenCopy[screen];
-  const isLogin = screen === 'Login' || screen === 'Error';
-  const onSubmit = async () => {
-    if (isLogin) {
-      const identifier = values['Username or work email']?.trim();
-      if (!identifier || !values.Password?.trim()) { setLoginError('Enter your username or work email and password.'); setScreen('Error'); return; }
-      setIsSubmitting(true);
-      try {
-        setLoginError('');
-        await onAuthenticated?.({ email: identifier, password: values.Password });
-      } catch (error) {
-        setLoginError(error.message || 'Unable to sign in. Check your credentials and the API connection, then try again.');
-        setScreen('Error');
-      } finally {
-        setIsSubmitting(false);
-      }
+  const submitting = useRef(false);
+  const onSubmit = async (event) => {
+    event.preventDefault();
+    if (submitting.current) return;
+    const identifier = username.trim();
+    if (!identifier || !password) {
+      setLoginError('Nhập tên đăng nhập và mật khẩu.');
       return;
     }
-    if (screen === 'Register') setScreen('Verify'); else if (screen === 'Forgot') setScreen('Sent'); else if (screen === 'Reset') setScreen('Updated'); else if (screen === 'Expired') setScreen('Forgot'); else setScreen('Login');
+    submitting.current = true;
+    setIsSubmitting(true);
+    setLoginError('');
+    try {
+      await onAuthenticated({ username: identifier, password });
+    } catch (error) {
+      setLoginError(error?.message || 'Không thể đăng nhập. Hãy thử lại sau.');
+    } finally {
+      submitting.current = false;
+      setIsSubmitting(false);
+    }
   };
-  const footerAction = () => { if (isLogin) setScreen('Register'); else setScreen('Login'); };
-  const workEmail = values['Work email']?.trim();
-  const message = screen === 'Verify' && workEmail ? `We sent a verification link to ${workEmail}. Open the link to verify your email address.` : screen === 'Sent' && workEmail ? `If an account exists for ${workEmail}, you will receive a password reset link shortly.` : info.description;
-  return <AuthShell><main className="auth-form" data-auth-screen={screen}><button className="auth-home" onClick={onHome}>{vi("← Home")}</button><h2>{vi(info.title)}</h2><p className="auth-description">{vi(message)}</p>{vi(info.fields?.map(([label, type, placeholder]) => <AuthField key={label} label={label} type={type} placeholder={vi(placeholder)} value={values[label] ?? ''} onChange={(value) => setValues((current) => ({ ...current, [label]: value }))} />))}{vi((loginError || info.error) && <p className="auth-error">{vi(loginError || info.error)}</p>)}{vi(isLogin ? <button className="auth-link" onClick={() => setScreen('Forgot')}>{vi("Forgot password?")}</button> : null)}{vi(info.message && <p className={info.success ? 'auth-success' : 'auth-message'}>{vi(info.message)}</p>)}{vi(resendNotice && <p className="auth-success">{vi(resendNotice)}</p>)}{vi(info.hint && <p className="auth-hint">{vi(info.hint)}</p>)}{vi(info.action && <AuthButton onClick={onSubmit}>{vi(isSubmitting ? 'Signing in…' : info.action)}</AuthButton>)}{vi(info.secondary && <AuthButton secondary onClick={() => setResendNotice(`A new email has been requested for ${workEmail || 'your work email'}.`)}> {vi(info.secondary)}</AuthButton>)}{vi(info.footer && <button className="auth-link auth-footer-link" onClick={footerAction}>{vi(info.footer)}</button>)}</main></AuthShell>;
+  return <AuthShell><form className="auth-form" onSubmit={onSubmit}>
+    <button type="button" className="auth-home" onClick={onHome}>{vi('← Home')}</button>
+    <h2>{vi('Welcome back')}</h2>
+    <p className="auth-description">Đăng nhập bằng tên tài khoản được cấp trên hệ thống này.</p>
+    <AuthField label="Tên đăng nhập" type="text" placeholder="Ví dụ: admin" value={username} onChange={value => { setUsername(value); setLoginError(''); }} />
+    <AuthField label="Mật khẩu" type="password" placeholder="Nhập mật khẩu" value={password} onChange={value => { setPassword(value); setLoginError(''); }} />
+    {loginError && <p className="auth-error" role="alert">{vi(loginError)}</p>}
+    <p className="auth-hint">Nếu chưa có tài khoản hoặc quên mật khẩu, liên hệ quản trị viên để được cấp hoặc đặt lại.</p>
+    <AuthButton type="submit" disabled={isSubmitting}>{isSubmitting ? 'Đang đăng nhập…' : 'Đăng nhập'}</AuthButton>
+  </form></AuthShell>;
 }

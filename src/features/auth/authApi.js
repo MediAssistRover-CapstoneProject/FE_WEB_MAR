@@ -4,7 +4,7 @@ export function login(credentials) {
   return apiRequest('/api/v1/auth/login', {
     method: 'POST',
     skipAuth: true,
-    body: { username: credentials.email, password: credentials.password, deviceInfo: navigator.userAgent },
+    body: { username: credentials.username, password: credentials.password, deviceInfo: navigator.userAgent },
   });
 }
 

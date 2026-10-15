@@ -16,5 +16,5 @@ export default function LoginPage() {
     navigate('/admin');
   };
 
-  return <AuthFlows initial="Login" onHome={() => navigate('/')} onAuthenticated={login} />;
+  return <AuthFlows onHome={() => navigate('/')} onAuthenticated={login} />;
 }
