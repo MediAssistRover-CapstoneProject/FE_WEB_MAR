@@ -91,7 +91,7 @@ export default function MapStudioFigma({initialStage='scan'}) {
       }else{
         const radians=(previous.heading||0)*Math.PI/180,distance=driveDirection==='forward'?7:-5;
         const candidate={...previous,x:previous.x+Math.sin(radians)*distance,y:previous.y-Math.cos(radians)*distance};
-        if(freePoint(candidate,18)){robot=candidate;moved=true;}
+        if(freePoint(candidate,6)){robot=candidate;moved=true;}
       }
       if(!moved)return current;
       const trail=current.scan.trail?.length?current.scan.trail:[{x:previous.x,y:previous.y}],last=trail[trail.length-1];

@@ -33,7 +33,7 @@ try {
   await page.getByRole('button',{name:'Bật cảm biến LiDAR',exact:true}).click();
   const robotIcon=page.getByTestId('scan-robot');await robotIcon.waitFor();
   const robotBounds=await robotIcon.evaluate(node=>node.getBBox());
-  assert.ok(robotBounds.width<=22&&robotBounds.height<=32,'Scan robot icon stays compact on the map');
+  assert.ok(robotBounds.width<=16&&robotBounds.height<=24,'Scan robot icon stays compact enough for doorways');
   const forward=page.getByRole('button',{name:'Giữ để robot tiến thẳng',exact:true});
   await forward.hover();await page.mouse.down();await page.waitForTimeout(700);await page.mouse.up();
   await page.getByRole('button',{name:'Tạm dừng cảm biến',exact:true}).click();
