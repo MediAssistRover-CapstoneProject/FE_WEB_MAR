@@ -112,6 +112,26 @@ export default function MapStudioFigma({initialStage='scan'}) {
     document.addEventListener('visibilitychange',stopWhenHidden);
     return()=>{window.removeEventListener('blur',stop);document.removeEventListener('visibilitychange',stopWhenHidden);};
   },[]);
+  useEffect(()=>{
+    const directions={ArrowUp:'forward',ArrowDown:'backward',ArrowLeft:'left',ArrowRight:'right'};
+    const editing=target=>target instanceof HTMLElement && (target.isContentEditable || ['INPUT','TEXTAREA','SELECT'].includes(target.tagName));
+    const keyDown=event=>{
+      const direction=directions[event.key];
+      if(!direction||editing(event.target)||['captured','complete'].includes(draftRef.current.scan.status))return;
+      event.preventDefault();
+      if(event.repeat)return;
+      if(draftRef.current.scan.status!=='running')setDraft(current=>({...current,scan:{...current.scan,status:'running'}}));
+      setCollisionWarning(false);setDriveDirection(direction);
+    };
+    const keyUp=event=>{
+      const direction=directions[event.key];
+      if(!direction||editing(event.target))return;
+      event.preventDefault();setDriveDirection(current=>current===direction?'':current);
+    };
+    window.addEventListener('keydown',keyDown);
+    window.addEventListener('keyup',keyUp);
+    return()=>{window.removeEventListener('keydown',keyDown);window.removeEventListener('keyup',keyUp);};
+  },[]);
   const update=patch=>setDraft(current=>changeDraft(current,typeof patch==='function'?patch(current):patch));
   const cancelTool=()=>{setTool('');setRectangleStart(null);};
   const guard=action=>{if(unsaved){setConfirm({kind:'discard-edit',action});return false;}action();return true;};
@@ -230,7 +250,7 @@ export default function MapStudioFigma({initialStage='scan'}) {
           </Panel>
           <Panel title="Điều khiển robot">
             <div className="ls-drive-panel">
-              <p className="ls-drive-help">Nhấn và giữ nút để di chuyển. Thả chuột hoặc ngón tay để robot tự dừng.</p>
+              <p className="ls-drive-help">Nhấn giữ nút trên màn hình hoặc phím mũi tên để di chuyển. Thả nút/phím để robot tự dừng.</p>
               <div className="ls-drive-pad" role="group" aria-label="Các nút điều khiển hướng robot">
                 <button type="button" disabled={['captured','complete'].includes(draft.scan.status)} className={'ls-drive-key ls-drive-up '+(driveDirection==='forward'?'active':'')} aria-label="Giữ để robot tiến thẳng" aria-pressed={driveDirection==='forward'} {...driveHandlers('forward')}>↑</button>
                 <button type="button" disabled={['captured','complete'].includes(draft.scan.status)} className={'ls-drive-key ls-drive-left '+(driveDirection==='left'?'active':'')} aria-label="Giữ để robot cua trái" aria-pressed={driveDirection==='left'} {...driveHandlers('left')}>←</button>
