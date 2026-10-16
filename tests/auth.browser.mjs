@@ -17,7 +17,7 @@ try {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [], totalElements: 0 }) });
   });
   await page.route('**/api/v1/auth/login', async route => {
-    assert.ok(route.request().url().startsWith('http://localhost:8080/api/v1/auth/login'), 'FE should use the local backend');
+    assert.ok(route.request().url().startsWith('https://bemar-production.up.railway.app/api/v1/auth/login'), 'FE should use the Railway backend');
     requests.push(route.request().postDataJSON());
     await new Promise(resolve => setTimeout(resolve, 150));
     if (acceptLogin) {
