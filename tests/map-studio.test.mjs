@@ -36,6 +36,8 @@ test('the compact scan robot fits through mapped door openings',()=>{
   assert.equal(freePoint({x:318,y:415},6),true);
   assert.equal(freePoint({x:372,y:415},6),true);
   assert.equal(freePoint({x:393,y:415},6),true);
+  assert.equal(freePoint({x:930,y:425},6),true);
+  assert.equal(freePoint({x:970,y:425},6),true);
 });
 test('manual scans reject endpoints outside the recorded LiDAR trail',()=>{
   const d=captured();d.scan.trail=[{x:580,y:330}];
