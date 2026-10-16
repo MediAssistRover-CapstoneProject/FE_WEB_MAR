@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STAGES, createDraft, stageEnabled, loadDraft, STORAGE_KEY, freePoint, zoneError, endpointError, changeDraft, saveMap, mapIssues, exportMap } from '../src/pages/Admin/mapStudioModel.js';
+import { STAGES, createDraft, stageEnabled, loadDraft, STORAGE_KEY, ROBOT_SAFETY_CLEARANCE, driveRobotStep, freePoint, zoneError, endpointError, changeDraft, saveMap, mapIssues, exportMap } from '../src/pages/Admin/mapStudioModel.js';
 import { SCAN_PATH, rayHits } from '../src/pages/Admin/lidarGeometry.js';
 const rectangle=(x,y,w,h)=>[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}];
 const zone=(points,type='NO_STOP')=>({id:'z1',name:'Zone A',type,speed:.3,points});
@@ -38,6 +38,18 @@ test('the compact scan robot fits through mapped door openings',()=>{
   assert.equal(freePoint({x:393,y:415},6),true);
   assert.equal(freePoint({x:930,y:425},6),true);
   assert.equal(freePoint({x:970,y:425},6),true);
+});
+test('robot keeps its safety clearance and reports a blocked drive command',()=>{
+  assert.equal(ROBOT_SAFETY_CLEARANCE,12);
+  for(const point of [{x:552.5,y:230},{x:277.5,y:310},{x:362.5,y:310},{x:857.5,y:310},{x:692.5,y:415},{x:782.5,y:415}]) {
+    assert.equal(freePoint(point,ROBOT_SAFETY_CLEARANCE),true,'safety footprint must still fit through each doorway');
+  }
+  const safe=driveRobotStep({x:800,y:180,heading:0},'forward');
+  assert.equal(safe.moved,true);assert.equal(safe.blocked,false);assert.equal(safe.robot.y,173);
+  const collision=driveRobotStep({x:800,y:170,heading:0},'forward');
+  assert.equal(collision.moved,false);assert.equal(collision.blocked,true);assert.equal(collision.robot.y,170);
+  const turn=driveRobotStep({x:800,y:170,heading:0},'right');
+  assert.equal(turn.moved,true);assert.equal(turn.blocked,false);assert.equal(turn.robot.heading,5);
 });
 test('manual scans reject endpoints outside the recorded LiDAR trail',()=>{
   const d=captured();d.scan.trail=[{x:580,y:330}];

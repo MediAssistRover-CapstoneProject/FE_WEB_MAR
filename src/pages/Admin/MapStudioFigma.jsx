@@ -8,7 +8,7 @@ import { groupsFor } from '../../features/facility/endpointGroups.js';
 import { useNavigate } from 'react-router-dom';
 import { ZoneProperties, EndpointProperties, ZoneTypePicker } from './MapFeatureProperties.jsx';
 import { MAP, SCAN_START } from './lidarGeometry.js';
-import { STAGES, STORAGE_KEY, ZONE_TYPES, ENDPOINT_TYPES, createDraft, loadDraft, changeDraft, removeEndpoint, removeEndpointGroup, stageEnabled, validPoint, freePoint, zoneError, endpointError, polygonArea, mapIssues, saveMap, exportMap } from './mapStudioModel.js';
+import { STAGES, STORAGE_KEY, ZONE_TYPES, ENDPOINT_TYPES, ROBOT_SAFETY_GAP_METERS, createDraft, loadDraft, changeDraft, removeEndpoint, removeEndpointGroup, stageEnabled, validPoint, driveRobotStep, zoneError, endpointError, polygonArea, mapIssues, saveMap, exportMap } from './mapStudioModel.js';
 import liveCamera from '../../assets/images/live-camera.png';
 
 const ROBOT_CAMERA_URL = (import.meta.env.VITE_ROBOT_CAMERA_URL || '').trim();
@@ -35,6 +35,7 @@ const styles = String.raw`
 .ls-map-viewport{position:relative;aspect-ratio:5/3;min-width:0;background:#121416;overflow:hidden}.ls-map-viewport>svg{width:100%;height:100%;position:absolute;inset:0;display:block}.ls-map-foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 15px;background:#1c2229;border-top:1px solid #2b3540;color:#a7b4c2;font-size:10px}.ls-map-foot>span{display:flex;gap:6px;align-items:center}.ls-map-foot i{width:7px;height:7px;border:1px solid #778491;border-radius:1px;display:inline-block;margin-left:5px}
 .ls-layout--scan{grid-template-columns:minmax(0,1fr) minmax(320px,350px)}.ls-camera{position:relative;overflow:hidden;aspect-ratio:16/9;border-radius:9px;background:#0f172a}.ls-camera img{display:block;width:100%;height:100%;object-fit:cover}.ls-camera:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,#0005,transparent 28%,transparent 68%,#0009)}.ls-camera-badge,.ls-camera-label{position:absolute;z-index:1;color:#fff}.ls-camera-badge{top:10px;left:10px;padding:4px 8px;border-radius:999px;background:#0f172acc;font-size:9px;font-weight:800;letter-spacing:.65px}.ls-camera-badge.live:before{content:"";display:inline-block;width:6px;height:6px;margin-right:5px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px #22c55e33}.ls-camera-label{left:11px;right:11px;bottom:9px;display:flex;justify-content:space-between;gap:10px;font-size:10px}.ls-camera-info{display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:var(--ls-muted);font-size:10px}.ls-camera-info b{color:#334155}
 .ls-drive-panel{text-align:center}.ls-drive-pad{display:grid;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(3,50px);justify-content:center;gap:7px;margin:4px auto 12px}.ls-drive-key{display:grid;place-items:center;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;color:#334155;font-size:20px;font-weight:800;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;transition:background .15s,border-color .15s,color .15s,transform .15s}.ls-drive-key:hover{border-color:#60a5fa;background:#eff6ff;color:#2563eb;transform:translateY(-1px)}.ls-drive-key.active{border-color:#2f80ff;background:#2f80ff;color:#fff;box-shadow:0 5px 12px #2f80ff33;transform:translateY(1px)}.ls-drive-key.stop{border-color:#fecaca;background:#fff1f2;color:#be123c;font-size:9px;letter-spacing:.4px}.ls-drive-key.stop.active{border-color:#e11d48;background:#e11d48;color:#fff}.ls-drive-up{grid-column:2}.ls-drive-left{grid-column:1;grid-row:2}.ls-drive-stop{grid-column:2;grid-row:2}.ls-drive-right{grid-column:3;grid-row:2}.ls-drive-down{grid-column:2;grid-row:3}.ls-drive-status{display:flex;align-items:center;justify-content:center;gap:7px;padding:8px 10px;border-radius:7px;background:#f8fafc;color:#64748b;font-size:10px}.ls-drive-status i{width:7px;height:7px;border-radius:50%;background:#94a3b8}.ls-drive-status.moving{color:#1d4ed8;background:#eff6ff}.ls-drive-status.moving i{background:#2f80ff}.ls-drive-help{margin:0 0 9px!important;color:#475569!important}.ls-safety-note{margin-top:10px!important;padding:9px 10px;border-radius:7px;background:#fffbeb;color:#92400e!important;text-align:left}
+.ls-drive-status.collision{color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;font-weight:700}.ls-drive-status.collision i{background:#ef4444;box-shadow:0 0 0 4px #ef444426}
 .ls-notice{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#1e40af;padding:10px 13px;margin-bottom:14px;overflow-wrap:anywhere}.ls-hint{padding:10px 12px;background:#f1f5f9;border-radius:7px;color:#64748b;font-size:11px;margin-top:12px}.ls-toolhint{padding:11px 14px;background:#eaf2ff;border:1px solid #c4dcff;border-radius:8px;color:#1d4ed8;display:flex;justify-content:space-between;align-items:center;gap:10px}.ls-error{font-size:11px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;padding:9px 11px;border-radius:7px;margin-top:12px}
 .ls-stat{display:flex;justify-content:space-between;gap:12px;padding:6px 0;font-size:12px}.ls-stat span{color:var(--ls-muted)}.ls-stat b{text-align:right;overflow-wrap:anywhere}.ls-field{display:grid;gap:5px;font-size:11px;color:#475569;margin:11px 0}.ls-field input,.ls-field select{width:100%;min-width:0;border:1px solid #cbd5e1;border-radius:6px;padding:8px 9px;background:white;color:#172b4d}.ls-field input:focus,.ls-field select:focus{outline:2px solid #93c5fd;outline-offset:1px}.ls-field input[type=range]{padding:0;accent-color:#2f80ff}
 .ls-item-list{display:grid;gap:6px;max-height:225px;overflow:auto}.ls-studio .ls-item{width:100%;display:flex;align-items:center;gap:10px;background:#f8fafc;color:#334155;border:1px solid transparent;border-radius:7px;padding:10px;text-align:left;font-size:12px;overflow-wrap:anywhere}.ls-studio .ls-item.selected{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}.ls-item>i{width:8px;height:8px;border-radius:2px;flex-shrink:0}.ls-item strong,.ls-item small{display:block}.ls-item small{color:var(--ls-muted);font-size:10px;margin-top:2px}.ls-item>span{min-width:0}.ls-confirm{padding:24px;border:1px solid #dce5f0;background:white;border-radius:12px;width:min(440px,calc(100vw - 32px));color:#172b4d;box-shadow:0 18px 60px #0f172a33}.ls-confirm::backdrop{background:#0f172a66}.ls-confirm p{margin:8px 0 18px;color:#64748b}
@@ -64,8 +65,11 @@ export default function MapStudioFigma({initialStage='scan'}) {
   const [tool,setTool]=useState(''),[rectangleStart,setRectangleStart]=useState(null),[hover,setHover]=useState(null);
   const [notice,setNotice]=useState(''),[storageError,setStorageError]=useState(false),[confirm,setConfirm]=useState(null);
   const [driveDirection,setDriveDirection]=useState('');
+  const [collisionWarning,setCollisionWarning]=useState(false);
   const [cameraFailed,setCameraFailed]=useState(false);
+  const draftRef=useRef(draft);
   const confirmRef=useRef(null);
+  draftRef.current=draft;
   const index=STAGES.findIndex(([id])=>id===stage);
   const zoneType=ZONE_TYPES.find(t=>t.id===zone.type);
   const zoneOriginal=draft.zones.find(z=>z.id===zone.id);
@@ -81,28 +85,24 @@ export default function MapStudioFigma({initialStage='scan'}) {
   useEffect(()=>{try{window.localStorage.setItem(STORAGE_KEY,JSON.stringify(draft));window.dispatchEvent(new Event('mediassist-map-saved'));setStorageError(false);}catch{setStorageError(true);}},[draft]);
   useEffect(()=>{
     if(draft.scan.status!=='running'||!driveDirection)return;
-    const timer=setInterval(()=>setDraft(current=>{
-      if(current.scan.status!=='running')return current;
+    const timer=setInterval(()=>{
+      const current=draftRef.current;
+      if(current.scan.status!=='running')return;
       const previous=current.scan.robot||SCAN_START;
-      let robot={...previous},moved=false;
-      if(driveDirection==='left'||driveDirection==='right'){
-        robot.heading=(previous.heading+(driveDirection==='left'?-5:5)+360)%360;
-        moved=true;
-      }else{
-        const radians=(previous.heading||0)*Math.PI/180,distance=driveDirection==='forward'?7:-5;
-        const candidate={...previous,x:previous.x+Math.sin(radians)*distance,y:previous.y-Math.cos(radians)*distance};
-        if(freePoint(candidate,6)){robot=candidate;moved=true;}
-      }
-      if(!moved)return current;
+      const {robot,moved,blocked}=driveRobotStep(previous,driveDirection);
+      if(blocked){setDriveDirection('');setCollisionWarning(true);return;}
+      if(!moved)return;
       const trail=current.scan.trail?.length?current.scan.trail:[{x:previous.x,y:previous.y}],last=trail[trail.length-1];
       const record=Math.hypot(robot.x-last.x,robot.y-last.y)>=14;
       const nextTrail=record?[...trail,{x:robot.x,y:robot.y}]:trail;
       const progress=Math.min(100,Math.round((current.scan.progress+.75)*100)/100);
-      return {...current,scan:{...current.scan,status:'running',progress,robot,trail:nextTrail}};
-    }),80);
+      const next={...current,scan:{...current.scan,status:'running',progress,robot,trail:nextTrail}};
+      draftRef.current=next;setDraft(next);
+    },80);
     return ()=>clearInterval(timer);
   },[draft.scan.status,driveDirection]);
   useEffect(()=>{if(draft.scan.status!=='running'&&driveDirection)setDriveDirection('');},[draft.scan.status,driveDirection]);
+  useEffect(()=>{if(!collisionWarning)return;const timer=setTimeout(()=>setCollisionWarning(false),3500);return()=>clearTimeout(timer);},[collisionWarning]);
   useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(''),5000);return()=>clearTimeout(timer);},[notice]);
   useEffect(()=>{if(confirm)confirmRef.current?.showModal();},[confirm]);
   useEffect(()=>{
@@ -173,12 +173,12 @@ export default function MapStudioFigma({initialStage='scan'}) {
     setDriveDirection('');
   };
   const driveHandlers=direction=>({
-    onPointerDown:event=>{if(draft.scan.status!=='running'||event.pointerType==='mouse'&&event.button!==0)return;event.preventDefault();event.currentTarget.setPointerCapture?.(event.pointerId);setDriveDirection(direction);},
+    onPointerDown:event=>{if(draft.scan.status!=='running'||event.pointerType==='mouse'&&event.button!==0)return;event.preventDefault();event.currentTarget.setPointerCapture?.(event.pointerId);setCollisionWarning(false);setDriveDirection(direction);},
     onPointerUp:stopDrive,
     onPointerCancel:stopDrive,
     onPointerLeave:stopDrive,
     onLostPointerCapture:()=>setDriveDirection(''),
-    onKeyDown:event=>{if(draft.scan.status==='running'&&!event.repeat&&(event.key===' '||event.key==='Enter')){event.preventDefault();setDriveDirection(direction);}},
+    onKeyDown:event=>{if(draft.scan.status==='running'&&!event.repeat&&(event.key===' '||event.key==='Enter')){event.preventDefault();setCollisionWarning(false);setDriveDirection(direction);}},
     onKeyUp:event=>{if(event.key===' '||event.key==='Enter'){event.preventDefault();setDriveDirection('');}},
     onBlur:()=>setDriveDirection(''),
     onContextMenu:event=>event.preventDefault()
@@ -204,7 +204,7 @@ export default function MapStudioFigma({initialStage='scan'}) {
       onMember={(group,member)=>update(current=>({endpointGroups:groupsFor(current).map(g=>g.id===group.id?{...g,members:[...g.members.filter(m=>m.endpointId!==member.endpointId),member]}:g)}))}
       onRemove={(group,member)=>update(current=>({endpointGroups:groupsFor(current).map(g=>g.id===group.id?{...g,members:g.members.filter(m=>m.endpointId!==member.endpointId)}:g)}))}/>:<div className={'ls-layout '+(stage==='scan'?'ls-layout--scan':'')}>
       <div className="ls-main">
-        <LidarMap draft={draft} stage={stage} tool={tool} onPoint={onPoint} zoneEdit={stage==='zone'?zone:null} endpointEdit={stage==='endpoint'?endpoint:null} onSelectZone={selectZone} onSelectEndpoint={selectEndpoint} onEditZone={setZone} onEditEndpoint={setEndpoint} rectangleStart={rectangleStart} hoverPoint={hover} onHover={setHover} zoneDirty={zoneDirty} endpointDirty={endpointDirty}/>
+        <LidarMap draft={draft} stage={stage} tool={tool} onPoint={onPoint} zoneEdit={stage==='zone'?zone:null} endpointEdit={stage==='endpoint'?endpoint:null} onSelectZone={selectZone} onSelectEndpoint={selectEndpoint} onEditZone={setZone} onEditEndpoint={setEndpoint} rectangleStart={rectangleStart} hoverPoint={hover} onHover={setHover} zoneDirty={zoneDirty} endpointDirty={endpointDirty} collisionWarning={collisionWarning}/>
         {vi(tool&&<div className="ls-toolhint"><span>{vi(toolText)}</span><Button className="small" onClick={cancelTool}>{vi("Cancel tool")}</Button></div>)}
         {vi(stage==='scan'&&<Panel title={vi("Scan controls")}><div className="ls-runbar"><div><strong>{({idle:'Sẵn sàng quét thủ công',running:'Cảm biến đang bật · hãy điều khiển robot',paused:'Đã tạm dừng cảm biến',captured:'Chờ xác nhận hoàn tất',complete:'Bản quét đã hoàn tất'})[draft.scan.status]}</strong><small>Bản đồ chỉ hiện những vùng robot đã đi qua và ghi nhận</small></div><div className="ls-actions">
           {vi(!['captured','complete'].includes(draft.scan.status)&&<Button tone="primary" onClick={()=>setDraft(current=>({...current,scan:{...current.scan,status:current.scan.status==='running'?'paused':'running'}}))}>{draft.scan.status==='running'?'Tạm dừng cảm biến':draft.scan.status==='paused'?'Tiếp tục quét':'Bật cảm biến LiDAR'}</Button>)}
@@ -239,8 +239,8 @@ export default function MapStudioFigma({initialStage='scan'}) {
                 <button type="button" disabled={draft.scan.status!=='running'} className={'ls-drive-key ls-drive-right '+(driveDirection==='right'?'active':'')} aria-label="Giữ để robot cua phải" aria-pressed={driveDirection==='right'} {...driveHandlers('right')}>→</button>
                 <button type="button" disabled={draft.scan.status!=='running'} className={'ls-drive-key ls-drive-down '+(driveDirection==='backward'?'active':'')} aria-label="Giữ để robot lùi" aria-pressed={driveDirection==='backward'} {...driveHandlers('backward')}>↓</button>
               </div>
-              <div className={'ls-drive-status '+(driveDirection?'moving':'')} role="status"><i/>{driveDirection?`Đang giữ: ${DRIVE_LABELS[driveDirection]}`:'Robot đang dừng'}</div>
-              <p className="ls-safety-note">Chế độ demo: robot và vùng LiDAR sẽ di chuyển trực tiếp trên bản đồ. Chưa gửi lệnh tới robot vật lý.</p>
+              <div className={'ls-drive-status '+(collisionWarning?'collision':driveDirection?'moving':'')} role={collisionWarning?'alert':'status'}><i/>{collisionWarning?'Cảnh báo va chạm · Robot đã tự dừng':driveDirection?`Đang giữ: ${DRIVE_LABELS[driveDirection]}`:'Robot đang dừng'}</div>
+              <p className="ls-safety-note">Tự động dừng cách tường hoặc vật cản tối thiểu {ROBOT_SAFETY_GAP_METERS.toLocaleString('vi-VN')} m. Chế độ demo chưa gửi lệnh tới robot vật lý.</p>
             </div>
           </Panel>
           <Panel title="Phiên quét"><Field label="Tên bản đồ" maxLength={60} value={draft.name} onChange={e=>update({name:e.target.value})}/><Stat label="Nguồn">Mô phỏng LiDAR thủ công</Stat><Stat label="Vị trí đã ghi nhận">{draft.scan.trail?.length||0}</Stat><Stat label="Độ phân giải">0,05 m / ô</Stat><Button tone="danger" className="ls-full" disabled={draft.scan.status==='idle'} onClick={()=>setConfirm({kind:'reset'})}>Quét mới</Button></Panel>

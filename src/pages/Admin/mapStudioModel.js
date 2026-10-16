@@ -10,6 +10,10 @@ export const STAGES = [
 ];
 export const STORAGE_KEY = 'mediassist.map-studio.lidar.v3';
 export const ENDPOINT_TYPES = ['WAYPOINT', 'CHARGER', 'PARK', 'STAGING'];
+export const ROBOT_SAFETY_GAP_METERS = 0.25;
+// The compact demo robot has a 7 px footprint radius. Keep another 0.25 m
+// (5 px at this map resolution) between its body and every solid surface.
+export const ROBOT_SAFETY_CLEARANCE = 7 + ROBOT_SAFETY_GAP_METERS / MAP.resolution;
 export function createDraft() {
   return { schema: 3, revision: 0, name: 'Tầng 1 bệnh viện', scan: { status: 'idle', progress: 0, robot: { ...SCAN_START }, trail: [{ x: SCAN_START.x, y: SCAN_START.y }] }, zones: [], endpoints: [], endpointGroups: [], saved: null };
 }
@@ -59,6 +63,20 @@ export function freePoint(point, clearance = 8) {
   if (!validPoint(point) || !inPolygon(point, FLOOR)) return false;
   if (WALLS.some(([a, b]) => distanceToSegment(point, a, b) < clearance)) return false;
   return !OBSTACLES.some(r => point.x >= r.x - clearance && point.x <= r.x + r.w + clearance && point.y >= r.y - clearance && point.y <= r.y + r.h + clearance);
+}
+export function driveRobotStep(previous, direction) {
+  if (!validPoint(previous) || !['forward', 'backward', 'left', 'right'].includes(direction)) return { robot: previous, moved: false, blocked: false };
+  if (direction === 'left' || direction === 'right') return {
+    robot: { ...previous, heading: ((previous.heading || 0) + (direction === 'left' ? -5 : 5) + 360) % 360 },
+    moved: true,
+    blocked: false,
+  };
+  const radians = (previous.heading || 0) * Math.PI / 180;
+  const distance = direction === 'forward' ? 7 : -5;
+  const candidate = { ...previous, x: previous.x + Math.sin(radians) * distance, y: previous.y - Math.cos(radians) * distance };
+  return freePoint(candidate, ROBOT_SAFETY_CLEARANCE)
+    ? { robot: candidate, moved: true, blocked: false }
+    : { robot: previous, moved: false, blocked: true };
 }
 export function pointAllowed(draft, point) { return freePoint(point) && !draft.zones.some(z => blockedZone(z) && (inPolygon(point, z.points) || z.points.some((p,i)=>distanceToSegment(point,p,z.points[(i+1)%z.points.length]) < 8))); }
 export function polygonArea(points) { return Math.abs(points.reduce((sum, p, i) => { const q = points[(i + 1) % points.length]; return sum + p.x * q.y - q.x * p.y; }, 0) / 2); }
