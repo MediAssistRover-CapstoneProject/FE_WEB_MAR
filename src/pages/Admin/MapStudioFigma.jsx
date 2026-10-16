@@ -34,7 +34,7 @@ const styles = String.raw`
 .ls-map-layers{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 15px;color:#98a6b5;background:#161c22;border-top:1px solid #2b3540;border-bottom:1px solid #2b3540;font-size:10px}.ls-map-layers>span:nth-child(2){letter-spacing:1.1px;font-size:9px}.ls-live-dot{width:5px;height:5px;border-radius:50%;background:#69d2b8}.ls-map-layers label{display:flex;gap:5px;align-items:center;cursor:pointer}.ls-map-layers input{accent-color:#60a5fa;width:12px;height:12px;margin:0}.ls-map-layers small{margin-left:auto}
 .ls-map-viewport{position:relative;aspect-ratio:5/3;min-width:0;background:#121416;overflow:hidden}.ls-map-viewport>svg{width:100%;height:100%;position:absolute;inset:0;display:block}.ls-map-foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 15px;background:#1c2229;border-top:1px solid #2b3540;color:#a7b4c2;font-size:10px}.ls-map-foot>span{display:flex;gap:6px;align-items:center}.ls-map-foot i{width:7px;height:7px;border:1px solid #778491;border-radius:1px;display:inline-block;margin-left:5px}
 .ls-layout--scan{grid-template-columns:minmax(0,1fr) minmax(320px,350px)}.ls-camera{position:relative;overflow:hidden;aspect-ratio:16/9;border-radius:9px;background:#0f172a}.ls-camera img{display:block;width:100%;height:100%;object-fit:cover}.ls-camera:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,#0005,transparent 28%,transparent 68%,#0009)}.ls-camera-badge,.ls-camera-label{position:absolute;z-index:1;color:#fff}.ls-camera-badge{top:10px;left:10px;padding:4px 8px;border-radius:999px;background:#0f172acc;font-size:9px;font-weight:800;letter-spacing:.65px}.ls-camera-badge.live:before{content:"";display:inline-block;width:6px;height:6px;margin-right:5px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px #22c55e33}.ls-camera-label{left:11px;right:11px;bottom:9px;display:flex;justify-content:space-between;gap:10px;font-size:10px}.ls-camera-info{display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:var(--ls-muted);font-size:10px}.ls-camera-info b{color:#334155}
-.ls-drive-panel{text-align:center}.ls-drive-pad{display:grid;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(3,50px);justify-content:center;gap:7px;margin:4px auto 12px}.ls-drive-key{display:grid;place-items:center;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;color:#334155;font-size:20px;font-weight:800;cursor:pointer;transition:background .15s,border-color .15s,color .15s,transform .15s}.ls-drive-key:hover{border-color:#60a5fa;background:#eff6ff;color:#2563eb;transform:translateY(-1px)}.ls-drive-key.active{border-color:#2f80ff;background:#2f80ff;color:#fff;box-shadow:0 5px 12px #2f80ff33}.ls-drive-key.stop{border-color:#fecaca;background:#fff1f2;color:#be123c;font-size:9px;letter-spacing:.4px}.ls-drive-key.stop.active{border-color:#e11d48;background:#e11d48;color:#fff}.ls-drive-up{grid-column:2}.ls-drive-left{grid-column:1;grid-row:2}.ls-drive-stop{grid-column:2;grid-row:2}.ls-drive-right{grid-column:3;grid-row:2}.ls-drive-down{grid-column:2;grid-row:3}.ls-drive-status{display:flex;align-items:center;justify-content:center;gap:7px;padding:8px 10px;border-radius:7px;background:#f8fafc;color:#64748b;font-size:10px}.ls-drive-status i{width:7px;height:7px;border-radius:50%;background:#94a3b8}.ls-drive-status.moving{color:#1d4ed8;background:#eff6ff}.ls-drive-status.moving i{background:#2f80ff}.ls-safety-note{margin-top:10px!important;padding:9px 10px;border-radius:7px;background:#fffbeb;color:#92400e!important;text-align:left}
+.ls-drive-panel{text-align:center}.ls-drive-pad{display:grid;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(3,50px);justify-content:center;gap:7px;margin:4px auto 12px}.ls-drive-key{display:grid;place-items:center;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;color:#334155;font-size:20px;font-weight:800;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;transition:background .15s,border-color .15s,color .15s,transform .15s}.ls-drive-key:hover{border-color:#60a5fa;background:#eff6ff;color:#2563eb;transform:translateY(-1px)}.ls-drive-key.active{border-color:#2f80ff;background:#2f80ff;color:#fff;box-shadow:0 5px 12px #2f80ff33;transform:translateY(1px)}.ls-drive-key.stop{border-color:#fecaca;background:#fff1f2;color:#be123c;font-size:9px;letter-spacing:.4px}.ls-drive-key.stop.active{border-color:#e11d48;background:#e11d48;color:#fff}.ls-drive-up{grid-column:2}.ls-drive-left{grid-column:1;grid-row:2}.ls-drive-stop{grid-column:2;grid-row:2}.ls-drive-right{grid-column:3;grid-row:2}.ls-drive-down{grid-column:2;grid-row:3}.ls-drive-status{display:flex;align-items:center;justify-content:center;gap:7px;padding:8px 10px;border-radius:7px;background:#f8fafc;color:#64748b;font-size:10px}.ls-drive-status i{width:7px;height:7px;border-radius:50%;background:#94a3b8}.ls-drive-status.moving{color:#1d4ed8;background:#eff6ff}.ls-drive-status.moving i{background:#2f80ff}.ls-drive-help{margin:0 0 9px!important;color:#475569!important}.ls-safety-note{margin-top:10px!important;padding:9px 10px;border-radius:7px;background:#fffbeb;color:#92400e!important;text-align:left}
 .ls-notice{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;color:#1e40af;padding:10px 13px;margin-bottom:14px;overflow-wrap:anywhere}.ls-hint{padding:10px 12px;background:#f1f5f9;border-radius:7px;color:#64748b;font-size:11px;margin-top:12px}.ls-toolhint{padding:11px 14px;background:#eaf2ff;border:1px solid #c4dcff;border-radius:8px;color:#1d4ed8;display:flex;justify-content:space-between;align-items:center;gap:10px}.ls-error{font-size:11px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;padding:9px 11px;border-radius:7px;margin-top:12px}
 .ls-progress{height:5px;background:#e2e8f0;border-radius:8px;overflow:hidden;margin:12px 0}.ls-progress i{display:block;height:100%;background:#2f80ff;transition:width .2s linear}.ls-stat{display:flex;justify-content:space-between;gap:12px;padding:6px 0;font-size:12px}.ls-stat span{color:var(--ls-muted)}.ls-stat b{text-align:right;overflow-wrap:anywhere}.ls-field{display:grid;gap:5px;font-size:11px;color:#475569;margin:11px 0}.ls-field input,.ls-field select{width:100%;min-width:0;border:1px solid #cbd5e1;border-radius:6px;padding:8px 9px;background:white;color:#172b4d}.ls-field input:focus,.ls-field select:focus{outline:2px solid #93c5fd;outline-offset:1px}.ls-field input[type=range]{padding:0;accent-color:#2f80ff}
 .ls-item-list{display:grid;gap:6px;max-height:225px;overflow:auto}.ls-studio .ls-item{width:100%;display:flex;align-items:center;gap:10px;background:#f8fafc;color:#334155;border:1px solid transparent;border-radius:7px;padding:10px;text-align:left;font-size:12px;overflow-wrap:anywhere}.ls-studio .ls-item.selected{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}.ls-item>i{width:8px;height:8px;border-radius:2px;flex-shrink:0}.ls-item strong,.ls-item small{display:block}.ls-item small{color:var(--ls-muted);font-size:10px;margin-top:2px}.ls-item>span{min-width:0}.ls-confirm{padding:24px;border:1px solid #dce5f0;background:white;border-radius:12px;width:min(440px,calc(100vw - 32px));color:#172b4d;box-shadow:0 18px 60px #0f172a33}.ls-confirm::backdrop{background:#0f172a66}.ls-confirm p{margin:8px 0 18px;color:#64748b}
@@ -86,6 +86,13 @@ export default function MapStudioFigma({initialStage='scan'}) {
   },[draft.scan.status]);
   useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(''),5000);return()=>clearTimeout(timer);},[notice]);
   useEffect(()=>{if(confirm)confirmRef.current?.showModal();},[confirm]);
+  useEffect(()=>{
+    const stop=()=>setDriveDirection('');
+    const stopWhenHidden=()=>{if(document.hidden)stop();};
+    window.addEventListener('blur',stop);
+    document.addEventListener('visibilitychange',stopWhenHidden);
+    return()=>{window.removeEventListener('blur',stop);document.removeEventListener('visibilitychange',stopWhenHidden);};
+  },[]);
   const update=patch=>setDraft(current=>changeDraft(current,typeof patch==='function'?patch(current):patch));
   const cancelTool=()=>{setTool('');setRectangleStart(null);};
   const guard=action=>{if(unsaved){setConfirm({kind:'discard-edit',action});return false;}action();return true;};
@@ -142,9 +149,24 @@ export default function MapStudioFigma({initialStage='scan'}) {
   };
   const toolText={rectangle:rectangleStart?'Click the opposite corner of the rectangle.':'Click the first corner of the rectangle.',polygon:'Click each corner, then choose Finish shape.',endpoint:'Click scanned free space to place the endpoint.'}[tool];
   const cameraIsLive=Boolean(ROBOT_CAMERA_URL&&!cameraFailed);
-  const previewDrive=direction=>{
-    setDriveDirection(direction);
-    setNotice(direction?`Đã chọn hướng ${DRIVE_LABELS[direction]}. Backend chưa có API điều khiển nên lệnh chưa được gửi tới robot.`:'Đã dừng điều khiển thử trên giao diện.');
+  const stopDrive=event=>{
+    if(event?.pointerId!==undefined&&event.currentTarget?.hasPointerCapture?.(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);
+    setDriveDirection('');
+  };
+  const driveHandlers=direction=>({
+    onPointerDown:event=>{if(event.pointerType==='mouse'&&event.button!==0)return;event.preventDefault();event.currentTarget.setPointerCapture?.(event.pointerId);setDriveDirection(direction);},
+    onPointerUp:stopDrive,
+    onPointerCancel:stopDrive,
+    onPointerLeave:stopDrive,
+    onLostPointerCapture:()=>setDriveDirection(''),
+    onKeyDown:event=>{if(!event.repeat&&(event.key===' '||event.key==='Enter')){event.preventDefault();setDriveDirection(direction);}},
+    onKeyUp:event=>{if(event.key===' '||event.key==='Enter'){event.preventDefault();setDriveDirection('');}},
+    onBlur:()=>setDriveDirection(''),
+    onContextMenu:event=>event.preventDefault()
+  });
+  const stopNow=event=>{
+    event.preventDefault();
+    setDriveDirection('');
   };
   return <section className="ls-studio">
     <WorkspaceTabs label={vi('Map Studio stages')} active={stage} onSelect={navigate} items={STAGES.map(([id,name],i)=>({id,label:`${i+1}. ${vi(name)}`,disabled:!stageEnabled(draft,id),hint:!stageEnabled(draft,id)?vi('Finish the scan first'):undefined}))}/>
@@ -191,14 +213,15 @@ export default function MapStudioFigma({initialStage='scan'}) {
           </Panel>
           <Panel title="Điều khiển robot">
             <div className="ls-drive-panel">
+              <p className="ls-drive-help">Nhấn và giữ nút để di chuyển. Thả chuột hoặc ngón tay để robot tự dừng.</p>
               <div className="ls-drive-pad" role="group" aria-label="Các nút điều khiển hướng robot">
-                <button type="button" className={'ls-drive-key ls-drive-up '+(driveDirection==='forward'?'active':'')} aria-label="Điều khiển robot tiến lên" aria-pressed={driveDirection==='forward'} onClick={()=>previewDrive('forward')}>↑</button>
-                <button type="button" className={'ls-drive-key ls-drive-left '+(driveDirection==='left'?'active':'')} aria-label="Điều khiển robot quay trái" aria-pressed={driveDirection==='left'} onClick={()=>previewDrive('left')}>←</button>
-                <button type="button" className={'ls-drive-key stop ls-drive-stop '+(!driveDirection?'active':'')} aria-label="Dừng robot" aria-pressed={!driveDirection} onClick={()=>previewDrive('')}>DỪNG</button>
-                <button type="button" className={'ls-drive-key ls-drive-right '+(driveDirection==='right'?'active':'')} aria-label="Điều khiển robot quay phải" aria-pressed={driveDirection==='right'} onClick={()=>previewDrive('right')}>→</button>
-                <button type="button" className={'ls-drive-key ls-drive-down '+(driveDirection==='backward'?'active':'')} aria-label="Điều khiển robot lùi xuống" aria-pressed={driveDirection==='backward'} onClick={()=>previewDrive('backward')}>↓</button>
+                <button type="button" className={'ls-drive-key ls-drive-up '+(driveDirection==='forward'?'active':'')} aria-label="Giữ để robot tiến thẳng" aria-pressed={driveDirection==='forward'} {...driveHandlers('forward')}>↑</button>
+                <button type="button" className={'ls-drive-key ls-drive-left '+(driveDirection==='left'?'active':'')} aria-label="Giữ để robot cua trái" aria-pressed={driveDirection==='left'} {...driveHandlers('left')}>←</button>
+                <button type="button" className={'ls-drive-key stop ls-drive-stop '+(!driveDirection?'active':'')} aria-label="Dừng robot" aria-pressed={!driveDirection} onPointerDown={stopNow} onClick={stopNow}>DỪNG</button>
+                <button type="button" className={'ls-drive-key ls-drive-right '+(driveDirection==='right'?'active':'')} aria-label="Giữ để robot cua phải" aria-pressed={driveDirection==='right'} {...driveHandlers('right')}>→</button>
+                <button type="button" className={'ls-drive-key ls-drive-down '+(driveDirection==='backward'?'active':'')} aria-label="Giữ để robot lùi" aria-pressed={driveDirection==='backward'} {...driveHandlers('backward')}>↓</button>
               </div>
-              <div className={'ls-drive-status '+(driveDirection?'moving':'')} role="status"><i/>{driveDirection?`Đang chọn: ${DRIVE_LABELS[driveDirection]}`:'Robot đang dừng'}</div>
+              <div className={'ls-drive-status '+(driveDirection?'moving':'')} role="status"><i/>{driveDirection?`Đang giữ: ${DRIVE_LABELS[driveDirection]}`:'Robot đang dừng'}</div>
               <p className="ls-safety-note">Kênh điều khiển backend chưa được kết nối. Các nút hiện chỉ để kiểm tra giao diện và không làm robot di chuyển.</p>
             </div>
           </Panel>
