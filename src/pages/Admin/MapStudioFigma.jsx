@@ -173,12 +173,12 @@ export default function MapStudioFigma({initialStage='scan'}) {
     setDriveDirection('');
   };
   const driveHandlers=direction=>({
-    onPointerDown:event=>{if(draft.scan.status!=='running'||event.pointerType==='mouse'&&event.button!==0)return;event.preventDefault();event.currentTarget.setPointerCapture?.(event.pointerId);setCollisionWarning(false);setDriveDirection(direction);},
+    onPointerDown:event=>{if(['captured','complete'].includes(draft.scan.status)||event.pointerType==='mouse'&&event.button!==0)return;event.preventDefault();event.currentTarget.setPointerCapture?.(event.pointerId);if(draft.scan.status!=='running')setDraft(current=>({...current,scan:{...current.scan,status:'running'}}));setCollisionWarning(false);setDriveDirection(direction);},
     onPointerUp:stopDrive,
     onPointerCancel:stopDrive,
     onPointerLeave:stopDrive,
     onLostPointerCapture:()=>setDriveDirection(''),
-    onKeyDown:event=>{if(draft.scan.status==='running'&&!event.repeat&&(event.key===' '||event.key==='Enter')){event.preventDefault();setCollisionWarning(false);setDriveDirection(direction);}},
+    onKeyDown:event=>{if(!['captured','complete'].includes(draft.scan.status)&&!event.repeat&&(event.key===' '||event.key==='Enter')){event.preventDefault();if(draft.scan.status!=='running')setDraft(current=>({...current,scan:{...current.scan,status:'running'}}));setCollisionWarning(false);setDriveDirection(direction);}},
     onKeyUp:event=>{if(event.key===' '||event.key==='Enter'){event.preventDefault();setDriveDirection('');}},
     onBlur:()=>setDriveDirection(''),
     onContextMenu:event=>event.preventDefault()
@@ -207,7 +207,6 @@ export default function MapStudioFigma({initialStage='scan'}) {
         <LidarMap draft={draft} stage={stage} tool={tool} onPoint={onPoint} zoneEdit={stage==='zone'?zone:null} endpointEdit={stage==='endpoint'?endpoint:null} onSelectZone={selectZone} onSelectEndpoint={selectEndpoint} onEditZone={setZone} onEditEndpoint={setEndpoint} rectangleStart={rectangleStart} hoverPoint={hover} onHover={setHover} zoneDirty={zoneDirty} endpointDirty={endpointDirty} collisionWarning={collisionWarning}/>
         {vi(tool&&<div className="ls-toolhint"><span>{vi(toolText)}</span><Button className="small" onClick={cancelTool}>{vi("Cancel tool")}</Button></div>)}
         {vi(stage==='scan'&&<Panel title={vi("Scan controls")}><div className="ls-runbar"><div><strong>{({idle:'Sẵn sàng quét thủ công',running:'Cảm biến đang bật · hãy điều khiển robot',paused:'Đã tạm dừng cảm biến',captured:'Chờ xác nhận hoàn tất',complete:'Bản quét đã hoàn tất'})[draft.scan.status]}</strong><small>Bản đồ chỉ hiện những vùng robot đã đi qua và ghi nhận</small></div><div className="ls-actions">
-          {vi(!['captured','complete'].includes(draft.scan.status)&&<Button tone="primary" onClick={()=>setDraft(current=>({...current,scan:{...current.scan,status:current.scan.status==='running'?'paused':'running'}}))}>{draft.scan.status==='running'?'Tạm dừng cảm biến':draft.scan.status==='paused'?'Tiếp tục quét':'Bật cảm biến LiDAR'}</Button>)}
           <Button tone={draft.scan.progress>0?'primary':''} disabled={draft.scan.progress<=0} onClick={()=>{setDriveDirection('');if(draft.scan.status!=='complete')update(current=>({scan:{...current.scan,status:'complete'}}));setStage('zone');setNotice('Đã hoàn tất bản quét thủ công. Hãy khoanh vùng trên dữ liệu vừa ghi nhận.');}}>Hoàn tất quét → Phân vùng</Button>
         </div></div></Panel>)}
         {stage!=='scan'&&<div className="ls-hint">{stage==='zone'?'Khoanh vùng bằng hình chữ nhật hoặc đa giác. Kéo bên trong để di chuyển, kéo chấm trắng để chỉnh đường biên.':'Kéo chấm xanh trên bản đồ để đổi vị trí điểm đích.'} Nhấn Esc để hủy lượt kéo, sau đó bấm Lưu để giữ thay đổi.</div>}
@@ -233,11 +232,11 @@ export default function MapStudioFigma({initialStage='scan'}) {
             <div className="ls-drive-panel">
               <p className="ls-drive-help">Nhấn và giữ nút để di chuyển. Thả chuột hoặc ngón tay để robot tự dừng.</p>
               <div className="ls-drive-pad" role="group" aria-label="Các nút điều khiển hướng robot">
-                <button type="button" disabled={draft.scan.status!=='running'} className={'ls-drive-key ls-drive-up '+(driveDirection==='forward'?'active':'')} aria-label="Giữ để robot tiến thẳng" aria-pressed={driveDirection==='forward'} {...driveHandlers('forward')}>↑</button>
-                <button type="button" disabled={draft.scan.status!=='running'} className={'ls-drive-key ls-drive-left '+(driveDirection==='left'?'active':'')} aria-label="Giữ để robot cua trái" aria-pressed={driveDirection==='left'} {...driveHandlers('left')}>←</button>
+                <button type="button" disabled={['captured','complete'].includes(draft.scan.status)} className={'ls-drive-key ls-drive-up '+(driveDirection==='forward'?'active':'')} aria-label="Giữ để robot tiến thẳng" aria-pressed={driveDirection==='forward'} {...driveHandlers('forward')}>↑</button>
+                <button type="button" disabled={['captured','complete'].includes(draft.scan.status)} className={'ls-drive-key ls-drive-left '+(driveDirection==='left'?'active':'')} aria-label="Giữ để robot cua trái" aria-pressed={driveDirection==='left'} {...driveHandlers('left')}>←</button>
                 <button type="button" className={'ls-drive-key stop ls-drive-stop '+(!driveDirection?'active':'')} aria-label="Dừng robot" aria-pressed={!driveDirection} onPointerDown={stopNow} onClick={stopNow}>DỪNG</button>
-                <button type="button" disabled={draft.scan.status!=='running'} className={'ls-drive-key ls-drive-right '+(driveDirection==='right'?'active':'')} aria-label="Giữ để robot cua phải" aria-pressed={driveDirection==='right'} {...driveHandlers('right')}>→</button>
-                <button type="button" disabled={draft.scan.status!=='running'} className={'ls-drive-key ls-drive-down '+(driveDirection==='backward'?'active':'')} aria-label="Giữ để robot lùi" aria-pressed={driveDirection==='backward'} {...driveHandlers('backward')}>↓</button>
+                <button type="button" disabled={['captured','complete'].includes(draft.scan.status)} className={'ls-drive-key ls-drive-right '+(driveDirection==='right'?'active':'')} aria-label="Giữ để robot cua phải" aria-pressed={driveDirection==='right'} {...driveHandlers('right')}>→</button>
+                <button type="button" disabled={['captured','complete'].includes(draft.scan.status)} className={'ls-drive-key ls-drive-down '+(driveDirection==='backward'?'active':'')} aria-label="Giữ để robot lùi" aria-pressed={driveDirection==='backward'} {...driveHandlers('backward')}>↓</button>
               </div>
               <div className={'ls-drive-status '+(collisionWarning?'collision':driveDirection?'moving':'')} role={collisionWarning?'alert':'status'}><i/>{collisionWarning?'Cảnh báo va chạm · Robot đã tự dừng':driveDirection?`Đang giữ: ${DRIVE_LABELS[driveDirection]}`:'Robot đang dừng'}</div>
               <p className="ls-safety-note">Tự động dừng cách tường hoặc vật cản tối thiểu {ROBOT_SAFETY_GAP_METERS.toLocaleString('vi-VN')} m. Chế độ demo chưa gửi lệnh tới robot vật lý.</p>
