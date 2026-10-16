@@ -28,6 +28,11 @@ test('endpoint placement rejects unknown space, walls and furniture',()=>{
   assert.equal(freePoint({x:125,y:270}),false);
   assert.equal(freePoint({x:580,y:330}),true);
 });
+test('manual scans reject endpoints outside the recorded LiDAR trail',()=>{
+  const d=captured();d.scan.trail=[{x:580,y:330}];
+  assert.equal(endpointError(d,endpoint()),'');
+  assert.match(endpointError(d,endpoint({x:815,y:245})),/recorded by LiDAR/);
+});
 test('the simulated survey path stays in free space',()=>{
   SCAN_PATH.slice(1).forEach((b,i)=>{const a=SCAN_PATH[i];for(let t=0;t<=1;t+=.05)assert.ok(freePoint({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t},2),'Survey must not cross a wall or obstacle');});
   assert.equal(rayHits({x:580,y:330}).length,64);

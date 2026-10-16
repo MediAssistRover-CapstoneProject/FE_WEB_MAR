@@ -91,6 +91,7 @@ export function endpointError(draft, endpoint) {
   if (!endpoint.name.trim()) return 'Enter an endpoint name.';
   if (!ENDPOINT_TYPES.includes(endpoint.type)) return 'Select an endpoint type.';
   if (!freePoint(endpoint)) return 'Place the endpoint on scanned free space, at least 0.4 m from walls and obstacles.';
+  if (draft.scan?.trail?.length && !draft.scan.trail.some(point => Math.hypot(point.x - endpoint.x, point.y - endpoint.y) <= 150)) return 'Place the endpoint inside the area recorded by LiDAR.';
   if (!pointAllowed(draft, endpoint)) return 'An endpoint cannot be placed inside a KEEP_OUT zone.';
   if (draft.zones.some(z => noStopZone(z) && inPolygon(endpoint, z.points))) return 'An endpoint cannot be placed inside a NO_STOP zone.';
   if (draft.endpoints.some(e => e.id !== endpoint.id && e.name.toLowerCase() === endpoint.name.trim().toLowerCase())) return 'An endpoint with this name already exists.';

@@ -45,20 +45,20 @@ function createScan() {
   for(let i=0;i<260;i++){const p={x:random()*1200,y:random()*680};if(inPolygon(p,FLOOR)){ctx.fillStyle='#d4d9da66';ctx.fillRect(p.x,p.y,1+random(),1+random());}}
   return canvas;
 }
-function ScanCanvas({progress,trail}) {
+function ScanCanvas({trail,revealAll=false}) {
   const ref=useRef(null), image=useRef(null);
   useEffect(()=>{
     image.current ||= createScan();
     const ctx=ref.current.getContext('2d');ctx.setTransform(2,0,0,2,0,0);ctx.fillStyle='#121416';ctx.fillRect(0,0,1200,680);
     ctx.save();
-    if(progress<100){
+    if(!revealAll){
       ctx.beginPath();
       // Accumulate observed patches only where the operator has driven the robot.
-      if(progress>0) for(const pos of trail){ctx.moveTo(pos.x+190,pos.y);ctx.arc(pos.x,pos.y,190,0,Math.PI*2);}
+      for(const pos of trail){ctx.moveTo(pos.x+150,pos.y);ctx.arc(pos.x,pos.y,150,0,Math.PI*2);}
       ctx.clip();
     }
     ctx.drawImage(image.current,0,0,1200,680);ctx.restore();
-  },[progress,trail]);
+  },[trail,revealAll]);
   return <canvas ref={ref} width="2400" height="1360" style={{width:'100%',height:'100%',display:'block'}} aria-label={vi("Synthetic LiDAR occupancy returns")} />;
 }
 function Selectable({label,onSelect,onPointerDown,children}) {
@@ -75,8 +75,10 @@ function Endpoint({value,preview=false}) {
 export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit,onSelectZone,onSelectEndpoint,onEditZone,onEditEndpoint,rectangleStart,hoverPoint,onHover,zoneDirty,endpointDirty,simulation}) {
   const [zoom,setZoom]=useState(1),[centre,setCentre]=useState({x:600,y:340}),[grid,setGrid]=useState(false),[rays,setRays]=useState(true),[zonesVisible,setZonesVisible]=useState(true),[endpointsVisible,setEndpointsVisible]=useState(true);
   const drag=useRef(null),svgRef=useRef(null),suppressClick=useRef(false);
-  const raw=stage==='scan',progress=raw?draft.scan.progress:100;
-  const robot=raw?(draft.scan.robot||SCAN_START):scanPosition(progress),trail=raw?(draft.scan.trail||[robot]):[];
+  const raw=stage==='scan',progress=draft.scan.progress;
+  const robot=raw?(draft.scan.robot||SCAN_START):scanPosition(100);
+  const storedTrail=Array.isArray(draft.scan.trail)?draft.scan.trail:[];
+  const trail=progress>0?storedTrail:[],revealAll=!storedTrail.length&&progress>=100;
   const beams=useMemo(()=>rayHits(robot),[robot.x,robot.y]);
   // A 5:3 view adds a small vertical margin without stretching saved geometry.
   const width=MAP.width/zoom,height=MAP.width*3/5/zoom;
@@ -146,7 +148,7 @@ export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit
         onPointerUp={e=>{if(e.pointerId===drag.current?.pointerId)finishDrag(false);}} onPointerCancel={e=>{if(e.pointerId===drag.current?.pointerId)finishDrag(true);}} onLostPointerCapture={e=>{if(e.pointerId===drag.current?.pointerId)finishDrag(true);}}
         onClick={e=>{if(tool){const p=coordinate(e);if(p)onPoint({x:Math.round(p.x),y:Math.round(p.y)});}}}>
         <title>{vi("LiDAR-style scan. White returns mark walls; grey is observed floor; black is unknown space.")}</title>
-        <foreignObject width="1200" height="680" pointerEvents="none"><ScanCanvas progress={progress} trail={trail}/></foreignObject>
+        <foreignObject width="1200" height="680" pointerEvents="none"><ScanCanvas trail={trail} revealAll={revealAll}/></foreignObject>
         {vi(grid&&<g stroke="#7a879a" strokeWidth=".4" opacity=".25" pointerEvents="none">{vi(Array.from({length:31},(_,i)=><path key={'x'+i} d={'M'+i*40+' 0V680'}/>))}{vi(Array.from({length:18},(_,i)=><path key={'y'+i} d={'M0 '+i*40+'H1200'}/>))}</g>)}
         {!raw&&zonesVisible&&draft.zones.filter(z=>z.id!==activeZone?.id).map(renderZone)}
         {!raw&&zonesVisible&&activeZone&&renderZone(activeZone)}
