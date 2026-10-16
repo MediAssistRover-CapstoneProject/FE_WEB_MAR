@@ -3,30 +3,28 @@ import assert from 'node:assert/strict';
 import { createDraft, removeEndpoint, removeEndpointGroup, saveMap, mapIssues, loadDraft, pointAllowed } from '../src/pages/Admin/mapStudioModel.js';
 import { ZONE_TYPES, ZONE_SETUP_TYPES, ZONE_ROBOT_POLICY } from '../src/pages/Admin/zoneCatalog.js';
 
-test('setup offers five zone types with explicit robot policies', () => {
-  assert.deepEqual(ZONE_SETUP_TYPES.map(t => t.id), ['AREA', 'EXCLUSION', 'SPEED_LIMIT', 'ASSUMED_COST', 'REST']);
+test('setup offers exactly three zone types with explicit robot policies', () => {
+  assert.deepEqual(ZONE_SETUP_TYPES.map(t => t.id), ['KEEP_OUT', 'SPEED', 'NO_STOP']);
   for (const type of ZONE_SETUP_TYPES) assert.ok(ZONE_ROBOT_POLICY[type.id]);
 });
 
-test('setup zone colors are distinct and rest does not reuse a legacy zone color', () => {
+test('setup zone colors are distinct', () => {
   assert.equal(new Set(ZONE_SETUP_TYPES.map(type => type.color.toLowerCase())).size, ZONE_SETUP_TYPES.length);
-  const rest = ZONE_TYPES.find(type => type.id === 'REST');
-  assert.equal(rest.color, '#c084fc');
-  assert.ok(ZONE_TYPES.filter(type => type.id !== 'REST').every(type => type.color.toLowerCase() !== rest.color));
+  assert.deepEqual(ZONE_TYPES, ZONE_SETUP_TYPES);
 });
 
 const draft = () => ({ ...createDraft(), scan: { status: 'complete', progress: 100 },
   endpoints: [
-    { id: 'home', name: 'Gốc', type: 'HOME', x: 580, y: 330, heading: 90 },
-    { id: 'pickup', name: 'Nhận thuốc', type: 'PICKUP', x: 815, y: 245, heading: 180, queueId: 'home', tasks: [{ action: 'LOAD', seconds: 7 }] },
+    { id: 'home', name: 'Gốc', type: 'PARK', x: 580, y: 330, heading: 90 },
+    { id: 'pickup', name: 'Nhận thuốc', type: 'WAYPOINT', x: 815, y: 245, heading: 180, queueId: 'home', tasks: [{ action: 'LOAD', seconds: 7 }] },
   ],
   endpointGroups: [{ id: 'g', code: 'G', name: 'Nhóm', active: true, selectionPolicy: 'PRIORITY', members: [{ endpointId: 'home', sequenceNo: 1 }, { endpointId: 'pickup', sequenceNo: 2 }] }],
 });
 
-test('rest zone and endpoints without headings survive save and reload without blocking travel', () => {
+test('speed zone and endpoints without headings survive save and reload without blocking travel', () => {
   const value = draft();
   value.endpoints = value.endpoints.map(({ heading, ...endpoint }) => endpoint);
-  value.zones = [{ id: 'rest', name: 'Trạm nghỉ', type: 'REST', enabled: true, points: [{x:540,y:315},{x:620,y:315},{x:620,y:355},{x:540,y:355}] }];
+  value.zones = [{ id: 'slow', name: 'Khu chậm', type: 'SPEED', speed:.3, enabled: true, points: [{x:540,y:315},{x:620,y:315},{x:620,y:355},{x:540,y:355}] }];
   assert.deepEqual(mapIssues(value), []);
   assert.ok(pointAllowed(value, value.endpoints[0]));
   const saved = saveMap(value, '2026-10-14');

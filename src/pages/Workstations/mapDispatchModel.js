@@ -6,31 +6,15 @@ import { groupsFor, groupCandidates } from '../../features/facility/endpointGrou
 const STEP=10, WIDTH=121, HEIGHT=69;
 const point=k=>({x:(k%WIDTH)*STEP,y:Math.floor(k/WIDTH)*STEP});
 export function travelSpeed(map,p){
-  return Math.min(.6,...map.zones.filter(z=>z.enabled!==false&&z.type==='SPEED_LIMIT'&&inPolygon(p,z.points)).map(z=>z.speed));
+  return Math.min(.6,...map.zones.filter(z=>z.enabled!==false&&z.type==='SPEED'&&inPolygon(p,z.points)).map(z=>z.speed));
 }
 export function segmentAllowed(map,a,b){
   const n=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)/2));
-  const forbidden=Math.hypot(b.x-a.x,b.y-a.y)<.001?[]:map.zones.filter(z=>z.enabled!==false&&z.type==='PREFERRED_DIRECTION'&&directionPenalty(z,a,b)>=1);
   for(let i=0;i<=n;i++){
     const p={x:a.x+(b.x-a.x)*i/n,y:a.y+(b.y-a.y)*i/n};
-    if(!pointAllowed(map,p)||forbidden.some(z=>inPolygon(p,z.points)))return false;
+    if(!pointAllowed(map,p))return false;
   }
   return true;
-}
-function directionPenalty(z,a,b){
-  const heading=Math.atan2(a.y-b.y,b.x-a.x),dot=Math.cos(heading-z.heading*Math.PI/180);
-  // Hard one-way restrictions include diagonal connectors: a backwards
-  // component must not evade the rule by being classified as a cross move.
-  if((z.antiAlignCost===1&&dot<-.000001)||(z.alignCost===1&&dot>.000001)||(z.crossCost===1&&Math.abs(dot)<.999999))return 1;
-  return dot>.7?(z.alignCost??-.5):dot<-.7?(z.antiAlignCost??0):(z.crossCost??0);
-}
-function directionCost(map,a,b){
-  let cost=1;
-  for(const z of map.zones.filter(z=>z.enabled!==false&&z.type==='PREFERRED_DIRECTION'&&inPolygon(a,z.points))){
-    const penalty=directionPenalty(z,a,b);
-    cost*=Math.max(.1,1+penalty*4);
-  }
-  return cost;
 }
 class Heap{
   values=[];
@@ -46,18 +30,18 @@ export function findRoute(map,start,end){
   const neighbors=(p,arrival=false)=>{const result=[];const cx=Math.round(p.x/STEP),cy=Math.round(p.y/STEP);for(let y=cy-2;y<=cy+2;y++)for(let x=cx-2;x<=cx+2;x++){if(x<0||x>=WIDTH||y<0||y>=HEIGHT)continue;const k=y*WIDTH+x;if(ok(k)&&(arrival?segmentAllowed(map,point(k),p):segmentAllowed(map,p,point(k))))result.push(k);}return result;};
   const starts=neighbors(start),ends=new Set(neighbors(end,true));
   const queue=new Heap(),dist=new Map(),previous=new Map();
-  for(const k of starts){const d=Math.hypot(start.x-point(k).x,start.y-point(k).y)*MAP.resolution/travelSpeed(map,start)*directionCost(map,start,point(k));dist.set(k,d);queue.push([d,k]);}
+  for(const k of starts){const d=Math.hypot(start.x-point(k).x,start.y-point(k).y)*MAP.resolution/travelSpeed(map,start);dist.set(k,d);queue.push([d,k]);}
   let target=null,best=Infinity;
   while(queue.values.length){const [d,k]=queue.pop();if(d!==dist.get(k))continue;if(d>=best)break;const a=point(k);
-    if(ends.has(k)){const total=d+Math.hypot(a.x-end.x,a.y-end.y)*MAP.resolution/travelSpeed(map,a)*directionCost(map,a,end);if(total<best){best=total;target=k;}}
+    if(ends.has(k)){const total=d+Math.hypot(a.x-end.x,a.y-end.y)*MAP.resolution/travelSpeed(map,a);if(total<best){best=total;target=k;}}
     const x=k%WIDTH,y=Math.floor(k/WIDTH);
-    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){if(x+dx<0||x+dx>=WIDTH||y+dy<0||y+dy>=HEIGHT)continue;const n=k+dx+dy*WIDTH,b=point(n);if(!ok(n)||!segmentAllowed(map,a,b))continue;const nd=d+STEP*MAP.resolution/travelSpeed(map,a)*directionCost(map,a,b);if(nd<(dist.get(n)??Infinity)){dist.set(n,nd);previous.set(n,k);queue.push([nd,n]);}}
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){if(x+dx<0||x+dx>=WIDTH||y+dy<0||y+dy>=HEIGHT)continue;const n=k+dx+dy*WIDTH,b=point(n);if(!ok(n)||!segmentAllowed(map,a,b))continue;const nd=d+STEP*MAP.resolution/travelSpeed(map,a);if(nd<(dist.get(n)??Infinity)){dist.set(n,nd);previous.set(n,k);queue.push([nd,n]);}}
   }
   if(target===null)throw Error('Không có tuyến an toàn giữa '+(start.name||'điểm đầu')+' và '+(end.name||'điểm đích')+'. Kiểm tra vùng cấm, cửa và khoảng hở 0,4 m.');
   const path=[];for(let k=target;k!==undefined;k=previous.get(k))path.push(point(k));
   return[start,...path.reverse(),end].filter((p,i,a)=>!i||Math.hypot(p.x-a[i-1].x,p.y-a[i-1].y)>.01);
 }
-const defaultTasks={PICKUP:[{action:'LOAD',seconds:4}],DROPOFF:[{action:'UNLOAD',seconds:4}],PARKING:[{action:'WAIT',seconds:2}],CHARGING:[{action:'CHARGE',seconds:10}]};
+const defaultTasks={CHARGER:[{action:'CHARGE',seconds:10}],PARK:[{action:'WAIT',seconds:2}],STAGING:[{action:'WAIT',seconds:2}]};
 export function createDispatchPlan(map,startId,stops,options={}){
   const issues=mapIssues(map);if(issues.length)throw Error('Bản đồ chưa hợp lệ: '+vi(issues[0]));
   let current=map.endpoints.find(e=>e.id===startId);if(!current||current.enabled===false)throw Error('Chọn điểm xuất phát đang hoạt động.');

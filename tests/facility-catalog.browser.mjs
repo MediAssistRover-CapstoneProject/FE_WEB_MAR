@@ -7,7 +7,7 @@ const context=await browser.newContext({viewport:{width:1440,height:1000}});
 await context.addInitScript(()=>sessionStorage.setItem('mediassist-rover.session',JSON.stringify({tokens:{accessToken:'test-not-a-real-token'},account:{role:'ADMIN'}})));
 const page=await context.newPage(),errors=[],writes=[],reads=[];page.on('pageerror',e=>errors.push(e.message));
 const map={mapId:'map-a',floorId:'f1',mapName:'Bản đồ BE thử nghiệm',mapCode:'MAP_A',versionNo:3,status:'ACTIVE',widthM:40,heightM:20,resolutionMPerPixel:.05,originXM:-5,originYM:-2,originYawRad:0,frameId:'map'};
-const endpoint=(id,mapId)=>({endpointId:id,mapId,endpointCode:id,endpointName:id==='end-a'?'Điểm quầy A':'Điểm bản đồ khác',endpointType:'PICKUP',xM:2,yM:3,yawRad:0,active:true,accessible:true,publicVisible:false});
+const endpoint=(id,mapId)=>({endpointId:id,mapId,endpointCode:id,endpointName:id==='end-a'?'Điểm quầy A':'Điểm bản đồ khác',endpointType:'WAYPOINT',xM:2,yM:3,yawRad:0,active:true,accessible:true,publicVisible:false});
 const state={maps:[map],zones:[],rooms:[],endpoints:[endpoint('end-a','map-a'),endpoint('end-other','map-other')],'endpoint-groups':[],'endpoint-group-members':[]};
 let rejectNext=false;
 await page.route(url=>url.pathname.startsWith('/api/'),async route=>{
@@ -58,11 +58,11 @@ try{
  assert.equal(writes.at(-1).method,'DELETE');
  await page.getByRole('button',{name:'2. Vùng',exact:true}).click();
  await page.getByLabel('Mã vùng BE',{exact:true}).fill('WAIT_A');await page.getByLabel('Tên vùng BE',{exact:true}).fill('Sảnh chờ');
- await page.getByLabel('Chức năng vùng BE',{exact:true}).selectOption('WAITING');
+ await page.getByLabel('Chức năng vùng BE',{exact:true}).selectOption('NO_STOP');
  await page.getByText('Tọa độ đa giác nâng cao',{exact:true}).click();await page.getByLabel('Đa giác BE (mét)',{exact:true}).fill('{"points":[[0,0],[10,0],[10,8],[0,8]]}');
  await page.getByLabel('Giới hạn tốc độ (m/s)',{exact:true}).fill('.4');await page.getByLabel('Sức chứa (người)',{exact:true}).fill('20');
  await page.getByRole('button',{name:'Lưu vùng lên BE',exact:true}).click();await page.getByText('Chỉnh vùng BE',{exact:true}).waitFor();
- assert.equal(writes.at(-1).body.zoneType,'WAITING');assert.equal(writes.at(-1).body.capacityLimit,20);
+ assert.equal(writes.at(-1).body.zoneType,'NO_STOP');assert.equal(writes.at(-1).body.capacityLimit,20);
  for(const [width,height]of[[1920,1080],[1366,768],[1024,768],[390,844]]){await page.setViewportSize({width,height});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No overflow '+width);await page.screenshot({path:`.workstation-build/facility/zones-${width}.png`,fullPage:true});}
  await page.setViewportSize({width:1366,height:900});await page.getByRole('button',{name:'3. Điểm đích',exact:true}).click();await page.getByRole('button',{name:'Điểm đích',exact:true}).click();
  await page.getByLabel('Mã điểm BE',{exact:true}).fill('END_NEW');await page.getByLabel('Tên điểm BE',{exact:true}).fill('Điểm mới');await page.getByLabel('X (m)',{exact:true}).fill('5');await page.getByLabel('Y (m)',{exact:true}).fill('7');await page.getByLabel('Hướng đến (radian)',{exact:true}).fill('1.57');

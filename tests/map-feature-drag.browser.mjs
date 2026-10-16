@@ -6,7 +6,7 @@ import {createDraft,saveMap} from '../src/pages/Admin/mapStudioModel.js';
 const require=createRequire(import.meta.url),{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const browser=await chromium.launch({headless:true,...(process.env.CHROME_EXECUTABLE?{executablePath:process.env.CHROME_EXECUTABLE}:{})});
 const context=await browser.newContext({viewport:{width:1440,height:1000}});
-const seed=saveMap({...createDraft(),scan:{status:'complete',progress:100},zones:[{id:'area',name:'Vùng A',type:'AREA',enabled:true,points:[{x:660,y:180},{x:880,y:180},{x:880,y:290},{x:660,y:290}]}],endpoints:[{id:'home',name:'Gốc',type:'HOME',x:580,y:330,heading:90,enabled:true},{id:'pickup',name:'Nhận thuốc',type:'PICKUP',x:815,y:245,heading:180,enabled:true,description:'Giữ metadata',tasks:[{action:'LOAD',seconds:7}]}]},'2026-10-14');
+const seed=saveMap({...createDraft(),scan:{status:'complete',progress:100},zones:[{id:'area',name:'Vùng A',type:'NO_STOP',enabled:true,points:[{x:660,y:180},{x:880,y:180},{x:880,y:290},{x:660,y:290}]}],endpoints:[{id:'home',name:'Gốc',type:'PARK',x:580,y:330,heading:90,enabled:true},{id:'pickup',name:'Nhận thuốc',type:'WAYPOINT',x:815,y:245,heading:180,enabled:true,description:'Giữ metadata',tasks:[{action:'LOAD',seconds:7}]}]},'2026-10-14');
 await context.addInitScript(seed=>{sessionStorage.setItem('mediassist-rover.session',JSON.stringify({tokens:{accessToken:'ui-test-only'},account:{role:'ADMIN'}}));if(!localStorage.getItem('mediassist.map-studio.lidar.v3'))localStorage.setItem('mediassist.map-studio.lidar.v3',JSON.stringify(seed));},seed);
 const page=await context.newPage(),errors=[],requests=[];
 page.on('pageerror',e=>errors.push(e.message));await page.route(url=>url.pathname.startsWith('/api/'),route=>{requests.push(route.request().url());return route.abort();});
@@ -29,7 +29,7 @@ try{
   const moved=seed.zones[0].points.map(p=>({x:p.x-25,y:p.y+10}));
   assert.deepEqual(await corners(),moved,'First drag selects and moves the whole zone');
   assert.equal(await field('Corner 1 X').count(),0,'Coordinate fields are hidden');
-  assert.deepEqual(await field('Loại vùng').locator('option').evaluateAll(options=>options.map(o=>o.value)),['AREA','EXCLUSION','SPEED_LIMIT','ASSUMED_COST','REST']);
+  assert.deepEqual(await field('Loại vùng').locator('option').evaluateAll(options=>options.map(o=>o.value)),['KEEP_OUT','SPEED','NO_STOP']);
   await page.getByRole('region',{name:'Chính sách áp dụng vùng'}).getByText('Chưa đồng bộ với robot',{exact:true}).waitFor();
   assert.deepEqual((await data()).zones[0].points,seed.zones[0].points,'Drag previews until saved');
   await drag(moved[0],{x:moved[0].x+15,y:moved[0].y+5});

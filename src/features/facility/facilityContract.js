@@ -1,5 +1,5 @@
-export const ZONE_CATEGORIES={WAITING:'Khu chờ',CORRIDOR:'Hành lang',RESTRICTED:'Khu hạn chế',SERVICE:'Khu dịch vụ',OTHER:'Khu khác'};
-export const ENDPOINT_CATEGORIES={ROOM_STOP:'Điểm dừng phòng',PICKUP:'Nhận hàng',DROPOFF:'Giao hàng',WAITING:'Điểm chờ',CHECKPOINT:'Điểm kiểm tra',MANUAL_CHARGE:'Sạc có người hỗ trợ'};
+export const ZONE_CATEGORIES={KEEP_OUT:'Khu vực cấm',SPEED:'Khu vực giới hạn tốc độ',NO_STOP:'Khu vực không được dừng'};
+export const ENDPOINT_CATEGORIES={WAYPOINT:'Điểm đường',CHARGER:'Điểm sạc',PARK:'Điểm đỗ',STAGING:'Điểm tập kết'};
 const text=(value,name,max)=>{if(typeof value!=='string'||!value.trim()||value.length>max)throw Error(`${name} bắt buộc, tối đa ${max} ký tự.`);return value.trim();};
 const number=(value,name)=>{if(value===''||value==null||!Number.isFinite(Number(value)))throw Error(`${name} phải là số hữu hạn.`);return Number(value);};
 function optionalNumber(value,name,min=0,strict=false){if(value===''||value==null)return null;const n=number(value,name);if(strict?n<=min:n<min)throw Error(`${name} không hợp lệ.`);return n;}

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { STAGES, createDraft, stageEnabled, loadDraft, STORAGE_KEY, freePoint, zoneError, endpointError, changeDraft, saveMap, mapIssues, exportMap } from '../src/pages/Admin/mapStudioModel.js';
 import { SCAN_PATH, rayHits } from '../src/pages/Admin/lidarGeometry.js';
 const rectangle=(x,y,w,h)=>[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}];
-const zone=(points,type='AREA')=>({id:'z1',name:'Zone A',type,speed:.3,heading:90,points});
-const endpoint=(patch={})=>({id:'e1',name:'Home',type:'HOME',x:580,y:330,heading:90,...patch});
+const zone=(points,type='NO_STOP')=>({id:'z1',name:'Zone A',type,speed:.3,points});
+const endpoint=(patch={})=>({id:'e1',name:'Home',type:'PARK',x:580,y:330,heading:90,...patch});
 const captured=()=>({...createDraft(),scan:{status:'complete',progress:100}});
 test('exactly three steps; raw scan carries no semantic labels or navigation data',()=>{
   const d=createDraft();
@@ -41,15 +41,15 @@ test('zone polygons reject invalid geometry but may overlay occupied or unknown 
   assert.match(zoneError(d,zone(rectangle(330,330,3,3))),/larger/);
 });
 test('zone and endpoint guards enforce exclusion rules in both editing directions',()=>{
-  const d=captured();const z=zone(rectangle(540,315,80,30),'EXCLUSION');
-  d.zones=[z];assert.match(endpointError(d,endpoint()),/exclusion/);
+  const d=captured();const z=zone(rectangle(540,315,80,30),'KEEP_OUT');
+  d.zones=[z];assert.match(endpointError(d,endpoint()),/KEEP_OUT/);
   d.zones=[];d.endpoints=[endpoint()];assert.match(zoneError(d,z),/phủ lên điểm đích/);
 });
-test('speed and direction parameters are validated and persisted',()=>{
+test('speed parameters and canonical zone values are validated',()=>{
   const d=captured();
-  assert.match(zoneError(d,{...zone(rectangle(330,320,80,55),'SPEED_LIMIT'),speed:0}),/speed/);
-  assert.match(zoneError(d,{...zone(rectangle(330,320,80,55),'PREFERRED_DIRECTION'),heading:360}),/direction/);
-  assert.equal(zoneError(d,zone(rectangle(330,320,80,55),'PREFERRED_DIRECTION')),'');
+  assert.match(zoneError(d,{...zone(rectangle(330,320,80,55),'SPEED'),speed:0}),/speed/);
+  assert.match(zoneError(d,zone(rectangle(330,320,80,55),'AREA')),/zone type/);
+  assert.equal(zoneError(d,zone(rectangle(330,320,80,55),'NO_STOP')),'');
 });
 test('endpoint names and separation are validated without requiring arrival heading',()=>{
   const d=captured();d.endpoints=[endpoint()];

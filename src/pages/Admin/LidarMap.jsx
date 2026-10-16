@@ -112,8 +112,7 @@ export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit
     return <Selectable key={z.id||'new-zone'} label={'Edit zone '+(z.name||'mới')} onSelect={editable?()=>onSelectZone(z.id):undefined}
       onPointerDown={editable?e=>startDrag(e,'zone',z):undefined}>
       <polygon data-testid={editing?'selected-zone':undefined} points={z.points.map(p=>p.x+','+p.y).join(' ')} fill={c+'30'} stroke={c} strokeWidth={editing?3:1.7} strokeDasharray={editing&&zoneDirty?'6 4':undefined}/>
-      <text x={p.x+6} y={p.y+18} fill={c} stroke="#101317" strokeWidth="3" paintOrder="stroke" fontSize="12" fontWeight="600">{vi(z.name)}{z.type==='SPEED_LIMIT'?' · '+z.speed+' m/s':''}</text>
-      {z.type==='PREFERRED_DIRECTION'&&<Direction point={{x:z.points.reduce((s,p)=>s+p.x,0)/z.points.length,y:z.points.reduce((s,p)=>s+p.y,0)/z.points.length}} heading={z.heading} color={c} length={36}/>}
+      <text x={p.x+6} y={p.y+18} fill={c} stroke="#101317" strokeWidth="3" paintOrder="stroke" fontSize="12" fontWeight="600">{vi(z.name)}{z.type==='SPEED'?' · '+z.speed+' m/s':''}</text>
       {editing&&z.points.map((p,i)=><g key={i}><circle data-testid={'zone-vertex-'+i} aria-label={'Kéo đỉnh '+(i+1)} cx={p.x} cy={p.y} r={7/zoom} fill="white" stroke={c} strokeWidth={2/zoom} style={{cursor:editable?'move':undefined}} onPointerDown={editable?e=>startDrag(e,'vertex',z,i):undefined}/><text x={p.x+10/zoom} y={p.y-10/zoom} fill="white" fontSize={11/zoom} pointerEvents="none">{i+1}</text></g>)}
     </Selectable>;
   };

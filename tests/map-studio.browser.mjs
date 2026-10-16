@@ -43,10 +43,10 @@ try {
   await click('Save zone');assert.equal((await saved()).zones.length,1);
   await shot('03-area');
   await click('New zone');await page.getByLabel(vi('Zone name'),{exact:true}).fill('No entry');
-  await page.getByLabel(vi('Zone type'),{exact:true}).selectOption('EXCLUSION');
+  await page.getByLabel(vi('Zone type'),{exact:true}).selectOption('KEEP_OUT');
   await rect(335,320,70,45);await click('Save zone');
   await click('New zone');await page.getByLabel(vi('Zone name'),{exact:true}).fill('Slow crossing');
-  await page.getByLabel(vi('Zone type'),{exact:true}).selectOption('SPEED_LIMIT');
+  await page.getByLabel(vi('Zone type'),{exact:true}).selectOption('SPEED');
   await page.getByLabel(vi('Maximum speed (m/s)'),{exact:true}).fill('0.2');
   await click('Draw polygon');await point(520,310);await point(625,310);await point(625,360);await point(520,360);
   await click('Undo corner');await point(520,360);await click('Finish shape');await click('Save zone');
@@ -54,7 +54,7 @@ try {
   await shot('04-zones');
   await click('Continue to Endpoint →');assert.equal(await button('Save map').isDisabled(),true);
   await page.getByLabel(vi('Endpoint name'),{exact:true}).fill('Home');
-  await page.getByLabel(vi('Endpoint type'),{exact:true}).selectOption('HOME');
+  await page.getByLabel(vi('Endpoint type'),{exact:true}).selectOption('PARK');
   await click('Place on map');await point(365,340);
   await page.getByText(vi('An endpoint cannot be placed inside an exclusion zone.'),{exact:true}).waitFor();
   assert.equal(await button('Save endpoint').isDisabled(),true);
@@ -73,7 +73,7 @@ try {
   assert.equal(await page.getByTestId('selected-endpoint').locator('path').count(),0,'No endpoint direction arrow');
   await click('New endpoint');
   await page.getByLabel(vi('Endpoint name'),{exact:true}).fill('Pickup');
-  await page.getByLabel(vi('Endpoint type'),{exact:true}).selectOption('PICKUP');
+  await page.getByLabel(vi('Endpoint type'),{exact:true}).selectOption('WAYPOINT');
   await click('Zoom in');await point(815,245);await click('Fit map');await click('Save endpoint');
   const pickup=(await saved()).endpoints.find(e=>e.name==='Pickup');
   assert.equal(pickup.tasks,undefined,'New endpoints do not inject hidden workflow tasks');
@@ -95,7 +95,7 @@ try {
   await tab('Zone').click();await page.getByRole('alertdialog').waitFor();await click('Keep editing');assert.ok(await page.getByRole('heading',{name:/3\.\s*Điểm đích/,exact:true}).isVisible());
   await tab('Zone').click();await click('Discard edits');
   await click('New zone');await page.getByLabel(vi('Zone name'),{exact:true}).fill('Blocked home');
-  await page.getByLabel(vi('Zone type'),{exact:true}).selectOption('EXCLUSION');await rect(555,315,60,32);
+  await page.getByLabel(vi('Zone type'),{exact:true}).selectOption('KEEP_OUT');await rect(555,315,60,32);
   await page.getByText(vi('Vùng cấm quá gần hoặc phủ lên điểm đích đã lưu. Hãy di chuyển điểm đích trước.'),{exact:true}).waitFor();
   assert.equal(await button('Save zone').isDisabled(),true);
   await click('New zone');await click('Discard edits');

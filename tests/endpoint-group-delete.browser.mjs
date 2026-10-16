@@ -9,7 +9,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_EXECUTABLE });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const seed = saveMap({ ...createDraft(), scan: { status: 'complete', progress: 100 },
-  endpoints: [{ id: 'home', name: 'Gốc', type: 'HOME', x: 580, y: 330, heading: 90 }],
+  endpoints: [{ id: 'home', name: 'Gốc', type: 'PARK', x: 580, y: 330, heading: 90 }],
   endpointGroups: [
     { id: 'full', code: 'FULL', name: 'Nhóm có điểm', selectionPolicy: 'PRIORITY', active: true, members: [{ endpointId: 'home', sequenceNo: 1, active: true }] },
     { id: 'empty', code: 'EMPTY', name: 'Nhóm rỗng', selectionPolicy: 'PRIORITY', active: true, members: [] },

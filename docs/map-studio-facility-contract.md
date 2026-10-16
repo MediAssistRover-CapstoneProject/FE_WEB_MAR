@@ -22,7 +22,7 @@ Map Studio chỉ có ba bước Quét / Vùng / Điểm đích, cùng `Workspace
 
 OTTO mô tả vùng là đa giác kín từ ba đỉnh, không bị hạn chế bởi tường/vật cản. Bỏ điều kiện cũ buộc vùng phải giao vùng sàn quan sát được. Điểm đích mô phỏng vẫn phải nằm trên sàn đi được và đủ khoảng cách thân robot.
 
-BE `ZoneType`: WAITING, CORRIDOR, RESTRICTED, SERVICE, OTHER. Các loại này là phân loại chức năng, **không tự ánh xạ** thành EXCLUSION hoặc PREFERRED_DIRECTION. ZoneRequest hỗ trợ polygonJson, speedLimitMps, capacityLimit, calibratedAreaM2, cameraSourceRef, cameraRoiJson, active, publicVisible, description. FE cho vẽ đa giác trên khung mét và chỉnh JSON nâng cao; không giả vẽ tường khi chưa có occupancy artifact.
+BE `ZoneType` chỉ gồm `KEEP_OUT`, `SPEED`, `NO_STOP`. `ZoneRequest` hỗ trợ polygonJson, speedLimitMps, capacityLimit, calibratedAreaM2, cameraSourceRef, cameraRoiJson, active, publicVisible, description. FE cho vẽ đa giác trên khung mét và chỉnh JSON nâng cao; không giả vẽ tường khi chưa có occupancy artifact.
 
 Danh mục tham khảo gồm đủ 18 loại vùng OTTO và AREA để gắn nhãn. Menu tạo vùng chỉ cho chọn 8 loại có hành vi thực thi trong demo: AREA, EXCLUSION, SPEED_LIMIT, PREFERRED_DIRECTION, ASSUMED_COST (chế độ vật cản), SINGLE_ROBOT, OCCUPANCY_MONITORING, NO_REPLAN. Các loại còn lại nằm trong mục thu gọn “Các loại vùng cần kết nối robot”, giải thích giới hạn thay vì cho tạo vùng không có tác dụng.
 
@@ -37,7 +37,7 @@ Tài liệu đối chiếu bổ sung: [danh mục 18 loại vùng](https://docs.
 
 ## Endpoint và nhóm
 
-Endpoint là đích chức năng có vị trí + hướng. EndpointRequest BE dùng mét/radian, enum ROOM_STOP, PICKUP, DROPOFF, WAITING, CHECKPOINT, MANUAL_CHARGE; có zoneId, roomId, accessible và trạng thái. Mẫu, tác vụ chờ/thoát, ownership trong editor cục bộ **không được gửi giả** vào DTO này.
+Endpoint là đích chức năng có vị trí + hướng. `EndpointRequest` BE dùng mét/radian và enum chỉ gồm `WAYPOINT`, `CHARGER`, `PARK`, `STAGING`; có zoneId, roomId, accessible và trạng thái. Mẫu, tác vụ chờ/thoát, ownership trong editor cục bộ **không được gửi giả** vào DTO này.
 
 Nhóm thể hiện các điểm thay thế được cho một công việc, không phải tuyến đi qua tất cả điểm và không phải joint ownership. Mỗi điểm có thể vào nhiều nhóm; các thành viên không bắt buộc giống hệt bước thao tác hay docking offset.
 
