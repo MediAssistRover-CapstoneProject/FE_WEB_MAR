@@ -41,8 +41,10 @@ try {
   await turn.hover();await page.mouse.down();
   await page.waitForFunction(()=>JSON.parse(localStorage.getItem('mediassist.map-studio.lidar.v3')).scan.progress===100,null,{timeout:20000});
   await page.mouse.up();
+  assert.equal((await saved()).scan.status,'running','Full coverage must not auto-finish a manual scan');
   assert.deepEqual((await saved()).zones,[]);await shot('02-scan');
-  await click('Finish scan → Zone');
+  await page.getByRole('button',{name:'Hoàn tất quét → Phân vùng',exact:true}).click();
+  assert.equal((await saved()).scan.status,'complete','Only the explicit finish action completes the scan');
   await page.getByLabel(vi('Zone name'),{exact:true}).fill('Pharmacy');
   await page.getByText('Thông tin bổ sung',{exact:true}).click();
   await page.getByLabel('Mô tả vùng',{exact:true}).fill('Khu vực nhận thuốc, không làm thay đổi đường đi');

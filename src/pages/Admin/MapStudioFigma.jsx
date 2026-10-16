@@ -98,7 +98,7 @@ export default function MapStudioFigma({initialStage='scan'}) {
       const record=Math.hypot(robot.x-last.x,robot.y-last.y)>=14;
       const nextTrail=record?[...trail,{x:robot.x,y:robot.y}]:trail;
       const progress=Math.min(100,Math.round((current.scan.progress+.75)*100)/100);
-      return {...current,scan:{...current.scan,status:progress>=100?'captured':'running',progress,robot,trail:nextTrail}};
+      return {...current,scan:{...current.scan,status:'running',progress,robot,trail:nextTrail}};
     }),80);
     return ()=>clearInterval(timer);
   },[draft.scan.status,driveDirection]);
@@ -206,9 +206,9 @@ export default function MapStudioFigma({initialStage='scan'}) {
       <div className="ls-main">
         <LidarMap draft={draft} stage={stage} tool={tool} onPoint={onPoint} zoneEdit={stage==='zone'?zone:null} endpointEdit={stage==='endpoint'?endpoint:null} onSelectZone={selectZone} onSelectEndpoint={selectEndpoint} onEditZone={setZone} onEditEndpoint={setEndpoint} rectangleStart={rectangleStart} hoverPoint={hover} onHover={setHover} zoneDirty={zoneDirty} endpointDirty={endpointDirty}/>
         {vi(tool&&<div className="ls-toolhint"><span>{vi(toolText)}</span><Button className="small" onClick={cancelTool}>{vi("Cancel tool")}</Button></div>)}
-        {vi(stage==='scan'&&<Panel title={vi("Scan controls")}><div className="ls-runbar"><div><strong>{({idle:'Sẵn sàng quét thủ công',running:'Cảm biến đang bật · hãy điều khiển robot',paused:'Đã tạm dừng cảm biến',captured:'Đã hoàn tất bản quét',complete:'Bản quét đã hoàn tất'})[draft.scan.status]}</strong><small>Robot chỉ quét khi bạn đang giữ nút điều khiển</small></div><div className="ls-actions">
+        {vi(stage==='scan'&&<Panel title={vi("Scan controls")}><div className="ls-runbar"><div><strong>{({idle:'Sẵn sàng quét thủ công',running:'Cảm biến đang bật · hãy điều khiển robot',paused:'Đã tạm dừng cảm biến',captured:'Chờ xác nhận hoàn tất',complete:'Bản quét đã hoàn tất'})[draft.scan.status]}</strong><small>Mức phủ chỉ để tham khảo · bạn quyết định khi nào hoàn tất</small></div><div className="ls-actions">
           {vi(!['captured','complete'].includes(draft.scan.status)&&<Button tone="primary" onClick={()=>setDraft(current=>({...current,scan:{...current.scan,status:current.scan.status==='running'?'paused':'running'}}))}>{draft.scan.status==='running'?'Tạm dừng cảm biến':draft.scan.status==='paused'?'Tiếp tục quét':'Bật cảm biến LiDAR'}</Button>)}
-          <Button tone={draft.scan.progress===100?'primary':''} disabled={draft.scan.progress<100} onClick={()=>{if(draft.scan.status!=='complete')update({scan:{status:'complete',progress:100}});setStage('zone');setNotice('Scan retained. Draw zones over the captured geometry.');}}>{vi("Finish scan → Zone")}</Button>
+          <Button tone={draft.scan.progress>0?'primary':''} disabled={draft.scan.progress<=0} onClick={()=>{setDriveDirection('');if(draft.scan.status!=='complete')update(current=>({scan:{...current.scan,status:'complete'}}));setStage('zone');setNotice('Đã hoàn tất bản quét thủ công. Hãy khoanh vùng trên dữ liệu vừa ghi nhận.');}}>Hoàn tất quét → Phân vùng</Button>
         </div></div><div className="ls-progress"><i style={{width:draft.scan.progress+'%'}}/></div></Panel>)}
         {stage!=='scan'&&<div className="ls-hint">{stage==='zone'?'Khoanh vùng bằng hình chữ nhật hoặc đa giác. Kéo bên trong để di chuyển, kéo chấm trắng để chỉnh đường biên.':'Kéo chấm xanh trên bản đồ để đổi vị trí điểm đích.'} Nhấn Esc để hủy lượt kéo, sau đó bấm Lưu để giữ thay đổi.</div>}
       </div>
@@ -243,7 +243,7 @@ export default function MapStudioFigma({initialStage='scan'}) {
               <p className="ls-safety-note">Chế độ demo: robot và vùng LiDAR sẽ di chuyển trực tiếp trên bản đồ. Chưa gửi lệnh tới robot vật lý.</p>
             </div>
           </Panel>
-          <Panel title="Phiên quét"><Field label="Tên bản đồ" maxLength={60} value={draft.name} onChange={e=>update({name:e.target.value})}/><Stat label="Nguồn">Bản quét LiDAR mẫu</Stat><Stat label="Tiến độ quét">{draft.scan.progress}%</Stat><Stat label="Độ phân giải">0,05 m / ô</Stat><Button tone="danger" className="ls-full" disabled={draft.scan.status==='idle'} onClick={()=>setConfirm({kind:'reset'})}>Quét mới</Button></Panel>
+          <Panel title="Phiên quét"><Field label="Tên bản đồ" maxLength={60} value={draft.name} onChange={e=>update({name:e.target.value})}/><Stat label="Nguồn">Bản quét LiDAR mẫu</Stat><Stat label="Mức phủ tham khảo">{draft.scan.progress}%</Stat><Stat label="Độ phân giải">0,05 m / ô</Stat><Button tone="danger" className="ls-full" disabled={draft.scan.status==='idle'} onClick={()=>setConfirm({kind:'reset'})}>Quét mới</Button></Panel>
         </>}
         {vi(stage==='zone'&&<><Panel title={vi(zone.id?'Edit zone':'Create zone')}><form onSubmit={storeZone}><Field label="Zone name" required maxLength={40} placeholder={vi("e.g. Pharmacy")} value={zone.name} onChange={e=>setZone(z=>({...z,name:e.target.value}))}/><ZoneTypePicker value={zone.type} onChange={type=>setZone(z=>({...z,type}))}/><p>{vi(zoneType.help)}</p><ZoneProperties zone={zone} setZone={setZone}/>
           {vi(zone.type==='SPEED'&&<Field label="Maximum speed (m/s)" type="number" min=".1" max="1.5" step=".05" required value={zone.speed} onChange={e=>setZone(z=>({...z,speed:e.target.value===''?'':Number(e.target.value)}))}/>)}
