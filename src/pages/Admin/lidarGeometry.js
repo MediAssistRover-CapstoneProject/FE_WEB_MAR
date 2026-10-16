@@ -1,6 +1,7 @@
 // Synthetic scan geometry inspired by the user's reference. Editing layers use
 // the same coordinates; these are not measurements from a connected sensor.
 export const MAP = { width: 1200, height: 680, resolution: 0.05 };
+export const SCAN_START = { x: 600, y: 350, heading: 0 };
 export const FLOOR = [[90,230],[500,230],[500,100],[640,100],[640,155],[930,155],[930,215],[1110,215],[1110,355],[920,355],[920,425],[1000,425],[1000,570],[650,570],[650,600],[500,600],[500,570],[230,570],[230,415],[290,415],[290,355],[90,355]].map(([x,y]) => ({x,y}));
 const segments = points => points.slice(1).map((p,i) => [points[i],p].map(([x,y])=>({x,y})));
 export const WALLS = [

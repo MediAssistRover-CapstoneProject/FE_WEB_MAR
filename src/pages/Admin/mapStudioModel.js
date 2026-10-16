@@ -1,4 +1,4 @@
-import { MAP, FLOOR, WALLS, OBSTACLES, inPolygon, distanceToSegment } from './lidarGeometry.js';
+import { MAP, FLOOR, WALLS, OBSTACLES, SCAN_START, inPolygon, distanceToSegment } from './lidarGeometry.js';
 import { groupsFor, groupError } from '../../features/facility/endpointGroups.js';
 import { ZONE_TYPES, blockedZone, noStopZone } from './zoneCatalog.js';
 export { ZONE_TYPES } from './zoneCatalog.js';
@@ -11,7 +11,7 @@ export const STAGES = [
 export const STORAGE_KEY = 'mediassist.map-studio.lidar.v3';
 export const ENDPOINT_TYPES = ['WAYPOINT', 'CHARGER', 'PARK', 'STAGING'];
 export function createDraft() {
-  return { schema: 3, revision: 0, name: 'Tầng 1 bệnh viện', scan: { status: 'idle', progress: 0 }, zones: [], endpoints: [], endpointGroups: [], saved: null };
+  return { schema: 3, revision: 0, name: 'Tầng 1 bệnh viện', scan: { status: 'idle', progress: 0, robot: { ...SCAN_START }, trail: [{ x: SCAN_START.x, y: SCAN_START.y }] }, zones: [], endpoints: [], endpointGroups: [], saved: null };
 }
 export function validPoint(p) { return Number.isFinite(p?.x) && Number.isFinite(p?.y) && p.x >= 0 && p.x <= MAP.width && p.y >= 0 && p.y <= MAP.height; }
 export function loadDraft(storage) {
@@ -24,7 +24,15 @@ export function loadDraft(storage) {
     // A damaged saved snapshot must not crash Dispatch or discard a valid draft.
     let saved=d.saved;
     if(saved){try{if(saved.revision!==saved.snapshot?.revision||mapIssues(saved.snapshot).length)saved=null;}catch{saved=null;}}
-    return { ...d, endpointGroups: groupsFor(d), saved, scan: { ...d.scan, status: d.scan.status === 'running' ? 'paused' : d.scan.status } };
+    const scan={...d.scan,status:d.scan.status==='running'?'paused':d.scan.status};
+    // Completed legacy maps keep their original serialized shape. Active scan
+    // drafts receive the manual-control state required by the new demo.
+    if(scan.status!=='complete'){
+      const source=validPoint(scan.robot)?scan.robot:SCAN_START;
+      scan.robot={...SCAN_START,...source,heading:Number.isFinite(source.heading)?source.heading:SCAN_START.heading};
+      scan.trail=Array.isArray(scan.trail)&&scan.trail.length&&scan.trail.every(validPoint)?scan.trail.map(({x,y})=>({x,y})):[{x:scan.robot.x,y:scan.robot.y}];
+    }
+    return { ...d, endpointGroups: groupsFor(d), saved, scan };
   } catch { return createDraft(); }
 }
 export function changeDraft(draft, changes) { return { ...draft, ...changes, revision: draft.revision + 1 }; }
