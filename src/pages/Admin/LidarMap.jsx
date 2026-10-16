@@ -53,8 +53,16 @@ function ScanCanvas({trail,revealAll=false}) {
     ctx.save();
     if(!revealAll){
       ctx.beginPath();
-      // Accumulate observed patches only where the operator has driven the robot.
-      for(const pos of trail){ctx.moveTo(pos.x+150,pos.y);ctx.arc(pos.x,pos.y,150,0,Math.PI*2);}
+      // Accumulate only line-of-sight polygons recorded at driven positions.
+      // Unlike the former circular mask, these polygons end at the first wall
+      // or obstacle and therefore never reveal rooms hidden behind a surface.
+      for(const pos of trail){
+        const hits=rayHits(pos,128);
+        if(!hits.length)continue;
+        ctx.moveTo(hits[0].x,hits[0].y);
+        for(let i=1;i<hits.length;i++)ctx.lineTo(hits[i].x,hits[i].y);
+        ctx.closePath();
+      }
       ctx.clip();
     }
     ctx.drawImage(image.current,0,0,1200,680);ctx.restore();

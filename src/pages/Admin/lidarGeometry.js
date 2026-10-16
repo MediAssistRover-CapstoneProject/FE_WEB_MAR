@@ -25,6 +25,10 @@ export const OBSTACLES = [
   {x:940,y:520,w:20,h:30}, {x:486,y:367,w:14,h:15}, {x:658,y:360,w:15,h:15},
   {x:555,y:411,w:65,h:13}, {x:548,y:390,w:13,h:35}, {x:613,y:390,w:13,h:35},
 ];
+const LIDAR_SURFACES = [...WALLS, ...OBSTACLES.flatMap(({x,y,w,h}) => {
+  const corners=[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}];
+  return corners.map((point,index)=>[point,corners[(index+1)%corners.length]]);
+})];
 export const SCAN_PATH = [[165,330],[280,330],[460,330],[548,330],[548,190],[548,330],[800,330],[1060,330],[880,330],[880,380],[635,380],[635,450],[580,450],[580,550],[580,450],[525,450],[525,395],[330,395]].map(([x,y]) => ({x,y}));
 export function distanceToSegment(p,a,b) {
   const dx=b.x-a.x,dy=b.y-a.y;
@@ -48,7 +52,10 @@ export function rayHits(origin, count=64) {
   return Array.from({length:count},(_,i)=>{
     const angle=i/count*Math.PI*2, dx=Math.cos(angle),dy=Math.sin(angle);
     let distance=240;
-    for(const [a,b] of WALLS) {
+    // A LiDAR return always stops at the nearest solid surface. Furniture is
+    // included here as well as walls so neither beams nor observed floor can
+    // appear through an obstacle.
+    for(const [a,b] of LIDAR_SURFACES) {
       const sx=b.x-a.x,sy=b.y-a.y,den=dx*sy-dy*sx;
       if(Math.abs(den)<1e-9) continue;
       const qx=a.x-origin.x,qy=a.y-origin.y,t=(qx*sy-qy*sx)/den,u=(qx*dy-qy*dx)/den;

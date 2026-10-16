@@ -48,6 +48,13 @@ test('the simulated survey path stays in free space',()=>{
   SCAN_PATH.slice(1).forEach((b,i)=>{const a=SCAN_PATH[i];for(let t=0;t<=1;t+=.05)assert.ok(freePoint({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t},2),'Survey must not cross a wall or obstacle');});
   assert.equal(rayHits({x:580,y:330}).length,64);
 });
+test('LiDAR beams stop at the nearest wall or obstacle',()=>{
+  const [right,down,left,up]=rayHits({x:800,y:200},4);
+  assert.deepEqual(right,{x:930,y:200});
+  assert.deepEqual(down,{x:800,y:310});
+  assert.ok(Math.abs(left.x-773)<1e-9 && Math.abs(left.y-200)<1e-9,'left beam must stop at furniture');
+  assert.ok(Math.abs(up.x-800)<1e-9 && Math.abs(up.y-155)<1e-9,'up beam must stop at the room wall');
+});
 test('zone polygons reject invalid geometry but may overlay occupied or unknown space (OTTO)',()=>{
   const d=captured();
   assert.equal(zoneError(d,zone(rectangle(330,320,80,55))),'');
