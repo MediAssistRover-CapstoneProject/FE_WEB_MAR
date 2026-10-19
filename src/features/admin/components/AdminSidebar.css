@@ -1,0 +1,216 @@
+.sidebar.mediassist-sidebar {
+  width: 248px;
+  padding: 18px 12px 12px;
+  overflow: hidden;
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.app .workspace {
+  margin-left: 248px;
+  width: calc(100% - 248px);
+}
+
+.workflows-screen .workflows-main {
+  margin-left: 248px;
+}
+
+.sidebar.mediassist-sidebar .brand {
+  flex: none;
+  padding: 0 10px 15px;
+  font-size: 19px;
+  line-height: 1.2;
+  position: relative;
+}
+
+.sidebar.mediassist-sidebar .brand span {
+  margin-top: 5px;
+  font-size: 11px;
+}
+
+.sidebar.mediassist-sidebar nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.sidebar.mediassist-sidebar nav section {
+  margin: 3px 0;
+}
+
+.sidebar.mediassist-sidebar nav h3 {
+  margin: 0;
+}
+
+.sidebar.mediassist-sidebar .sidebar-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 37px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: transparent;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.sidebar.mediassist-sidebar .sidebar-group-toggle:hover,
+.sidebar.mediassist-sidebar .current-group > h3 .sidebar-group-toggle {
+  background: #eaf2ff;
+  color: #2563eb;
+}
+
+.sidebar.mediassist-sidebar .sidebar-chevron {
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform .15s ease;
+}
+
+.sidebar.mediassist-sidebar .sidebar-group-toggle[aria-expanded="true"] .sidebar-chevron {
+  transform: rotate(225deg);
+}
+
+.sidebar.mediassist-sidebar .sidebar-group-items {
+  padding: 2px 0 5px 8px;
+}
+
+.sidebar.mediassist-sidebar .nav-item {
+  min-height: 36px;
+  height: auto;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.sidebar.mediassist-sidebar .nav-item.active,
+.sidebar.mediassist-sidebar .sidebar-account.active {
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.sidebar.mediassist-sidebar .sidebar-footer {
+  flex: none;
+  gap: 4px;
+  margin: 0;
+  padding: 10px 0 2px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.sidebar.mediassist-sidebar .sidebar-account,
+.sidebar.mediassist-sidebar .sidebar-footer .logout-button {
+  width: 100%;
+  min-height: 36px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: transparent;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+}
+
+.sidebar.mediassist-sidebar .sidebar-account:hover {
+  background: #eaf2ff;
+  color: #1d4ed8;
+}
+
+.sidebar-mobile-toggle,
+.sidebar.mediassist-sidebar .sidebar-mobile-close,
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .app .workspace {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .workflows-screen .workflows-main {
+    margin-left: 0;
+  }
+
+  .app .topbar {
+    padding-left: 66px;
+  }
+
+  .workflows-screen .workflows-header {
+    padding-left: 48px;
+  }
+
+  .sidebar-mobile-toggle {
+    display: grid;
+    place-items: center;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 40;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #0f172a;
+    font-size: 20px;
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 41;
+    border-radius: 0;
+    background: rgb(15 23 42 / 45%);
+  }
+
+  .sidebar.mediassist-sidebar {
+    display: flex;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 42;
+    width: min(280px, 86vw);
+    visibility: hidden;
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+    box-shadow: 10px 0 32px rgb(15 23 42 / 14%);
+  }
+
+  .sidebar.mediassist-sidebar.is-open {
+    visibility: visible;
+    transform: translateX(0);
+  }
+
+  .sidebar.mediassist-sidebar .sidebar-mobile-close {
+    display: grid;
+    place-items: center;
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    background: transparent;
+    color: #475569;
+    font-size: 24px;
+  }
+}

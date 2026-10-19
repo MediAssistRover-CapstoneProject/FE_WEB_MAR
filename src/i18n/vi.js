@@ -1,11 +1,13 @@
 import { catalog } from './viCatalog.js';
-const messages=new Map(Object.entries(catalog).map(([key,value])=>[key.toLowerCase(),value]));
+import { backendMessages } from './backendLabels.js';
+const combinedCatalog = { ...catalog, ...backendMessages };
+const messages=new Map(Object.entries(combinedCatalog).map(([key,value])=>[key.toLowerCase(),value]));
 // Translate display values only; do not change state, routes or API payloads.
 export function vi(value){
   if(Array.isArray(value))return value.map(vi);
   if(typeof value!=='string')return value;
   value=value.replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
-  const key=value.trim(),translated=catalog[key]??messages.get(key.toLowerCase());
+  const key=value.trim(),translated=combinedCatalog[key]??messages.get(key.toLowerCase());
   if(translated!==undefined)return (value.match(/^\s*/)?.[0]||'')+translated+(value.match(/\s*$/)?.[0]||'');
   const patterns=[
     [/^Enter (.+)$/i,(_,field)=>'Nhập '+vi(field)],

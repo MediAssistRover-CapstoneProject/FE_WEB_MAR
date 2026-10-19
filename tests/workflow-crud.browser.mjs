@@ -18,7 +18,7 @@ const json = (route, value, status = 200) => route.fulfill({ status, contentType
 
 try {
   await page.addInitScript(() => {
-    sessionStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { username: 'admin' }, tokens: { accessToken: 'test-access' } }));
+    sessionStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { username: 'admin', role: 'ADMIN' }, tokens: { accessToken: 'test-access' } }));
   });
   await page.route('**/api/v1/admin/workflows**', (route) => {
     const request = route.request();

@@ -134,7 +134,7 @@ export default function WorkstationsPage() {
   const [catalog, setCatalog] = useState({ endpoints: [], rooms: [], workflows: [], loading: true, error: '' });
   useEffect(() => {
     let active = true;
-    Promise.all([facilityApi.listEndpoints({ page: 0, size: 100 }), facilityApi.listRooms({ page: 0, size: 100 }), workflowApi.list({ page: 0, size: 100 })]).then(([endpointPage, roomPage, workflowPage]) => {
+    Promise.all([facilityApi.listEndpoints({ page: 0, size: 100 }), facilityApi.listRooms({ page: 0, size: 100 }), workflowApi.listPublished({ page: 0, size: 100 })]).then(([endpointPage, roomPage, workflowPage]) => {
       if (active) setCatalog({ endpoints: endpointPage.content ?? [], rooms: roomPage.content ?? [], workflows: latestWorkflowVersions(Array.isArray(workflowPage) ? workflowPage : workflowPage.content ?? []), loading: false, error: '' });
     }).catch((error) => { if (active) setCatalog({ endpoints: [], rooms: [], workflows: [], loading: false, error: error.message || 'Dispatch catalog is unavailable.' }); });
     return () => { active = false; };

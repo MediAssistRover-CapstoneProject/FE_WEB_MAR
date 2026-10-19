@@ -1,11 +1,11 @@
 export const navigationGroups = [
   ['Overview', ['Dashboard']],
-  ['Operations', ['Live Operations', 'Emergency Center', 'Missions', 'Patrol']],
-  ['Map & Navigation', ['Map Studio']],
+  ['Operations', ['Live Operations', 'Emergency Center', 'Missions', 'Patrol', 'Staff Shifts']],
+  ['Map & Navigation', ['Map Studio', 'Facility Management', 'Public Catalog']],
   ['Robot', ['Robot Status', 'Charging']],
-  ['Monitoring', ['Alerts', 'Crowd Heatmap', 'History & Replay', 'Analytics']],
-  ['Automation', ['Workflows', 'Voice & Scripts']],
-  ['Administration', ['Users & Roles', 'System Settings', 'Audit Logs']],
+  ['Monitoring', ['Alerts', 'Crowd Heatmap', 'History & Replay', 'Analytics', 'Audit Logs']],
+  ['Automation', ['Workflows', 'Workflow Management', 'Voice & Scripts']],
+  ['Administration', ['Users & Roles', 'System Settings', 'My Account']],
 ];
 
 export function isAdminScreen(screen) {

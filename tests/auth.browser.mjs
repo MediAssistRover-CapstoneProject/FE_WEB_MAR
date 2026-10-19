@@ -7,11 +7,21 @@ const browser = await chromium.launch({ headless: true, executablePath: process.
 const page = await browser.newPage();
 const requests = [];
 let acceptLogin = false;
+let rejectProfile = false;
+let forcePasswordChange = false, rejectCurrentPassword = true, profileRequests = 0;
+const passwordWrites = [];
 
 try {
   await page.route('**/api/v1/**', async route => {
     if (route.request().url().endsWith('/auth/me')) {
+      profileRequests++;
+      if (rejectProfile) return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ message: 'Tài khoản chưa có quyền truy cập' }) });
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ username: 'admin', role: 'ADMIN' }) });
+    }
+    if (route.request().url().endsWith('/auth/change-password')) {
+      passwordWrites.push(route.request().postDataJSON());
+      if (rejectCurrentPassword) { rejectCurrentPassword = false; return route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ message: 'Mật khẩu hiện tại không đúng' }) }); }
+      return route.fulfill({ status: 204 });
     }
     if (route.request().url().endsWith('/auth/login')) return route.fallback();
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [], totalElements: 0 }) });
@@ -21,7 +31,7 @@ try {
     requests.push(route.request().postDataJSON());
     await new Promise(resolve => setTimeout(resolve, 150));
     if (acceptLogin) {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ accessToken: 'test-access', refreshToken: 'test-refresh' }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ accessToken: 'test-access', refreshToken: 'test-refresh', mustChangePassword: forcePasswordChange }) });
     }
     await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ message: 'Tên đăng nhập hoặc mật khẩu không đúng' }) });
   });
@@ -45,6 +55,40 @@ try {
   await page.waitForURL('**/admin');
   assert.equal(requests.length, 2);
   assert.ok(await page.evaluate(() => JSON.parse(sessionStorage.getItem('mediassist-rover.session')).tokens.accessToken === 'test-access'));
+
+  rejectProfile = true;
+  await page.goto('http://127.0.0.1:5173/login');
+  await page.getByLabel('Tên đăng nhập').fill('admin');
+  await page.getByLabel('Mật khẩu').fill('test-only-password');
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await page.getByRole('alert').getByText('Tài khoản chưa có quyền truy cập').waitFor();
+  assert.ok(page.url().endsWith('/login'));
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('mediassist-rover.session')), null);
+  rejectProfile = false;
+
+  forcePasswordChange = true;
+  const beforeProfile = profileRequests;
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await page.waitForURL('**/change-password');
+  assert.equal(profileRequests, beforeProfile, 'BE blocks /auth/me until password is changed');
+  await page.goto('http://127.0.0.1:5173/admin');
+  await page.waitForURL('**/change-password');
+  await page.getByLabel('Mật khẩu hiện tại', { exact: true }).fill('temporary-test-password');
+  await page.getByLabel('Mật khẩu mới', { exact: true }).fill('new-test-password');
+  await page.getByLabel('Xác nhận mật khẩu mới', { exact: true }).fill('does-not-match');
+  await page.getByRole('button', { name: 'Lưu mật khẩu mới', exact: true }).click();
+  await page.getByText('Xác nhận mật khẩu mới chưa khớp.', { exact: true }).waitFor();
+  assert.equal(passwordWrites.length, 0);
+  await page.getByLabel('Xác nhận mật khẩu mới', { exact: true }).fill('new-test-password');
+  await page.getByRole('button', { name: 'Lưu mật khẩu mới', exact: true }).click();
+  await page.getByText('Mật khẩu hiện tại không đúng', { exact: true }).waitFor();
+  assert.ok(await page.evaluate(() => sessionStorage.getItem('mediassist-rover.session')));
+  await page.getByRole('button', { name: 'Lưu mật khẩu mới', exact: true }).click();
+  await page.waitForURL('**/login');
+  await page.getByText('Đã đổi mật khẩu. Hãy đăng nhập lại bằng mật khẩu mới.', { exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('mediassist-rover.session')), null);
+  assert.deepEqual(passwordWrites.at(-1), { currentPassword: 'temporary-test-password', newPassword: 'new-test-password' });
+  forcePasswordChange = false;
 
   await page.goto('http://127.0.0.1:5173/register');
   await page.getByText('Tài khoản MediAssistRover được quản trị viên cấp.', { exact: false }).waitFor();
