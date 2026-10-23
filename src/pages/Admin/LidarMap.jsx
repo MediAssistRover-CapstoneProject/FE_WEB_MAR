@@ -80,7 +80,7 @@ function Direction({point,heading,color='#60a5fa',length=25}) {
 function Endpoint({value,preview=false}) {
   return <g opacity={preview ? 0.7 : 1}><title>{value.name || vi('New endpoint')}</title><circle cx={value.x} cy={value.y} r="14" fill="transparent"/><circle data-testid="endpoint-dot" cx={value.x} cy={value.y} r="4" fill="#60a5fa" pointerEvents="none"/></g>;
 }
-export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit,onSelectZone,onSelectEndpoint,onEditZone,onEditEndpoint,rectangleStart,hoverPoint,onHover,zoneDirty,endpointDirty,simulation,collisionWarning=false}) {
+export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit,onSelectZone,onSelectEndpoint,onEditZone,onEditEndpoint,rectangleStart,hoverPoint,onHover,zoneDirty,endpointDirty,simulation,overlay,collisionWarning=false}) {
   const [zoom,setZoom]=useState(1),[centre,setCentre]=useState({x:600,y:340}),[grid,setGrid]=useState(false),[rays,setRays]=useState(true),[zonesVisible,setZonesVisible]=useState(true),[endpointsVisible,setEndpointsVisible]=useState(true);
   const drag=useRef(null),svgRef=useRef(null),suppressClick=useRef(false);
   const raw=stage==='scan',progress=draft.scan.progress;
@@ -162,6 +162,7 @@ export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit
         {!raw&&zonesVisible&&activeZone&&renderZone(activeZone)}
         {vi(!raw&&previewPoints?.length>0&&<g pointerEvents="none"><polygon points={previewPoints.map(p=>p.x+','+p.y).join(' ')} fill={color+'22'} stroke={color} strokeWidth="2" strokeDasharray="6 4"/>{vi(previewPoints.map((p,i)=><g key={i}><circle cx={p.x} cy={p.y} r="5" fill={color}/><text x={p.x+8} y={p.y-7} fill="white" fontSize="10">{vi(i+1)}</text></g>))}</g>)}
         {stage==='endpoint'&&endpointsVisible&&draft.endpoints.filter(e=>e.id!==endpointEdit?.id).map(e=>renderEndpoint(e))}
+        {overlay}
         {vi(simulation&&<g pointerEvents="none"><polyline data-testid="dispatch-route" points={simulation.path.map(p=>p.x+','+p.y).join(' ')} fill="none" stroke="#4ade80" strokeWidth="4" strokeDasharray="8 5" strokeLinejoin="round"/>{vi(simulation.point&&<g transform={'translate('+simulation.point.x+' '+simulation.point.y+')'} data-testid="dispatch-robot"><circle r="15" fill="#1d4ed8" stroke="white" strokeWidth="3"/><rect x="-8" y="-6" width="16" height="12" rx="4" fill="#14283f"/><circle cx="-3" cy="-1" r="2" fill="#7dd3fc"/><circle cx="3" cy="-1" r="2" fill="#7dd3fc"/><Direction point={{x:0,y:0}} heading={simulation.point.heading||0} color="#4ade80" length={25}/><text y="31" textAnchor="middle" fill="white" stroke="#111827" paintOrder="stroke" strokeWidth="3" fontSize="11">{vi("MAR-01")}</text></g>)}</g>)}
         {stage==='endpoint'&&endpointsVisible&&endpointEdit?.placed&&renderEndpoint(endpointEdit,true)}
         {simulation?.actors?.map(actor=><g key={actor.id} data-testid={'traffic-actor-'+actor.kind} pointerEvents="none" transform={`translate(${actor.point.x} ${actor.point.y})`}>{actor.kind==='robot'?<circle r="12" fill="#d97706" stroke="white" strokeWidth="2"/>:<rect x="-8" y="-8" width="16" height="16" fill="#ef4444" stroke="white" strokeWidth="2"/>}<text y="-20" textAnchor="middle" fill="white" stroke="#111827" paintOrder="stroke" strokeWidth="3" fontSize="12">{actor.label}</text></g>)}

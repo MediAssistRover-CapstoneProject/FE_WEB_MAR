@@ -624,15 +624,19 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 .step-config-panel{height:706px}.config-back{align-self:flex-start;border:0;background:transparent;padding:0;color:#397cf1;font:600 11px Inter;cursor:pointer}.step-config-panel h2{margin:3px 0}.step-config-panel>p{margin:0;color:#7892b5;font-size:11px}.inline-config-fields{display:grid;grid-template-columns:1fr 1fr;gap:13px;overflow:auto;margin-top:12px;padding-right:4px}.inline-config-fields label{color:#52709c;font-size:10px;font-weight:700}.inline-config-fields input{box-sizing:border-box;width:100%;margin-top:7px;border:1px solid #d4e2f8;border-radius:8px;padding:10px;font:inherit;font-size:12px;color:#193b70;outline:0}.inline-config-fields input:focus{border-color:#5792ff;box-shadow:0 0 0 3px #e8f1ff}.inline-config-save{margin-top:auto;width:100%;border:0;border-radius:7px;padding:13px;background:#2f7cf6;color:#fff;font:600 12px Inter;cursor:pointer}@media(max-width:560px){.inline-config-fields{grid-template-columns:1fr}}
 .type-modal,.rename-backdrop{width:100vw;height:100vh;max-width:100vw;overflow:hidden}.type-modal-card{position:relative;box-sizing:border-box;max-width:calc(100vw - 48px);max-height:calc(100vh - 48px)}.type-modal-card>div button:hover{transform:none}.type-modal-card .type-modal-close{position:absolute!important;top:30px!important;right:30px!important;z-index:2}.type-modal-card header{padding-right:54px}
 .workflow-steps-panel{background:linear-gradient(180deg,#fff 0%,#f9fbff 100%)}.workflow-steps-panel>h2{margin:5px 0}.workflow-steps-panel>p{margin:0 0 20px;color:#7289aa;font-size:12px}.step-table{border:1px solid #d8e5fa;border-radius:10px;overflow:hidden;background:#fff}.step-table-head,.step-table-row{display:grid;grid-template-columns:52px 1fr 105px;align-items:center;gap:12px}.step-table-head{padding:11px 15px;background:#eef4ff;color:#5b7eb6;font-size:9px;font-weight:700;letter-spacing:.7px}.step-table-row{width:100%;border:0;border-top:1px solid #e5eefc;background:#fff;padding:15px;text-align:left;cursor:pointer;transition:background .15s}.step-table-row:hover{background:#f1f6ff}.step-table-row span{color:#7d96bf;font-size:11px;font-weight:700}.step-table-row b{color:#1d427c;font-size:12px}.step-table-row em{justify-self:end;border-radius:20px;background:#eef4ff;padding:5px 8px;color:#4b79c5;font-size:9px;font-style:normal}.step-empty-state{padding:30px 18px;color:#8095b5;font-size:12px;text-align:center}@media(max-width:560px){.step-table-head,.step-table-row{grid-template-columns:34px 1fr}.step-table-head span:last-child,.step-table-row em{display:none}}
+.workflow-card-actions{display:flex;align-items:center;gap:6px}.workflow-card-status,.workflow-card-published{border:1px solid #cfe0fb;border-radius:8px;background:#f7faff;color:#3373d5;padding:6px 8px;font:600 10px Inter;white-space:nowrap}.workflow-card-status{cursor:pointer}.workflow-card-status.is-publish{border-color:#2f7cf6;background:#2f7cf6;color:#fff}.workflow-card-published{border-color:#c7e5d8;background:#effaf5;color:#168261}.workflow-type-choice{max-width:760px;margin:auto;display:grid;gap:14px;padding:28px}.workflow-type-choice h2,.workflow-type-choice p{margin:0}.workflow-type-choice p{color:#6d84a7;line-height:1.6}.workflow-type-choice>div{display:grid;grid-template-columns:1fr 1fr;gap:14px}.workflow-type-choice>div button{display:grid;gap:7px;border:1px solid #cfe0fb;border-radius:13px;background:#f9fbff;color:#193b70;padding:19px;text-align:left;cursor:pointer}.workflow-type-choice>div button:hover{border-color:#5d96fb;background:#edf4ff}.workflow-type-choice>div strong{font-size:16px}.workflow-type-choice>div span{color:#6580a6;font-size:12px;line-height:1.5}.workflow-type-choice>div em{color:#286df0;font-size:12px;font-style:normal;font-weight:600}.patrol-workflow-builder .editor-side{height:auto}.patrol-workflow-builder .wf-field select,.patrol-workflow-builder .wf-field input{box-sizing:border-box;width:100%;height:42px;border:1px solid #d4e2f8;border-radius:8px;background:#fbfdff;color:#193b70;padding:10px;font:inherit;font-size:12px}.patrol-return-toggle{display:flex;gap:8px;align-items:flex-start;color:#55729c;font-size:12px;line-height:1.45}.patrol-return-toggle input{accent-color:#2f7cf6}.patrol-step-list{display:grid;gap:10px;margin:17px 0}.patrol-step-config{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:11px;align-items:start;border:1px solid #d8e5fa;border-radius:11px;background:#fff;padding:12px}.patrol-step-config>b{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#e9f2ff;color:#2f7cf6;font-size:11px}.patrol-step-config>div:nth-child(2){display:grid;grid-template-columns:1fr 130px;gap:9px}.patrol-step-config label{display:grid;gap:5px;color:#58749d;font-size:10px;font-weight:700}.patrol-step-config select,.patrol-step-config input{box-sizing:border-box;width:100%;height:38px;border:1px solid #d4e2f8;border-radius:7px;background:#fff;color:#193b70;padding:8px;font:inherit;font-size:12px}.patrol-step-actions{display:flex;gap:4px}.patrol-step-actions button{width:29px;height:29px;border:1px solid #d4e2f8;border-radius:7px;background:#fff;color:#376fbf;cursor:pointer}.patrol-step-actions button:disabled{opacity:.45;cursor:not-allowed}@media(max-width:620px){.workflow-type-choice>div{grid-template-columns:1fr}.patrol-step-config{grid-template-columns:28px 1fr}.patrol-step-actions{grid-column:2}.patrol-step-config>div:nth-child(2){grid-template-columns:1fr}}
 `;
 injectStyles('mediassist-style-pages-Workflows-WorkflowsPage-jsx', inlineStyles);
 
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import AdminSidebar from '../../features/admin/components/AdminSidebar.jsx';
 import { clearSession } from '../../features/auth/session.js';
 import { latestWorkflowVersions, workflowApi } from '../../features/workflows/workflowApi.js';
 import { editorTasks, newWorkflowCode, stepPayload, taskPayload, workflowPayload } from '../../features/workflows/workflowDraftModel.js';
+import { buildPatrolGraph, loadAllPages, orderedPatrolSteps } from '../../features/workflows/patrolWorkflowModel.js';
+import MoveDestinationFields from './MoveDestinationFields.jsx';
+import { LOCAL_MAP_ID, localMapCatalog, mergeLocalDesigns, getDesign, saveLocalGraph, removeLocalDesign } from '../../features/workflows/localPatrolDesign.js';
 
 const navGroups = [
   ['Overview', ['Dashboard']],
@@ -714,11 +718,10 @@ export function MarButton({ children, variant = 'primary', className = '', onCli
   );
 }
 
-function Field({ label, value, onChange, placeholder }) {
+function Field({ label, value, onChange, placeholder, children }) {
   return (
     <label className="wf-field">
-      <span>{vi(label)}</span>
-      <input value={value} readOnly={!onChange} onChange={onChange ? (event) => onChange(event.target.value) : undefined} placeholder={placeholder ? vi(placeholder) : undefined} />
+      <span>{vi(label)}</span>{children ?? <input value={value} readOnly={!onChange} onChange={onChange ? (event) => onChange(event.target.value) : undefined} placeholder={placeholder ? vi(placeholder) : undefined} />}
     </label>
   );
 }
@@ -839,27 +842,32 @@ export function DispatchSimulationPreview({ onCreate, definitions, loading, erro
   </section>;
 }
 
-function Library({ onCreate, onOpen, onRemove, definitions, loading, error }) {
+function Library({ onCreate, onOpen, onRemove, onValidate, onPublish, actionId, definitions, loading, error }) {
+  const visible = definitions.filter(item => item.status !== 'ARCHIVED');
   return (
     <div className="workflows-grid">
       <section className="workflow-panel library-panel">
-        <h2>{vi("QUY TRÌNH CÓ SẴN · ")}{vi(loading ? 'ĐANG TẢI' : definitions.length)}</h2>
+        <h2>QUY TRÌNH CÓ SẴN · {loading ? 'ĐANG TẢI' : visible.length}</h2>
         <div className="workflow-list">
-          {vi(definitions.map((workflow) => {
+          {vi(visible.map((workflow) => {
             const presentation = workflowPresentation(workflow);
             return <div className="workflow-card" key={workflow.workflowId || workflow.code}>
               <button className="workflow-card-open" type="button" onClick={() => onOpen(workflow)} aria-label={vi(`Mở ${presentation.title}`)}>
                 <span className="workflow-card-icon" aria-hidden="true">{presentation.badge}</span>
                 <span className="workflow-card-copy"><strong>{vi(presentation.title)}</strong><small>{vi(presentation.description)}</small></span>
               </button>
-              {workflow.status === 'DRAFT' && <button className="workflow-card-delete" type="button" onClick={() => onRemove(workflow)} aria-label={`Xóa ${presentation.title}`} title="Xóa bản nháp"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 4v5m4-5v5" /></svg></button>}
+              <div className="workflow-card-actions">
+                {workflow.status === 'DRAFT' && <>{workflow.localOnly ? <span className="workflow-card-status">Lưu trên thiết bị</span> : <button className="workflow-card-status" type="button" disabled={actionId === workflow.workflowId} onClick={() => onValidate(workflow)}>{actionId === workflow.workflowId ? '…' : 'Xác thực'}</button>}<button className="workflow-card-delete" type="button" onClick={() => onRemove(workflow)} aria-label={`Xóa ${presentation.title}`} title="Xóa bản nháp"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 4v5m4-5v5" /></svg></button></>}
+                {workflow.status === 'VALIDATED' && <button className="workflow-card-status is-publish" type="button" disabled={actionId === workflow.workflowId} onClick={() => onPublish(workflow)}>{actionId === workflow.workflowId ? '…' : 'Xuất bản'}</button>}
+                {workflow.status === 'PUBLISHED' && <><span className="workflow-card-published">Đã xuất bản</span><button className="workflow-card-delete" type="button" onClick={() => onRemove(workflow)} aria-label={`Xóa ${presentation.title}`} title="Xóa quy trình đã xuất bản"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 4v5m4-5v5" /></svg></button></>}
+              </div>
             </div>;
           }))}
           {vi(!loading && !definitions.length && <p className="preview-note">{vi(error || 'No workflow definitions returned by the backend.')}</p>)}
         </div>
       </section>
       <aside className="workflow-panel action-panel">
-        <h2>{vi("TẠO QUY TRÌNH")}</h2><p>{vi("Tạo quy trình, thêm tác vụ và lưu bản nháp vào máy chủ.")}</p><MarButton className="full" onClick={onCreate}>{vi("+ Tạo quy trình")}</MarButton><h2>{vi("QUY TRÌNH CÓ SẴN")}</h2><p>{vi("Chọn bản nháp để tiếp tục chỉnh sửa. Chỉ bản nháp mới có thể xóa.")}</p>
+        <h2>{vi("TẠO QUY TRÌNH")}</h2><p>{vi("Tạo tuyến tuần tra từ điểm trên bản đồ đã lưu. Tuyến tuần tra được lưu trên thiết bị để chạy thử.")}</p><MarButton className="full" onClick={onCreate}>{vi("+ Tạo quy trình")}</MarButton><h2>{vi("QUY TRÌNH CÓ SẴN")}</h2><p>{vi("Chọn bản nháp để tiếp tục chỉnh sửa. Có thể xóa bản nháp hoặc quy trình đã xuất bản chưa có lịch sử nhiệm vụ.")}</p>
       </aside>
     </div>
   );
@@ -1035,17 +1043,148 @@ function ReviewPanel() {
 }
 
 function StepConfigPanel({ step, onChange, onDone }) {
+  if (step.type === 'MOVE') return <section className="workflow-panel editor-detail step-config-panel"><button type="button" className="config-back" onClick={onDone}>← Quay lại tác vụ</button><span className="modal-kicker">CẤU HÌNH BƯỚC</span><h2>Di chuyển đến điểm đích</h2><MoveDestinationFields step={step} onChange={onChange} /><button type="button" className="inline-config-save" onClick={onDone}>Xong · Quay lại tác vụ</button></section>;
   return <section className="workflow-panel editor-detail step-config-panel"><button className="config-back" onClick={onDone}>{vi("← Back to task")}</button><span className="modal-kicker">{vi("STEP CONFIGURATION")}</span><h2>{vi(step.type)}</h2><p>{vi(stepTypeCopy[step.type][1])}</p><div className="inline-config-fields">{vi(stepFields[step.type].map((field) => <label key={field}>{vi(field)}<input placeholder={vi(`Enter ${field}`)} value={step.values[field]} onChange={(event) => onChange({ ...step, values: { ...step.values, [field]: event.target.value } })} /></label>))}</div><button className="inline-config-save" onClick={onDone}>{vi("✓ Done · Back to task")}</button></section>;
+}
+
+function listContent(value) {
+  return Array.isArray(value) ? value : value?.content ?? [];
+}
+
+function newPatrolCode() {
+  return `WF_PATROL_${crypto.randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase()}`;
+}
+
+/**
+ * A patrol is intentionally built as one static graph: one task, an ordered
+ * chain of MOVE steps and explicit terminal transitions.  The deployment
+ * screen can therefore read the same route without keeping a second route
+ * definition in browser storage.
+ */
+function PatrolWorkflowEditor({ onSaved, onCancel }) {
+  const [name, setName] = useState('Tuyến tuần tra mới');
+  const [description, setDescription] = useState('Robot đi tuần qua các điểm theo thứ tự đã cấu hình.');
+  const [maps, setMaps] = useState([]);
+  const [endpoints, setEndpoints] = useState([]);
+  const [mapId, setMapId] = useState('');
+  const [moves, setMoves] = useState([{ endpointId: '', speed: '0.08' }]);
+  const [returnToStart, setReturnToStart] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let current = true;
+    Promise.resolve().then(() => { const catalog = localMapCatalog(); return [catalog.maps, catalog.endpoints]; })
+      .then(([mapPage, endpointPage]) => {
+        if (!current) return;
+        const nextMaps = listContent(mapPage);
+        setMaps(nextMaps);
+        setEndpoints(listContent(endpointPage));
+        const active = nextMaps.find((map) => map.status === 'ACTIVE') ?? nextMaps[0];
+        setMapId(active?.mapId ?? '');
+      })
+      .catch((cause) => { if (current) setError(cause?.message || 'Không tải được bản đồ và điểm đích.'); })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, []);
+
+  const availableEndpoints = endpoints.filter((endpoint) => endpoint.mapId === mapId && endpoint.active !== false && endpoint.accessible !== false);
+  const selectedEndpoints = moves.map((move) => availableEndpoints.find((endpoint) => endpoint.endpointId === move.endpointId)).filter(Boolean);
+  const updateMove = (index, patch) => setMoves((current) => current.map((move, itemIndex) => itemIndex === index ? { ...move, ...patch } : move));
+  const changeMap = (nextMapId) => {
+    setMapId(nextMapId);
+    setMoves((current) => current.map((move) => ({ ...move, endpointId: '' })));
+    setError('');
+  };
+  const moveStep = (index, offset) => setMoves((current) => {
+    const copy = [...current];
+    [copy[index], copy[index + offset]] = [copy[index + offset], copy[index]];
+    return copy;
+  });
+
+  const save = async () => {
+    const validMoves = moves.filter((move) => move.endpointId);
+    if (!name.trim()) { setError('Nhập tên quy trình tuần tra.'); return; }
+    if (!mapId) { setError('Chọn bản đồ trước khi chọn điểm tuần tra.'); return; }
+    if (validMoves.length < 2 || validMoves.length !== moves.length) { setError('Tuyến tuần tra cần ít nhất 2 điểm đích hợp lệ.'); return; }
+    if (new Set(validMoves.map((move) => move.endpointId)).size !== validMoves.length) { setError('Không chọn trùng một điểm trong cùng tuyến.'); return; }
+    const invalidSpeed = validMoves.some((move) => !Number.isFinite(Number(move.speed)) || Number(move.speed) <= 0 || Number(move.speed) > .3);
+    if (invalidSpeed) { setError('Tốc độ mỗi chặng phải lớn hơn 0 và không quá 0,30 m/s.'); return; }
+    if (!validMoves.every((move) => availableEndpoints.some((endpoint) => endpoint.endpointId === move.endpointId))) { setError('Có điểm đích không thuộc bản đồ đang chọn hoặc đã không sẵn sàng.'); return; }
+
+    const routeMoves = returnToStart ? [...validMoves, { ...validMoves[0], returnMove: true }] : validMoves;
+    const steps = routeMoves.map((move, index) => {
+      const endpoint = availableEndpoints.find((item) => item.endpointId === move.endpointId);
+      const stepCode = move.returnMove ? 'MOVE_RETURN_START' : `MOVE_${String(index + 1).padStart(2, '0')}`;
+      return {
+        taskCode: 'PATROL_ROUTE', stepType: 'MOVE', stepCode,
+        stepName: move.returnMove ? `Quay về ${endpoint.endpointName}` : `Đi đến ${endpoint.endpointName}`,
+        sequenceNo: index + 1, description: move.returnMove ? 'Kết thúc tuyến tại điểm xuất phát.' : `Điểm tuần tra ${index + 1}.`,
+        paramsJson: { map_id: mapId, endpoint_id: endpoint.endpointId, mode: 'PATROL', max_speed_mps: Number(move.speed) },
+        inputMappingJson: {}, timeoutSec: 300, maxAttempts: 2, retryDelaySec: 5, retryCodesJson: [], maxVisits: 1, auditLevel: 'BASIC',
+      };
+    });
+    const transitions = steps.flatMap((step, index) => [
+      { fromStepCode: step.stepCode, toStepCode: steps[index + 1]?.stepCode ?? null, outcome: 'SUCCESS', conditionJson: null, priority: 1, defaultTransition: true, terminalStatus: index === steps.length - 1 ? 'SUCCEEDED' : null },
+      { fromStepCode: step.stepCode, toStepCode: null, outcome: 'FAILURE', conditionJson: null, priority: 1, defaultTransition: true, terminalStatus: 'RECOVERY_REQUIRED' },
+      { fromStepCode: step.stepCode, toStepCode: null, outcome: 'TIMEOUT', conditionJson: null, priority: 1, defaultTransition: true, terminalStatus: 'RECOVERY_REQUIRED' },
+    ]);
+    setSaving(true); setError('');
+    try {
+      const saved = saveLocalGraph({
+        workflow: {
+          workflowCode: newPatrolCode(), versionNo: 1, workflowName: name.trim(), serviceType: 'PATROL', description: description.trim(),
+          inputSchemaJson: { type: 'object' }, inputUiJson: {}, defaultInputsJson: {}, outputMappingJson: {}, requiredCapabilitiesJson: ['MOVE'],
+          maxDurationSec: Math.max(1200, steps.length * 360), maxTotalVisits: steps.length, graphVersion: 3, schemaVersion: 3,
+        },
+        graph: {
+          startStepCode: steps[0].stepCode,
+          tasks: [{ taskCode: 'PATROL_ROUTE', taskName: 'Tuyến tuần tra', sequenceNo: 1, description: 'Chuỗi di chuyển qua các điểm tuần tra.', configJson: { map_id: mapId, route_kind: 'PATROL' } }],
+          steps, transitions,
+        },
+      });
+      await onSaved('Đã lưu tuyến trên thiết bị này. Mở Tuần tra để xem bản đồ và chạy mô phỏng; không gửi lệnh robot.', saved.workflow.workflowId);
+    } catch (cause) {
+      setError(cause?.message || 'Không thể tạo quy trình tuần tra.');
+    } finally { setSaving(false); }
+  };
+
+  return <>
+    <div className="workflow-editor-grid patrol-workflow-builder">
+      <section className="workflow-panel editor-side">
+        <span className="modal-kicker">TUYẾN LẤY TỪ WORKFLOW</span>
+        <h2>Thông tin quy trình</h2>
+        <Field label="Tên quy trình" value={name} onChange={setName} placeholder="Ví dụ: Tuần tra tầng 1" />
+        <Field label="Mô tả" value={description} onChange={setDescription} placeholder="Mô tả mục đích tuyến" />
+        <Field label="Bản đồ dùng cho toàn tuyến"><select value={mapId} disabled={loading} onChange={(event) => changeMap(event.target.value)}><option value="">Chọn bản đồ đã lưu</option>{maps.map((map) => <option key={map.mapId} value={map.mapId}>{map.mapName}{map.status === 'ACTIVE' ? ' · đang hoạt động' : ''}</option>)}</select></Field>
+        <p className="preview-note">Tạo một tác vụ “Tuyến tuần tra”. Các bước MOVE bên phải là nguồn dữ liệu duy nhất mà màn hình Tuần tra sẽ đọc.</p>
+        <label className="patrol-return-toggle"><input type="checkbox" checked={returnToStart} onChange={(event) => setReturnToStart(event.target.checked)} /> Thêm bước quay về điểm đầu sau chặng cuối</label>
+      </section>
+      <section className="workflow-panel editor-detail workflow-steps-panel">
+        <span className="modal-kicker">TÁC VỤ DUY NHẤT · TUYẾN TUẦN TRA</span>
+        <h2>Các chặng di chuyển</h2>
+        <p>Chọn điểm đích đã tạo trong Bản đồ. Thứ tự tại đây chính là thứ tự robot đi qua ở màn hình Tuần tra.</p>
+        {loading && <p className="preview-note">Đang tải bản đồ và điểm đích…</p>}
+        {!loading && mapId && !availableEndpoints.length && <p className="workflow-save-error">Bản đồ này chưa có điểm đích khả dụng. Hãy tạo điểm đích trong Bản đồ trước.</p>}
+        <div className="patrol-step-list">{moves.map((move, index) => <article key={index} className="patrol-step-config"><b>{String(index + 1).padStart(2, '0')}</b><div><label>Điểm đích<select value={move.endpointId} disabled={!mapId} onChange={(event) => updateMove(index, { endpointId: event.target.value })}><option value="">Chọn điểm đích</option>{availableEndpoints.map((endpoint) => <option key={endpoint.endpointId} value={endpoint.endpointId} disabled={moves.some((item, itemIndex) => itemIndex !== index && item.endpointId === endpoint.endpointId)}>{endpoint.endpointName}</option>)}</select></label><label>Tốc độ tối đa (m/s)<input type="number" min="0.01" max="0.3" step="0.01" value={move.speed} onChange={(event) => updateMove(index, { speed: event.target.value })} /></label></div><div className="patrol-step-actions"><button type="button" disabled={index === 0} onClick={() => moveStep(index, -1)} aria-label="Đưa chặng lên">↑</button><button type="button" disabled={index === moves.length - 1} onClick={() => moveStep(index, 1)} aria-label="Đưa chặng xuống">↓</button><button type="button" disabled={moves.length <= 1} onClick={() => setMoves((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label="Xóa chặng">×</button></div></article>)}</div>
+        <MarButton variant="subtle" onClick={() => setMoves((current) => [...current, { endpointId: '', speed: '0.08' }])}>+ Thêm bước MOVE</MarButton>
+        {selectedEndpoints.length > 0 && <p className="preview-note">Tuyến sẽ đi: {selectedEndpoints.map((endpoint) => endpoint.endpointName).join(' → ')}{returnToStart ? ` → ${selectedEndpoints[0]?.endpointName}` : ''}.</p>}
+      </section>
+    </div>
+    <footer className="workflow-actions"><MarButton className="create" onClick={save} disabled={saving || loading}>{saving ? 'Đang tạo…' : 'Tạo bản nháp tuyến tuần tra'}</MarButton><MarButton variant="subtle" onClick={onCancel} disabled={saving}>Quay lại</MarButton>{error && <p role="alert" className="workflow-save-error">{error}</p>}</footer>
+  </>;
 }
 
 function Editor({ initialDetail, onSaved, onCancel }) {
   const workflow = initialDetail?.workflow;
+  const [serviceType, setServiceType] = useState(workflow?.serviceType ?? 'CUSTOM');
   const [name, setName] = useState(workflow?.workflowName ?? '');
   const [description, setDescription] = useState(workflow?.description ?? '');
   const [code] = useState(() => workflow?.workflowCode ?? newWorkflowCode());
   const [workflowId, setWorkflowId] = useState(workflow?.workflowId ?? null);
   const [tasks, setTasks] = useState(() => editorTasks(initialDetail));
-  const [activeTask, setActiveTask] = useState(null);
+  const [activeTask, setActiveTask] = useState(() => editorTasks(initialDetail)[0]?.id ?? null);
   const [showTypes, setShowTypes] = useState(false);
   const [configStep, setConfigStep] = useState(null);
   const [deletedTasks, setDeletedTasks] = useState([]);
@@ -1070,7 +1209,8 @@ function Editor({ initialDetail, onSaved, onCancel }) {
   };
   const addStep = (type) => {
     const id = crypto.randomUUID();
-    const step = { id, code: `STEP_${id.replaceAll('-', '').slice(0, 12).toUpperCase()}`, type, values: Object.fromEntries(stepFields[type].map((field) => [field, ''])) };
+    const previousMove = tasks.flatMap(task => task.steps).findLast(step => step.type === 'MOVE');
+    const step = { id, code: `STEP_${id.replaceAll('-', '').slice(0, 12).toUpperCase()}`, type, values: type === 'MOVE' ? { map_id: serviceType === 'PATROL' ? previousMove?.values.map_id ?? '' : '', endpoint_id: '', mode: serviceType === 'PATROL' ? 'PATROL' : 'NORMAL', max_speed_mps: .08 } : Object.fromEntries(stepFields[type].map((field) => [field, ''])) };
     setTasks((current) => current.map((task) => task.id === activeTask ? { ...task, steps: [...task.steps, step] } : task));
     setShowTypes(false);
     setConfigStep(step);
@@ -1084,6 +1224,12 @@ function Editor({ initialDetail, onSaved, onCancel }) {
     setTasks((current) => current.map((task) => task.id === activeTask ? { ...task, steps: task.steps.filter((item) => item.id !== step.id) } : task));
     if (configStep?.id === step.id) setConfigStep(null);
   };
+  const reorderStep = (index, offset) => setTasks(current => current.map(task => {
+    if (task.id !== activeTask) return task;
+    const steps = [...task.steps];
+    [steps[index], steps[index + offset]] = [steps[index + offset], steps[index]];
+    return { ...task, steps };
+  }));
   const save = async () => {
     if (saving) return;
     if (!name.trim()) { setError('Nhập tên quy trình trước khi lưu.'); return; }
@@ -1092,6 +1238,19 @@ function Editor({ initialDetail, onSaved, onCancel }) {
     setError('');
     try {
       const body = workflowPayload({ code, versionNo: workflow?.versionNo ?? 1, name, description, source: workflow });
+      if (serviceType === 'PATROL') {
+        // Never silently flatten existing branches or recovery actions.
+        if (initialDetail?.transitions?.length && (orderedPatrolSteps(initialDetail).issues.length || orderedPatrolSteps(initialDetail).steps.some((step, index) => step.stepId !== editorTasks(initialDetail).flatMap(task => task.steps)[index]?.stepId) || initialDetail.transitions.some(item => item.outcome !== 'SUCCESS' && (item.toStepId || item.terminalStatus !== 'RECOVERY_REQUIRED' || item.conditionJson != null)))) throw new Error('Quy trình có nhánh, thứ tự đồ thị khác thứ tự bước hoặc xử lý lỗi riêng. Không thể thay bằng tuyến tuần tra đơn giản; hãy tạo tuyến mới để giữ nguyên quy trình hiện có.');
+        const graph = buildPatrolGraph(tasks);
+        const { maps, endpoints } = localMapCatalog();
+        if (graph.steps.some(step => !maps.some(map => map.mapId === step.paramsJson.map_id) || !endpoints.some(endpoint => endpoint.endpointId === step.paramsJson.endpoint_id && endpoint.mapId === step.paramsJson.map_id && endpoint.active !== false && endpoint.accessible !== false))) throw new Error('Có điểm đích không còn khả dụng hoặc sai bản đồ. Hãy chọn lại trong từng bước Di chuyển.');
+        Object.assign(body, { serviceType: 'PATROL', schemaVersion: 3, graphVersion: 3, requiredCapabilitiesJson: ['MOVE'], maxTotalVisits: graph.steps.length, maxDurationSec: Math.max(1200, graph.steps.length * 360) });
+        const saved = saveLocalGraph({ workflow: { ...body, workflowId }, graph });
+        setWorkflowId(saved.workflow.workflowId);
+        await onSaved('Đã lưu tuyến trên thiết bị này. Mở Tuần tra để xem bản đồ và mô phỏng. Bản trên máy chủ không thay đổi.', saved.workflow.workflowId);
+        return;
+      }
+      if (tasks.some(task => task.steps.some(step => step.type === 'MOVE' && step.values.map_id === LOCAL_MAP_ID))) throw new Error('Các điểm này thuộc bản đồ cục bộ. Chọn mục đích “Tuyến tuần tra” để lưu và chạy thử; không gửi điểm cục bộ lên máy chủ.');
       const savedWorkflow = workflowId ? await workflowApi.update(workflowId, body) : await workflowApi.create(body);
       const id = savedWorkflow.workflowId;
       setWorkflowId(id);
@@ -1137,6 +1296,8 @@ function Editor({ initialDetail, onSaved, onCancel }) {
         <h2>Quy trình</h2>
         <Field label="Tên quy trình" value={name} onChange={setName} placeholder="Nhập tên quy trình" />
         <Field label="Mô tả" value={description} onChange={setDescription} placeholder="Mô tả ngắn" />
+        <Field label="Mục đích quy trình"><select value={serviceType} disabled={workflow?.serviceType === 'PATROL'} onChange={event => setServiceType(event.target.value)}><option value={workflow?.serviceType === 'PATROL' ? 'CUSTOM' : workflow?.serviceType ?? 'CUSTOM'}>Quy trình nghiệp vụ</option><option value="PATROL">Tuyến tuần tra</option></select></Field>
+        <p className="wf-link-note">{serviceType === 'PATROL' ? 'Thêm các bước Di chuyển theo thứ tự ghé thăm, chọn điểm trên cùng bản đồ. Khi lưu, tuyến được liên kết sang Tuần tra để xem bản đồ và chạy mô phỏng. Bản nháp lưu trên thiết bị này, không thay đổi quy trình máy chủ.' : 'Nếu đây là chuỗi đi qua nhiều điểm, chọn “Tuyến tuần tra” để liên kết với màn Tuần tra. Chỉ đặt tên “Tuần tra” chưa xác định loại quy trình.'}</p>
         <div className="task-heading"><h2>Tác vụ · {tasks.length}</h2><button type="button" onClick={addTask} aria-label="Thêm tác vụ">+</button></div>
         {tasks.length === 0 && <p className="task-empty-note">Chưa có tác vụ. Bấm + để thêm.</p>}
         {tasks.map((task) => <div className="editor-task-item" key={task.id}>
@@ -1147,7 +1308,7 @@ function Editor({ initialDetail, onSaved, onCancel }) {
       {configStep ? <StepConfigPanel step={configStep} onChange={updateConfigStep} onDone={() => setConfigStep(null)} /> : <section className="workflow-panel editor-detail workflow-steps-panel">
         <span className="modal-kicker">CÁC BƯỚC QUY TRÌNH</span>
         <h2>{selected?.name || 'Chọn tác vụ'}</h2>
-        {selected ? <><Field label="Tên tác vụ" value={selected.name} onChange={(value) => setTasks((current) => current.map((task) => task.id === selected.id ? { ...task, name: value } : task))} placeholder="Nhập tên tác vụ" /><p>Chọn bước để cấu hình hoặc thêm bước mới.</p><div className="step-table"><div className="step-table-head"><span>#</span><span>LOẠI BƯỚC</span><span>TRẠNG THÁI</span></div>{selected.steps.length ? selected.steps.map((step, index) => <div className="editor-step-item" key={step.id}><button className="step-table-row" type="button" onClick={() => setConfigStep(step)}><span>{String(index + 1).padStart(2, '0')}</span><b>{step.type}</b><em>{Object.values(step.values).some(Boolean) ? 'Đã cấu hình' : 'Chưa cấu hình'}</em></button><button className="editor-delete-button" type="button" onClick={() => removeStep(step)} aria-label={`Xóa bước ${index + 1}`}>×</button></div>) : <div className="step-empty-state">Chưa có bước nào.</div>}</div><MarButton variant="subtle" onClick={() => setShowTypes(true)}>+ Thêm bước</MarButton></> : <SelectTaskPanel />}
+        {selected ? <><Field label="Tên tác vụ" value={selected.name} onChange={(value) => setTasks((current) => current.map((task) => task.id === selected.id ? { ...task, name: value } : task))} placeholder="Nhập tên tác vụ" /><p>Chọn bước để cấu hình hoặc thêm bước mới.</p><div className="step-table"><div className="step-table-head"><span>#</span><span>LOẠI BƯỚC</span><span>TRẠNG THÁI</span></div>{selected.steps.length ? selected.steps.map((step, index) => <div className="editor-step-item" key={step.id}><button className="step-table-row" type="button" onClick={() => setConfigStep(step)}><span>{String(index + 1).padStart(2, '0')}</span><b>{step.type === 'MOVE' ? 'Di chuyển' : step.type}</b><em>{Object.values(step.values).some(Boolean) ? 'Đã cấu hình' : 'Chưa cấu hình'}</em></button>{serviceType === 'PATROL' && <span className="wf-step-order"><button type="button" disabled={index === 0} onClick={() => reorderStep(index, -1)} aria-label={`Đưa bước ${index + 1} lên`}>↑</button><button type="button" disabled={index === selected.steps.length - 1} onClick={() => reorderStep(index, 1)} aria-label={`Đưa bước ${index + 1} xuống`}>↓</button></span>}<button className="editor-delete-button" type="button" onClick={() => removeStep(step)} aria-label={`Xóa bước ${index + 1}`}>×</button></div>) : <div className="step-empty-state">Chưa có bước nào.</div>}</div><MarButton variant="subtle" onClick={() => setShowTypes(true)}>+ Thêm bước</MarButton></> : <SelectTaskPanel />}
       </section>}
     </div>
     {showTypes && <div className="type-modal" onClick={() => setShowTypes(false)}><div className="type-modal-card" onClick={(event) => event.stopPropagation()}><header><div><span className="modal-kicker">THƯ VIỆN HÀNH ĐỘNG</span><h2>Thêm bước vào tác vụ</h2><p>Chọn loại bước cần cấu hình.</p></div><button className="type-modal-close" type="button" onClick={() => setShowTypes(false)} aria-label="Đóng">×</button></header><div>{stepTypes.map((type) => <button type="button" key={type} onClick={() => addStep(type)}><i>{stepTypeCopy[type][0]}</i><span><small>{type}</small><b>{type.replaceAll('_', ' ')}</b><em>{stepTypeCopy[type][1]}</em></span><strong>＋</strong></button>)}</div></div></div>}
@@ -1155,7 +1316,25 @@ function Editor({ initialDetail, onSaved, onCancel }) {
   </>;
 }
 
+function WorkflowTypeChoice({ onPatrol, onStandard, onCancel }) {
+  return <section className="workflow-panel workflow-type-choice">
+    <span className="modal-kicker">TẠO QUY TRÌNH</span>
+    <h2>Quy trình này dùng để làm gì?</h2>
+    <p>Chọn “Tuyến tuần tra” khi robot cần đi qua nhiều điểm đích theo thứ tự. Chọn quy trình khác cho các tác vụ nghiệp vụ độc lập.</p>
+    <div>
+      <button type="button" onClick={onPatrol}><strong>Tuyến tuần tra</strong><span>Một tác vụ với chuỗi MOVE. Mỗi MOVE chọn một điểm đích trên cùng bản đồ.</span><em>Mở trình tạo tuyến →</em></button>
+      <button type="button" onClick={onStandard}><strong>Quy trình khác</strong><span>Tạo tác vụ và bước tự do từ thư viện hành động hiện có.</span><em>Mở trình thiết kế →</em></button>
+    </div>
+    <MarButton variant="subtle" onClick={onCancel}>Quay lại</MarButton>
+  </section>;
+}
+
 export default function WorkflowsPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const linkedWorkflowId = searchParams.get('workflowId');
+  const [savedPatrolId, setSavedPatrolId] = useState('');
+  const previewPatrol = id => navigate(`/admin?screen=Patrol&workflowId=${encodeURIComponent(id)}`);
   const [mode, setMode] = useState('library');
   const [editing, setEditing] = useState(null);
   const [editorKey, setEditorKey] = useState(0);
@@ -1163,16 +1342,19 @@ export default function WorkflowsPage() {
   const [definitions, setDefinitions] = useState([]);
   const [definitionError, setDefinitionError] = useState('');
   const [definitionsLoading, setDefinitionsLoading] = useState(true);
-  const creating = mode === 'create';
+  const [actionId, setActionId] = useState('');
+  const creating = mode === 'create' || mode === 'patrol';
 
   const loadDefinitions = async () => {
     setDefinitionsLoading(true);
     try {
-      const page = await workflowApi.list({ page: 0, size: 100 });
-      setDefinitions(latestWorkflowVersions(Array.isArray(page) ? page : page?.content ?? []));
+      setDefinitions(current => mergeLocalDesigns(current.filter(item => !item.localOnly)));
+      const page = await loadAllPages(workflowApi.list);
+      setDefinitions(mergeLocalDesigns(latestWorkflowVersions(Array.isArray(page) ? page : page?.content ?? [])));
       setDefinitionError('');
     } catch (error) {
       setDefinitionError(error.message || 'Không tải được danh sách quy trình.');
+      try { setDefinitions(mergeLocalDesigns([])); } catch (cause) { setDefinitionError(cause.message); }
     } finally {
       setDefinitionsLoading(false);
     }
@@ -1180,28 +1362,39 @@ export default function WorkflowsPage() {
 
   useEffect(() => {
     let current = true;
-    workflowApi.list({ page: 0, size: 100 }).then((page) => {
+    loadAllPages(workflowApi.list).then((page) => {
       if (!current) return;
-      setDefinitions(latestWorkflowVersions(Array.isArray(page) ? page : page?.content ?? []));
+      setDefinitions(mergeLocalDesigns(latestWorkflowVersions(Array.isArray(page) ? page : page?.content ?? [])));
       setDefinitionError('');
-    }).catch((error) => { if (current) setDefinitionError(error.message || 'Unable to load workflow definitions.'); })
+    }).catch((error) => { if (current) { setDefinitionError(error.message || 'Không tải được quy trình máy chủ.'); try { setDefinitions(mergeLocalDesigns([])); } catch (cause) { setDefinitionError(cause.message); } } })
       .finally(() => { if (current) setDefinitionsLoading(false); });
     return () => { current = false; };
   }, []);
+
+  useEffect(() => {
+    if (!linkedWorkflowId) return;
+    let current = true;
+    getDesign(linkedWorkflowId, workflowApi.get).then(detail => {
+      if (!current) return;
+      if (!['DRAFT', 'VALIDATED'].includes(detail.workflow.status) && detail.workflow.serviceType !== 'PATROL') { setPageMessage('Đây là phiên bản đã xuất bản, không sửa trực tiếp. Hãy tạo tuyến mới nếu cần thay đổi.'); return; }
+      setEditing(detail); setEditorKey(key => key + 1); setMode('create');
+    }).catch(cause => { if (current) setPageMessage(cause.message || 'Không mở được quy trình được liên kết.'); });
+    return () => { current = false; };
+  }, [linkedWorkflowId]);
 
   const openCreate = () => {
     setEditing(null);
     setEditorKey((key) => key + 1);
     setPageMessage('');
-    setMode('create');
+    setMode('choose');
   };
   const openExisting = async (definition) => {
-    if (!['DRAFT', 'VALIDATED'].includes(definition.status)) {
+    if (!['DRAFT', 'VALIDATED'].includes(definition.status) && definition.serviceType !== 'PATROL') {
       setPageMessage('Quy trình đã xuất bản không thể sửa trực tiếp. Hãy tạo bản nháp mới.');
       return;
     }
     try {
-      const detail = await workflowApi.get(definition.workflowId);
+      const detail = await getDesign(definition.workflowId, workflowApi.get);
       setEditing(detail);
       setEditorKey((key) => key + 1);
       setPageMessage('');
@@ -1209,17 +1402,42 @@ export default function WorkflowsPage() {
     } catch (error) { setPageMessage(error.message || 'Không mở được quy trình.'); }
   };
   const removeDefinition = async (definition) => {
-    if (!window.confirm(`Xóa bản nháp “${definition.workflowName}”?`)) return;
+    const published = definition.status === 'PUBLISHED';
+    const label = published ? 'quy trình đã xuất bản' : 'bản nháp';
+    const warning = published ? ' Quy trình sẽ không còn nhận nhiệm vụ mới.' : '';
+    if (!window.confirm(`Xóa ${label} “${definition.workflowName}”?${warning}${definition.localOnly ? ' Chỉ xóa bản trên thiết bị, bản máy chủ (nếu có) vẫn giữ nguyên.' : ''}`)) return;
     try {
-      await workflowApi.remove(definition.workflowId);
-      setPageMessage('Đã xóa bản nháp.');
+      if (definition.localOnly) removeLocalDesign(definition.workflowId);
+      else await workflowApi.remove(definition.workflowId);
+      setPageMessage(definition.localOnly ? 'Đã xóa bản nháp trên thiết bị. Bản máy chủ (nếu có) được giữ nguyên.' : `Đã xóa ${label}.`);
       await loadDefinitions();
-    } catch (error) { setPageMessage(error.message || 'Không xóa được bản nháp.'); }
+    } catch (error) { setPageMessage(error.message || `Không xóa được ${label}.`); }
   };
-  const afterSave = async () => {
-    await loadDefinitions();
-    setPageMessage('Đã lưu quy trình vào máy chủ.');
+  const validateDefinition = async (definition) => {
+    if (definition.localOnly) return;
+    setActionId(definition.workflowId);
+    try {
+      await workflowApi.validate(definition.workflowId);
+      setPageMessage('Đã xác thực workflow. Có thể xuất bản khi không còn cảnh báo chặn.');
+      await loadDefinitions();
+    } catch (error) { setPageMessage(error.message || 'Không thể xác thực workflow.'); }
+    finally { setActionId(''); }
+  };
+  const publishDefinition = async (definition) => {
+    if (definition.localOnly) return;
+    setActionId(definition.workflowId);
+    try {
+      await workflowApi.publish(definition.workflowId);
+      setPageMessage('Đã xuất bản workflow. Tuyến hiện xuất hiện trong màn hình Tuần tra.');
+      await loadDefinitions();
+    } catch (error) { setPageMessage(error.message || 'Không thể xuất bản workflow.'); }
+    finally { setActionId(''); }
+  };
+  const afterSave = async (message = 'Đã lưu quy trình vào máy chủ.', patrolId = '') => {
+    setPageMessage(message);
+    setSavedPatrolId(patrolId);
     setMode('library');
+    await loadDefinitions();
   };
 
   return (
@@ -1227,19 +1445,17 @@ export default function WorkflowsPage() {
       <Sidebar />
       <main className="workflows-main">
         <header className="workflows-header">
-          <h1>{vi(creating ? 'Create Workflow' : 'Workflows')}</h1>
+          <h1>{vi(mode === 'patrol' ? 'Tạo tuyến tuần tra' : creating ? (editing ? 'Chỉnh sửa quy trình' : 'Tạo quy trình') : mode === 'choose' ? 'Chọn loại quy trình' : 'Quy trình')}</h1>
           <Tabs />
           <p className="preview-note">
-            {vi(creating ? 'Đặt tên, thêm tác vụ và lưu bản nháp quy trình.' : 'Chọn bản nháp để chỉnh sửa hoặc tạo quy trình mới.')}
+            {vi(mode === 'patrol' ? 'Một tác vụ, nhiều bước MOVE. Các endpoint được dùng lại trực tiếp ở màn hình Tuần tra.' : creating ? 'Đặt tên, thêm tác vụ và lưu bản nháp quy trình.' : mode === 'choose' ? 'Chọn đúng loại để tránh tạo lại tuyến ở hai màn hình.' : 'Chọn bản nháp để chỉnh sửa hoặc tạo quy trình mới.')}
           </p>
+          {definitionError && <p className="preview-note" role="alert">{definitionError} Các bản nháp trên thiết bị vẫn được giữ lại.</p>}
           {pageMessage && <p className="preview-note" role="status">{pageMessage}</p>}
+          {savedPatrolId && !creating && <MarButton variant="subtle" onClick={() => previewPatrol(savedPatrolId)}>Xem tuyến vừa lưu trong Tuần tra →</MarButton>}
         </header>
 
-        {vi(creating ? (
-          <Editor key={editorKey} initialDetail={editing} onSaved={afterSave} onCancel={() => { setMode('library'); loadDefinitions(); }} />
-        ) : (
-          <Library onCreate={openCreate} onOpen={openExisting} onRemove={removeDefinition} definitions={definitions} loading={definitionsLoading} error={definitionError} />
-        ))}
+        {vi(mode === 'create' ? <Editor key={editorKey} initialDetail={editing} onSaved={afterSave} onCancel={() => { setMode('library'); loadDefinitions(); }} /> : mode === 'patrol' ? <PatrolWorkflowEditor key={editorKey} onSaved={afterSave} onCancel={() => setMode('library')} /> : mode === 'choose' ? <WorkflowTypeChoice onPatrol={() => { setEditorKey((key) => key + 1); setMode('patrol'); }} onStandard={() => { setEditorKey((key) => key + 1); setMode('create'); }} onCancel={() => setMode('library')} /> : <Library onCreate={openCreate} onOpen={openExisting} onRemove={removeDefinition} onValidate={validateDefinition} onPublish={publishDefinition} actionId={actionId} definitions={definitions} loading={definitionsLoading} error={definitionError} />)}
       </main>
     </div>
   );

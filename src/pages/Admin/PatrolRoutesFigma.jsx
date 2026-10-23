@@ -1,45 +1,111 @@
-import { vi } from '../../i18n/vi.js';
-import { injectStyles } from '../../styles/injectStyles.js';
-const inlineStyles = String.raw`.patrol-routes-figma{--ink:#0f172a;--slate:#475569;--line:#cbd5e1;--cloud:#f1f5f9;--blue:#2f80ff;--pale:#dbeafe;--good:#15803d;--warn:#a16207;--danger:#f05252;font-family:Inter,Arial,sans-serif;color:var(--ink);min-width:0}.patrol-routes-figma *{box-sizing:border-box}.patrol-page-header{height:64px;margin:-24px -28px 8px;padding:0 38px;background:#fff;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f1f5f9}.patrol-page-header h2{font-size:22px;margin:0;font-weight:600}.patrol-page-header>div{display:flex;align-items:center;gap:20px;font-size:13px}.robot-online{color:var(--good)}.patrol-figma-button{height:36px;min-width:130px;border:1px solid var(--line);border-radius:7px;background:var(--cloud);color:var(--ink);padding:0 14px;font:600 13px Inter,Arial,sans-serif;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease}.patrol-figma-button:hover{transform:translateY(-1px);box-shadow:0 5px 14px #0f172a18}.patrol-figma-button.primary{background:var(--blue);border-color:var(--blue);color:#fff}.patrol-figma-button.danger{background:var(--danger);border-color:var(--danger);color:#fff}.patrol-tabs{height:40px;border:1px solid var(--line);border-radius:8px;padding:5px 8px;margin-bottom:10px;display:flex;gap:6px}.patrol-tabs button{width:96px;height:24px;border:1px solid var(--line);border-radius:6px;background:var(--cloud);color:var(--slate);font-size:10px;text-align:left;padding:0 10px;cursor:pointer}.patrol-tabs button.active{background:var(--blue);border-color:var(--blue);color:#fff}.patrol-screen-grid{display:grid;grid-template-columns:212px minmax(0,1fr) 186px;gap:16px}.patrol-card{border:1px solid var(--line);border-radius:10px;background:#fff;padding:14px 12px;min-width:0}.patrol-card h3{font-size:13px;font-weight:500;text-transform:uppercase;color:var(--slate);margin:0 4px 12px}.patrol-settings-card,.patrol-builder-card,.patrol-saved-card{height:782px}.patrol-field{display:block;margin:0 0 14px}.patrol-field>span{display:block;font-size:10px;color:var(--slate);margin:0 4px 7px}.patrol-field>div{height:36px;border:1px solid var(--line);border-radius:6px;background:var(--cloud);padding:10px 11px;font-size:11px}.patrol-settings-card h4,.selected-point h4,.next-run h4{font-size:11px;margin:22px 4px 11px}.patrol-pair{display:flex;justify-content:space-between;margin:0;padding:9px 4px;font-size:10px}.patrol-pair span{color:var(--slate)}.patrol-pair b{font-size:11px}.patrol-check{color:var(--good);font-size:11px;font-weight:600;margin:10px 4px}.patrol-check span{padding-left:10px;color:var(--ink);font-size:10px;font-weight:400}.patrol-settings-actions{display:grid;gap:8px;margin-top:32px}.patrol-settings-actions .patrol-figma-button{width:100%}.patrol-builder-card{padding:14px 14px}.patrol-route-image{height:462px;margin:28px 0 0;border:1px solid #c7d0d8;border-radius:8px;overflow:hidden;background:#e9eef5}.patrol-route-image img{display:block;width:100%;height:100%;object-fit:cover}.selected-point{min-height:132px;margin-top:24px;border:1px solid var(--line);border-radius:8px;padding:13px 14px}.selected-point small{display:block;color:var(--slate);font-size:9px;text-transform:uppercase}.selected-point h4{font-size:11px;margin:5px 0}.selected-point b{color:#0e7490;font-size:10px}.selected-point p{color:var(--slate);font-size:9px;margin:8px 0}.selected-point .patrol-figma-button{float:right;margin-top:-34px}.patrol-saved-card button:not(.patrol-figma-button){position:relative;width:100%;height:56px;border:1px solid var(--line);border-radius:6px;background:var(--cloud);padding:10px;text-align:left;margin:0 0 12px;cursor:pointer}.patrol-saved-card button:not(.patrol-figma-button).active{background:var(--pale)}.patrol-saved-card button b,.patrol-saved-card button span{display:block}.patrol-saved-card button b{font-size:11px}.patrol-saved-card button span{font-size:9px;color:var(--slate);margin-top:4px}.patrol-saved-card button em{position:absolute;right:10px;bottom:10px;font-size:9px;font-style:normal}.active-status{color:var(--good)}.paused-status{color:var(--warn)}.next-run{margin-top:40px;padding:0 2px}.next-run small{font-size:9px;color:var(--slate);text-transform:uppercase}.next-run h4{font-size:13px;margin:7px 0}.next-run p{font-size:9px;color:var(--slate);margin:0 0 14px}.next-run .patrol-figma-button{width:100%;min-width:0;font-size:11px}.patrol-notice{position:fixed;right:24px;bottom:24px;z-index:8;margin:0;padding:10px 14px;border-radius:8px;background:#0f172a;color:#fff;font:500 12px Inter,Arial,sans-serif;box-shadow:0 12px 28px #0f172a3d}@media(max-width:1180px){.patrol-screen-grid{grid-template-columns:230px minmax(0,1fr) 170px}.patrol-page-header{margin-left:-16px;margin-right:-16px;padding:0 24px}.patrol-page-header>div{gap:10px}.patrol-page-header>div>span{display:none}}@media(max-width:900px){.patrol-page-header{height:auto;min-height:64px;padding:12px 16px;align-items:flex-start;gap:10px}.patrol-page-header>div{flex-wrap:wrap;justify-content:flex-end}.patrol-screen-grid{grid-template-columns:1fr}.patrol-settings-card,.patrol-builder-card,.patrol-saved-card{height:auto}.patrol-saved-card{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.patrol-saved-card h3,.next-run{grid-column:1/-1}.patrol-saved-card button:not(.patrol-figma-button){margin:0}.patrol-route-image{height:min(65vw,500px)}}@media(max-width:580px){.patrol-page-header{margin-top:-16px}.patrol-page-header h2{font-size:17px}.patrol-page-header>div{width:100%}.patrol-figma-button{flex:1;min-width:0;font-size:11px;padding:0 8px}.patrol-tabs{overflow:auto}.patrol-tabs button{flex:0 0 96px}.patrol-saved-card{display:block}.patrol-saved-card h3{margin-bottom:12px}.patrol-saved-card button:not(.patrol-figma-button){margin-bottom:10px}.selected-point .patrol-figma-button{float:none;margin:8px 0 0}.patrol-notice{right:16px;bottom:16px}}
-`;
-injectStyles('mediassist-style-pages-Admin-PatrolRoutesFigma-jsx', inlineStyles);
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { workflowApi } from '../../features/workflows/workflowApi.js';
+import { loadAllPages } from '../../features/workflows/patrolWorkflowModel.js';
+import { getDesign, localMapCatalog, localPatrolPlan, mergeLocalDesigns } from '../../features/workflows/localPatrolDesign.js';
+import { samplePlan } from '../Workstations/mapDispatchModel.js';
+import { formatDuration } from './patrolModel.js';
+import LidarMap from './LidarMap.jsx';
+import './patrol.css';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import patrolRouteMap from '../../assets/images/map-studio/patrol-1.png';
-import { operationsApi } from '../../features/operations/operationsApi.js';
+const Button = ({ children, primary, ...props }) => <button type="button" className={primary ? 'patrol-primary' : undefined} {...props}>{children}</button>;
 
-const pageItems = (page) => Array.isArray(page) ? page : page?.content ?? [];
-
-function PatrolButton({ children, primary = false, danger = false, onClick }) {
-  return <button type="button" onClick={onClick} className={`patrol-figma-button${primary ? ' primary' : ''}${danger ? ' danger' : ''}`}>{vi(children)}</button>;
-}
-
-function Field({ label, value }) {
-  return <label className="patrol-field"><span>{vi(label)}</span><div>{vi(value)}</div></label>;
-}
-
-function SettingPair({ label, value }) { return <p className="patrol-pair"><span>{vi(label)}</span><b>{vi(value)}</b></p>; }
-
-/** Standalone Patrol Routes screen matching Figma node 65:2. */
 export default function PatrolRoutesFigma() {
-  const [schedules, setSchedules] = useState([]);
-  const [activeId, setActiveId] = useState(null);
-  const [selectedPoint, setSelectedPoint] = useState('P9 — Waiting Hall Checkpoint');
-  const [notice, setNotice] = useState('');
-  const [running, setRunning] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const load = useCallback(async () => { setLoading(true); try { const page = await operationsApi.listSchedules({ page: 0, size: 100 }); const next = pageItems(page); setSchedules(next); setActiveId((current) => current && next.some((schedule) => schedule.scheduleId === current) ? current : next[0]?.scheduleId ?? null); } catch (error) { setNotice(error.message || 'Unable to load schedules.'); } finally { setLoading(false); } }, []);
-  useEffect(() => { load(); }, [load]);
-  const activeRoute = useMemo(() => schedules.find((schedule) => schedule.scheduleId === activeId) || null, [schedules, activeId]);
-  const changeSchedule = async (kind) => { if (!activeRoute) return; try { if (kind === 'activate') await operationsApi.activateSchedule(activeRoute.scheduleId); if (kind === 'pause') await operationsApi.pauseSchedule(activeRoute.scheduleId); setNotice(`Schedule ${kind}d.`); load(); } catch (error) { setNotice(error.message || 'Unable to update schedule.'); } };
-  return <section className="patrol-routes-figma">
-    <header className="patrol-page-header"><h2>{vi("Patrol Routes")}</h2><div><span className="robot-online">{vi("Schedule API")}</span><span>{vi(schedules.length)}{vi(" schedules")}</span><PatrolButton onClick={load}>{vi(loading ? 'Loading…' : 'Refresh')}</PatrolButton><PatrolButton primary onClick={() => setRunning(!running)}>{vi(running ? 'Patrol previewing' : 'Run Preview')}</PatrolButton></div></header>
-    <nav className="patrol-tabs" aria-label={vi("Patrol management views")}>{vi(['Route Builder', 'Point Actions', 'Schedule', 'Simulation', 'History'].map((tab, index) => <button type="button" className={index === 0 ? 'active' : ''} key={tab}>{vi(tab)}</button>))}</nav>
-    <main className="patrol-screen-grid">
-      <aside className="patrol-card patrol-settings-card"><h3>{vi("Schedule settings")}</h3><Field label="Schedule name" value={activeRoute?.scheduleName || 'Select a schedule'} /><Field label="Schedule type" value={activeRoute?.scheduleType || '—'} /><h4>{vi("Timing")}</h4>{vi([['Starts', activeRoute?.startsAt ? new Date(activeRoute.startsAt).toLocaleString('vi-VN') : '—'], ['Ends', activeRoute?.endsAt ? new Date(activeRoute.endsAt).toLocaleString('vi-VN') : '—'], ['Interval', activeRoute?.intervalSec ? `${activeRoute.intervalSec} sec` : '—'], ['Timezone', activeRoute?.timezone || '—']].map(([label, value]) => <SettingPair key={label} label={label} value={value} />))}<h4>{vi("Backend status")}</h4><p className="patrol-check">{vi("✓ ")}<span>{vi(activeRoute?.status || 'No schedule selected')}</span></p><p className="patrol-check">{vi("✓ ")}<span>{vi("Next run: ")}{vi(activeRoute?.nextRunAt ? new Date(activeRoute.nextRunAt).toLocaleString('vi-VN') : '—')}</span></p><div className="patrol-settings-actions"><PatrolButton onClick={() => changeSchedule('activate')}>{vi("Activate Schedule")}</PatrolButton><PatrolButton danger onClick={() => changeSchedule('pause')}>{vi("Pause Schedule")}</PatrolButton></div></aside>
-      <section className="patrol-card patrol-builder-card"><h3>{vi("Patrol route builder")}</h3><div className="patrol-route-image"><img src={patrolRouteMap} alt={vi("Patrol route map for Hospital Floor 1")} /></div><article className="selected-point"><small>{vi("Selected point action")}</small><h4>{vi(selectedPoint)}</h4><b>{vi("Action: Check Crowd Density")}</b><p>{vi("Wait 8 sec · Snapshot if density is HIGH")}</p><PatrolButton onClick={() => setSelectedPoint(selectedPoint === 'P9 — Waiting Hall Checkpoint' ? 'P2 — Corridor Camera Check' : 'P9 — Waiting Hall Checkpoint')}>{vi("Edit Point Action")}</PatrolButton></article></section>
-      <aside className="patrol-card patrol-saved-card"><h3>{vi("Saved schedules")}</h3>{vi(schedules.map((schedule) => <button type="button" key={schedule.scheduleId} className={activeId === schedule.scheduleId ? 'active' : ''} onClick={() => setActiveId(schedule.scheduleId)}><b>{vi(schedule.scheduleName || schedule.scheduleCode || schedule.scheduleId.slice(0, 8))}</b><span>{vi(schedule.scheduleType || 'Schedule')}</span><em className={/active/i.test(schedule.status || '') ? 'active-status' : 'paused-status'}>{vi(schedule.status || '—')}</em></button>))}{vi(!loading && schedules.length === 0 && <p className="patrol-check">{vi("No schedules returned by the backend.")}</p>)}<div className="next-run"><small>{vi("Next scheduled run")}</small><h4>{vi(activeRoute?.nextRunAt ? new Date(activeRoute.nextRunAt).toLocaleString('vi-VN') : '—')}</h4><p>{vi(activeRoute?.cronExpression || activeRoute?.intervalSec ? 'Backend schedule loaded' : 'Choose a schedule to inspect timing')}</p><PatrolButton onClick={load}>{vi("Refresh Schedules")}</PatrolButton></div></aside>
-    </main>
-    {vi(notice && <p className="patrol-notice" role="status">{vi(notice)}</p>)}
+  const navigate = useNavigate();
+  const [search, setSearch] = useSearchParams();
+  const workflowId = search.get('workflowId') || '';
+  const [workflows, setWorkflows] = useState([]);
+  const [saved, setSaved] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [error, setError] = useState('');
+  const [catalogError, setCatalogError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+  const [startId, setStartId] = useState('');
+  const [elapsed, setElapsed] = useState(0);
+  const [simState, setSimState] = useState('ready');
+  const [simSpeed, setSimSpeed] = useState(1);
+  const reset = () => { setSimState('ready'); setElapsed(0); };
+
+  useEffect(() => {
+    const update = () => { reset(); setRefresh(value => value + 1); };
+    window.addEventListener('storage', update);
+    window.addEventListener('focus', update);
+    window.addEventListener('mediassist-map-saved', update);
+    return () => { window.removeEventListener('storage', update); window.removeEventListener('focus', update); window.removeEventListener('mediassist-map-saved', update); };
+  }, []);
+
+  useEffect(() => {
+    let current = true;
+    setCatalogError('');
+    const patrols = items => mergeLocalDesigns(items).filter(item => item.serviceType === 'PATROL' && item.status !== 'ARCHIVED');
+    try {
+      const catalog = localMapCatalog();
+      setSaved(catalog.saved);
+      setStartId(previous => catalog.endpoints.some(point => point.endpointId === previous) ? previous : catalog.endpoints.find(point => point.active && point.accessible)?.endpointId || '');
+      setWorkflows(patrols([]));
+    } catch (cause) { setCatalogError(cause.message); }
+    loadAllPages(workflowApi.list).then(items => { if (current) setWorkflows(patrols(items)); })
+      .catch(cause => { if (current) setCatalogError('Không tải được quy trình máy chủ. Bạn vẫn có thể dùng tuyến đã lưu trên thiết bị. ' + cause.message); });
+    return () => { current = false; };
+  }, [refresh]);
+
+  useEffect(() => {
+    let current = true;
+    setDetail(null); reset(); setError(''); setLoading(!!workflowId);
+    if (workflowId) getDesign(workflowId, workflowApi.get).then(value => {
+      if (!current) return;
+      if (value.workflow.serviceType !== 'PATROL') throw new Error('Quy trình này không phải tuyến tuần tra. Hãy chọn tuyến khác.');
+      setDetail(value);
+    }).catch(cause => { if (current) setError(cause.message || 'Không đọc được quy trình.'); })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, [workflowId, refresh]);
+
+  const plan = useMemo(() => detail?.workflow.workflowId === workflowId ? localPatrolPlan(detail, saved, startId) : null, [detail, workflowId, saved, startId]);
+  const runnable = !!plan?.valid && !loading;
+  const done = runnable && simState !== 'ready' && elapsed >= plan.duration;
+  const sample = runnable ? samplePlan(plan, elapsed) : null;
+  const progress = runnable && plan.duration ? Math.min(1, elapsed / plan.duration) : done ? 1 : 0;
+  const edit = () => navigate(workflowId ? '/workflows?workflowId=' + encodeURIComponent(workflowId) : '/workflows');
+
+  useEffect(() => {
+    if (!runnable || simState !== 'running' || done) return;
+    let previous = performance.now();
+    const timer = window.setInterval(() => {
+      const now = performance.now(); const delta = (now - previous) / 1000; previous = now;
+      setElapsed(value => Math.min(plan.duration, value + delta * simSpeed));
+    }, 50);
+    return () => window.clearInterval(timer);
+  }, [runnable, simState, done, plan?.duration, simSpeed]);
+
+  return <section className="patrol-workspace patrol-deployment">
+    <header className="patrol-banner"><div><h2>Tuần tra</h2><p>Chọn quy trình, xem các điểm trên bản đồ đã lưu và chạy thử hành trình.</p></div><div className="patrol-actions"><Button onClick={() => navigate('/workflows')}>Thiết kế quy trình</Button><Button onClick={() => { reset(); setRefresh(value => value + 1); }}>Tải lại</Button></div></header>
+    {catalogError && <p className="patrol-notice" role="status">{catalogError}</p>}
+    {error && <p className="patrol-notice is-error" role="alert">{error}</p>}
+    <div className="patrol-deployment-layout">
+      <section className="patrol-panel patrol-deployment-controls">
+        <h3>Quy trình & điểm đi qua</h3>
+        <label className="patrol-field">Quy trình tuần tra<select value={workflows.some(item => item.workflowId === workflowId) ? workflowId : ''} onChange={event => { reset(); const next = new URLSearchParams(search); if (event.target.value) next.set('workflowId', event.target.value); else next.delete('workflowId'); setSearch(next, { replace: true }); }}><option value="">Chọn tuyến tuần tra đã lưu</option>{workflows.map(item => <option key={item.workflowId} value={item.workflowId}>{item.workflowName} · v{item.versionNo}{item.localOnly ? '' : ' · Cần chọn điểm cục bộ'}</option>)}</select></label>
+        {!workflows.length && <p>Chưa có quy trình tuần tra. Tạo quy trình với mục đích “Tuyến tuần tra”, chọn các điểm đích và lưu.</p>}
+        <p className="patrol-map-note">Thứ tự lấy từ các bước MOVE trong Quy trình. Không tạo thêm bộ điểm đích riêng.</p>
+        {detail && <Button onClick={edit}>Sửa điểm đích trong Quy trình →</Button>}
+        <label className="patrol-field">Điểm xuất phát chạy thử<select value={startId} onChange={event => { reset(); setStartId(event.target.value); }}><option value="">Chọn điểm xuất phát</option>{saved?.snapshot.endpoints.map(point => <option key={point.id} value={point.id} disabled={point.enabled === false || point.accessible === false}>{point.name}</option>)}</select></label>
+        <p className="patrol-map-note">Điểm xuất phát chỉ đặt vị trí robot mô phỏng; không thay đổi thứ tự MOVE.</p>
+        <h3>Thứ tự ghé thăm</h3>
+        {loading ? <p role="status">Đang đọc quy trình…</p> : plan?.points.length ? <ol className="patrol-route-timeline">{plan.points.map(({ step, endpoint }, index) => <li key={step.stepId}><span>{index + 1}</span><div><strong>{endpoint?.name || 'Cần chọn lại điểm đích'}</strong><small>Di chuyển · {step.paramsJson?.max_speed_mps} m/s</small></div></li>)}</ol> : <p>Chọn quy trình để xem các điểm đi qua.</p>}
+        <p className="patrol-map-note">Tuyến lưu trên thiết bị này. Chạy thử không gửi lệnh robot và không tạo lịch chạy thật.</p>
+      </section>
+      <section className="patrol-panel patrol-route-preview patrol-preview">
+        <h3>Xem trước hành trình</h3>
+        <div className="patrol-summary"><div><small>Điểm tuần tra</small><strong>{plan?.points.length || 0} điểm</strong></div><div><small>Quãng đường ước tính</small><strong>{runnable ? plan.distance.toFixed(2) + ' m' : 'Chưa xác định'}</strong></div><div><small>Thời gian ước tính</small><strong>{runnable ? formatDuration(plan.duration) : 'Chưa xác định'}</strong></div></div>
+        {plan?.issues.length > 0 && <div className="patrol-notice is-error" role="alert"><strong>Cần kiểm tra tuyến</strong><ul>{plan.issues.map(issue => <li key={issue}>{issue}</li>)}</ul><Button onClick={edit}>Chọn lại điểm trong Quy trình</Button></div>}
+        {saved ? <LidarMap draft={saved.snapshot} stage="endpoint" simulation={runnable ? { path: plan.path, point: sample?.point || saved.snapshot.endpoints.find(point => point.id === startId) } : undefined} overlay={<g pointerEvents="none">{plan?.points.map(({ endpoint }, index) => endpoint && <g key={index} transform={'translate(' + endpoint.x + ' ' + (endpoint.y - 25 - index * 3) + ')'}><circle r="10" fill="#2563eb" stroke="white"/><text textAnchor="middle" y="4" fill="white" fontSize="12">{index + 1}</text></g>)}</g>} /> : <div className="patrol-empty"><h3>Chưa có bản đồ đã lưu</h3><p>Mở Bản đồ, lưu bản quét và các điểm đích để dùng chung với Điều phối và Tuần tra.</p><Button onClick={() => navigate('/admin?screen=Map+Studio')}>Mở Bản đồ</Button></div>}
+        <div className="patrol-simulation-summary"><div><small>Trạng thái</small><strong>{done ? 'Hoàn tất mô phỏng' : { ready: 'Chưa chạy', running: 'Đang mô phỏng', paused: 'Đã tạm dừng' }[simState]}</strong></div><div><small>Điểm đang hướng đến</small><strong>{runnable ? plan.points[sample?.stopIndex ?? 0]?.endpoint?.name || '—' : '—'}</strong></div><div><small>Tiến độ</small><strong>{Math.round(progress * 100)}%</strong></div></div>
+        <progress className="patrol-progress" value={progress} max="1" aria-label="Tiến độ mô phỏng" />
+        <div className="patrol-actions"><Button primary disabled={!runnable || (simState === 'running' && !done)} onClick={() => { if (done) setElapsed(0); setSimState('running'); }}>{simState === 'paused' ? 'Tiếp tục mô phỏng' : 'Chạy mô phỏng'}</Button><Button disabled={simState !== 'running' || done} onClick={() => setSimState('paused')}>Tạm dừng</Button><Button disabled={!plan} onClick={reset}>Đặt lại</Button><label className="patrol-speed-label">Tốc độ xem<select value={simSpeed} onChange={event => setSimSpeed(Number(event.target.value))}>{[1, 2, 5].map(value => <option key={value} value={value}>{value}×</option>)}</select></label></div>
+        <p className="patrol-map-note">Dùng lại bản đồ, vùng cấm và vùng giới hạn tốc độ đã lưu. Đường đi và thời gian là kết quả mô phỏng, chưa được kiểm chứng trên robot.</p>
+      </section>
+    </div>
   </section>;
 }

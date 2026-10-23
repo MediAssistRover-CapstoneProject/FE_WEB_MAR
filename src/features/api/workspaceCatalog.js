@@ -9,8 +9,8 @@ export const resources = [
   resource('jobs', 'Công việc', 'Live Operations', 'jobs', 'jobId'),
   resource('schedules', 'Lịch tự động', 'Patrol', 'schedules', 'scheduleId'),
   resource('robots', 'Robot', 'Robot Status', 'robots', 'robotId'),
-  resource('hospitals', 'Thông tin bệnh viện', 'Facility Management', 'hospital-information', 'hospitalInformationId'),
-  resource('articles', 'Bài hướng dẫn', 'Facility Management', 'hospital-information/{hospitalId}/articles', 'articleId'),
+  resource('hospitals', 'Thông tin bệnh viện', 'Facility Management', 'hospital-information', 'hospitalInformationId', { description: 'Hồ sơ nội bộ của bệnh viện. API quản trị chỉ hỗ trợ phân trang; không có bộ lọc máy chủ.' }),
+  resource('articles', 'Bài hướng dẫn', 'Facility Management', 'hospital-information/{hospitalId}/articles', 'articleId', { parentCatalogKey: 'GET /api/v1/hospital-information', parentLabel: 'Bệnh viện', description: 'Chọn một hồ sơ bệnh viện để quản lý bài hướng dẫn. API hỗ trợ lọc trạng thái bài viết.' }),
   resource('floors', 'Tầng', 'Facility Management', 'floors', 'floorId'),
   resource('maps', 'Bản đồ máy chủ', 'Facility Management', 'maps', 'mapId'),
   resource('zones', 'Vùng', 'Facility Management', 'zones', 'zoneId'),
@@ -40,7 +40,13 @@ export const resources = [
   resource('job-reports', 'Báo cáo công việc', 'Analytics', 'admin/reports/jobs', 'jobId', { adminOnly: true }),
   resource('interactions', 'Hội thoại', 'Voice & Scripts', 'voice/interactions', 'voiceInteractionId'),
   resource('commands', 'Lệnh giọng nói', 'Voice & Scripts', 'voice/commands', 'voiceCommandId'),
-  ...[['hospital-information', 'Thông tin công khai', 'hospitalInformationId'], ['floors', 'Tầng công khai', 'floorId'], ['rooms', 'Phòng công khai', 'roomId'], ['zones', 'Vùng công khai', 'zoneId'], ['endpoints', 'Điểm đích công khai', 'endpointId'], ['endpoint-groups', 'Nhóm công khai', 'endpointGroupId']].map(([name, title, id]) => resource(`public-${name}`, title, 'Public Catalog', `public/${name}`, id)),
+  resource('public-hospital-information', 'Thông tin bệnh viện', 'Public Catalog', 'public/hospital-information', 'hospitalInformationId', { description: 'Chỉ hiển thị thông tin đã phát hành và công khai.', filterHint: 'Tìm theo từ khóa, danh mục hoặc mã ngôn ngữ.' }),
+  resource('public-articles', 'Bài hướng dẫn', 'Public Catalog', 'public/hospital-information/{hospitalId}/articles', 'articleId', { parentCatalogKey: 'GET /api/v1/public/hospital-information', parentLabel: 'Bệnh viện công khai', description: 'Chỉ hiển thị bài hướng dẫn đã phát hành của bệnh viện đã chọn.', filterHint: 'Tìm theo từ khóa, danh mục hoặc mã ngôn ngữ.' }),
+  resource('public-floors', 'Tầng', 'Public Catalog', 'public/floors', 'floorId', { description: 'Chỉ hiển thị tầng đang hoạt động và được phép công khai.', filterHint: 'Có thể lọc theo bệnh viện hoặc từ khóa.' }),
+  resource('public-rooms', 'Phòng', 'Public Catalog', 'public/rooms', 'roomId', { description: 'Chỉ hiển thị phòng đang hoạt động và công khai.', filterHint: 'Có thể lọc theo tầng, loại phòng, khoa hoặc từ khóa.' }),
+  resource('public-zones', 'Vùng', 'Public Catalog', 'public/zones', 'zoneId', { description: 'Chỉ hiển thị vùng đang hoạt động và công khai.', filterHint: 'Có thể lọc theo bản đồ, loại vùng hoặc từ khóa.' }),
+  resource('public-endpoints', 'Điểm đích', 'Public Catalog', 'public/endpoints', 'endpointId', { description: 'Chỉ hiển thị điểm đích đang hoạt động, công khai.', filterHint: 'Có thể lọc theo bản đồ, phòng, loại điểm, khả năng tiếp cận hoặc từ khóa.' }),
+  resource('public-endpoint-groups', 'Nhóm điểm đích', 'Public Catalog', 'public/endpoint-groups', 'endpointGroupId', { description: 'Chỉ hiển thị nhóm điểm đích đang hoạt động và công khai.', filterHint: 'Có thể lọc theo bản đồ hoặc từ khóa.' }),
 ];
 export const managedOperations = new Set(['POST /api/v1/auth/login', 'POST /api/v1/auth/logout', 'POST /api/v1/auth/refresh']);
 export function resourceFor(operation) {

@@ -41,7 +41,7 @@ async function refreshAccessToken() {
   return true;
 }
 
-export async function apiRequest(path, { method = 'GET', body, headers = {}, skipAuth = false, retry = true, signal, responseType = 'json' } = {}) {
+export async function apiRequest(path, { method = 'GET', body, headers = {}, skipAuth = false, retry = true, signal, responseType = 'json', keepalive = false } = {}) {
   const session = getSession();
   if (session?.mode === 'demo' && !skipAuth) {
     if (method !== 'GET' || responseType !== 'json' || path.includes('/export.')) {
@@ -67,6 +67,7 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
       headers: requestHeaders,
       body: body === undefined ? undefined : JSON.stringify(body),
       signal,
+      keepalive,
     });
   } catch (error) {
     if (error.name === 'AbortError') throw error;
@@ -76,9 +77,9 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
   const protectedResource = !path.startsWith('/api/v1/auth/') || path.split('?')[0] === '/api/v1/auth/me';
   if (response.status === 401 && !skipAuth && retry && protectedResource) {
     const latestToken = getSession()?.tokens?.accessToken;
-    if (latestToken && latestToken !== session?.tokens?.accessToken) return apiRequest(path, { method, body, headers, skipAuth, retry: false, signal, responseType });
+    if (latestToken && latestToken !== session?.tokens?.accessToken) return apiRequest(path, { method, body, headers, skipAuth, retry: false, signal, responseType, keepalive });
     if (!refreshing) refreshing = refreshAccessToken().catch(() => { throw new ApiError('Không thể gia hạn phiên. Kiểm tra kết nối rồi thử lại.', 0); }).finally(() => { refreshing = null; });
-    if (await refreshing) return apiRequest(path, { method, body, headers, skipAuth, retry: false, signal, responseType });
+    if (await refreshing) return apiRequest(path, { method, body, headers, skipAuth, retry: false, signal, responseType, keepalive });
   }
   if (response.status === 401 && !skipAuth && protectedResource && getSession()?.tokens?.accessToken === session?.tokens?.accessToken) {
     clearSession();

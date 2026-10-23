@@ -9,10 +9,11 @@ import RecordDetails, { displayValue } from './RecordDetails.jsx';
 import ListFilters from './ListFilters.jsx';
 import OperationsReport from './OperationsReport.jsx';
 import FacilityCatalogEditor from '../FacilityCatalogEditor.jsx';
+import SpeechAnnouncement from '../robotOperations/SpeechAnnouncement.jsx';
 import './backend.css';
 import './presentation.css';
 
-export const backendScreens = new Set([...resources.map(r => r.section), 'Charging']);
+export const backendScreens = new Set([...resources.map(r => r.section).filter(section => section !== 'Patrol'), 'Charging']);
 const unwrap = value => ({ ...value?.account, ...value?.request, ...value?.workflow, ...value?.job, ...value });
 const paths = op => op.parameters.filter(p => p.in === 'path');
 const filters = op => op.parameters.filter(p => p.in === 'query' && !['page', 'size'].includes(p.name));
@@ -33,7 +34,7 @@ function ChargingWorkspace() {
 }
 function ResourceWorkspace({ section }) {
   const role = getSession()?.account?.role;
-  const available = resources.filter(r => r.section === section && (!r.adminOnly || role === 'ADMIN') && (!r.staffOnly || role === 'STAFF'));
+  const available = [...(section === 'Voice & Scripts' ? [{ id: 'speech-announcement', title: 'Phát thông báo' }] : []), ...resources.filter(r => r.section === section && (!r.adminOnly || role === 'ADMIN') && (!r.staffOnly || role === 'STAFF'))];
   const [tab, setTab] = useState(available[0]?.id);
   const [geometry, setGeometry] = useState('');
   const resource = available.find(r => r.id === tab) || available[0];
@@ -41,7 +42,7 @@ function ResourceWorkspace({ section }) {
     {section === 'Facility Management' && role === 'ADMIN' && <div className="be-actions"><button type="button" aria-pressed={!geometry} onClick={() => setGeometry('')}>Danh mục máy chủ</button><button type="button" aria-pressed={geometry === 'zone'} onClick={() => setGeometry('zone')}>Vẽ vùng trên bản đồ máy chủ</button><button type="button" aria-pressed={geometry === 'endpoint'} onClick={() => setGeometry('endpoint')}>Đặt điểm và nhóm trên bản đồ máy chủ</button></div>}
     {geometry ? <div className="ls-studio"><FacilityCatalogEditor key={geometry} stage={geometry} /></div> : <>
     {available.length > 1 && <nav className="be-tabs" aria-label="Danh mục chức năng">{available.map(r => <button type="button" key={r.id} className={resource?.id === r.id ? 'selected' : ''} aria-pressed={resource?.id === r.id} onClick={() => setTab(r.id)}>{r.title}</button>)}</nav>}
-    {resource ? <ResourcePanel key={resource.id} resource={resource} role={role} /> : <p role="status">Tài khoản này không có quyền sử dụng mục này.</p>}
+    {resource?.id === 'speech-announcement' ? <SpeechAnnouncement /> : resource ? <ResourcePanel key={resource.id} resource={resource} role={role} /> : <p role="status">Tài khoản này không có quyền sử dụng mục này.</p>}
     </>}
   </section>;
 }
@@ -55,7 +56,9 @@ function ResourcePanel({ resource, role }) {
   const [selected, setSelected] = useState(null), [detail, setDetail] = useState(null), [detailError, setDetailError] = useState(''), [detailLoading, setDetailLoading] = useState(false);
   const [action, setAction] = useState(null), [live, setLive] = useState(false), [liveStatus, setLiveStatus] = useState('');
   const parentSignature = JSON.stringify(parent), querySignature = JSON.stringify(applied);
-  const parentReady = paths(listOp).every(p => parent[p.name]);
+  const listPaths = paths(listOp);
+  const parentPaths = resource.parentCatalogKey ? listPaths.filter(path => path.name !== 'hospitalId') : listPaths;
+  const parentReady = listPaths.every(p => parent[p.name]);
   useEffect(() => {
     setData(null); setError(''); setSelected(null); setDetail(null); setLive(false);
     if (!parentReady) return;
@@ -97,9 +100,9 @@ function ResourcePanel({ resource, role }) {
   };
   const open = op => setAction({ op, row: selectedData || selected, bindings: rowPaths(resource, selectedData || selected, parent) });
   return <>
-    <header className="be-heading"><div><h2>{resource.title}</h2><p>{resource.id === 'retention' ? 'Mỗi mục là một chính sách lưu trữ cho một nhóm dữ liệu, không phải số bản ghi đang lưu.' : `Quản lý dữ liệu và thao tác của ${resource.title.toLowerCase()}.`}</p></div><div className="be-actions"><button type="button" disabled={loading} onClick={() => setRevision(v => v + 1)}>Tải lại</button>{globalOps.map(op => <button type="button" key={op.key} className={write(op) ? 'primary' : ''} onClick={() => open(op)}>{actionLabel(op)}</button>)}</div></header>
-    {paths(listOp).length > 0 && <div className="be-card"><SchemaFields schema={paramsSchema(paths(listOp))} value={parent} onChange={next => { setParent(next); setPage(0); }} context={{ role }} /></div>}
-    {filters(listOp).length > 0 && <ListFilters schema={paramsSchema(filters(listOp))} value={query} applied={applied} onChange={setQuery} role={role} onApply={() => { try { setApplied(prepareValue(query, paramsSchema(filters(listOp)))); setPage(0); setError(''); } catch (e) { setError(e.message); } }} onReset={() => { setQuery({}); setApplied({}); setPage(0); setError(''); }} />}
+    <header className="be-heading"><div><h2>{resource.title}</h2><p>{resource.description || (resource.id === 'retention' ? 'Mỗi mục là một chính sách lưu trữ cho một nhóm dữ liệu, không phải số bản ghi đang lưu.' : `Quản lý dữ liệu và thao tác của ${resource.title.toLowerCase()}.`)}</p></div><div className="be-actions"><button type="button" disabled={loading} onClick={() => setRevision(v => v + 1)}>Tải lại</button>{globalOps.map(op => <button type="button" key={op.key} className={write(op) ? 'primary' : ''} onClick={() => open(op)}>{actionLabel(op)}</button>)}</div></header>
+    {(resource.parentCatalogKey || parentPaths.length > 0) && <div className="be-card be-parent-selector">{resource.parentCatalogKey && <ParentCatalogSelector resource={resource} value={parent.hospitalId || ''} onChange={hospitalId => { setParent(current => ({ ...current, hospitalId })); setPage(0); }} />}{parentPaths.length > 0 && <SchemaFields schema={paramsSchema(parentPaths)} value={parent} onChange={next => { setParent(next); setPage(0); }} context={{ role }} />}</div>}
+    {filters(listOp).length > 0 && <ListFilters resource={resource} schema={paramsSchema(filters(listOp))} value={query} applied={applied} onChange={setQuery} role={role} onApply={() => { try { setApplied(prepareValue(query, paramsSchema(filters(listOp)))); setPage(0); setError(''); } catch (e) { setError(e.message); } }} onReset={() => { setQuery({}); setApplied({}); setPage(0); setError(''); }} />}
     {error && <p className="be-error" role="alert">{error}</p>}
     {loading && <p role="status">Đang tải dữ liệu…</p>}
     {!parentReady && <p className="be-empty">Chọn thông tin ở trên để xem danh sách.</p>}
@@ -118,6 +121,20 @@ function ResourcePanel({ resource, role }) {
     {singleton && <section className={resource.id === 'reports' ? '' : 'be-card'}><div className="be-actions">{itemOps.filter(eligible).map(op => <button key={op.key} onClick={() => open(op)}>{actionLabel(op)}</button>)}</div>{resource.id === 'reports' ? <OperationsReport value={data} /> : <RecordDetails value={data} />}</section>}
     {action && <OperationDialog key={action.op.key} {...action} resource={resource} role={role} onClose={() => setAction(null)} onSaved={() => setRevision(v => v + 1)} />}
   </>;
+}
+
+function ParentCatalogSelector({ resource, value, onChange }) {
+  const [rows, setRows] = useState([]), [loading, setLoading] = useState(true), [error, setError] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true); setError('');
+    callBackend(resource.parentCatalogKey, { query: { page: 0, size: 100 } }, { signal: controller.signal })
+      .then(response => setRows(Array.isArray(response) ? response : response?.content ?? []))
+      .catch(cause => { if (cause.name !== 'AbortError') setError(cause.message || 'Không tải được danh sách bệnh viện.'); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [resource.parentCatalogKey]);
+  return <label className="be-parent-field">{resource.parentLabel}<select value={value} disabled={loading} onChange={event => onChange(event.target.value)}><option value="">{loading ? 'Đang tải…' : `Chọn ${resource.parentLabel.toLowerCase()}`}</option>{rows.map(item => <option key={item.hospitalInformationId} value={item.hospitalInformationId}>{item.title || item.hospitalName || item.hospitalInformationId}</option>)}</select>{error && <small role="alert">{error}</small>}</label>;
 }
 
 function rowPaths(resource, raw, parent = {}) {

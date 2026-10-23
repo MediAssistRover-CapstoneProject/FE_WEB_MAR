@@ -11,8 +11,6 @@ import { MAP, SCAN_START } from './lidarGeometry.js';
 import { STAGES, STORAGE_KEY, ZONE_TYPES, ENDPOINT_TYPES, ROBOT_SAFETY_GAP_METERS, createDraft, loadDraft, changeDraft, removeEndpoint, removeEndpointGroup, stageEnabled, validPoint, driveRobotStep, zoneError, endpointError, polygonArea, mapIssues, saveMap, exportMap } from './mapStudioModel.js';
 import liveCamera from '../../assets/images/live-camera.png';
 
-const ROBOT_CAMERA_URL = (import.meta.env.VITE_ROBOT_CAMERA_URL || '').trim();
-
 const styles = String.raw`
 .ls-group-toolbar{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:12px 0}.ls-group-toolbar .ls-field{flex:1;min-width:180px;margin:0}.ls-group-toolbar>.ls-btn{flex-shrink:0}
 .ls-policy{padding:12px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;font-size:12px}.ls-policy strong{color:#1d4ed8}.ls-endpoint-row{display:flex;gap:8px;align-items:center}.ls-endpoint-row .ls-item{flex:1;min-width:0}.ls-endpoint-row .ls-btn{flex-shrink:0}
@@ -54,8 +52,11 @@ function Field({label,children,...props}) { const id=useId();return <label class
 const emptyZone=()=>({id:'',name:'',description:'',enabled:true,type:'KEEP_OUT',speed:0.3,points:[]});
 const emptyEndpoint=()=>({id:'',name:'',description:'',type:'WAYPOINT',x:580,y:330,enabled:true,placed:false});
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-const DRIVE_LABELS={forward:'Tiến',backward:'Lùi',left:'Quay trái',right:'Quay phải'};
+const DRIVE_LABELS={forward:'Tiến',left:'Quay trái',right:'Quay phải'};
 export default function MapStudioFigma({initialStage='scan'}) {
+  return <SimulatedMapStudio initialStage={initialStage}/>;
+}
+function SimulatedMapStudio({initialStage='scan'}) {
   const goTo=useNavigate();
   const [draft,setDraft]=useState(()=>loadDraft(window.localStorage));
   const [endpointTab,setEndpointTab]=useState('points');
@@ -66,7 +67,6 @@ export default function MapStudioFigma({initialStage='scan'}) {
   const [notice,setNotice]=useState(''),[storageError,setStorageError]=useState(false),[confirm,setConfirm]=useState(null);
   const [driveDirection,setDriveDirection]=useState('');
   const [collisionWarning,setCollisionWarning]=useState(false);
-  const [cameraFailed,setCameraFailed]=useState(false);
   const draftRef=useRef(draft);
   const confirmRef=useRef(null);
   draftRef.current=draft;
@@ -113,7 +113,7 @@ export default function MapStudioFigma({initialStage='scan'}) {
     return()=>{window.removeEventListener('blur',stop);document.removeEventListener('visibilitychange',stopWhenHidden);};
   },[]);
   useEffect(()=>{
-    const directions={ArrowUp:'forward',ArrowDown:'backward',ArrowLeft:'left',ArrowRight:'right'};
+    const directions={ArrowUp:'forward',ArrowLeft:'left',ArrowRight:'right'};
     const editing=target=>target instanceof HTMLElement && (target.isContentEditable || ['INPUT','TEXTAREA','SELECT'].includes(target.tagName));
     const keyDown=event=>{
       const direction=directions[event.key];
@@ -187,7 +187,6 @@ export default function MapStudioFigma({initialStage='scan'}) {
     const link=document.createElement('a');link.href=url;link.download='hospital-lidar-map.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   };
   const toolText={rectangle:rectangleStart?'Click the opposite corner of the rectangle.':'Click the first corner of the rectangle.',polygon:'Click each corner, then choose Finish shape.',endpoint:'Click scanned free space to place the endpoint.'}[tool];
-  const cameraIsLive=Boolean(ROBOT_CAMERA_URL&&!cameraFailed);
   const stopDrive=event=>{
     if(event?.pointerId!==undefined&&event.currentTarget?.hasPointerCapture?.(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);
     setDriveDirection('');
@@ -241,12 +240,12 @@ export default function MapStudioFigma({initialStage='scan'}) {
         {stage==='scan'&&<>
           <Panel title="Camera phía trước robot">
             <div className="ls-camera">
-              <img src={cameraIsLive?ROBOT_CAMERA_URL:liveCamera} alt="Hình ảnh từ camera phía trước robot MAR-01" onError={()=>setCameraFailed(true)}/>
-              <span className={'ls-camera-badge '+(cameraIsLive?'live':'')}>{cameraIsLive?'TRỰC TIẾP':'XEM TRƯỚC'}</span>
-              <span className="ls-camera-label"><b>MAR-01 · Camera trước</b><span>{cameraIsLive?'Đang nhận hình':'Ảnh minh họa'}</span></span>
+              <img src={liveCamera} alt="Ảnh minh họa camera cho mô phỏng"/>
+              <span className="ls-camera-badge">ẢNH MINH HỌA</span>
+              <span className="ls-camera-label"><b>MAR-01 · Mô phỏng</b><span>Không phải camera trực tiếp</span></span>
             </div>
-            <div className="ls-camera-info"><span>Nguồn camera</span><b>{cameraIsLive?'Robot MAR-01':'Chưa cấu hình stream'}</b></div>
-            {!cameraIsLive&&<p>Thêm <code>VITE_ROBOT_CAMERA_URL</code> để hiển thị luồng MJPEG hoặc ảnh snapshot từ camera robot.</p>}
+            <div className="ls-camera-info"><span>Nguồn camera</span><b>Ảnh minh họa cục bộ</b></div>
+            <p>Ảnh minh họa cho chế độ mô phỏng. Chưa kết nối camera robot thật.</p>
           </Panel>
           <Panel title="Điều khiển robot">
             <div className="ls-drive-panel">
@@ -256,7 +255,6 @@ export default function MapStudioFigma({initialStage='scan'}) {
                 <button type="button" disabled={['captured','complete'].includes(draft.scan.status)} className={'ls-drive-key ls-drive-left '+(driveDirection==='left'?'active':'')} aria-label="Giữ để robot cua trái" aria-pressed={driveDirection==='left'} {...driveHandlers('left')}>←</button>
                 <button type="button" className={'ls-drive-key stop ls-drive-stop '+(!driveDirection?'active':'')} aria-label="Dừng robot" aria-pressed={!driveDirection} onPointerDown={stopNow} onClick={stopNow}>DỪNG</button>
                 <button type="button" disabled={['captured','complete'].includes(draft.scan.status)} className={'ls-drive-key ls-drive-right '+(driveDirection==='right'?'active':'')} aria-label="Giữ để robot cua phải" aria-pressed={driveDirection==='right'} {...driveHandlers('right')}>→</button>
-                <button type="button" disabled={['captured','complete'].includes(draft.scan.status)} className={'ls-drive-key ls-drive-down '+(driveDirection==='backward'?'active':'')} aria-label="Giữ để robot lùi" aria-pressed={driveDirection==='backward'} {...driveHandlers('backward')}>↓</button>
               </div>
               <div className={'ls-drive-status '+(collisionWarning?'collision':driveDirection?'moving':'')} role={collisionWarning?'alert':'status'}><i/>{collisionWarning?'Cảnh báo va chạm · Robot đã tự dừng':driveDirection?`Đang giữ: ${DRIVE_LABELS[driveDirection]}`:'Robot đang dừng'}</div>
               <p className="ls-safety-note">Tự động dừng cách tường hoặc vật cản tối thiểu {ROBOT_SAFETY_GAP_METERS.toLocaleString('vi-VN')} m. Chế độ demo chưa gửi lệnh tới robot vật lý.</p>

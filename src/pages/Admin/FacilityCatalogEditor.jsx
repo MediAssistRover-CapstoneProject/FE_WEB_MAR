@@ -12,7 +12,7 @@ const jsonString=value=>value==null?'':JSON.stringify(value,null,2);
 function Field({label,children,...props}){return <label className="ls-field">{label}{children?cloneElement(children,{'aria-label':label}):<input {...props} aria-label={label}/>}</label>;}
 function Check({label,...props}){return <label className="ls-field"><span><input type="checkbox" {...props}/> {label}</span></label>;}
 
-export default function FacilityCatalogEditor({stage}) {
+export default function FacilityCatalogEditor({stage, initialMapId = ''}) {
   const [catalog,setCatalog]=useState(emptyCatalog),[mapId,setMapId]=useState(''),[status,setStatus]=useState('Đang tải danh mục…'),[busy,setBusy]=useState(false),[ready,setReady]=useState(false);
   const [zone,setZone]=useState(zoneDefault),[endpoint,setEndpoint]=useState(endpointDefault),[endpointTab,setEndpointTab]=useState('point');
   const [drawing,setDrawing]=useState(false);
@@ -25,7 +25,7 @@ export default function FacilityCatalogEditor({stage}) {
     const [maps,zones,endpoints,groups,members,rooms]=await Promise.all([api.listMaps,api.listZones,api.listEndpoints,api.listEndpointGroups,api.listEndpointGroupMembers,api.listRooms].map(allFacilityPages));
     return {maps,zones,endpoints,groups,members,rooms};
   };
-  useEffect(()=>{let mounted=true;fetchCatalog().then(data=>{if(mounted){setCatalog(data);setMapId(data.maps.find(m=>m.status==='ACTIVE')?.mapId||data.maps[0]?.mapId||'');setReady(true);setStatus('Đã đọc danh mục từ BE. Chưa thay đổi dữ liệu máy chủ.');}}).catch(e=>{if(mounted)setStatus('Không tải được danh mục BE: '+e.message);});return()=>{mounted=false;};},[]);
+  useEffect(()=>{let mounted=true;fetchCatalog().then(data=>{if(mounted){setCatalog(data);setMapId(data.maps.find(m=>m.mapId===initialMapId)?.mapId||data.maps.find(m=>m.status==='ACTIVE')?.mapId||data.maps[0]?.mapId||'');setReady(true);setStatus('Đã đọc danh mục từ BE. Chưa thay đổi dữ liệu máy chủ.');}}).catch(e=>{if(mounted)setStatus('Không tải được danh mục BE: '+e.message);});return()=>{mounted=false;};},[initialMapId]);
   const reload=async()=>{setBusy(true);try{const data=await fetchCatalog();setCatalog(data);setReady(true);if(!data.maps.some(m=>m.mapId===mapId))setMapId(data.maps[0]?.mapId||'');setStatus('Đã tải lại danh mục.');}catch(e){setStatus('Không tải được: '+e.message);}finally{setBusy(false);}};
   const write=async action=>{
     if(writeLock.current)throw Error('Đang lưu, vui lòng chờ.');writeLock.current=true;setBusy(true);

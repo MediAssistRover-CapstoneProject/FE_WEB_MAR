@@ -40,7 +40,7 @@ export function stepPayload(step, taskId, sequenceNo) {
     sequenceNo,
     description: step.description ?? '',
     enabled: step.enabled ?? true,
-    paramsJson: step.values,
+    paramsJson: step.type === 'MOVE' && step.values.max_speed_mps !== '' && Number.isFinite(Number(step.values.max_speed_mps)) ? { ...step.values, max_speed_mps: Number(step.values.max_speed_mps) } : step.values,
     inputMappingJson: step.inputMappingJson ?? {},
     timeoutSec: step.timeoutSec ?? 60,
     maxAttempts: step.maxAttempts ?? 1,
@@ -52,7 +52,7 @@ export function stepPayload(step, taskId, sequenceNo) {
 }
 
 export function editorTasks(detail) {
-  return (detail?.tasks ?? []).map((task) => ({
+  return [...(detail?.tasks ?? [])].sort((a, b) => a.sequenceNo - b.sequenceNo).map((task) => ({
     id: task.taskId,
     taskId: task.taskId,
     code: task.taskCode,
@@ -60,7 +60,7 @@ export function editorTasks(detail) {
     sequenceNo: task.sequenceNo,
     description: task.description,
     configJson: task.configJson,
-    steps: (detail.steps ?? []).filter((step) => step.taskId === task.taskId).map((step) => ({
+    steps: (detail.steps ?? []).filter((step) => step.taskId === task.taskId).sort((a, b) => a.sequenceNo - b.sequenceNo).map((step) => ({
       id: step.stepId,
       stepId: step.stepId,
       code: step.stepCode,

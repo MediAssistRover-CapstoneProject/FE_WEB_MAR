@@ -61,12 +61,17 @@
 .be-report-breakdown li span { color: #526c8c; }
 .be-report-bar { height: 6px; overflow: hidden; background: #edf2fa; border-radius: 6px; }
 .be-report-bar span { display: block; height: 100%; background: #5c94ef; border-radius: inherit; }
+.be-parent-selector { display: flex; align-items: end; gap: 16px; }
+.be-parent-field { display: grid; gap: 6px; min-width: min(100%, 420px); color: #314c70; font-size: 13px; font-weight: 600; }
+.be-parent-field small { color: #a32c3c; font-weight: 400; }
+.be-filter-hint { margin: 0 0 16px; color: #72829a; font-size: 13px; }
 @media (max-width:1100px) {
   .be-record-detail { position: static; }
   .be-filter .be-fields, .be-report-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .be-report-groups { grid-template-columns: 1fr; }
 }
 @media (max-width:600px) {
+  .be-parent-selector { align-items: stretch; flex-direction: column; }
   .be-filter > summary, .be-filter form { padding: 16px; }
   .be-filter .be-fields { grid-template-columns: 1fr; }
   .be-filter-footer { align-items: stretch; flex-direction: column; }

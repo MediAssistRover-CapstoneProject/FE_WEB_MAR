@@ -2,14 +2,15 @@ import { fieldLabel, references } from '../../../features/api/workspaceCatalog.j
 import { displayValue } from './RecordDetails.jsx';
 import SchemaFields from './SchemaFields.jsx';
 
-export default function ListFilters({ schema, value, applied, onChange, onApply, onReset, role }) {
+export default function ListFilters({ resource, schema, value, applied, onChange, onApply, onReset, role }) {
   const selected = Object.entries(applied).filter(([, item]) => item !== '' && item != null);
   return <details className="be-filter">
     <summary>
-      <span className="be-filter-label"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8Z" strokeLinejoin="round" /></svg>Bộ lọc<span className="be-filter-count">{selected.length ? `${selected.length} đang áp dụng` : 'Tất cả kết quả'}</span></span>
+      <span className="be-filter-label"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8Z" strokeLinejoin="round" /></svg>{resource?.section === 'Public Catalog' ? 'Tìm kiếm và lọc' : 'Bộ lọc'}<span className="be-filter-count">{selected.length ? `${selected.length} đang áp dụng` : 'Không bắt buộc'}</span></span>
       <span className="be-filter-chevron" aria-hidden="true" />
     </summary>
     <form onSubmit={event => { event.preventDefault(); onApply(); }}>
+      {resource?.filterHint && <p className="be-filter-hint">{resource.filterHint}</p>}
       <SchemaFields schema={schema} value={value} onChange={onChange} context={{ role, filter: true }} />
       <div className="be-filter-footer"><span>Chọn điều kiện để thu gọn danh sách.</span><div className="be-actions"><button type="button" onClick={onReset}>Đặt lại</button><button type="submit" className="primary">Áp dụng bộ lọc</button></div></div>
     </form>
