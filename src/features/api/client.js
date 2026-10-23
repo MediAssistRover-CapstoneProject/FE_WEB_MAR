@@ -1,6 +1,8 @@
 import { clearSession, getRefreshToken, getSession, updateTokens } from '../auth/session.js';
 
-const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? 'https://bemar-production.up.railway.app').trim().replace(/\/+$/, '');
+// Local development uses the backend configured in Be/BE_MAR/.env.
+// Deployments override this through VITE_API_BASE_URL during their build.
+const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? 'http://localhost:8080').trim().replace(/\/+$/, '');
 let refreshing = null;
 
 export class ApiError extends Error {
