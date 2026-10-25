@@ -24,10 +24,10 @@ function ProtectedRoute({ children, adminOnly = false, allowPasswordChange = fal
   }, []);
   if (!authenticated || !hasSession()) return <Navigate to="/login" replace />;
   if (getSession()?.tokens?.mustChangePassword && !allowPasswordChange) return <Navigate to="/change-password" replace />;
-  if (adminOnly && getSession()?.account?.role !== 'ADMIN') return <Navigate to="/admin?screen=Workflow%20Management" replace />;
+  if (adminOnly && getSession()?.account?.role !== 'ADMIN') return <Navigate to="/admin/workflow-catalog" replace />;
   return children;
 }
 
 export default function AppRoutes() {
-  return <Routes><Route element={<AppLayout />}><Route path="/" element={<LandingRoute />} /><Route path="/login" element={<LoginPage />} /><Route path="/register" element={<RegisterPage />} /><Route path="/change-password" element={<ProtectedRoute allowPasswordChange><ChangePasswordPage /></ProtectedRoute>} /><Route path="/admin" element={<ProtectedRoute><AdminApp onLanding={() => window.location.assign('/')} /></ProtectedRoute>} /><Route path="/workflows" element={<ProtectedRoute adminOnly><WorkflowsPage /></ProtectedRoute>} /><Route path="/workstations" element={<ProtectedRoute><WorkstationsPage /></ProtectedRoute>} /></Route></Routes>;
+  return <Routes><Route element={<AppLayout />}><Route path="/" element={<LandingRoute />} /><Route path="/login" element={<LoginPage />} /><Route path="/register" element={<RegisterPage />} /><Route path="/change-password" element={<ProtectedRoute allowPasswordChange><ChangePasswordPage /></ProtectedRoute>} /><Route path="/admin" element={<ProtectedRoute><AdminApp onLanding={() => window.location.assign('/')} /></ProtectedRoute>} /><Route path="/admin/:screenSlug" element={<ProtectedRoute><AdminApp onLanding={() => window.location.assign('/')} /></ProtectedRoute>} /><Route path="/workflow" element={<ProtectedRoute adminOnly><WorkflowsPage /></ProtectedRoute>} /><Route path="/workflows" element={<Navigate to="/workflow" replace />} /><Route path="/workstations" element={<ProtectedRoute><WorkstationsPage /></ProtectedRoute>} /></Route></Routes>;
 }

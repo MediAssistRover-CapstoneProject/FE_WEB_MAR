@@ -1,5 +1,6 @@
 import { vi } from '../../i18n/vi.js';
 import { injectStyles } from '../../styles/injectStyles.js';
+import { pathForScreen, screenForSlug } from '../../features/admin/screenRoutes.js';
 const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
 .quick-actions div button:nth-child(2){display:none}.quick-actions div button:first-child{width:100%}
 .missions-page{padding:0}.missions-page>header{height:64px;margin:-24px -28px 20px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 38px}.missions-page>header h2{font-size:22px;margin:0}.missions-page>header div,.running-mission footer{display:flex;gap:8px}.missions-page>header button,.missions-page nav button{height:36px;padding:0 14px;font-size:13px}.missions-page nav{display:flex;gap:12px;margin:0 0 18px}.missions-page nav .active{background:#2f80ff;color:#fff}.mission-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.mission-stats article,.missions-main .card,.mission-history{background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;padding:14px 20px}.mission-stats article{height:96px}.mission-stats small{display:block;font-size:11px;color:#475569}.mission-stats strong{font-size:28px}.mission-stats article:nth-child(1) strong{color:#15803d}.mission-stats article:nth-child(2) strong{color:#2f80ff}.mission-stats article:nth-child(3) strong{color:#6d28d9}.mission-stats article:nth-child(4) strong{color:#0e7490}.missions-main{display:grid;grid-template-columns:742px 404px;gap:18px;margin-top:22px}.running-mission,.mission-queue{height:310px}.running-mission h2,.mission-queue h2,.mission-history h2{font-size:18px;margin:8px 0}.running-mission h2 em{float:right;font-size:11px;color:#15803d;border:1px solid #28d17c;border-radius:13px;padding:5px 10px;font-style:normal;text-transform:uppercase}.running-mission p,.mission-queue p,.mission-history p{font-size:12px;color:#475569}.running-mission small{display:flex;justify-content:space-between;font-size:11px;color:#475569}.running-mission .progress{height:10px;margin:10px 0 16px}.running-mission .progress i{width:64%}.running-mission p b{display:inline-block;width:30px;color:#475569}.running-mission p.current{font-weight:600;color:#0f172a}.running-mission p.current b,.running-mission p:first-of-type b{color:#15803d}.running-mission footer{justify-content:flex-end}.running-mission footer button{height:36px;font-size:13px}.mission-queue>div{height:52px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;margin:12px 0;padding:12px;display:flex;justify-content:space-between;font-size:12px}.mission-queue em{font-size:11px;font-style:normal;border:1px solid #cbd5e1;border-radius:13px;padding:4px 10px;margin-top:-3px}.mission-queue div:nth-of-type(1) em{color:#b91c1c;border-color:#ff5a5f}.mission-queue div:nth-of-type(2) em{color:#2f80ff;border-color:#2f80ff}.mission-history{height:286px;margin-top:22px}.mission-history .card-title{color:#0e7490}.mission-history h2{margin:5px 0}.mission-history p{margin:4px 0 5px}@media(max-width:1100px){.missions-main{grid-template-columns:1fr}.mission-stats{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){.missions-page>header{margin:-16px -16px 16px;padding:0 16px}.missions-page>header button{padding:0 8px;font-size:11px}.missions-page nav{overflow:auto}.mission-stats{grid-template-columns:1fr}.mission-history{height:auto}}
@@ -20,7 +21,7 @@ const inlineStyles = String.raw`@import url('https://fonts.googleapis.com/css2?f
 injectStyles('mediassist-style-pages-Admin-AdminApp-jsx', inlineStyles);
 
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import BackendWorkspace, { backendScreens } from './backend/BackendWorkspace.jsx';
 import BackendDashboard from './backend/BackendDashboard.jsx';
 import { screenTitles } from '../../features/api/workspaceCatalog.js';
@@ -132,13 +133,16 @@ function PublicSite({ onBack, onAuth }) { return <div className="public"><header
 function Auth({ kind, onBack }) { const register = kind === 'Register'; return <div className="auth"><button className="back" onClick={onBack}>{vi("← Back home")}</button><div className="auth-art"><div className="robot">{vi("✚")}</div><h1>{vi("Care in motion.")}</h1><p>{vi("One simple workspace for your hospital team.")}</p></div><form><h1>{vi(register ? 'Create your account' : 'Welcome back')}</h1><p>{vi(register ? 'Use your work email to get started.' : 'Sign in to your MediAssistRover workspace.')}</p>{vi(register && <label>{vi("Full name")}<input /></label>)}<label>{vi("Work email")}<input type="email" /></label><label>{vi("Password")}<input type="password" /></label>{vi(register && <label>{vi("Confirm password")}<input type="password" /></label>)}<button type="button">{vi(register ? 'Create account' : 'Sign in')}</button><p className="muted">{vi(register ? 'Already have an account?' : 'New to MediAssistRover?')} <a onClick={onBack}>{vi(register ? 'Sign in' : 'Create an account')}</a></p></form></div>; }
 export default function AdminApp({ onLanding }) {
   const navigate = useNavigate();
-  const [search, setSearch] = useSearchParams();
+  const { screenSlug } = useParams();
+  const [search] = useSearchParams();
   const requested = search.get('screen');
-  const screen = isAdminScreen(requested) ? requested : 'Dashboard';
+  const legacyScreen = isAdminScreen(requested) ? requested : null;
+  const screen = screenForSlug(screenSlug) || legacyScreen || 'Dashboard';
+  useEffect(() => { if (!screenSlug && legacyScreen) navigate(pathForScreen(legacyScreen), { replace: true }); }, [screenSlug, legacyScreen, navigate]);
   const handleLogout = async () => {
     try { if (!isDemoSession()) await logout(getRefreshToken()); }
     catch { /* Always clear the local session, including when the server is unavailable. */ }
     finally { clearSession(); if (onLanding) onLanding(); else navigate('/'); }
   };
-  return <div className="app"><AdminSidebar active={screen} onSelect={value => setSearch({ screen: value })} onLogout={handleLogout} /><main className="workspace"><AdminTopbar title={screenTitles[screen] || vi(screen)} /><div className="content">{screen === 'Dashboard' ? <BackendDashboard /> : backendScreens.has(screen) ? <BackendWorkspace key={screen} section={screen} /> : <PageRouter page={screen} />}</div></main></div>;
+  return <div className="app"><AdminSidebar active={screen} onSelect={value => navigate(pathForScreen(value))} onLogout={handleLogout} /><main className="workspace"><AdminTopbar title={screenTitles[screen] || vi(screen)} /><div className="content">{screen === 'Dashboard' ? <BackendDashboard /> : backendScreens.has(screen) ? <BackendWorkspace key={screen} section={screen} /> : <PageRouter page={screen} />}</div></main></div>;
 }

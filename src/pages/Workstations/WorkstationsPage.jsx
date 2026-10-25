@@ -164,7 +164,7 @@ export default function WorkstationsPage() {
   const selectedWorkflow = workflowOptions.find((item) => item.value === button.workflow) || workflowOptions.find((item) => /delivery/i.test(item.label)) || workflowOptions[0] || { value: button.workflow, label: button.workflow };
   const includeCurrent = (options, value) => options.some((item) => item.value === value) ? options : [{ value, label: value }, ...options];
   const go = next => { setSearch(''); setErrors({}); setParams(next === 'stations' ? {} : { view: next }); };
-  const selectWorkspaceTab = id => id === 'workflow' ? navigate('/workflows') : go('stations');
+  const selectWorkspaceTab = id => id === 'workflow' ? navigate('/workflow') : go('stations');
   function saveStation(value) { setStation(value); setStations(items => [...items.filter(item => item.id !== value.id), value]); }
   const editStation = () => { setStationDraft(station); go('configuration'); };
   const newJob = type => { setSimulationStep(0); setJob({ ...initialJob, type, description: type === 'escort' ? 'Escort patient to Room 305' : initialJob.description }); go(type); };

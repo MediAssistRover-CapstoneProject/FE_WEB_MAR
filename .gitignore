@@ -21,6 +21,8 @@ pnpm-debug.log*
 # Tooling and editor files
 .vite/
 .workstation-build/
+gazebo/generated/
+gazebo/__pycache__/
 .vscode/*
 !.vscode/extensions.json
 .idea/

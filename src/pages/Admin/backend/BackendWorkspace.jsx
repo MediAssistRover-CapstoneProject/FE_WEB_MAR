@@ -10,8 +10,10 @@ import ListFilters from './ListFilters.jsx';
 import OperationsReport from './OperationsReport.jsx';
 import FacilityCatalogEditor from '../FacilityCatalogEditor.jsx';
 import SpeechAnnouncement from '../robotOperations/SpeechAnnouncement.jsx';
+import { CatalogNavigation, DataSource, EmptyRecords, JobSteps, RecordSummary, WorkspaceIntro, enhancedSection, resourceHints } from './WorkspaceOverview.jsx';
 import './backend.css';
 import './presentation.css';
+import './workspaceOverview.css';
 
 export const backendScreens = new Set([...resources.map(r => r.section).filter(section => section !== 'Patrol'), 'Charging']);
 const unwrap = value => ({ ...value?.account, ...value?.request, ...value?.workflow, ...value?.job, ...value });
@@ -39,15 +41,18 @@ function ResourceWorkspace({ section }) {
   const [geometry, setGeometry] = useState('');
   const resource = available.find(r => r.id === tab) || available[0];
   return <section className="be-workspace" aria-label={screenTitles[section] || vi(section)}>
+    <WorkspaceIntro section={section} role={role} />
     {section === 'Facility Management' && role === 'ADMIN' && <div className="be-actions"><button type="button" aria-pressed={!geometry} onClick={() => setGeometry('')}>Danh mục máy chủ</button><button type="button" aria-pressed={geometry === 'zone'} onClick={() => setGeometry('zone')}>Vẽ vùng trên bản đồ máy chủ</button><button type="button" aria-pressed={geometry === 'endpoint'} onClick={() => setGeometry('endpoint')}>Đặt điểm và nhóm trên bản đồ máy chủ</button></div>}
     {geometry ? <div className="ls-studio"><FacilityCatalogEditor key={geometry} stage={geometry} /></div> : <>
-    {available.length > 1 && <nav className="be-tabs" aria-label="Danh mục chức năng">{available.map(r => <button type="button" key={r.id} className={resource?.id === r.id ? 'selected' : ''} aria-pressed={resource?.id === r.id} onClick={() => setTab(r.id)}>{r.title}</button>)}</nav>}
+    {available.length > 1 && (['Facility Management', 'Public Catalog'].includes(section) ? <CatalogNavigation available={available} resource={resource} onSelect={setTab} section={section} /> : <nav className="be-tabs" aria-label="Danh mục chức năng">{available.map(r => <button type="button" key={r.id} className={resource?.id === r.id ? 'selected' : ''} aria-pressed={resource?.id === r.id} onClick={() => setTab(r.id)}>{r.title}</button>)}</nav>)}
     {resource?.id === 'speech-announcement' ? <SpeechAnnouncement /> : resource ? <ResourcePanel key={resource.id} resource={resource} role={role} /> : <p role="status">Tài khoản này không có quyền sử dụng mục này.</p>}
     </>}
   </section>;
 }
 
 function ResourcePanel({ resource, role }) {
+  const enhanced = enhancedSection(resource.section);
+  const [loadedAt, setLoadedAt] = useState(null);
   const ops = useMemo(() => resourceOperations(resource.id).filter(op => canUse(op, role)), [resource.id, role]);
   const listOp = operations[`GET ${resource.root}`];
   const detailOp = ops.find(op => op.method === 'GET' && op.path.startsWith(resource.root + '/') && /^\{[^}]+\}$/.test(op.path.slice(resource.root.length + 1)));
@@ -60,20 +65,20 @@ function ResourcePanel({ resource, role }) {
   const parentPaths = resource.parentCatalogKey ? listPaths.filter(path => path.name !== 'hospitalId') : listPaths;
   const parentReady = listPaths.every(p => parent[p.name]);
   useEffect(() => {
-    setData(null); setError(''); setSelected(null); setDetail(null); setLive(false);
+    setData(null); setError(''); setSelected(null); setDetail(null); setLive(false); setLoadedAt(null); setLoading(false); setDetailLoading(false);
     if (!parentReady) return;
     const controller = new AbortController(); setLoading(true);
-    callBackend(listOp.key, { path: parent, query: { ...applied, page, size: 20 } }, { signal: controller.signal }).then(setData).catch(e => { if (e.name !== 'AbortError') setError(e.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    callBackend(listOp.key, { path: parent, query: { ...applied, page, size: 20 } }, { signal: controller.signal }).then(value => { if (!controller.signal.aborted) { setData(value); setLoadedAt(Date.now()); } }).catch(e => { if (e.name !== 'AbortError') setError(e.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [listOp.key, parentReady, parentSignature, querySignature, page, revision]);
   const selectedId = selected && keyFor(resource, selected);
   useEffect(() => {
-    setDetail(null); setDetailError(''); setLive(false);
+    setDetail(null); setDetailError(''); setDetailLoading(false); setLive(false);
     if (!selected) return;
     if (!detailOp || selectedId == null) { setDetail(selected); return; }
     const controller = new AbortController(); setDetailLoading(true);
     const context = rowPaths(resource, selected, parent);
-    callBackend(detailOp.key, { path: context }, { signal: controller.signal }).then(setDetail).catch(e => { if (e.name !== 'AbortError') setDetailError(e.message); }).finally(() => { if (!controller.signal.aborted) setDetailLoading(false); });
+    callBackend(detailOp.key, { path: context }, { signal: controller.signal }).then(value => { if (!controller.signal.aborted) setDetail(value); }).catch(e => { if (e.name !== 'AbortError') setDetailError(e.message); }).finally(() => { if (!controller.signal.aborted) setDetailLoading(false); });
     return () => controller.abort();
   }, [selected, selectedId, detailOp?.key]);
   useEffect(() => {
@@ -99,25 +104,28 @@ function ResourcePanel({ resource, role }) {
     return true;
   };
   const open = op => setAction({ op, row: selectedData || selected, bindings: rowPaths(resource, selectedData || selected, parent) });
+  const resetFilters = () => { setQuery({}); setApplied({}); setPage(0); setError(''); };
+  const hasFilters = Object.values(applied).some(value => value != null && value !== '');
   return <>
-    <header className="be-heading"><div><h2>{resource.title}</h2><p>{resource.description || (resource.id === 'retention' ? 'Mỗi mục là một chính sách lưu trữ cho một nhóm dữ liệu, không phải số bản ghi đang lưu.' : `Quản lý dữ liệu và thao tác của ${resource.title.toLowerCase()}.`)}</p></div><div className="be-actions"><button type="button" disabled={loading} onClick={() => setRevision(v => v + 1)}>Tải lại</button>{globalOps.map(op => <button type="button" key={op.key} className={write(op) ? 'primary' : ''} onClick={() => open(op)}>{actionLabel(op)}</button>)}</div></header>
+    <header className="be-heading"><div><h2>{resource.title}</h2><p>{resourceHints[resource.id] || resource.description || (resource.id === 'retention' ? 'Mỗi mục là một chính sách lưu trữ cho một nhóm dữ liệu, không phải số bản ghi đang lưu.' : `Quản lý dữ liệu và thao tác của ${resource.title.toLowerCase()}.`)}</p></div><div className="be-actions"><button type="button" disabled={loading || !parentReady} onClick={() => setRevision(v => v + 1)}>Tải lại</button>{globalOps.map(op => <button type="button" key={op.key} disabled={!parentReady} className={write(op) ? 'primary' : ''} onClick={() => open(op)}>{actionLabel(op)}</button>)}</div></header>
+    {enhanced && <DataSource loading={loading} error={error} loadedAt={loadedAt} total={data?.totalElements ?? rows?.length} parentReady={parentReady} />}
     {(resource.parentCatalogKey || parentPaths.length > 0) && <div className="be-card be-parent-selector">{resource.parentCatalogKey && <ParentCatalogSelector resource={resource} value={parent.hospitalId || ''} onChange={hospitalId => { setParent(current => ({ ...current, hospitalId })); setPage(0); }} />}{parentPaths.length > 0 && <SchemaFields schema={paramsSchema(parentPaths)} value={parent} onChange={next => { setParent(next); setPage(0); }} context={{ role }} />}</div>}
     {filters(listOp).length > 0 && <ListFilters resource={resource} schema={paramsSchema(filters(listOp))} value={query} applied={applied} onChange={setQuery} role={role} onApply={() => { try { setApplied(prepareValue(query, paramsSchema(filters(listOp)))); setPage(0); setError(''); } catch (e) { setError(e.message); } }} onReset={() => { setQuery({}); setApplied({}); setPage(0); setError(''); }} />}
     {error && <p className="be-error" role="alert">{error}</p>}
     {loading && <p role="status">Đang tải dữ liệu…</p>}
     {!parentReady && <p className="be-empty">Chọn thông tin ở trên để xem danh sách.</p>}
     {rows && <div className="be-split"><section className="be-card be-record-list"><div className="be-list-head"><strong>{data?.totalElements ?? rows.length} {resource.id === 'retention' ? 'chính sách lưu trữ' : 'kết quả'}</strong>{listOp.parameters.some(p => p.name === 'page') && <span>Trang {page + 1}{data?.totalPages > 0 ? ` / ${data.totalPages}` : ''}</span>}</div>
-      {!rows.length && <p className="be-empty">Chưa có dữ liệu phù hợp.</p>}
+      {!rows.length && (enhanced ? <EmptyRecords resource={resource} filtered={hasFilters} reset={resetFilters} /> : <p className="be-empty">Chưa có dữ liệu phù hợp.</p>)}
       <div className="be-records">{rows.map((record, index) => { const item = unwrap(record), id = keyFor(resource, record), status = recordStatus(item), date = recordTimestamp(item), reference = item.jobCode || item.requestCode; return <button type="button" key={id == null ? index : `${id}-${index}`} className={selected === record ? 'selected' : ''} aria-pressed={selected === record} onClick={() => setSelected(record)}>
         <span className="be-record-copy"><strong>{recordTitle(item, resource)}</strong>{item.dataset && item.retentionDays != null ? <small>Thời hạn lưu: {item.retentionDays.toLocaleString('vi-VN')} ngày</small> : item.settingKey ? <small>{settingDisplayValue(item) || 'Chưa có giá trị'}</small> : <small>{[item.actorUsername, date && displayValue(date), reference && `Tham chiếu · ${reference.slice(-6)}`].filter(Boolean).join(' · ') || 'Chọn để xem chi tiết'}</small>}</span>
-        {status != null && status !== '' && <span className={`be-badge be-tone-${statusTone(status)}`}>{displayValue(status)}</span>}
+        <span className="be-record-badges">{status != null && status !== '' && <span className={`be-badge be-tone-${statusTone(status)}`}>{displayValue(status)}</span>}{enhanced && typeof item.publicVisible === 'boolean' && <small>{item.publicVisible ? 'Công khai' : 'Nội bộ'}</small>}</span>
       </button>; })}</div>
       {listOp.parameters.some(p => p.name === 'page') && <div className="be-pagination"><button disabled={!page || loading} onClick={() => setPage(p => p - 1)}>Trang trước</button><button disabled={loading || (data.totalPages != null ? page + 1 >= data.totalPages : rows.length < 20)} onClick={() => setPage(p => p + 1)}>Trang sau</button></div>}
     </section><section className="be-card be-record-detail"><h3>{selectedData ? recordTitle(row, resource) : 'Thông tin chi tiết'}</h3>{detailLoading ? <p role="status">Đang tải chi tiết…</p> : detailError ? <p role="alert" className="be-error">{detailError}</p> : selectedData ? <>
       <div className="be-actions">{itemOps.filter(eligible).map(op => <button key={op.key} type="button" className={sensitiveAction(op) ? 'danger' : ''} onClick={() => open(op)}>{actionLabel(op)}</button>)}</div>
       {resource.id === 'jobs' && <div className="be-live"><label className="be-check"><input type="checkbox" checked={live} onChange={e => setLive(e.target.checked)} />Theo dõi trực tiếp</label><small role="status">{liveStatus}</small><JobInstruction detail={selectedData} open={open} /></div>}
-      <RecordDetails value={selectedData} />
-    </> : <p className="be-empty">Chọn một bản ghi để xem và thao tác.</p>}</section></div>}
+      {enhanced ? <><RecordSummary row={row} resource={resource} />{resource.id === 'jobs' && <JobSteps detail={selectedData} />}<details className="be-full-record"><summary>Toàn bộ thông tin bản ghi</summary><RecordDetails value={selectedData} /></details></> : <RecordDetails value={selectedData} />}
+    </> : <div className="be-empty"><h3>Chọn một mục trong danh sách</h3><p>Thông tin và các thao tác phù hợp sẽ xuất hiện tại đây.</p></div>}</section></div>}
     {singleton && <section className={resource.id === 'reports' ? '' : 'be-card'}><div className="be-actions">{itemOps.filter(eligible).map(op => <button key={op.key} onClick={() => open(op)}>{actionLabel(op)}</button>)}</div>{resource.id === 'reports' ? <OperationsReport value={data} /> : <RecordDetails value={data} />}</section>}
     {action && <OperationDialog key={action.op.key} {...action} resource={resource} role={role} onClose={() => setAction(null)} onSaved={() => setRevision(v => v + 1)} />}
   </>;
@@ -212,7 +220,7 @@ function OperationDialog({ op, resource, row: raw, bindings, role, preset, onClo
       <fieldset disabled={busy} className="be-form-body">
         {!!missingPaths.length && <SchemaFields schema={paramsSchema(missingPaths)} value={path} onChange={selectPath} context={{ role, choices }} />}
         {!!queryParams(op).length && <SchemaFields schema={paramsSchema(queryParams(op))} value={query} onChange={setQuery} context={{ role }} />}
-        {hasBody && (responseAction ? <StepConfirmation step={currentStep} value={body} onChange={setBody} /> : <SchemaFields key={JSON.stringify(path)} schema={schema} value={body} onChange={setBody} context={{ role, choices }} />)}
+        {hasBody && (responseAction ? <StepConfirmation step={currentStep} value={body} onChange={setBody} /> : <SchemaFields key={JSON.stringify(path)} schema={schema} value={body} onChange={setBody} context={{ role, choices, quickRoomCreate: op.key === 'POST /api/v1/admin/shifts' || op.key === 'PUT /api/v1/admin/shifts/{shiftId}' }} />)}
         {!hasBody && write(op) && <p>Thực hiện “{title}” cho bản ghi đang chọn.</p>}
         {op.path.endsWith('/retention/runs') && <p className={query.dryRun ? 'be-muted' : 'be-error'}>{query.dryRun ? 'Chỉ xem trước; không xóa dữ liệu.' : 'Thao tác thật có thể lưu trữ hoặc xóa dữ liệu theo chính sách máy chủ. Hãy kiểm tra kết quả xem trước trước khi tiếp tục.'}</p>}
         {sensitiveAction(op) && <label className="be-check be-confirm"><input type="checkbox" checked={confirm} onChange={e => setConfirm(e.target.checked)} />Tôi xác nhận thực hiện thao tác này.</label>}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { workflowApi } from '../../features/workflows/workflowApi.js';
 import { loadAllPages } from '../../features/workflows/patrolWorkflowModel.js';
@@ -7,6 +7,9 @@ import { samplePlan } from '../Workstations/mapDispatchModel.js';
 import { formatDuration } from './patrolModel.js';
 import LidarMap from './LidarMap.jsx';
 import './patrol.css';
+
+const PatrolThreePreview = lazy(() => import('./PatrolThreePreview.jsx'));
+const GazeboPanel = lazy(() => import('./GazeboPanel.jsx'));
 
 const Button = ({ children, primary, ...props }) => <button type="button" className={primary ? 'patrol-primary' : undefined} {...props}>{children}</button>;
 
@@ -25,6 +28,7 @@ export default function PatrolRoutesFigma() {
   const [elapsed, setElapsed] = useState(0);
   const [simState, setSimState] = useState('ready');
   const [simSpeed, setSimSpeed] = useState(1);
+  const [viewMode, setViewMode] = useState('2d');
   const reset = () => { setSimState('ready'); setElapsed(0); };
 
   useEffect(() => {
@@ -67,7 +71,7 @@ export default function PatrolRoutesFigma() {
   const done = runnable && simState !== 'ready' && elapsed >= plan.duration;
   const sample = runnable ? samplePlan(plan, elapsed) : null;
   const progress = runnable && plan.duration ? Math.min(1, elapsed / plan.duration) : done ? 1 : 0;
-  const edit = () => navigate(workflowId ? '/workflows?workflowId=' + encodeURIComponent(workflowId) : '/workflows');
+  const edit = () => navigate(workflowId ? '/workflow?workflowId=' + encodeURIComponent(workflowId) : '/workflow');
 
   useEffect(() => {
     if (!runnable || simState !== 'running' || done) return;
@@ -80,7 +84,7 @@ export default function PatrolRoutesFigma() {
   }, [runnable, simState, done, plan?.duration, simSpeed]);
 
   return <section className="patrol-workspace patrol-deployment">
-    <header className="patrol-banner"><div><h2>Tuần tra</h2><p>Chọn quy trình, xem các điểm trên bản đồ đã lưu và chạy thử hành trình.</p></div><div className="patrol-actions"><Button onClick={() => navigate('/workflows')}>Thiết kế quy trình</Button><Button onClick={() => { reset(); setRefresh(value => value + 1); }}>Tải lại</Button></div></header>
+    <header className="patrol-banner"><div><h2>Tuần tra</h2><p>Chọn quy trình, xem các điểm trên bản đồ đã lưu và chạy thử hành trình.</p></div><div className="patrol-actions"><Button onClick={() => navigate('/workflow')}>Thiết kế quy trình</Button><Button onClick={() => { reset(); setRefresh(value => value + 1); }}>Tải lại</Button></div></header>
     {catalogError && <p className="patrol-notice" role="status">{catalogError}</p>}
     {error && <p className="patrol-notice is-error" role="alert">{error}</p>}
     <div className="patrol-deployment-layout">
@@ -94,17 +98,19 @@ export default function PatrolRoutesFigma() {
         <p className="patrol-map-note">Điểm xuất phát chỉ đặt vị trí robot mô phỏng; không thay đổi thứ tự MOVE.</p>
         <h3>Thứ tự ghé thăm</h3>
         {loading ? <p role="status">Đang đọc quy trình…</p> : plan?.points.length ? <ol className="patrol-route-timeline">{plan.points.map(({ step, endpoint }, index) => <li key={step.stepId}><span>{index + 1}</span><div><strong>{endpoint?.name || 'Cần chọn lại điểm đích'}</strong><small>Di chuyển · {step.paramsJson?.max_speed_mps} m/s</small></div></li>)}</ol> : <p>Chọn quy trình để xem các điểm đi qua.</p>}
-        <p className="patrol-map-note">Tuyến lưu trên thiết bị này. Chạy thử không gửi lệnh robot và không tạo lịch chạy thật.</p>
+        <p className="patrol-map-note">Tuyến lưu trên thiết bị này. Chọn Gazebo để gửi các điểm MOVE tới bộ mô phỏng trong Ubuntu.</p>
       </section>
       <section className="patrol-panel patrol-route-preview patrol-preview">
-        <h3>Xem trước hành trình</h3>
+        <div className="patrol-view-heading"><h3>Xem trước hành trình</h3><div className="patrol-view-switch" role="group" aria-label="Chế độ xem hành trình"><Button aria-pressed={viewMode === '2d'} onClick={() => setViewMode('2d')}>Bản đồ 2D</Button><Button aria-pressed={viewMode === '3d'} onClick={() => setViewMode('3d')}>Mô phỏng 3D</Button><Button aria-pressed={viewMode === 'gazebo'} onClick={() => { reset(); setViewMode('gazebo'); }}>Gazebo</Button></div></div>
+        {viewMode === 'gazebo' && saved ? <Suspense fallback={<p>Đang mở kết nối Gazebo…</p>}><GazeboPanel key={workflowId} map={saved.snapshot} plan={plan} /></Suspense> : <>
         <div className="patrol-summary"><div><small>Điểm tuần tra</small><strong>{plan?.points.length || 0} điểm</strong></div><div><small>Quãng đường ước tính</small><strong>{runnable ? plan.distance.toFixed(2) + ' m' : 'Chưa xác định'}</strong></div><div><small>Thời gian ước tính</small><strong>{runnable ? formatDuration(plan.duration) : 'Chưa xác định'}</strong></div></div>
         {plan?.issues.length > 0 && <div className="patrol-notice is-error" role="alert"><strong>Cần kiểm tra tuyến</strong><ul>{plan.issues.map(issue => <li key={issue}>{issue}</li>)}</ul><Button onClick={edit}>Chọn lại điểm trong Quy trình</Button></div>}
-        {saved ? <LidarMap draft={saved.snapshot} stage="endpoint" simulation={runnable ? { path: plan.path, point: sample?.point || saved.snapshot.endpoints.find(point => point.id === startId) } : undefined} overlay={<g pointerEvents="none">{plan?.points.map(({ endpoint }, index) => endpoint && <g key={index} transform={'translate(' + endpoint.x + ' ' + (endpoint.y - 25 - index * 3) + ')'}><circle r="10" fill="#2563eb" stroke="white"/><text textAnchor="middle" y="4" fill="white" fontSize="12">{index + 1}</text></g>)}</g>} /> : <div className="patrol-empty"><h3>Chưa có bản đồ đã lưu</h3><p>Mở Bản đồ, lưu bản quét và các điểm đích để dùng chung với Điều phối và Tuần tra.</p><Button onClick={() => navigate('/admin?screen=Map+Studio')}>Mở Bản đồ</Button></div>}
+    {saved ? viewMode === '3d' ? <Suspense fallback={<div className="patrol-empty">Đang mở mô phỏng 3D…</div>}><PatrolThreePreview map={saved.snapshot} plan={runnable ? plan : null} position={sample?.point || saved.snapshot.endpoints.find(point => point.id === startId)} /></Suspense> : <LidarMap draft={saved.snapshot} stage="endpoint" artifactPreview={false} simulation={runnable ? { path: plan.path, point: sample?.point || saved.snapshot.endpoints.find(point => point.id === startId) } : undefined} overlay={<g pointerEvents="none">{plan?.points.map(({ endpoint }, index) => endpoint && <g key={index} transform={'translate(' + endpoint.x + ' ' + (endpoint.y - 25 - index * 3) + ')'}><circle r="10" fill="#2563eb" stroke="white"/><text textAnchor="middle" y="4" fill="white" fontSize="12">{index + 1}</text></g>)}</g>} /> : <div className="patrol-empty"><h3>Chưa có bản đồ đã lưu</h3><p>Mở Bản đồ, lưu bản quét và các điểm đích để dùng chung với Điều phối và Tuần tra.</p><Button onClick={() => navigate('/admin/map')}>Mở Bản đồ</Button></div>}
         <div className="patrol-simulation-summary"><div><small>Trạng thái</small><strong>{done ? 'Hoàn tất mô phỏng' : { ready: 'Chưa chạy', running: 'Đang mô phỏng', paused: 'Đã tạm dừng' }[simState]}</strong></div><div><small>Điểm đang hướng đến</small><strong>{runnable ? plan.points[sample?.stopIndex ?? 0]?.endpoint?.name || '—' : '—'}</strong></div><div><small>Tiến độ</small><strong>{Math.round(progress * 100)}%</strong></div></div>
         <progress className="patrol-progress" value={progress} max="1" aria-label="Tiến độ mô phỏng" />
         <div className="patrol-actions"><Button primary disabled={!runnable || (simState === 'running' && !done)} onClick={() => { if (done) setElapsed(0); setSimState('running'); }}>{simState === 'paused' ? 'Tiếp tục mô phỏng' : 'Chạy mô phỏng'}</Button><Button disabled={simState !== 'running' || done} onClick={() => setSimState('paused')}>Tạm dừng</Button><Button disabled={!plan} onClick={reset}>Đặt lại</Button><label className="patrol-speed-label">Tốc độ xem<select value={simSpeed} onChange={event => setSimSpeed(Number(event.target.value))}>{[1, 2, 5].map(value => <option key={value} value={value}>{value}×</option>)}</select></label></div>
-        <p className="patrol-map-note">Dùng lại bản đồ, vùng cấm và vùng giới hạn tốc độ đã lưu. Đường đi và thời gian là kết quả mô phỏng, chưa được kiểm chứng trên robot.</p>
+        <p className="patrol-map-note">Chạy thử trong trình duyệt, dùng bản đồ và các vùng đã lưu. Chọn tab Gazebo khi muốn chạy trên bộ mô phỏng Ubuntu và xem vị trí nhận từ ROS.</p>
+        </>}
       </section>
     </div>
   </section>;

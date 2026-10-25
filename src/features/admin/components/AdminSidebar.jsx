@@ -4,6 +4,7 @@ import { vi } from '../../../i18n/vi.js';
 import { navigationGroups } from '../navigation.js';
 import { getSession } from '../../auth/session.js';
 import { screenTitles } from '../../api/workspaceCatalog.js';
+import { pathForScreen } from '../screenRoutes.js';
 import './AdminSidebar.css';
 
 const adminOnly = new Set(['Users & Roles', 'System Settings', 'Audit Logs', 'Analytics', 'Crowd Heatmap', 'History & Replay']);
@@ -26,7 +27,7 @@ export default function AdminSidebar({ active, onSelect, onLogout }) {
 
   const select = item => {
     setMobileOpen(false);
-    if (item === 'Workflows') navigate(role === 'ADMIN' ? '/workflows' : '/admin?screen=Workflow%20Management');
+    if (item === 'Workflows') navigate(role === 'ADMIN' ? '/workflow' : pathForScreen('Workflow Management'));
     else onSelect(item);
   };
 

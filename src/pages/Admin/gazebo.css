@@ -1,0 +1,12 @@
+.gazebo-panel { display: grid; gap: 16px; min-width: 0; }
+.gazebo-panel .patrol-notice, .gazebo-panel .patrol-map-note { margin: 0; }
+.gazebo-setup { padding: 16px; border: 1px solid #dce7f5; border-radius: 12px; background: #f7faff; }
+.gazebo-setup summary { cursor: pointer; color: #194a80; font-weight: 700; }
+.gazebo-setup .patrol-field { margin-top: 14px; }
+.gazebo-setup input { min-width: 0; width: 100%; box-sizing: border-box; }
+.gazebo-setup .patrol-actions { margin: 12px 0; }
+.gazebo-panel .patrol-readiness span { overflow-wrap: anywhere; }
+@media (max-width: 620px) {
+  .gazebo-panel .patrol-actions > button { flex: 1 1 100%; }
+  .patrol-view-switch { flex-wrap: wrap; }
+}
