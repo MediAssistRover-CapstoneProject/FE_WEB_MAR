@@ -1,4 +1,5 @@
 import { vi } from '../../i18n/vi.js';
+import { pathForScreen } from '../../features/admin/screenRoutes.js';
 import WorkspaceTabs from '../../components/WorkspaceTabs.jsx';
 import { injectStyles } from '../../styles/injectStyles.js';
 import workflowRouteMap from '../../assets/images/workflow-simulation-route.png';
@@ -707,7 +708,7 @@ const stepFields = { MOVE:['map_id','endpoint_id','mode','max_speed_mps'],INTERA
 
 export function Sidebar() {
   const navigate = useNavigate();
-  return <AdminSidebar active="Workflows" onSelect={(screen) => navigate(`/admin?screen=${encodeURIComponent(screen)}`)} onLogout={() => { clearSession(); navigate('/'); }} />;
+  return <AdminSidebar active="Workflows" onSelect={(screen) => navigate(pathForScreen(screen))} onLogout={() => { clearSession(); navigate('/'); }} />;
 }
 
 export function MarButton({ children, variant = 'primary', className = '', onClick, disabled = false }) {
@@ -729,7 +730,7 @@ function Field({ label, value, onChange, placeholder, children }) {
 function Tabs() {
   const navigate = useNavigate();
   return (
-    <WorkspaceTabs label="Không gian quy trình" active="workflow" onSelect={id => navigate(id === 'workflow' ? '/workflows' : '/workstations')} items={[{ id: 'workflow', label: 'Quy trình' }, { id: 'dispatch', label: 'Điều phối' }]}/>
+    <WorkspaceTabs label="Không gian quy trình" active="workflow" onSelect={id => navigate(id === 'workflow' ? '/workflow' : '/workstations')} items={[{ id: 'workflow', label: 'Quy trình' }, { id: 'dispatch', label: 'Điều phối' }]}/>
   );
 }
 
@@ -1334,7 +1335,7 @@ export default function WorkflowsPage() {
   const [searchParams] = useSearchParams();
   const linkedWorkflowId = searchParams.get('workflowId');
   const [savedPatrolId, setSavedPatrolId] = useState('');
-  const previewPatrol = id => navigate(`/admin?screen=Patrol&workflowId=${encodeURIComponent(id)}`);
+  const previewPatrol = id => navigate(`/admin/patrol?workflowId=${encodeURIComponent(id)}`);
   const [mode, setMode] = useState('library');
   const [editing, setEditing] = useState(null);
   const [editorKey, setEditorKey] = useState(0);

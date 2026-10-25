@@ -45,11 +45,74 @@ function createScan() {
   for(let i=0;i<260;i++){const p={x:random()*1200,y:random()*680};if(inPolygon(p,FLOOR)){ctx.fillStyle='#d4d9da66';ctx.fillRect(p.x,p.y,1+random(),1+random());}}
   return canvas;
 }
-function ScanCanvas({trail,revealAll=false}) {
+// Temporary local preview of the verified map artifact supplied for this
+// workspace. The PGM stays unmodified; it is decoded in the browser so the
+// preview preserves its 92 x 185 pixel aspect ratio (2.30 x 4.625 m).
+const LOCAL_MAP_ARTIFACT = {
+  src: '/mock-map-73f7af66/map.pgm',
+  widthPx: 92,
+  heightPx: 185,
+  widthM: 2.3,
+  heightM: 4.625,
+  resolution: 0.025,
+};
+function readPgmToken(bytes, position) {
+  let index = position;
+  while (index < bytes.length) {
+    while (index < bytes.length && /\s/.test(String.fromCharCode(bytes[index]))) index += 1;
+    if (bytes[index] !== 35) break;
+    while (index < bytes.length && bytes[index] !== 10) index += 1;
+  }
+  const start = index;
+  while (index < bytes.length && !/\s/.test(String.fromCharCode(bytes[index]))) index += 1;
+  return { value: new TextDecoder().decode(bytes.slice(start, index)), next: index };
+}
+function decodePgm(bytes) {
+  const magic = readPgmToken(bytes, 0);
+  const width = readPgmToken(bytes, magic.next);
+  const height = readPgmToken(bytes, width.next);
+  const max = readPgmToken(bytes, height.next);
+  if (magic.value !== 'P5' || Number(width.value) !== LOCAL_MAP_ARTIFACT.widthPx || Number(height.value) !== LOCAL_MAP_ARTIFACT.heightPx || Number(max.value) !== 255) throw new Error('Map artifact không đúng định dạng PGM P5 mong đợi.');
+  let dataStart = max.next;
+  // P5 has exactly one whitespace separator after MAXVAL (or CRLF). Do not
+  // skip arbitrary whitespace here: a valid first grayscale pixel can itself
+  // have a whitespace byte value.
+  if (bytes[dataStart] === 13 && bytes[dataStart + 1] === 10) dataStart += 2;
+  else if (/\s/.test(String.fromCharCode(bytes[dataStart]))) dataStart += 1;
+  const pixels = bytes.slice(dataStart);
+  if (pixels.length < LOCAL_MAP_ARTIFACT.widthPx * LOCAL_MAP_ARTIFACT.heightPx) throw new Error('Map artifact bị thiếu dữ liệu ảnh.');
+  const image = new ImageData(LOCAL_MAP_ARTIFACT.widthPx, LOCAL_MAP_ARTIFACT.heightPx);
+  for (let i = 0; i < LOCAL_MAP_ARTIFACT.widthPx * LOCAL_MAP_ARTIFACT.heightPx; i += 1) {
+    const value = pixels[i];
+    image.data[i * 4] = value; image.data[i * 4 + 1] = value; image.data[i * 4 + 2] = value; image.data[i * 4 + 3] = 255;
+  }
+  const source = document.createElement('canvas');
+  source.width = LOCAL_MAP_ARTIFACT.widthPx; source.height = LOCAL_MAP_ARTIFACT.heightPx;
+  source.getContext('2d').putImageData(image, 0, 0);
+  return source;
+}
+function ScanCanvas({trail,revealAll=false,artifactPreview=true}) {
   const ref=useRef(null), image=useRef(null);
+  const [artifact, setArtifact] = useState(null);
+  useEffect(() => {
+    if (!artifactPreview) return undefined;
+    let active = true;
+    fetch(LOCAL_MAP_ARTIFACT.src).then(response => {
+      if (!response.ok) throw new Error('Không tải được map artifact.');
+      return response.arrayBuffer();
+    }).then(buffer => { if (active) setArtifact(decodePgm(new Uint8Array(buffer))); }).catch(() => { if (active) setArtifact(false); });
+    return () => { active = false; };
+  }, [artifactPreview]);
   useEffect(()=>{
     image.current ||= createScan();
     const ctx=ref.current.getContext('2d');ctx.setTransform(2,0,0,2,0,0);ctx.fillStyle='#121416';ctx.fillRect(0,0,1200,680);
+    if (artifactPreview && artifact) {
+      const scale = Math.min(1080 / LOCAL_MAP_ARTIFACT.widthPx, 630 / LOCAL_MAP_ARTIFACT.heightPx);
+      const width = LOCAL_MAP_ARTIFACT.widthPx * scale, height = LOCAL_MAP_ARTIFACT.heightPx * scale;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(artifact, (1200 - width) / 2, (680 - height) / 2, width, height);
+      return;
+    }
     ctx.save();
     if(!revealAll){
       ctx.beginPath();
@@ -66,8 +129,8 @@ function ScanCanvas({trail,revealAll=false}) {
       ctx.clip();
     }
     ctx.drawImage(image.current,0,0,1200,680);ctx.restore();
-  },[trail,revealAll]);
-  return <canvas ref={ref} width="2400" height="1360" style={{width:'100%',height:'100%',display:'block'}} aria-label={vi("Synthetic LiDAR occupancy returns")} />;
+  },[artifact,artifactPreview,trail,revealAll]);
+  return <canvas ref={ref} width="2400" height="1360" style={{width:'100%',height:'100%',display:'block'}} aria-label={vi(artifact ? 'Verified local map artifact preview' : 'Synthetic LiDAR occupancy returns')} />;
 }
 function Selectable({label,onSelect,onPointerDown,children}) {
   return <g role={onSelect?'button':undefined} tabIndex={onSelect?0:undefined} aria-label={vi(onSelect?label:undefined)}
@@ -80,7 +143,7 @@ function Direction({point,heading,color='#60a5fa',length=25}) {
 function Endpoint({value,preview=false}) {
   return <g opacity={preview ? 0.7 : 1}><title>{value.name || vi('New endpoint')}</title><circle cx={value.x} cy={value.y} r="14" fill="transparent"/><circle data-testid="endpoint-dot" cx={value.x} cy={value.y} r="4" fill="#60a5fa" pointerEvents="none"/></g>;
 }
-export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit,onSelectZone,onSelectEndpoint,onEditZone,onEditEndpoint,rectangleStart,hoverPoint,onHover,zoneDirty,endpointDirty,simulation,overlay,collisionWarning=false}) {
+export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit,onSelectZone,onSelectEndpoint,onEditZone,onEditEndpoint,rectangleStart,hoverPoint,onHover,zoneDirty,endpointDirty,simulation,overlay,collisionWarning=false,artifactPreview=false}) {
   const [zoom,setZoom]=useState(1),[centre,setCentre]=useState({x:600,y:340}),[grid,setGrid]=useState(false),[rays,setRays]=useState(true),[zonesVisible,setZonesVisible]=useState(true),[endpointsVisible,setEndpointsVisible]=useState(true);
   const drag=useRef(null),svgRef=useRef(null),suppressClick=useRef(false);
   const raw=stage==='scan',progress=draft.scan.progress;
@@ -134,7 +197,7 @@ export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit
     </Selectable>;
   };
   return <section className="ls-map" aria-label={vi("LiDAR map editor")}>
-    <header className="ls-map-head"><div><strong>{vi(raw?'LiDAR occupancy map':draft.name)}</strong><small>{vi(raw?'Unlabelled scan':'Shared scan · editable overlays')}</small></div><div className="ls-map-tools">
+    <header className="ls-map-head"><div><strong>{vi(raw?'LiDAR occupancy map':draft.name)}</strong><small>{artifactPreview ? vi(`Map artifact tạm thời · ${LOCAL_MAP_ARTIFACT.widthPx} × ${LOCAL_MAP_ARTIFACT.heightPx} px · ${LOCAL_MAP_ARTIFACT.widthM} × ${LOCAL_MAP_ARTIFACT.heightM} m · ${LOCAL_MAP_ARTIFACT.resolution.toLocaleString('vi-VN')} m/px`) : 'Mặt bằng mô phỏng cục bộ · cùng tọa độ với tuyến 3D'}</small></div><div className="ls-map-tools">
       <button type="button" aria-label={vi("Zoom out")} disabled={zoom<=1} onClick={()=>zoomTo(Math.max(1,zoom-.25))}>{vi("−")}</button>
       <button type="button" aria-label={vi("Fit map")} onClick={()=>{setZoom(1);setCentre({x:600,y:340});}}>{vi("Fit")}</button>
       <button type="button" aria-label={vi("Zoom in")} disabled={zoom>=3} onClick={()=>zoomTo(Math.min(3,zoom+.25))}>{vi("+")}</button>
@@ -156,7 +219,7 @@ export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit
         onPointerUp={e=>{if(e.pointerId===drag.current?.pointerId)finishDrag(false);}} onPointerCancel={e=>{if(e.pointerId===drag.current?.pointerId)finishDrag(true);}} onLostPointerCapture={e=>{if(e.pointerId===drag.current?.pointerId)finishDrag(true);}}
         onClick={e=>{if(tool){const p=coordinate(e);if(p)onPoint({x:Math.round(p.x),y:Math.round(p.y)});}}}>
         <title>{vi("LiDAR-style scan. White returns mark walls; grey is observed floor; black is unknown space.")}</title>
-        <foreignObject width="1200" height="680" pointerEvents="none"><ScanCanvas trail={trail} revealAll={revealAll}/></foreignObject>
+        <foreignObject width="1200" height="680" pointerEvents="none"><ScanCanvas trail={trail} revealAll={revealAll} artifactPreview={artifactPreview}/></foreignObject>
         {vi(grid&&<g stroke="#7a879a" strokeWidth=".4" opacity=".25" pointerEvents="none">{vi(Array.from({length:31},(_,i)=><path key={'x'+i} d={'M'+i*40+' 0V680'}/>))}{vi(Array.from({length:18},(_,i)=><path key={'y'+i} d={'M0 '+i*40+'H1200'}/>))}</g>)}
         {!raw&&zonesVisible&&draft.zones.filter(z=>z.id!==activeZone?.id).map(renderZone)}
         {!raw&&zonesVisible&&activeZone&&renderZone(activeZone)}
