@@ -1,61 +1,12 @@
+import { localMockMap as model, viewTransform } from '../../features/maps/MapProvider.js';
 import { vi } from '../../i18n/vi.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FLOOR, MAP, OBSTACLES, SCAN_START, WALLS, inPolygon, rayHits, scanPosition } from './lidarGeometry.js';
 import { ZONE_TYPES } from './mapStudioModel.js';
 import { dragFeature } from './mapFeatureDrag.js';
 
-function trace(ctx, points) {
-  ctx.beginPath(); points.forEach((p,i) => i ? ctx.lineTo(p.x,p.y) : ctx.moveTo(p.x,p.y)); ctx.closePath();
-}
-// Seeded returns keep the scan stable through editing and resizing.
-function createScan() {
-  const canvas = document.createElement('canvas'); canvas.width = MAP.width * 2; canvas.height = MAP.height * 2;
-  const ctx = canvas.getContext('2d'); ctx.scale(2,2);
-  let seed = 217;
-  const random = () => { seed = (1664525 * seed + 1013904223) >>> 0; return seed / 4294967296; };
-  ctx.fillStyle = '#121416'; ctx.fillRect(0,0,MAP.width,MAP.height);
-  // Low confidence returns in unknown space around the physical boundary.
-  for (let i=0;i<1800;i++) {
-    const a=FLOOR[i%FLOOR.length],b=FLOOR[(i+1)%FLOOR.length],t=random();
-    const x=a.x+(b.x-a.x)*t,y=a.y+(b.y-a.y)*t;
-    const dx=x-600,dy=y-350,scale=.05+random()*.5;
-    ctx.strokeStyle='rgba(185,192,197,'+(.018+random()*.048)+')'; ctx.lineWidth=.3;
-    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+dx*scale+(random()-.5)*60,y+dy*scale+(random()-.5)*60);ctx.stroke();
-  }
-  trace(ctx,FLOOR);ctx.fillStyle='#373b3e';ctx.fill();
-  ctx.save();trace(ctx,FLOOR);ctx.clip();
-  const shade=ctx.createRadialGradient(580,350,30,580,350,650);shade.addColorStop(0,'#414548');shade.addColorStop(1,'#292d30');ctx.fillStyle=shade;ctx.fillRect(0,0,1200,680);
-  for(let i=0;i<6500;i++){ctx.fillStyle='rgba(215,221,225,'+(random()*.08)+')';ctx.fillRect(random()*1200,random()*680,.7,.7);}
-  ctx.restore();
-  const returns = [...WALLS, ...OBSTACLES.flatMap(r => {
-    const p=[{x:r.x,y:r.y},{x:r.x+r.w,y:r.y},{x:r.x+r.w,y:r.y+r.h},{x:r.x,y:r.y+r.h}];
-    return p.map((a,i)=>[a,p[(i+1)%4]]);
-  })];
-  for(const [a,b] of returns) {
-    const length=Math.hypot(b.x-a.x,b.y-a.y);
-    ctx.strokeStyle='#dde2e4';ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
-    for(let i=0;i<length*4;i++) {
-      const t=random(),offset=(random()-.5)*4.6;
-      const x=a.x+(b.x-a.x)*t + (b.y-a.y)/(length||1)*offset;
-      const y=a.y+(b.y-a.y)*t - (b.x-a.x)/(length||1)*offset;
-      ctx.fillStyle='rgba(244,247,249,'+(.3+random()*.7)+')';const size=.45+random()*1.25;ctx.fillRect(x,y,size,size);
-      if(i%12===0){ctx.fillStyle='#bfc6c755';ctx.fillRect(x+(random()-.5)*16,y+(random()-.5)*16,1.2,1.2);}
-    }
-  }
-  for(let i=0;i<260;i++){const p={x:random()*1200,y:random()*680};if(inPolygon(p,FLOOR)){ctx.fillStyle='#d4d9da66';ctx.fillRect(p.x,p.y,1+random(),1+random());}}
-  return canvas;
-}
-// Temporary local preview of the verified map artifact supplied for this
-// workspace. The PGM stays unmodified; it is decoded in the browser so the
-// preview preserves its 92 x 185 pixel aspect ratio (2.30 x 4.625 m).
-const LOCAL_MAP_ARTIFACT = {
-  src: '/mock-map-73f7af66/map.pgm',
-  widthPx: 92,
-  heightPx: 185,
-  widthM: 2.3,
-  heightM: 4.625,
-  resolution: 0.025,
-};
+const LOCAL_MAP_ARTIFACT = { src:model.imagePath, widthPx:model.width, heightPx:model.height, widthM:model.width*model.resolution, heightM:model.height*model.resolution, resolution:model.resolution };
+const MOCK_MAP_ROTATION_DEG = viewTransform().angle*180/Math.PI;
 function readPgmToken(bytes, position) {
   let index = position;
   while (index < bytes.length) {
@@ -91,46 +42,21 @@ function decodePgm(bytes) {
   source.getContext('2d').putImageData(image, 0, 0);
   return source;
 }
-function ScanCanvas({trail,revealAll=false,artifactPreview=true}) {
-  const ref=useRef(null), image=useRef(null);
-  const [artifact, setArtifact] = useState(null);
-  useEffect(() => {
-    if (!artifactPreview) return undefined;
-    let active = true;
-    fetch(LOCAL_MAP_ARTIFACT.src).then(response => {
-      if (!response.ok) throw new Error('Không tải được map artifact.');
-      return response.arrayBuffer();
-    }).then(buffer => { if (active) setArtifact(decodePgm(new Uint8Array(buffer))); }).catch(() => { if (active) setArtifact(false); });
-    return () => { active = false; };
-  }, [artifactPreview]);
+function ScanCanvas() {
+  const ref=useRef(null);
+  const [error,setError]=useState('');
   useEffect(()=>{
-    image.current ||= createScan();
-    const ctx=ref.current.getContext('2d');ctx.setTransform(2,0,0,2,0,0);ctx.fillStyle='#121416';ctx.fillRect(0,0,1200,680);
-    if (artifactPreview && artifact) {
-      const scale = Math.min(1080 / LOCAL_MAP_ARTIFACT.widthPx, 630 / LOCAL_MAP_ARTIFACT.heightPx);
-      const width = LOCAL_MAP_ARTIFACT.widthPx * scale, height = LOCAL_MAP_ARTIFACT.heightPx * scale;
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(artifact, (1200 - width) / 2, (680 - height) / 2, width, height);
-      return;
-    }
-    ctx.save();
-    if(!revealAll){
-      ctx.beginPath();
-      // Accumulate only line-of-sight polygons recorded at driven positions.
-      // Unlike the former circular mask, these polygons end at the first wall
-      // or obstacle and therefore never reveal rooms hidden behind a surface.
-      for(const pos of trail){
-        const hits=rayHits(pos,128);
-        if(!hits.length)continue;
-        ctx.moveTo(hits[0].x,hits[0].y);
-        for(let i=1;i<hits.length;i++)ctx.lineTo(hits[i].x,hits[i].y);
-        ctx.closePath();
-      }
-      ctx.clip();
-    }
-    ctx.drawImage(image.current,0,0,1200,680);ctx.restore();
-  },[artifact,artifactPreview,trail,revealAll]);
-  return <canvas ref={ref} width="2400" height="1360" style={{width:'100%',height:'100%',display:'block'}} aria-label={vi(artifact ? 'Verified local map artifact preview' : 'Synthetic LiDAR occupancy returns')} />;
+    let current=true;
+    fetch(model.imagePath).then(r=>{if(!r.ok)throw Error('Không tải được ảnh LiDAR gốc.');return r.arrayBuffer();}).then(buffer=>{
+      if(!current)return;
+      const source=decodePgm(new Uint8Array(buffer)), ctx=ref.current.getContext('2d'), t=viewTransform();
+      ctx.setTransform(2,0,0,2,0,0);ctx.fillStyle='#121416';ctx.fillRect(0,0,t.width,t.height);
+      ctx.translate(t.width/2,t.height/2);ctx.rotate(t.angle);ctx.scale(t.scale,t.scale);ctx.imageSmoothingEnabled=false;
+      ctx.drawImage(source,-model.width/2,-model.height/2);
+    }).catch(e=>{if(current)setError(e.message);});
+    return()=>{current=false;};
+  },[]);
+  return error ? <div role="alert">{error}</div> : <canvas ref={ref} width="2400" height="1360" style={{width:'100%',height:'100%',display:'block'}} aria-label="Map LiDAR gốc — xoay hiển thị, giữ nguyên tỉ lệ"/>;
 }
 function Selectable({label,onSelect,onPointerDown,children}) {
   return <g role={onSelect?'button':undefined} tabIndex={onSelect?0:undefined} aria-label={vi(onSelect?label:undefined)}
@@ -197,7 +123,7 @@ export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit
     </Selectable>;
   };
   return <section className="ls-map" aria-label={vi("LiDAR map editor")}>
-    <header className="ls-map-head"><div><strong>{vi(raw?'LiDAR occupancy map':draft.name)}</strong><small>{artifactPreview ? vi(`Map artifact tạm thời · ${LOCAL_MAP_ARTIFACT.widthPx} × ${LOCAL_MAP_ARTIFACT.heightPx} px · ${LOCAL_MAP_ARTIFACT.widthM} × ${LOCAL_MAP_ARTIFACT.heightM} m · ${LOCAL_MAP_ARTIFACT.resolution.toLocaleString('vi-VN')} m/px`) : 'Mặt bằng mô phỏng cục bộ · cùng tọa độ với tuyến 3D'}</small></div><div className="ls-map-tools">
+    <header className="ls-map-head"><div><strong>{vi(raw?'LiDAR occupancy map':draft.name)}</strong><small>{artifactPreview ? vi(`Map quét mock · căn thẳng ${MOCK_MAP_ROTATION_DEG}° · ${LOCAL_MAP_ARTIFACT.widthPx} × ${LOCAL_MAP_ARTIFACT.heightPx} px · ${LOCAL_MAP_ARTIFACT.widthM} × ${LOCAL_MAP_ARTIFACT.heightM} m · ${LOCAL_MAP_ARTIFACT.resolution.toLocaleString('vi-VN')} m/px`) : 'Mặt bằng mô phỏng cục bộ · cùng tọa độ với tuyến 3D'}</small></div><div className="ls-map-tools">
       <button type="button" aria-label={vi("Zoom out")} disabled={zoom<=1} onClick={()=>zoomTo(Math.max(1,zoom-.25))}>{vi("−")}</button>
       <button type="button" aria-label={vi("Fit map")} onClick={()=>{setZoom(1);setCentre({x:600,y:340});}}>{vi("Fit")}</button>
       <button type="button" aria-label={vi("Zoom in")} disabled={zoom>=3} onClick={()=>zoomTo(Math.min(3,zoom+.25))}>{vi("+")}</button>
@@ -229,9 +155,9 @@ export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit
         {vi(simulation&&<g pointerEvents="none"><polyline data-testid="dispatch-route" points={simulation.path.map(p=>p.x+','+p.y).join(' ')} fill="none" stroke="#4ade80" strokeWidth="4" strokeDasharray="8 5" strokeLinejoin="round"/>{vi(simulation.point&&<g transform={'translate('+simulation.point.x+' '+simulation.point.y+')'} data-testid="dispatch-robot"><circle r="15" fill="#1d4ed8" stroke="white" strokeWidth="3"/><rect x="-8" y="-6" width="16" height="12" rx="4" fill="#14283f"/><circle cx="-3" cy="-1" r="2" fill="#7dd3fc"/><circle cx="3" cy="-1" r="2" fill="#7dd3fc"/><Direction point={{x:0,y:0}} heading={simulation.point.heading||0} color="#4ade80" length={25}/><text y="31" textAnchor="middle" fill="white" stroke="#111827" paintOrder="stroke" strokeWidth="3" fontSize="11">{vi("MAR-01")}</text></g>)}</g>)}
         {stage==='endpoint'&&endpointsVisible&&endpointEdit?.placed&&renderEndpoint(endpointEdit,true)}
         {simulation?.actors?.map(actor=><g key={actor.id} data-testid={'traffic-actor-'+actor.kind} pointerEvents="none" transform={`translate(${actor.point.x} ${actor.point.y})`}>{actor.kind==='robot'?<circle r="12" fill="#d97706" stroke="white" strokeWidth="2"/>:<rect x="-8" y="-8" width="16" height="16" fill="#ef4444" stroke="white" strokeWidth="2"/>}<text y="-20" textAnchor="middle" fill="white" stroke="#111827" paintOrder="stroke" strokeWidth="3" fontSize="12">{actor.label}</text></g>)}
-        {vi(raw&&draft.scan.status!=='idle'&&<g pointerEvents="none">{vi(rays&&beams.map((p,i)=><line key={i} x1={robot.x} y1={robot.y} x2={p.x} y2={p.y} stroke="#68d6c0" strokeWidth=".7" opacity=".32"/>))}{collisionWarning&&<circle cx={robot.x} cy={robot.y} r="17" fill="#ef444422" stroke="#fb7185" strokeWidth="2" strokeDasharray="4 3"><animate attributeName="r" values="15;19;15" dur="1s" repeatCount="indefinite"/></circle>}<g data-testid="scan-robot" transform={`translate(${robot.x} ${robot.y}) rotate(${robot.heading||0})`}><title>MAR-01</title><rect x="-7" y="-9" width="14" height="18" rx="2.5" fill="#2f80ff" stroke="#93c5fd" strokeWidth=".9"/><rect x="-4.6" y="-5.5" width="9.2" height="11" rx="3.4" fill="#f8fafc" stroke="#cbd5e1" strokeWidth=".7"/><path d="M-3.2 -5.5Q0 -8.2 3.2 -5.5V-2.8H-3.2Z" fill="#dbe4ec"/><rect x="-3.2" y="-1.5" width="6.4" height="5" rx="1.4" fill="#d2d9df"/><circle cx="-5" cy="5.2" r="1.7" fill="#ef765e"/><circle cx="5" cy="5.2" r="1.7" fill="#ef765e"/><circle cx="0" cy="-5.8" r="1.1" fill="#ffffff"/><path d="M0 -12L-2.2 -9H2.2Z" fill="#bfdbfe"/></g></g>)}
+        {vi(raw&&!artifactPreview&&draft.scan.status!=='idle'&&<g pointerEvents="none">{vi(rays&&beams.map((p,i)=><line key={i} x1={robot.x} y1={robot.y} x2={p.x} y2={p.y} stroke="#68d6c0" strokeWidth=".7" opacity=".32"/>))}{collisionWarning&&<circle cx={robot.x} cy={robot.y} r="17" fill="#ef444422" stroke="#fb7185" strokeWidth="2" strokeDasharray="4 3"><animate attributeName="r" values="15;19;15" dur="1s" repeatCount="indefinite"/></circle>}<g data-testid="scan-robot" transform={`translate(${robot.x} ${robot.y}) rotate(${robot.heading||0})`}><title>MAR-01</title><rect x="-7" y="-9" width="14" height="18" rx="2.5" fill="#2f80ff" stroke="#93c5fd" strokeWidth=".9"/><rect x="-4.6" y="-5.5" width="9.2" height="11" rx="3.4" fill="#f8fafc" stroke="#cbd5e1" strokeWidth=".7"/><path d="M-3.2 -5.5Q0 -8.2 3.2 -5.5V-2.8H-3.2Z" fill="#dbe4ec"/><rect x="-3.2" y="-1.5" width="6.4" height="5" rx="1.4" fill="#d2d9df"/><circle cx="-5" cy="5.2" r="1.7" fill="#ef765e"/><circle cx="5" cy="5.2" r="1.7" fill="#ef765e"/><circle cx="0" cy="-5.8" r="1.1" fill="#ffffff"/><path d="M0 -12L-2.2 -9H2.2Z" fill="#bfdbfe"/></g></g>)}
         {vi(raw&&progress===0&&draft.scan.status==='idle'&&<g pointerEvents="none"><circle cx={SCAN_START.x} cy={SCAN_START.y} r="32" fill="none" stroke="#60717f" strokeDasharray="3 6"/><path d={`M${SCAN_START.x-20} ${SCAN_START.y}H${SCAN_START.x+20}M${SCAN_START.x} ${SCAN_START.y-20}V${SCAN_START.y+20}`} stroke="#8eabb9"/><text x={SCAN_START.x} y={SCAN_START.y+63} textAnchor="middle" fill="#d3dce3" fontSize="17">Sẵn sàng quét thủ công</text><text x={SCAN_START.x} y={SCAN_START.y+88} textAnchor="middle" fill="#8b99a5" fontSize="12">Bật cảm biến, sau đó giữ nút điều khiển để di chuyển</text></g>)}
-        <g transform={'translate('+(centre.x-width/2+22/zoom)+' '+(centre.y+height/2-26/zoom)+')'} pointerEvents="none"><path d="M0 -5V0H40V-5" fill="none" stroke="#afbbc5" strokeWidth={1/zoom}/><text x="0" y={15/zoom} fill="#afbbc5" fontSize={10/zoom}>{vi("2 m · N ↑")}</text></g>
+        <g transform={'translate('+(centre.x-width/2+22/zoom)+' '+(centre.y+height/2-26/zoom)+')'} pointerEvents="none"><path d={'M0 -5V0H'+(1/MAP.resolution)+'V-5'} fill="none" stroke="#afbbc5" strokeWidth={1/zoom}/><text x="0" y={15/zoom} fill="#afbbc5" fontSize={10/zoom}>{vi("1 m")}</text></g>
       </svg>
     </div></div>
     <footer className="ls-map-foot"><span><i style={{background:'#ecf0f1'}}/>{vi("Occupied")}<i style={{background:'#42474c'}}/>{vi("Free")}<i style={{background:'#111416'}}/>{vi("Unknown")}</span><span>{vi('Drag to pan when zoomed')}</span></footer>

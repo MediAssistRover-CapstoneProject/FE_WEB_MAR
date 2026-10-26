@@ -1,54 +1,46 @@
-"""Validation independent of ROS; tests run on Windows as well as Ubuntu."""
+"""Pure validation for the local simulation protocol; no ROS/database access."""
 import hashlib
 import math
-from prepare_map import occupancy, ros_point
-
+from map_processing import ros_to_pixel
 
 def grid_digest(values):
-    return hashlib.sha256(bytes(int(value) & 255 for value in values)).hexdigest()
-
+    return hashlib.sha256(bytes(int(v) & 255 for v in values)).hexdigest()
 
 def expected_grid(data):
-    image = occupancy(data)
-    # ROS OccupancyGrid row 0 is the lower image row.
-    return [100 if p == 0 else 0 if p == 254 else -1
-            for y in reversed(range(image.height)) for p in image.crop((0, y, image.width, y+1)).tobytes()]
+    w, h = data['width'], data['height']
+    return [data['occupancyGrid'][y*w+x] for y in reversed(range(h)) for x in range(w)]
 
+def free_pose(x, y, data, radius=.3):
+    px, py = ros_to_pixel(x, y, data)
+    r = radius/data['resolution']
+    for yy in range(math.floor(py-r), math.floor(py+r)+1):
+        for xx in range(math.floor(px-r), math.floor(px+r)+1):
+            dx, dy = max(xx-px, 0, px-xx-1), max(yy-py, 0, py-yy-1)
+            if math.hypot(dx,dy) <= r:
+                if not (0 <= xx < data['width'] and 0 <= yy < data['height']) or data['occupancyGrid'][yy*data['width']+xx] != 0:
+                    return False
+    return True
 
 def validate_run(body, envelope, data):
-    if not isinstance(body, dict) or body.get('mapKey') != envelope['mapKey']:
+    if not isinstance(body, dict) or body.get('mapKey') != data['mapVersion'] or body.get('mapId') != data['mapId']:
         raise ValueError('Bản đồ FE và Gazebo khác nhau.')
     run_id = body.get('runId')
-    if not isinstance(run_id, str) or not 1 <= len(run_id) <= 80:
+    if not isinstance(run_id,str) or not 1 <= len(run_id) <= 80:
         raise ValueError('Thiếu mã hành trình.')
     steps = body.get('steps')
-    if not isinstance(steps, list) or not 1 <= len(steps) <= 100:
-        raise ValueError('Quy trình cần 1–100 bước MOVE.')
-    image = occupancy(data)
-    endpoints = {p['id']: p for p in data['endpoints']}
-    zone_speeds = [float(z['speed']) for z in data['zones']
-                   if z.get('enabled') is not False and z['type'] == 'SPEED']
-    if any(not math.isfinite(s) or s <= 0 for s in zone_speeds):
-        raise ValueError('Vùng tốc độ không hợp lệ.')
+    if not isinstance(steps,list) or not 1 <= len(steps) <= 100:
+        raise ValueError('Cần 1–100 bước MOVE.')
     result = []
     for step in steps:
-        if not isinstance(step, dict):
-            raise ValueError('Bước MOVE không hợp lệ.')
-        endpoint = endpoints.get(step.get('endpointId'))
-        if not endpoint or endpoint.get('enabled') is False or endpoint.get('accessible') is False:
-            raise ValueError('Điểm đích không có hoặc không hoạt động trong bản đồ Gazebo.')
-        speed = step.get('speed')
-        if isinstance(speed, bool) or not isinstance(speed, (int, float)) or not math.isfinite(speed) or not .01 <= speed <= 1.5:
-            raise ValueError('Tốc độ MOVE phải từ 0,01 đến 1,5 m/s; bộ mẫu giới hạn tối đa 0,6 m/s.')
-        x, y = endpoint['x'], endpoint['y']
-        margin = .3 / data['map']['resolution']
-        for i in range(17):
-            px = round(x + (margin*math.cos(i*math.pi/8) if i < 16 else 0))
-            py = round(y + (margin*math.sin(i*math.pi/8) if i < 16 else 0))
-            if not (0 <= px < image.width and 0 <= py < image.height) or image.getpixel((px, py)) != 254:
-                raise ValueError(f'Điểm {endpoint.get("name", endpoint["id"])} quá gần tường hoặc trong vùng cấm/chưa biết.')
-        rx, ry = ros_point(endpoint, data['map'])
-        result.append({'endpointId': endpoint['id'], 'name': endpoint.get('name', endpoint['id']),
-                       'x': rx, 'y': ry, 'yaw': math.radians(float(endpoint.get('heading', 0))),
-                       'speed': min(speed, .6, *zone_speeds)})
+        if not isinstance(step,dict) or not isinstance(step.get('endpointId'),str):
+            raise ValueError('Thiếu điểm đích.')
+        values = [step.get(k) for k in ('x','y','yaw','speed')]
+        if any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) for v in values):
+            raise ValueError('Tọa độ/tốc độ phải là số hữu hạn.')
+        x,y,yaw,speed = values
+        if not .01 <= speed <= .26:
+            raise ValueError('TurtleBot3 Waffle mô phỏng hỗ trợ 0,01–0,26 m/s.')
+        if not free_pose(x,y,data):
+            raise ValueError('Điểm đích trong vật cản, vùng chưa biết hoặc quá gần tường (<0,3 m).')
+        result.append(dict(endpointId=step['endpointId'], name=str(step.get('name',step['endpointId']))[:120], x=x,y=y,yaw=yaw,speed=speed))
     return result

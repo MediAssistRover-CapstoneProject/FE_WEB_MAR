@@ -1,87 +1,63 @@
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
-import { mkdir } from 'node:fs/promises';
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE, headless: true, args: ['--enable-unsafe-swiftshader'] });
-const context = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
-const page = await context.newPage();
-const errors = [], commands = [];
-page.on('pageerror', error => errors.push(error.message));
-let mode = 'ready', state, polling = true;
-await page.route('http://127.0.0.1:8765/**', async route => {
-  const request = route.request();
-  if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': '*' } });
-  if (request.url().endsWith('/state')) {
-    if (!polling) return route.abort('connectionrefused');
-    const manifest = await page.evaluate(() => window.gazeboTestManifest);
-    const body = mode === 'denied' ? { error: 'Sai mã kết nối' } : { protocol: 'mar-gazebo-v1', simulation: true, mapKey: mode === 'mismatch' ? 'other' : manifest.mapKey, ready: true, status: 'IDLE', completed: 0, total: 0, poseFresh: true, pose: { x: 0, y: -.5, yaw: 0 }, path: [], ...state };
-    return route.fulfill({ status: mode === 'denied' ? 403 : 200, headers: { 'Access-Control-Allow-Origin': '*' }, json: body });
-  }
-  commands.push({ path: new URL(request.url()).pathname, body: request.postDataJSON() });
-  return route.fulfill({ status: 202, headers: { 'Access-Control-Allow-Origin': '*' }, json: { accepted: true } });
+import {createRequire} from 'node:module';
+import {mkdir} from 'node:fs/promises';
+const require=createRequire(import.meta.url);
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const browser=await chromium.launch({executablePath:process.env.CHROME_EXECUTABLE,headless:true,args:['--enable-unsafe-swiftshader']});
+const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage();
+const errors=[],commands=[];let mode='ready',state={},polling=true,run=0;
+page.on('pageerror',e=>errors.push(e.message));
+await page.route('**/api/v1/simulation/**',async route=>{
+ const req=route.request(),headers={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'*','Access-Control-Allow-Methods':'GET,POST,OPTIONS'};
+ if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
+ if(req.method()==='POST'){
+  const body=req.postDataJSON();commands.push(body);
+  return route.fulfill({status:202,headers,json:{accepted:true,runId:body.commandType==='START_PATROL'?'run-'+(++run):body.runId,correlationId:'command-'+commands.length}});
+ }
+ if(!polling)return route.abort('connectionrefused');
+ const m=await page.evaluate(()=>window.gazeboTestManifest);
+ return route.fulfill({headers,json:{protocol:'MAR-SIM-1',mapId:mode==='mismatch'?'other':m.mapId,mapVersion:m.mapVersion,connected:true,mqttConnected:true,rosConnected:true,simulationActive:true,ready:true,status:'IDLE',poseFresh:true,pose:m.spawn,path:[],...state}});
 });
-const start = page.getByRole('button', { name: 'Chạy quy trình trên Gazebo', exact: true });
-const connect = page.getByRole('button', { name: 'Kết nối Gazebo', exact: true });
-const disconnect = page.getByRole('button', { name: 'Ngắt kết nối', exact: true });
-const until = async predicate => { for (let i = 0; i < 50; i++) { if (await predicate()) return; await page.waitForTimeout(100); } throw Error('Timed out waiting for condition'); };
-try {
-  await page.goto('http://127.0.0.1:5175/tests/gazebo.fixture.html');
-  await connect.waitFor();
-  assert.equal(await start.isDisabled(), true);
-  await page.getByLabel('Địa chỉ Ubuntu').fill('http://127.0.0.1:8765');
-  await page.getByLabel('Mã kết nối hiện trong terminal Ubuntu').fill('test-only');
-  mode = 'denied'; await connect.click();
-  await page.getByRole('alert').filter({ hasText: 'Sai mã' }).waitFor();
-  assert.equal(await start.isDisabled(), true);
-  mode = 'mismatch';
-  await page.getByRole('alert').filter({ hasText: 'Bản đồ Gazebo khác' }).waitFor();
-  assert.equal(await start.isDisabled(), true);
-  mode = 'ready';
-  await until(async () => await start.isEnabled());
-  const canvas = await page.locator('.patrol-three-scene canvas').elementHandle();
-  await start.click();
-  await until(() => commands.some(command => command.path === '/run'));
-  const run = commands.find(command => command.path === '/run');
-  assert.deepEqual(run.body.steps, [{ endpointId: 'a', speed: .3 }, { endpointId: 'b', speed: .3 }]);
-  // Acknowledgement and an old IDLE poll cannot report success or allow a second run.
-  await page.waitForTimeout(800);
-  assert.equal(await start.isDisabled(), true);
-  assert.equal(await page.getByText('Đã đến tất cả điểm đích', { exact: true }).count(), 0);
-  state = { status: 'RUNNING', runId: run.body.runId, completed: 0, total: 2, targetName: 'Điểm A', path: [{ x: 0, y: -.5, yaw: 0 }, { x: -1, y: .5, yaw: 0 }] };
-  await page.getByText('Đang di chuyển', { exact: true }).waitFor();
-  assert.equal(await canvas.evaluate(element => element.isConnected), true, 'path update must not recreate the WebGL renderer');
-  await page.getByRole('button', { name: 'Dừng hành trình Gazebo', exact: true }).click();
-  await until(() => commands.some(command => command.path === '/cancel'));
-  assert.equal(commands.find(command => command.path === '/cancel').body.runId, run.body.runId);
-  state = { ...state, status: 'CANCELED' };
-  await page.getByText('Đã hủy hành trình', { exact: true }).waitFor();
-  await page.locator('.gazebo-setup > summary').click();
-  await disconnect.click();
-  assert.equal(await start.isDisabled(), true);
-  await connect.click();
-  await until(async () => await start.isEnabled());
-  await start.click();
-  await until(() => commands.filter(command => command.path === '/run').length === 2);
-  const secondRun = commands.filter(command => command.path === '/run')[1];
-  state = { ...state, status: 'RUNNING', runId: secondRun.body.runId };
-  await page.getByText('Đang di chuyển', { exact: true }).waitFor();
-  polling = false;
-  await page.getByRole('alert').waitFor();
-  assert.equal(await start.isDisabled(), true);
-  assert.equal(await page.getByText('Chưa có vị trí mới', { exact: true }).count(), 1);
-  await until(() => commands.some(command => command.path === '/cancel' && command.body.runId === secondRun.body.runId));
-  polling = true; state = { ...state, status: 'SUCCEEDED', completed: 2 };
-  await page.getByText('Đã đến tất cả điểm đích', { exact: true }).waitFor();
-  await mkdir('.workstation-build/gazebo', { recursive: true });
-  await page.screenshot({ path: '.workstation-build/gazebo/desktop.png', fullPage: true });
-  await page.setViewportSize({ width: 390, height: 844 });
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-  await page.screenshot({ path: '.workstation-build/gazebo/mobile.png', fullPage: true });
-  const before = commands.length;
-  await page.getByRole('button', { name: 'Rời màn hình', exact: true }).click();
-  await until(() => commands.length > before);
-  assert.equal(commands.at(-1).path, '/cancel');
-  assert.deepEqual(errors, []);
-  console.log('PASS: disconnect, invalid key/map, 202 versus result, ordered MOVE, stop, stale connection, unmount cancellation, stable renderer, mobile layout. Mock bridge only.');
-} finally { await browser.close(); }
+const until=async pred=>{for(let i=0;i<80;i++){if(await pred())return;await page.waitForTimeout(100);}throw Error('Timed out');};
+const start=page.getByRole('button',{name:'Chạy quy trình trong Gazebo',exact:true});
+try{
+ await page.goto('http://127.0.0.1:5175/tests/gazebo.fixture.html');await until(()=>start.isEnabled());
+ const frame=await page.locator('iframe').elementHandle();
+ await page.getByRole('button',{name:'Mở màn hình lớn',exact:true}).click();
+ assert.equal(await page.locator('.gazebo-desktop-expanded').count(),1);assert.equal(context.pages().length,1);
+ assert.equal(await frame.evaluate(e=>e.isConnected),true);
+ await page.getByRole('button',{name:'Toàn màn hình',exact:true}).click();
+ await until(()=>page.evaluate(()=>!!document.fullscreenElement));
+ await page.evaluate(()=>document.exitFullscreen());
+ await page.getByRole('button',{name:'Thu lại',exact:true}).click();
+ assert.equal(await frame.evaluate(e=>e.isConnected),true);
+ // Actual noVNC server is embedded; inspect its DOM without issuing motion commands.
+ const vnc=page.frameLocator('iframe');await vnc.locator('#noVNC_container canvas').first().waitFor({timeout:30000});
+ await until(async()=>await vnc.locator('html').evaluate(e=>e.classList.contains('noVNC_connected')));
+ await page.getByRole('button',{name:'3d',exact:true}).click();await page.locator('.patrol-three-scene canvas').waitFor();
+ const canvas=await page.locator('.patrol-three-scene canvas').elementHandle();
+ mode='mismatch';await until(()=>start.isDisabled());mode='ready';await until(()=>start.isEnabled());
+ await start.click();await until(()=>commands.length===1);await page.waitForTimeout(800);assert.equal(await start.isDisabled(),true);
+ assert.equal(await page.getByText('Đã đến tất cả điểm đích',{exact:true}).count(),0);
+ state={status:'RUNNING',runId:'run-1',total:2,completed:0,path:[{x:2.9,y:-1,yaw:0},{x:3.3,y:-1,yaw:0}]};
+ await page.getByText('Đang di chuyển',{exact:true}).waitFor();assert.equal(await canvas.evaluate(e=>e.isConnected),true);
+ await page.getByRole('button',{name:'2d',exact:true}).click();await page.locator('[data-testid="dispatch-robot"]').waitFor();
+ polling=false;await page.getByRole('alert').waitFor({timeout:10000});assert.equal(await start.isDisabled(),true);
+ assert.equal(await page.locator('[data-testid="dispatch-robot"]').count(),0);
+ polling=true;state={...state,status:'RUNNING'};await page.getByText('Đang di chuyển',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'Dừng hành trình',exact:true}).click();await until(()=>commands.some(c=>c.commandType==='CANCEL_PATROL'));
+ state={...state,status:'CANCELED'};await page.getByText('Đã dừng',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'gazebo',exact:true}).click();
+ await page.getByRole('button',{name:'Mở màn hình lớn',exact:true}).click();
+ await until(async()=>await vnc.locator('html').evaluate(e=>e.classList.contains('noVNC_connected')));
+ await mkdir('.workstation-build/gazebo',{recursive:true});await page.screenshot({path:'.workstation-build/gazebo/embedded-desktop.png'});
+ await page.setViewportSize({width:390,height:844});
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await page.screenshot({path:'.workstation-build/gazebo/embedded-mobile.png'});
+ await page.getByRole('button',{name:'Thu lại',exact:true}).click();
+ const before=commands.length;await page.getByRole('button',{name:'Rời màn hình',exact:true}).click();await page.waitForTimeout(1500);console.log('unmount',before,commands,errors,await page.locator('.gazebo-panel').count());await until(()=>commands.length>before);
+ assert.equal(commands.at(-1).commandType,'CANCEL_PATROL');assert.deepEqual(errors,[]);
+ console.log('PASS: real embedded noVNC connected, expand/fullscreen keeps iframe, no new tab, 2D/3D telemetry, 202 not success, mismatched map, lost API, stop, unmount, mobile. Commands intercepted (no robot motion).');
+}finally{await browser.close();}
+
+

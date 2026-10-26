@@ -1,20 +1,37 @@
 const SESSION_KEY = 'mediassist-rover.session';
+const ACCESS_TOKEN_KEY = 'mediassist-rover.access-token';
 
-export function getSession() {
+function read(storage) {
   try {
-    return JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? 'null');
+    return JSON.parse(storage.getItem(SESSION_KEY) ?? 'null');
   } catch {
-    clearSession();
     return null;
   }
 }
 
+function persist(session) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  if (session?.tokens?.accessToken) localStorage.setItem(ACCESS_TOKEN_KEY, session.tokens.accessToken);
+  else localStorage.removeItem(ACCESS_TOKEN_KEY);
+}
+
+export function getSession() {
+  const saved = read(localStorage);
+  if (saved) return saved;
+
+  // Migrate sessions created before persistent local authentication was introduced.
+  const legacy = read(sessionStorage);
+  if (!legacy) return null;
+  try { persist(legacy); sessionStorage.removeItem(SESSION_KEY); } catch { /* Storage may be unavailable. */ }
+  return legacy;
+}
+
 export function createSession({ account = null, tokens }) {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ account, tokens }));
+  persist({ account, tokens });
 }
 
 export function createDemoSession(account) {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ mode: 'demo', account }));
+  persist({ mode: 'demo', account });
 }
 
 export function isDemoSession() {
@@ -32,6 +49,8 @@ export function updateCurrentUser(account) {
 }
 
 export function clearSession() {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(SESSION_KEY);
 }
 

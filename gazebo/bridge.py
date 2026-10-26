@@ -1,6 +1,6 @@
 """Private-LAN HTTP bridge to a dedicated Gazebo/Nav2 simulation (ROS_DOMAIN_ID=77).
 
-No database/MQTT access. Commands are serialized by the ROS executor. A lost UI
+Commands arrive through the existing MQTT broker via the authenticated BE. A lost UI
 lease cancels the owned Nav2 goal; only its result can complete a MOVE step.
 """
 import argparse
@@ -82,12 +82,13 @@ class SimulationBridge(Node):
             self.last_clock = value
 
     def on_map(self, msg):
-        spec = self.data['map']
+        spec = self.data
         origin = msg.info.origin
         self.map_ok = (msg.header.frame_id.lstrip('/') == 'map' and msg.info.width == spec['width']
                        and msg.info.height == spec['height'] and abs(msg.info.resolution-spec['resolution']) < 1e-6
-                       and abs(origin.position.x+30) < 1e-5 and abs(origin.position.y+17) < 1e-5
-                       and abs(origin.orientation.z) < 1e-5 and abs(abs(origin.orientation.w)-1) < 1e-5
+                       and abs(origin.position.x-spec['origin'][0]) < 1e-5 and abs(origin.position.y-spec['origin'][1]) < 1e-5
+                       and abs(origin.orientation.z-math.sin(spec['origin'][2]/2)) < 1e-5
+                       and abs(origin.orientation.w-math.cos(spec['origin'][2]/2)) < 1e-5
                        and grid_digest(msg.data) == self.grid_hash)
 
     def on_path(self, msg):
@@ -151,6 +152,8 @@ class SimulationBridge(Node):
                 self.cancel('Mất kết nối FE; đã yêu cầu hủy mục tiêu Nav2.')
             elif not ready:
                 self.cancel('Mất dữ liệu mô phỏng; đã yêu cầu hủy mục tiêu Nav2.')
+        if hasattr(self,'mqtt'):
+            self.mqtt.tick()
 
     def next_goal(self):
         if self.stopping:
@@ -249,40 +252,11 @@ def handler(node, key, origin):
                 return self.reply(403, {'error': 'Sai mã kết nối hoặc địa chỉ FE (origin).'})
             if self.path != '/state':
                 return self.reply(404, {'error': 'Không có API này.'})
-            if self.headers.get('X-Simulation-Run') in (node.run_id, node.queued_run):
-                node.last_ui = time.monotonic()
             self.reply(200, node.snapshot())
 
         def do_POST(self):
-            if not self.authorized():
-                return self.reply(403, {'error': 'Sai mã kết nối hoặc địa chỉ FE (origin).'})
-            if self.path not in ('/run', '/cancel'):
-                return self.reply(404, {'error': 'Không có API này.'})
-            try:
-                size = int(self.headers.get('Content-Length', '0'))
-                if not 0 < size <= 65536:
-                    raise ValueError('Yêu cầu quá lớn hoặc rỗng.')
-                body = json.loads(self.rfile.read(size))
-                if not isinstance(body, dict):
-                    raise ValueError('Yêu cầu phải là JSON object.')
-                if self.path == '/run':
-                    body['validatedSteps'] = validate_run(body, node.envelope, node.data)
-                    with node.lock:
-                        unavailable = node.state['status'] in ACTIVE or node.queued_run is not None
-                        if not unavailable:
-                            node.queued_run = body['runId']
-                    if unavailable:
-                        return self.reply(409, {'error': 'Có hành trình đang chạy. Dừng hành trình trước.'})
-                node.commands.put_nowait((self.path, body))
-                node.last_ui = time.monotonic()
-                self.reply(202, {'accepted': True})
-            except queue.Full:
-                if self.path == '/run':
-                    with node.lock:
-                        node.queued_run = None
-                self.reply(429, {'error': 'Đang xử lý nhiều yêu cầu. Thử lại sau.'})
-            except (ValueError, KeyError, TypeError) as error:
-                self.reply(400, {'error': str(error)})
+            # Motion exclusively uses authenticated BE -> MQTT, not browser HTTP.
+            return self.reply(410, {'error': 'Dùng /api/v1/simulation/commands trên BE.'})
     return Handler
 
 
@@ -297,6 +271,9 @@ def main():
         parser.error('Use ROS_DOMAIN_ID=77 for this dedicated simulation; do not join the physical robot domain.')
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = SimulationBridge(args.map)
+    if os.environ.get('SIM_MQTT_ENABLED') == 'true':
+        from mqtt_adapter import SimulationMqttAdapter
+        node.mqtt = SimulationMqttAdapter(node)
     key = secrets.token_urlsafe(24)
     server = ThreadingHTTPServer((args.bind, args.port), handler(node, key, args.origin))
     server.daemon_threads = True
@@ -310,6 +287,7 @@ def main():
         while rclpy.ok() and node.state['status'] in ACTIVE and time.monotonic() < deadline:
             rclpy.spin_once(node, timeout_sec=.1)
     finally:
+        if hasattr(node,'mqtt'): node.mqtt.close()
         server.shutdown()
         node.destroy_node()
         if rclpy.ok():

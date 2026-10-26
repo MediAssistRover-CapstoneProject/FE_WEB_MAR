@@ -1,9 +1,9 @@
 import { Component, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { MAP, FLOOR, WALLS, OBSTACLES } from './lidarGeometry.js';
+import { localMockMap as model, webToRos, pixelToRos, rosToThree } from '../../features/maps/MapProvider.js';
 
-const at = point => new THREE.Vector3((point.x - MAP.width / 2) * MAP.resolution, 0, (point.y - MAP.height / 2) * MAP.resolution);
+const at = point => { const p=rosToThree(webToRos(point));return new THREE.Vector3(p.x,p.y,p.z); };
 
 function label(text, color = '#eaf4ff') {
   const canvas = document.createElement('canvas');
@@ -15,7 +15,7 @@ function label(text, color = '#eaf4ff') {
   ctx.fillText(text.slice(0, 28), 256, 60);
   const texture = new THREE.CanvasTexture(canvas);
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false }));
-  sprite.scale.set(3.7, .7, 1);
+  sprite.scale.set(.9, .17, 1);
   return sprite;
 }
 
@@ -41,7 +41,7 @@ function ThreeScene({ map, plan, position }) {
     if (!element || !map) return;
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#101a2a');
-    scene.fog = new THREE.Fog('#101a2a', 42, 95);
+
     const camera = new THREE.PerspectiveCamera(48, 1, .1, 150);
     camera.position.set(20, 29, 31);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -52,36 +52,31 @@ function ThreeScene({ map, plan, position }) {
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.maxPolarAngle = Math.PI / 2.08;
-    controls.minDistance = 12; controls.maxDistance = 85;
+    controls.minDistance = .8; controls.maxDistance = 25;
     scene.add(new THREE.HemisphereLight('#d9efff', '#506173', 2.6));
     const sun = new THREE.DirectionalLight('#ffffff', 2.5);
     sun.position.set(-14, 30, 18); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.camera.left = -40; sun.shadow.camera.right = 40;
     sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40;
     scene.add(sun);
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 55), new THREE.MeshStandardMaterial({ color: '#1e3045', roughness: .9 }));
-    ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; ground.position.y = -.09; scene.add(ground);
-    const floorShape = new THREE.Shape();
-    FLOOR.forEach((p, i) => { const v = at(p); i ? floorShape.lineTo(v.x, v.z) : floorShape.moveTo(v.x, v.z); });
-    floorShape.closePath();
-    const floor = new THREE.Mesh(new THREE.ShapeGeometry(floorShape), new THREE.MeshStandardMaterial({ color: '#a8b9c8', roughness: .86, side: THREE.DoubleSide }));
-    floor.rotation.x = Math.PI / 2; floor.position.y = .015; floor.receiveShadow = true; scene.add(floor);
-    const wallMaterial = new THREE.MeshStandardMaterial({ color: '#d7e5ed', roughness: .58 });
-    WALLS.forEach(([start, end]) => {
-      const a = at(start), b = at(end), length = a.distanceTo(b);
-      const wall = new THREE.Mesh(new THREE.BoxGeometry(length, 2.3, .14), wallMaterial);
-      wall.position.copy(a).add(b).multiplyScalar(.5); wall.position.y = 1.15;
-      wall.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x);
-      wall.castShadow = true; wall.receiveShadow = true; scene.add(wall);
+    // Raster is the measured occupancy data; height is explicitly configured.
+    const pixels=new Uint8Array(model.width*model.height*4);
+    // DataTexture row 0 maps to UV bottom: explicitly reverse source image rows.
+    model.occupancyGrid.forEach((v,i)=>{const c=v===0?230:v===100?32:125;const j=(model.height-1-Math.floor(i/model.width))*model.width+i%model.width;pixels.set([c,c,c,255],j*4);});
+    const texture=new THREE.DataTexture(pixels,model.width,model.height,THREE.RGBAFormat);
+    texture.flipY=false;texture.magFilter=THREE.NearestFilter;texture.needsUpdate=true;
+    const center=pixelToRos({x:model.width/2,y:model.height/2});
+    const floor=new THREE.Mesh(new THREE.PlaneGeometry(model.width*model.resolution,model.height*model.resolution),new THREE.MeshStandardMaterial({map:texture,side:THREE.DoubleSide}));
+    floor.rotation.set(-Math.PI/2,0,0);floor.rotateZ(model.origin[2]);floor.position.set(center.x,0,-center.y);scene.add(floor);
+    const geometry=new THREE.BoxGeometry(1,1,1), material=new THREE.MeshStandardMaterial({color:'#c3d1de',roughness:.85});
+    const blocks=new THREE.InstancedMesh(geometry,material,model.obstacleGeometry.length);
+    const dummy=new THREE.Object3D();
+    model.obstacleGeometry.forEach((item,i)=>{
+      dummy.position.set(item.position[0],item.height/2,-item.position[1]);dummy.rotation.set(0,item.yaw,0);dummy.scale.set(item.width,item.height,item.depth);dummy.updateMatrix();blocks.setMatrixAt(i,dummy.matrix);
     });
-    const furniture = new THREE.MeshStandardMaterial({ color: '#546b82', roughness: .8 });
-    OBSTACLES.forEach(item => {
-      const center = at({ x: item.x + item.w / 2, y: item.y + item.h / 2 });
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(item.w * MAP.resolution, .65, item.h * MAP.resolution), furniture);
-      mesh.position.set(center.x, .33, center.z); mesh.castShadow = true; scene.add(mesh);
-    });
+    blocks.instanceMatrix.needsUpdate=true;scene.add(blocks);
     const colors = { KEEP_OUT: '#ef5d76', SPEED: '#efb84b', NO_STOP: '#f97316' };
-    map.zones.forEach(zone => {
+    (map.zones||[]).forEach(zone => {
       if (zone.enabled === false || !zone.points?.length) return;
       const shape = new THREE.Shape();
       zone.points.forEach((p, i) => { const v = at(p); i ? shape.lineTo(v.x, v.z) : shape.moveTo(v.x, v.z); });
@@ -91,23 +86,23 @@ function ThreeScene({ map, plan, position }) {
     });
     routeLayer.current = new THREE.Group(); scene.add(routeLayer.current);
     const robot = new THREE.Group();
-    const chassis = new THREE.Mesh(new THREE.CylinderGeometry(.44, .44, .35, 32), new THREE.MeshStandardMaterial({ color: '#1d65d8', metalness: .28, roughness: .38 }));
-    chassis.position.y = .34; chassis.castShadow = true; robot.add(chassis);
-    const turret = new THREE.Mesh(new THREE.BoxGeometry(.5, .36, .4), new THREE.MeshStandardMaterial({ color: '#f2f8ff', roughness: .3 }));
-    turret.position.y = .7; turret.castShadow = true; robot.add(turret);
+    const chassis = new THREE.Mesh(new THREE.CylinderGeometry(.22, .22, .2, 32), new THREE.MeshStandardMaterial({ color: '#1d65d8', metalness: .28, roughness: .38 }));
+    chassis.position.y = .15; chassis.castShadow = true; robot.add(chassis);
+    const turret = new THREE.Mesh(new THREE.BoxGeometry(.18, .16, .18), new THREE.MeshStandardMaterial({ color: '#f2f8ff', roughness: .3 }));
+    turret.position.y = .33; turret.castShadow = true; robot.add(turret);
     const lens = new THREE.Mesh(new THREE.BoxGeometry(.2, .12, .02), new THREE.MeshStandardMaterial({ color: '#39c9ec', emissive: '#0a7b9e', emissiveIntensity: .5 }));
-    lens.position.set(0, .72, -.22); robot.add(lens);
-    const robotName = label('MAR-01'); robotName.position.y = 1.7; robot.add(robotName);
+    lens.position.set(0, .33, -.1); robot.add(lens);
+    const robotName = label('Robot ROS'); robotName.position.y = .7; robot.add(robotName);
     robot.visible = false; scene.add(robot); live.current = robot;
     const fit = () => {
       const vertical = THREE.MathUtils.degToRad(camera.fov / 2);
       const horizontal = Math.atan(Math.tan(vertical) * camera.aspect);
-      const radius = 29;
+      const radius = Math.hypot(model.width,model.height)*model.resolution/2;
       const distance = radius / Math.sin(Math.min(vertical, horizontal)) * 1.08;
       controls.maxDistance = Math.max(110, distance * 1.5);
       camera.far = Math.max(180, distance * 3); camera.updateProjectionMatrix();
-      controls.target.set(0, 0, 0); camera.position.copy(new THREE.Vector3(20, 29, 31).normalize().multiplyScalar(distance));
-      scene.fog.near = distance + 40; scene.fog.far = distance + 100;
+      controls.target.set(center.x, 0, -center.y); camera.position.copy(new THREE.Vector3(20, 29, 31).normalize().multiplyScalar(distance).add(controls.target));
+
       controls.update();
     };
     fitView.current = fit;
@@ -124,9 +119,9 @@ function ThreeScene({ map, plan, position }) {
     (plan?.points || []).forEach(({ endpoint }, index) => {
       if (!endpoint) return;
       const marker = new THREE.Group();
-      const pin = new THREE.Mesh(new THREE.CylinderGeometry(.24, .24, .09, 24), new THREE.MeshStandardMaterial({ color: '#3585ff' }));
-      pin.position.y = .12; marker.add(pin);
-      const title = label(`${index + 1}. ${endpoint.name}`); title.position.y = 1.3; marker.add(title);
+      const pin = new THREE.Mesh(new THREE.CylinderGeometry(.06, .06, .03, 24), new THREE.MeshStandardMaterial({ color: '#3585ff' }));
+      pin.position.y = .04; marker.add(pin);
+      const title = label(`${index + 1}. ${endpoint.name}`); title.position.y = .4; marker.add(title);
       marker.position.copy(at(endpoint)); group.add(marker);
     });
     if (plan?.path?.length > 1) {
@@ -143,7 +138,7 @@ function ThreeScene({ map, plan, position }) {
     live.current.visible = !!position;
     if (!position) return;
     const point = at(position); live.current.position.set(point.x, 0, point.z);
-    live.current.rotation.y = (Number(position.heading) || 0) * Math.PI / 180 - Math.PI / 2;
+    live.current.rotation.y = webToRos(position).yaw - Math.PI / 2;
   }, [position, map]);
   return <div className="patrol-three-scene" ref={host} role="group" aria-label="Mô phỏng 3D của robot và tuyến tuần tra"><button className="three-fit" type="button" onClick={() => fitView.current?.()}>Vừa khung 3D</button><span>Kéo để xoay · Cuộn để phóng to</span></div>;
 }

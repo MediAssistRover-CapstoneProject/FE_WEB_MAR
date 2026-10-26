@@ -22,6 +22,7 @@ pnpm-debug.log*
 .vite/
 .workstation-build/
 gazebo/generated/
+gazebo/input/*.json
 gazebo/__pycache__/
 .vscode/*
 !.vscode/extensions.json

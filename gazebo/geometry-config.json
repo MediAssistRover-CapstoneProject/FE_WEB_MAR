@@ -1,0 +1,12 @@
+{
+  "approved": true,
+  "approval": "User approved occupied extrusion 1 m and floor thickness 0.1 m on 2026-10-26",
+  "occupiedHeight": 1.0,
+  "floorThickness": 0.1,
+  "wallHeight": null,
+  "wallThickness": null,
+  "doors": [],
+  "ceilingHeight": null,
+  "semanticStatus": "NEEDS_CONFIGURATION",
+  "description": "Occupied cells are unclassified obstacles. Heights are simulation assumptions, not measured LiDAR heights. Doors and ceiling are not inferred."
+}

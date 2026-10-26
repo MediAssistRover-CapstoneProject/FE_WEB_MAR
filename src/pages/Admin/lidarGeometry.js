@@ -1,35 +1,19 @@
-// Synthetic scan geometry inspired by the user's reference. Editing layers use
-// the same coordinates; these are not measurements from a connected sensor.
-export const MAP = { width: 1200, height: 680, resolution: 0.05 };
-export const SCAN_START = { x: 600, y: 350, heading: 0 };
-export const FLOOR = [[90,230],[500,230],[500,100],[640,100],[640,155],[930,155],[930,215],[1110,215],[1110,355],[1000,355],[1000,570],[650,570],[650,600],[500,600],[500,570],[230,570],[230,415],[290,415],[290,355],[90,355]].map(([x,y]) => ({x,y}));
-const segments = points => points.slice(1).map((p,i) => [points[i],p].map(([x,y])=>({x,y})));
-export const WALLS = [
-  ...FLOOR.map((p,i) => [p,FLOOR[(i+1)%FLOOR.length]]),
-  ...segments([[220,230],[220,310],[260,310]]), ...segments([[295,310],[310,310],[310,230]]),
-  ...segments([[310,310],[345,310]]), ...segments([[380,310],[470,310],[470,230]]),
-  ...segments([[500,230],[535,230]]), ...segments([[570,230],[640,230],[640,155]]),
-  ...segments([[640,230],[640,310],[840,310]]), ...segments([[875,310],[920,310],[920,215]]),
-  ...segments([[1020,215],[1020,300],[1050,300]]), ...segments([[1085,300],[1110,300]]),
-  ...segments([[230,415],[260,415]]), ...segments([[325,415],[340,415],[340,570]]),
-  ...segments([[340,415],[365,415]]), ...segments([[400,415],[430,415],[430,570]]),
-  ...segments([[430,415],[450,415]]), ...segments([[485,415],[500,415],[500,570]]),
-  ...segments([[650,570],[650,415],[675,415]]), ...segments([[710,415],[730,415],[730,570]]),
-  ...segments([[730,415],[765,415]]), ...segments([[800,415],[870,415],[870,570]]),
-];
-export const OBSTACLES = [
-  {x:116,y:260,w:34,h:18}, {x:120,y:320,w:22,h:12}, {x:273,y:245,w:20,h:30},
-  {x:380,y:250,w:40,h:16}, {x:735,y:190,w:38,h:17}, {x:764,y:260,w:14,h:30},
-  {x:1068,y:238,w:17,h:34}, {x:270,y:527,w:42,h:18}, {x:354,y:470,w:35,h:18},
-  {x:448,y:530,w:30,h:13}, {x:684,y:522,w:25,h:22}, {x:765,y:470,w:32,h:22},
-  {x:940,y:520,w:20,h:30}, {x:486,y:367,w:14,h:15}, {x:658,y:360,w:15,h:15},
-  {x:555,y:411,w:65,h:13}, {x:548,y:390,w:13,h:35}, {x:613,y:390,w:13,h:35},
-];
+import { localMockMap as model, viewTransform, pixelToWeb, rosToWeb } from '../../features/maps/MapProvider.js';
+export const MAP = { width:1200, height:680, resolution:model.resolution/viewTransform().scale };
+export const SCAN_START = rosToWeb(model.spawn);
+// Boundary is only the raster extent. Traversability is checked against occupancy.
+export const FLOOR = [[0,0],[model.width,0],[model.width,model.height],[0,model.height]].map(([x,y])=>pixelToWeb({x,y}));
+export const WALLS = model.obstacleGeometry.flatMap(ob=>{
+  const r=ob.sourcePixels;
+  const p=[[r.x,r.y],[r.x+r.width,r.y],[r.x+r.width,r.y+r.height],[r.x,r.y+r.height]].map(([x,y])=>pixelToWeb({x,y}));
+  return p.map((a,i)=>[a,p[(i+1)%4]]);
+});
+export const OBSTACLES = [];
 const LIDAR_SURFACES = [...WALLS, ...OBSTACLES.flatMap(({x,y,w,h}) => {
   const corners=[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h}];
   return corners.map((point,index)=>[point,corners[(index+1)%corners.length]]);
 })];
-export const SCAN_PATH = [[165,330],[280,330],[460,330],[548,330],[548,190],[548,330],[800,330],[1060,330],[880,330],[880,380],[635,380],[635,450],[580,450],[580,550],[580,450],[525,450],[525,395],[330,395]].map(([x,y]) => ({x,y}));
+export const SCAN_PATH = [SCAN_START, SCAN_START];
 export function distanceToSegment(p,a,b) {
   const dx=b.x-a.x,dy=b.y-a.y;
   const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy || 1)));

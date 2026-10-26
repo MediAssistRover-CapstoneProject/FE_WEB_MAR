@@ -1,3 +1,4 @@
+import { freeWebPoint, mapBinding, isCurrentMap } from '../../features/maps/MapProvider.js';
 import { MAP, FLOOR, WALLS, OBSTACLES, SCAN_START, inPolygon, distanceToSegment } from './lidarGeometry.js';
 import { groupsFor, groupError } from '../../features/facility/endpointGroups.js';
 import { ZONE_TYPES, blockedZone, noStopZone } from './zoneCatalog.js';
@@ -15,7 +16,7 @@ export const ROBOT_SAFETY_GAP_METERS = 0.25;
 // (5 px at this map resolution) between its body and every solid surface.
 export const ROBOT_SAFETY_CLEARANCE = 7 + ROBOT_SAFETY_GAP_METERS / MAP.resolution;
 export function createDraft() {
-  return { schema: 3, revision: 0, name: 'Tầng 1 bệnh viện', scan: { status: 'idle', progress: 0, robot: { ...SCAN_START }, trail: [{ x: SCAN_START.x, y: SCAN_START.y }] }, zones: [], endpoints: [], endpointGroups: [], saved: null };
+  return { schema: 3, mapSource: mapBinding(), revision: 0, name: 'Tầng 1 bệnh viện', scan: { status: 'idle', progress: 0, robot: { ...SCAN_START }, trail: [{ x: SCAN_START.x, y: SCAN_START.y }] }, zones: [], endpoints: [], endpointGroups: [], saved: null };
 }
 export function validPoint(p) { return Number.isFinite(p?.x) && Number.isFinite(p?.y) && p.x >= 0 && p.x <= MAP.width && p.y >= 0 && p.y <= MAP.height; }
 export function loadDraft(storage) {
@@ -59,10 +60,8 @@ export function removeEndpoint(draft, id) {
   return changeDraft(draft, { endpoints, endpointGroups });
 }
 export function stageEnabled(draft, stage) { return stage === 'scan' || ['zone', 'endpoint'].includes(stage) && draft.scan.status === 'complete'; }
-export function freePoint(point, clearance = 8) {
-  if (!validPoint(point) || !inPolygon(point, FLOOR)) return false;
-  if (WALLS.some(([a, b]) => distanceToSegment(point, a, b) < clearance)) return false;
-  return !OBSTACLES.some(r => point.x >= r.x - clearance && point.x <= r.x + r.w + clearance && point.y >= r.y - clearance && point.y <= r.y + r.h + clearance);
+export function freePoint(point, clearance = .3/MAP.resolution) {
+  return validPoint(point) && freeWebPoint(point, clearance*MAP.resolution);
 }
 export function driveRobotStep(previous, direction) {
   if (!validPoint(previous) || !['forward', 'backward', 'left', 'right'].includes(direction)) return { robot: previous, moved: false, blocked: false };
@@ -108,8 +107,8 @@ export function zoneError(draft, zone) {
 export function endpointError(draft, endpoint) {
   if (!endpoint.name.trim()) return 'Enter an endpoint name.';
   if (!ENDPOINT_TYPES.includes(endpoint.type)) return 'Select an endpoint type.';
-  if (!freePoint(endpoint)) return 'Place the endpoint on scanned free space, at least 0.4 m from walls and obstacles.';
-  if (draft.scan?.trail?.length && !draft.scan.trail.some(point => Math.hypot(point.x - endpoint.x, point.y - endpoint.y) <= 150)) return 'Place the endpoint inside the area recorded by LiDAR.';
+  if (!freePoint(endpoint)) return 'Place the endpoint on scanned free space, at least 0.3 m from walls and obstacles.';
+  if (!isCurrentMap(draft) && draft.scan?.trail?.length && !draft.scan.trail.some(point => Math.hypot(point.x - endpoint.x, point.y - endpoint.y) <= 150)) return 'Place the endpoint inside the area recorded by LiDAR.';
   if (!pointAllowed(draft, endpoint)) return 'An endpoint cannot be placed inside a KEEP_OUT zone.';
   if (draft.zones.some(z => noStopZone(z) && inPolygon(endpoint, z.points))) return 'An endpoint cannot be placed inside a NO_STOP zone.';
   if (draft.endpoints.some(e => e.id !== endpoint.id && e.name.toLowerCase() === endpoint.name.trim().toLowerCase())) return 'An endpoint with this name already exists.';
@@ -121,11 +120,12 @@ export function endpointError(draft, endpoint) {
 }
 export function mapIssues(draft) {
   const groups=groupsFor(draft);
-  return [draft.scan.status !== 'complete' ? 'Finish the scan first.' : '', !draft.name.trim() ? 'Enter a map name.' : '', !draft.endpoints.length ? 'Add at least one endpoint.' : '', ...draft.zones.map(z => zoneError(draft, z)), ...draft.endpoints.map(e => endpointError(draft, e)), ...groups.map(g=>groupError(g,groups,draft.endpoints))].filter(Boolean);
+  return [!isCurrentMap(draft) ? 'Bản đồ cũ chưa gắn với ảnh LiDAR hiện tại. Xuất bản nháp cũ để lưu giữ, rồi tạo bản quét mới và đặt lại điểm.' : '', draft.scan.status !== 'complete' ? 'Finish the scan first.' : '', !draft.name.trim() ? 'Enter a map name.' : '', !draft.endpoints.length ? 'Add at least one endpoint.' : '', ...draft.zones.map(z => zoneError(draft, z)), ...draft.endpoints.map(e => endpointError(draft, e)), ...groups.map(g=>groupError(g,groups,draft.endpoints))].filter(Boolean);
 }
 export function saveMap(draft, timestamp) {
   if (mapIssues(draft).length) return draft;
   const { saved, ...snapshot } = draft;
+  snapshot.mapSource = mapBinding();
   return { ...draft, saved: { revision: draft.revision, timestamp, snapshot: structuredClone(snapshot) } };
 }
 export function exportMap(draft) {

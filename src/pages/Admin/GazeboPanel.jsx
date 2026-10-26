@@ -1,90 +1,60 @@
+import GazeboDesktop from './GazeboDesktop.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PatrolThreePreview from './PatrolThreePreview.jsx';
+import LidarMap from './LidarMap.jsx';
+import { apiRequest } from '../../features/api/client.js';
+import { getSession } from '../../features/auth/session.js';
+import { localMockMap, isCurrentMap } from '../../features/maps/MapProvider.js';
+import { fromRosPoint, routeRequest } from '../../features/gazebo/gazeboModel.js';
 import './gazebo.css';
-import { bridgeUrl, downloadGazeboMap, fromRosPoint, gazeboManifest, routeRequest } from '../../features/gazebo/gazeboModel.js';
-
-const labels = { IDLE: 'Sẵn sàng', STARTING: 'Đang gửi điểm đích', RUNNING: 'Đang di chuyển', CANCELING: 'Đang yêu cầu dừng', CANCELED: 'Đã hủy hành trình', SUCCEEDED: 'Đã đến tất cả điểm đích', FAILED: 'Không hoàn thành hành trình' };
-
-export default function GazeboPanel({ map, plan }) {
-  const [address, setAddress] = useState(import.meta.env.VITE_GAZEBO_BRIDGE_URL || 'http://localhost:8765');
-  const [token, setToken] = useState('');
-  const [connection, setConnection] = useState(null);
-  const [manifest, setManifest] = useState(null);
-  const [state, setState] = useState(null);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [pendingRun, setPendingRun] = useState(null);
-  const active = useRef(null);
-  const commandAbort = useRef(null);
-  const runId = useRef(null);
-
-  useEffect(() => {
-    let current = true; setManifest(null);
-    gazeboManifest(map).then(value => { if (current) setManifest(value); }).catch(cause => { if (current) setError(cause.message); });
-    return () => { current = false; };
-  }, [map]);
-
-  useEffect(() => {
-    if (!connection || !manifest) { setState(null); setPendingRun(null); return; }
-    let current = true, timer;
-    const controller = new AbortController();
-    active.current = connection; setState(null); setError(''); setBusy(false);
-    const cancel = () => {
-      if (runId.current) fetch(connection.url + '/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Simulation-Key': connection.token }, body: JSON.stringify({ runId: runId.current }), keepalive: true }).catch(() => {});
-    };
-    const poll = async () => {
-      try {
-        const response = await fetch(connection.url + '/state', { headers: { 'X-Simulation-Key': connection.token, 'X-Simulation-Run': runId.current || '' }, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(2500)]) });
-        const value = await response.json();
-        if (!response.ok) throw Error(value.error || 'Cầu nối từ chối kết nối.');
-        if (value.protocol !== 'mar-gazebo-v1' || value.simulation !== true) throw Error('Địa chỉ này không phải cầu nối Gazebo của dự án.');
-        if (value.mapKey !== manifest.mapKey) throw Error('Bản đồ Gazebo khác bản đồ FE. Tải lại gói bản đồ và khởi động lại bộ mô phỏng.');
-        if (current) { setState(value); setPendingRun(id => id === value.runId ? null : id); setError(''); }
-      } catch (cause) {
-        if (current) { setState(null); setError(cause.name === 'TimeoutError' ? 'Gazebo không phản hồi. Hành trình sẽ bị hủy khi hết thời gian kết nối.' : cause.message); cancel(); }
-      } finally { if (current) timer = setTimeout(poll, 500); }
-    };
-    const hide = () => { if (document.hidden) { cancel(); setConnection(null); } };
-    document.addEventListener('visibilitychange', hide);
-    window.addEventListener('pagehide', cancel);
-    poll();
-    return () => {
-      current = false; clearTimeout(timer); controller.abort(); commandAbort.current?.abort(); cancel(); active.current = null; runId.current = null;
-      document.removeEventListener('visibilitychange', hide); window.removeEventListener('pagehide', cancel);
-    };
-  }, [connection, manifest]);
-
-  const execute = async (path, data) => {
-    const selected = active.current; if (!selected) return;
-    setBusy(true); setError('');
-    const controller = new AbortController(); commandAbort.current = controller;
-    try {
-      const response = await fetch(selected.url + path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Simulation-Key': selected.token }, body: JSON.stringify(data), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]) });
-      const result = await response.json();
-      if (!response.ok) throw Error(result.error || 'Không gửi được yêu cầu.');
-      // 202 only acknowledges receipt. Progress comes from Nav2 results.
-      if (path === '/run') setState(value => value ? { ...value, status: 'STARTING' } : value);
-    } catch (cause) { if (!controller.signal.aborted) { setError(cause.message); setPendingRun(null); } }
-    finally { if (active.current === selected) setBusy(false); }
-  };
-  const moving = !!pendingRun || ['STARTING', 'RUNNING', 'CANCELING'].includes(state?.status);
-  const pathKey = JSON.stringify(state?.path || []);
-  const renderPlan = useMemo(() => ({ points: plan?.points || [], path: JSON.parse(pathKey).map(fromRosPoint).filter(Boolean) }), [plan, pathKey]);
-  const pose = state?.poseFresh ? fromRosPoint(state.pose) : null;
-  return <div className="gazebo-panel">
-    <p className="patrol-notice">Gazebo chạy trong Ubuntu. Khung này hiển thị cùng mặt bằng và vị trí nhận từ ROS. Rover trên web là hình minh họa; mô hình vật lý trong bộ mẫu là TurtleBot3.</p>
-    <details open={!connection} className="gazebo-setup"><summary>Kết nối bộ mô phỏng</summary>
-      <label className="patrol-field">Địa chỉ Ubuntu<input type="url" value={address} disabled={!!connection} onChange={event => setAddress(event.target.value)} placeholder="http://IP_UBUNTU:8765" /></label>
-      <label className="patrol-field">Mã kết nối hiện trong terminal Ubuntu<input type="password" autoComplete="off" value={token} disabled={!!connection} onChange={event => setToken(event.target.value)} /></label>
-      <div className="patrol-actions"><button disabled={!!connection || !manifest || !token.trim()} onClick={() => { try { setConnection({ url: bridgeUrl(address.trim()), token: token.trim() }); } catch (cause) { setError(cause.message); } }}>Kết nối Gazebo</button><button disabled={!connection} onClick={() => setConnection(null)}>Ngắt kết nối</button><button onClick={() => downloadGazeboMap(map).catch(cause => setError(cause.message))}>Tải bản đồ cho Gazebo</button></div>
-      <p className="patrol-map-note">Hướng dẫn cài và chạy: FE_WEB_MAR/gazebo/README.vi.md. Mã kết nối chỉ giữ trong trang này.</p>
-    </details>
-    {error && <p className="patrol-notice is-error" role="alert">{error}</p>}
-    {!!plan?.issues?.length && <div className="patrol-notice is-error"><strong>Cần kiểm tra quy trình</strong><ul>{plan.issues.map(issue => <li key={issue}>{issue}</li>)}</ul></div>}
-    <div className={'patrol-readiness ' + (state?.ready ? 'is-ready' : '')} role="status"><strong>{state ? labels[state.status] || state.status : connection ? 'Đang chờ Gazebo' : 'Chưa kết nối Gazebo'}</strong><span>{state?.reason || (state?.ready ? 'Đã kết nối ROS và đúng phiên bản bản đồ.' : 'Mở Ubuntu, chạy bộ mô phỏng và cầu nối trước khi gửi quy trình.')}</span>{state?.message && <span>{state.message}</span>}</div>
-    <PatrolThreePreview map={map} plan={renderPlan} position={pose} />
-    <div className="patrol-simulation-summary"><div><small>Vị trí từ ROS</small><strong>{pose ? `${state.pose.x.toFixed(2)}, ${state.pose.y.toFixed(2)} m` : 'Chưa có vị trí mới'}</strong></div><div><small>Điểm đã hoàn thành</small><strong>{state?.completed || 0}/{state?.total || 0}</strong></div><div><small>Điểm đang đến</small><strong>{state?.targetName || '—'}</strong></div></div>
-    <div className="patrol-actions"><button className="patrol-primary" disabled={!connection || !state?.ready || !plan?.valid || moving || busy} onClick={() => { try { const id = crypto.randomUUID(); const request = routeRequest(plan, manifest, id); runId.current = id; setPendingRun(id); execute('/run', request); } catch (cause) { setError(cause.message); } }}>Chạy quy trình trên Gazebo</button><button disabled={!connection || (!moving && !busy)} onClick={() => execute('/cancel', { runId: runId.current })}>Dừng hành trình Gazebo</button></div>
-    <p className="patrol-map-note">Bắt đầu tại vị trí robot trong Gazebo. Nav2 tìm đường tới từng điểm MOVE. Tốc độ giới hạn bằng mức thấp nhất của bước và các vùng tốc độ. Đổi màn hình hoặc mất kết nối sẽ yêu cầu hủy hành trình.</p>
-  </div>;
+const labels={IDLE:'Sẵn sàng',STARTING:'Nav2 đang nhận mục tiêu',RUNNING:'Đang di chuyển',CANCELING:'Đang yêu cầu dừng',CANCELED:'Đã dừng',SUCCEEDED:'Đã đến tất cả điểm đích',FAILED:'Không hoàn thành'};
+const activeStatuses=['STARTING','RUNNING','CANCELING'];
+const emptyMap={name:'Bản đồ LiDAR local',zones:[],endpoints:[],scan:{status:'saved',progress:100}};
+export default function GazeboPanel({map,plan,viewMode='gazebo'}) {
+ const [state,setState]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[pending,setPending]=useState(null);
+ const run=useRef(''); const mounted=useRef(false);
+ const admin=getSession()?.account?.role==='ADMIN' || getSession()?.user?.role==='ADMIN';
+ const cancel=()=>run.current && apiRequest('/api/v1/simulation/commands',{method:'POST',body:{commandType:'CANCEL_PATROL',runId:run.current},keepalive:true,retry:false}).catch(()=>{});
+ useEffect(()=>{
+  mounted.current=true; let timer,stopped=false;const controller=new AbortController();
+  async function poll(){
+   try {
+    const value=await apiRequest('/api/v1/simulation/state?runId='+encodeURIComponent(document.hidden?'':run.current),{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(3000)])});
+    if(!stopped){setState(value);setError('');setPending(p=>p&&(value.runId===p.runId || value.lastAck?.correlationId===p.correlationId&&value.lastAck.accepted===false || Date.now()-p.at>7000)?null:p);}
+   }catch(e){if(!stopped){setState(null);setError(e.message);}}
+   finally {if(!stopped)timer=setTimeout(poll,700);}
+  }
+  const hide=()=>{if(document.hidden)cancel();};
+  document.addEventListener('visibilitychange',hide);window.addEventListener('pagehide',cancel);poll();
+  return()=>{mounted.current=false;stopped=true;clearTimeout(timer);controller.abort();cancel();document.removeEventListener('visibilitychange',hide);window.removeEventListener('pagehide',cancel);};
+ },[]);
+ const matches=state?.mapId===localMockMap.mapId&&state?.mapVersion===localMockMap.mapVersion;
+ const connected=!!state?.connected&&matches;
+ const pose=connected&&state.poseFresh?fromRosPoint(state.pose):null;
+ const pathKey=JSON.stringify(connected?state?.path||[]:[]);
+ const renderPlan=useMemo(()=>({points:plan?.points||[],path:JSON.parse(pathKey).map(fromRosPoint).filter(Boolean)}),[plan,pathKey]);
+ const moving=!!pending||activeStatuses.includes(state?.status);
+ const ready=connected&&state?.ready&&plan?.valid&&isCurrentMap(map)&&admin&&!moving&&!busy;
+ const execute=async(commandType)=>{
+  setBusy(true);setError('');
+  try{
+   const body=commandType==='START_PATROL'?routeRequest(plan):{commandType,runId:run.current};
+   const receipt=await apiRequest('/api/v1/simulation/commands',{method:'POST',body,signal:AbortSignal.timeout(5000)});
+   if(commandType==='START_PATROL'){run.current=receipt.runId;setPending({...receipt,at:Date.now()});if(!mounted.current)cancel();}
+  }catch(e){if(mounted.current)setError(e.message);}finally{if(mounted.current)setBusy(false);}
+ };
+ const gui=import.meta.env.VITE_GAZEBO_GUI_URL||'http://localhost:6080/vnc.html?autoconnect=1&resize=scale';
+ return <div className="gazebo-panel">
+  <p className="patrol-notice">MOCK MAP · LiDAR {localMockMap.width} × {localMockMap.height} px · Vật cản cao 1 m là cấu hình mô phỏng được cho phép. Chuyển động lấy từ ROS 2 qua MQTT.</p>
+  <div className="simulation-badges" role="status">{[['MQTT',state?.mqttConnected],['ROS 2',connected&&state?.rosConnected],['Gazebo simulation',connected&&state?.simulationActive],['Nav2',connected&&state?.ready]].map(([name,ok])=><span key={name} className={ok?'is-ready':''}>{name}: {ok?'Đã kết nối':'Chưa sẵn sàng'}</span>)}</div>
+  {error&&<p role="alert" className="patrol-notice is-error">{error}</p>}
+  {!admin&&<p className="patrol-notice">Cần đăng nhập tài khoản ADMIN để chạy robot mô phỏng.</p>}
+  {state?.connected&&!matches&&<p role="alert">Map trên BE/Gazebo khác phiên bản FE. Hãy tạo lại gói map và khởi động lại mô phỏng.</p>}
+  {!!plan?.issues?.length&&<ul className="patrol-notice is-error">{plan.issues.map(x=><li key={x}>{x}</li>)}</ul>}
+  <div className="patrol-readiness"><strong>{pending?'BE đã nhận yêu cầu; chờ phản hồi MQTT/Nav2':labels[state?.status]||'Đang chờ bộ mô phỏng'}</strong><span>{state?.reason||state?.message}</span>{state?.lastAck?.accepted===false&&<span role="alert">Adapter từ chối: {state.lastAck.error}</span>}{state?.publishError&&<span role="alert">{state.publishError}</span>}</div>
+  {viewMode==='gazebo'?<GazeboDesktop url={gui} canStop={!!run.current&&moving&&!busy} onStop={()=>execute('CANCEL_PATROL')}/>:viewMode==='3d'?<PatrolThreePreview map={map||emptyMap} plan={renderPlan} position={pose}/>:<LidarMap draft={map||emptyMap} stage="endpoint" artifactPreview simulation={{path:renderPlan.path,point:pose}}/>}
+  <div className="patrol-simulation-summary"><div><small>Vị trí ROS (m)</small><strong>{pose?state.pose.x.toFixed(2)+', '+state.pose.y.toFixed(2):'Chưa có dữ liệu mới'}</strong></div><div><small>Điểm hoàn thành</small><strong>{state?.completed||0}/{state?.total||0}</strong></div><div><small>Điểm đang đến</small><strong>{state?.targetName||'—'}</strong></div></div>
+  <div className="patrol-actions"><button className="patrol-primary" disabled={!ready} onClick={()=>execute('START_PATROL')}>Chạy quy trình trong Gazebo</button><button disabled={!run.current||!moving||busy} onClick={()=>execute('CANCEL_PATROL')}>Dừng hành trình</button></div>
+  <p className="patrol-map-note">Xuất phát tại vị trí định vị thật trong Gazebo. Nav2 tính đường đến từng MOVE; nét đường chỉ hiện khi ROS gửi về. Rời trang hoặc mất kết nối sẽ yêu cầu hủy. Vùng vẽ trên web chưa được đưa vào costmap Nav2.</p>
+ </div>;
 }

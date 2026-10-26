@@ -1,0 +1,4 @@
+generated/
+input/
+__pycache__/
+*.pyc

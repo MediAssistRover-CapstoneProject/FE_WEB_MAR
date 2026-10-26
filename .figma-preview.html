@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediAssistRover · Figma preview</title></head>
+<body><div id="root"></div><script type="module">
+import { createDemoSession } from '/src/features/auth/session.js';
+createDemoSession({ role: 'ADMIN', fullName: 'Quản trị hệ thống', username: 'admin' });
+const route = new URLSearchParams(location.search).get('route') || '/admin';
+history.replaceState(null, '', route + location.hash);
+await import('/src/main.jsx');
+const script = document.createElement('script');
+script.src = 'https://mcp.figma.com/mcp/html-to-design/capture.js';
+script.async = true;
+document.head.appendChild(script);
+</script></body></html>

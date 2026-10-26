@@ -1,10 +1,39 @@
 # Chạy bản đồ bệnh viện với Gazebo và FE
 
+## Chạy bằng Docker trên Windows (khuyến nghị)
+
+Không cần mở máy ảo Ubuntu VMware. Docker Desktop cần chế độ Linux containers/WSL 2. ROS 2 Jazzy, Gazebo Harmonic và RViz2 nằm trong image Docker của thư mục này.
+
+1. Trong FE, vào **Bản đồ → Quét** hoặc **Tuần tra → Gazebo**, bấm **Tải bản đồ cho Gazebo**. Chép file `hospital.gazebo.json` vào `gazebo/input/hospital.gazebo.json`. Sau khi sửa bản đồ hoặc điểm đích, xuất file mới và khởi động lại container.
+2. Trong PowerShell tại thư mục gốc FE, chạy:
+
+```powershell
+docker compose -f gazebo/compose.yaml up --build -d
+docker compose -f gazebo/compose.yaml logs -f simulator
+```
+
+3. Lấy dòng `Ma ket noi: ...` trong log. Tại **Tuần tra → Gazebo**, dùng địa chỉ `http://localhost:8765` và mã đó. Mã thay đổi mỗi lần container khởi động; đây không phải access token BE.
+
+Mặc định container mở desktop Gazebo và RViz2 để xem trực tiếp trong **Tuần tra → Gazebo → Gazebo và RViz2**. Trang cũng có thể mở riêng tại `http://localhost:6080/vnc.html`. Để chạy chế độ nhẹ không có cửa sổ, đặt `SIM_GUI=false` trước khi khởi động lại:
+
+```powershell
+$env:SIM_GUI='false'
+docker compose -f gazebo/compose.yaml up -d --force-recreate
+```
+
+GUI dùng đồ họa CPU nên có thể chậm. Muốn bật lại desktop, đặt `$env:SIM_GUI='true'` và chạy lại `up -d --force-recreate`. Kiểm tra bằng `docker compose -f gazebo/compose.yaml ps`; dừng bằng `docker compose -f gazebo/compose.yaml down`.
+
+Nếu FE dùng `http://127.0.0.1:5173`, đặt `$env:FE_ORIGIN='http://127.0.0.1:5173'` trước khi chạy Compose. Cầu nối chỉ chấp nhận đúng origin và mã kết nối. Port 8765 và 6080 chỉ mở trên máy Windows này.
+
+Nếu Docker lỗi khi giải nén image và ổ C gần đầy, trong Docker Desktop mở **Settings → Resources → Advanced → Disk image location** rồi chuyển dữ liệu sang ổ còn đủ chỗ, ví dụ `D:\DockerData`. Dùng tính năng chuyển của Docker Desktop để giữ nguyên image, container và volume; không tự xóa file `docker_data.vhdx`. Sau khi Docker Engine hoạt động lại, chạy lệnh `up --build -d` ở trên.
+
+Các mục bên dưới dành cho cách chạy Ubuntu VMware cũ, chỉ dùng khi bạn muốn tự vận hành ngoài Docker.
+
 Bộ này dùng **Ubuntu 24.04 Desktop + ROS 2 Jazzy + Gazebo Harmonic + Nav2**. FE vẫn chạy trên Windows. Robot vật lý trong Gazebo là **TurtleBot3 Waffle** từ bộ mẫu Nav2; hình rover trên web chỉ là ký hiệu hiển thị. Đây chưa phải model ROSOrin của Hiwonder.
 
 ## 1. Cài Linux trước
 
-Máy hiện chưa có Ubuntu/Gazebo; bản WSL `docker-desktop` phục vụ Docker không thay thế môi trường mô phỏng này.
+Cách này chỉ áp dụng nếu bạn chủ động dùng máy ảo Ubuntu riêng thay cho Docker ở trên.
 
 1. Tải **Ubuntu 24.04 Desktop amd64** ở [trang Ubuntu 24.04](https://releases.ubuntu.com/24.04/). Chọn bản Desktop 24.04, không chọn Server hoặc bản Ubuntu khác.
 2. Tạo máy ảo trong VMware Workstation hoặc phần mềm máy ảo có hỗ trợ đồ họa 3D. Gợi ý cấu hình khởi đầu: 4 CPU, 8 GB RAM, ổ ảo 50 GB, nếu máy chủ đủ tài nguyên. Đây là cấu hình đề xuất để thử, không phải mức tối thiểu của hãng.
