@@ -30,18 +30,27 @@ class SimulationMqttAdapter:
         self.client.reconnect_delay_set(1,5)
         self.client.on_connect=self.on_connect
         self.client.on_subscribe=self.on_subscribe
-        self.client.on_disconnect=lambda *_:setattr(self,'connected',False)
+        self.client.on_disconnect=self.on_disconnect
         self.client.on_message=self.on_message
+        print(f'MQTT simulator adapter: connecting to {uri.hostname}:{uri.port or 8883}', flush=True)
         self.client.connect_async(uri.hostname,uri.port or 8883,keepalive=10)
         self.client.loop_start()
 
     def on_connect(self,client,userdata,flags,rc,properties=None):
-        if getattr(rc,"value",rc)!=0:return
+        code=getattr(rc,"value",rc)
+        if code!=0:
+            print(f'MQTT simulator adapter: connection refused ({code})', flush=True)
+            return
         # retainAsPublished preserves the retained flag for rejection.
         client.subscribe(self.prefix+'commands',options=mqtt.SubscribeOptions(qos=1,retainAsPublished=True,retainHandling=2))
 
     def on_subscribe(self,client,userdata,mid,reasons,properties=None):
         self.connected=all(getattr(r,"value",r)<128 for r in reasons)
+        print(f'MQTT simulator adapter: command subscription={self.connected}', flush=True)
+
+    def on_disconnect(self,client,userdata,flags,rc,properties=None):
+        self.connected=False
+        print(f'MQTT simulator adapter: disconnected ({getattr(rc, "value", rc)})', flush=True)
 
     def ack(self,body,accepted,error=''):
         result=dict(protocol='MAR-SIM-1',robotId=self.robot_id,sessionId=self.session,

@@ -273,6 +273,7 @@ def main():
     node = SimulationBridge(args.map)
     if os.environ.get('SIM_MQTT_ENABLED') == 'true':
         from mqtt_adapter import SimulationMqttAdapter
+        print('Simulation MQTT adapter: enabled', flush=True)
         node.mqtt = SimulationMqttAdapter(node)
     key = secrets.token_urlsafe(24)
     server = ThreadingHTTPServer((args.bind, args.port), handler(node, key, args.origin))

@@ -17,6 +17,8 @@ const screenRoutes = {
   'Workflow Management': '/admin/workflow-catalog',
   'Voice & Scripts': '/admin/voice-scripts',
   Charging: '/admin/charging',
+  'Users & Roles': '/admin/users-roles',
+  'System Settings': '/admin/system-settings',
   'My Account': '/admin/my-account',
 };
 

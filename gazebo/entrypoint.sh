@@ -14,6 +14,10 @@ headless=True
 use_rviz=False
 if [[ "${SIM_GUI:-false}" == "true" ]]; then
   export DISPLAY=:99
+  # A Docker restart can leave only Xvfb's socket/lock behind.  It prevents a
+  # fresh virtual desktop and would otherwise stop Gazebo and RViz before ROS
+  # receives /clock. These are container-local, ephemeral display files.
+  rm -f /tmp/.X99-lock /tmp/.X11-unix/X99
   Xvfb :99 -screen 0 1600x900x24 -nolisten tcp +extension GLX &
   sleep 2
   fluxbox -display :99 >/tmp/fluxbox.log 2>&1 &
