@@ -58,9 +58,10 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
     if (path.includes('/workflows/step-types') || path === '/api/v1/workflows/published') return [];
     return { content: [], totalElements: 0, totalPages: 0, number: 0, size: 0 };
   }
-  const requestHeaders = { Accept: 'application/json', ...headers };
-  if (body !== undefined) requestHeaders['Content-Type'] = 'application/json';
-  if (!skipAuth && session?.tokens?.accessToken) requestHeaders.Authorization = `Bearer ${session.tokens.accessToken}`;
+  const requestHeaders = new Headers(headers);
+  if (!requestHeaders.has('Accept')) requestHeaders.set('Accept', responseType === 'json' ? 'application/json' : '*/*');
+  if (body !== undefined) requestHeaders.set('Content-Type', 'application/json');
+  if (!skipAuth && session?.tokens?.accessToken) requestHeaders.set('Authorization', `Bearer ${session.tokens.accessToken}`);
 
   let response;
   try {

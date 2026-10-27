@@ -8,7 +8,7 @@ export const jobPath = id => `/api/v1/jobs/${encodeURIComponent(id)}`;
 export async function allRows(path, signal) {
   const rows = [];
   for (let page = 0; page < 1000; page++) {
-    const data = await request(`${path}?page=${page}&size=100`, { signal });
+    const data = await request(`${path}${path.includes('?') ? '&' : '?'}page=${page}&size=100`, { signal });
     if (Array.isArray(data)) return data;
     if (!Array.isArray(data?.content)) throw Error('Danh mục không đúng định dạng.');
     rows.push(...data.content);

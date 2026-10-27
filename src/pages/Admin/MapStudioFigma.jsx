@@ -10,7 +10,8 @@ import { useNavigate } from 'react-router-dom';
 import { ZoneProperties, EndpointProperties, ZoneTypePicker } from './MapFeatureProperties.jsx';
 import { MAP, SCAN_START } from './lidarGeometry.js';
 import { STAGES, STORAGE_KEY, ZONE_TYPES, ENDPOINT_TYPES, ROBOT_SAFETY_GAP_METERS, createDraft, loadDraft, changeDraft, removeEndpoint, removeEndpointGroup, stageEnabled, validPoint, driveRobotStep, zoneError, endpointError, polygonArea, mapIssues, saveMap, exportMap } from './mapStudioModel.js';
-import liveCamera from '../../assets/images/live-camera.png';
+import SimulationCamera from './SimulationCamera.jsx';
+import RobotConsole from './robotOperations/RobotConsole.jsx';
 
 const styles = String.raw`
 .ls-group-toolbar{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:12px 0}.ls-group-toolbar .ls-field{flex:1;min-width:180px;margin:0}.ls-group-toolbar>.ls-btn{flex-shrink:0}
@@ -55,7 +56,8 @@ const emptyEndpoint=()=>({id:'',name:'',description:'',type:'WAYPOINT',x:580,y:3
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const DRIVE_LABELS={forward:'Tiến',left:'Quay trái',right:'Quay phải'};
 export default function MapStudioFigma({initialStage='scan'}) {
-  return <SimulatedMapStudio initialStage={initialStage}/>;
+  const [mode, setMode] = useState('robot');
+  return <><nav aria-label="Nguồn bản đồ"><button aria-pressed={mode === 'robot'} onClick={() => setMode('robot')}>Robot thật</button><button aria-pressed={mode === 'simulation'} onClick={() => setMode('simulation')}>Mô phỏng</button></nav>{mode === 'robot' ? <RobotConsole /> : <SimulatedMapStudio initialStage={initialStage}/>}</>;
 }
 function SimulatedMapStudio({initialStage='scan'}) {
   const goTo=useNavigate();
@@ -241,13 +243,7 @@ function SimulatedMapStudio({initialStage='scan'}) {
         </Panel>}
         {stage==='scan'&&<>
           <Panel title="Camera phía trước robot">
-            <div className="ls-camera">
-              <img src={liveCamera} alt="Ảnh minh họa camera cho mô phỏng"/>
-              <span className="ls-camera-badge">ẢNH MINH HỌA</span>
-              <span className="ls-camera-label"><b>MAR-01 · Mô phỏng</b><span>Không phải camera trực tiếp</span></span>
-            </div>
-            <div className="ls-camera-info"><span>Nguồn camera</span><b>Ảnh minh họa cục bộ</b></div>
-            <p>Ảnh minh họa cho chế độ mô phỏng. Chưa kết nối camera robot thật.</p>
+            <SimulationCamera/>
           </Panel>
           <Panel title="Điều khiển robot">
             <div className="ls-drive-panel">

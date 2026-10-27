@@ -33,7 +33,7 @@ function SnapshotImage({ jobId, kind, enabled }) {
 }
 
 function Camera({ jobId, enabled }) {
-  const [url, setUrl] = useState(''), [stream, setStream] = useState(''), [message, setMessage] = useState('');
+  const [url, setUrl] = useState(import.meta.env.VITE_ROBOT_CAMERA_URL || ''), [stream, setStream] = useState(''), [message, setMessage] = useState('');
   useEffect(() => { setStream(''); setMessage(''); }, [jobId]);
   const connect = () => {
     try {
@@ -45,7 +45,7 @@ function Camera({ jobId, enabled }) {
   };
   return <section className="ro-card"><h3>Camera robot <span className="ro-badge">{stream ? 'Video cùng mạng' : 'Ảnh MQTT'}</span></h3>
     {stream ? <div className="ro-preview"><img src={stream} alt="Video trực tiếp từ robot" onLoad={() => setMessage('Đã nhận hình từ nguồn video.')} onError={() => { setStream(''); setMessage('Không kết nối được video. Đã chuyển về ảnh MQTT.'); }} /></div> : <SnapshotImage jobId={jobId} kind="camera" enabled={enabled} />}
-    <details className="ro-details"><summary>Video trực tiếp cùng mạng</summary><p>Chỉ dùng khi máy mở web truy cập được Pi. Ảnh MQTT vẫn dùng được khi robot ở mạng khác.</p><Field label="URL video từ robot"><input type="url" placeholder="http://IP_PI:8081/stream?topic=…" value={url} onChange={e => setUrl(e.target.value)} /></Field><div className="ro-actions"><button onClick={connect} disabled={!url.trim()}>Xem video trực tiếp</button><button onClick={() => { setStream(''); setMessage('Đã chuyển về ảnh MQTT.'); }}>Dùng ảnh MQTT</button></div></details>
+    <details className="ro-details"><summary>Video trực tiếp cùng mạng</summary><p>Chỉ dùng khi máy mở web truy cập được Pi. Ảnh MQTT vẫn dùng được khi robot ở mạng khác.</p><Field label="URL video từ robot"><input type="url" placeholder="http://IP_PI:8080/stream?topic=/ascamera/camera_publisher/rgb0/image" value={url} onChange={e => setUrl(e.target.value)} /></Field><div className="ro-actions"><button onClick={connect} disabled={!url.trim()}>Xem video trực tiếp</button><button onClick={() => { setStream(''); setMessage('Đã chuyển về ảnh MQTT.'); }}>Dùng ảnh MQTT</button></div></details>
     {message && <p role="status">{message}</p>}
   </section>;
 }
