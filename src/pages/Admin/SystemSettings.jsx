@@ -7,13 +7,31 @@ injectStyles('mediassist-style-pages-Admin-SystemSettings-jsx', inlineStyles);
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminApi } from '../../features/admin/adminApi.js';
+import LiveMapping, { ROBOT_CAMERA_URL_KEY } from './robotOperations/LiveMapping.jsx';
+
+export function RobotCameraSettings() {
+  const [url, setUrl] = useState(() => localStorage.getItem(ROBOT_CAMERA_URL_KEY) || import.meta.env.VITE_ROBOT_CAMERA_URL || '');
+  const [message, setMessage] = useState('');
+  const save = () => {
+    try {
+      if (url.trim()) {
+        const parsed = new URL(url.trim());
+        if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) throw Error('URL phải dùng HTTP/HTTPS và không chứa tài khoản hoặc mật khẩu.');
+        if (location.protocol === 'https:' && parsed.protocol !== 'https:') throw Error('Trang HTTPS cần URL video HTTPS.');
+        localStorage.setItem(ROBOT_CAMERA_URL_KEY, parsed.href);
+      } else localStorage.removeItem(ROBOT_CAMERA_URL_KEY);
+      setMessage('Đã lưu trên trình duyệt này. Mở lại Bản đồ → Quét để áp dụng. Để trống để dùng ảnh MQTT.');
+    } catch (error) { setMessage(error.message); }
+  };
+  return <div className="settings-form"><label><b>URL video trực tiếp từ robot</b><span>Chỉ dùng khi máy mở web truy cập được Pi cùng mạng. Để trống để xem ảnh MQTT qua máy chủ.</span><input type="url" placeholder="http://IP_PI:8080/stream?topic=/ascamera/camera_publisher/rgb0/image" value={url} onChange={(event) => setUrl(event.target.value)} /></label><button type="button" onClick={save}>Lưu nguồn camera</button>{message && <p role="status">{message}</p>}</div>;
+}
 
 export default function SystemSettings() {
-  const [settings, setSettings] = useState([]); const [active, setActive] = useState(''); const [drafts, setDrafts] = useState({}); const [notice, setNotice] = useState('');
+  const [settings, setSettings] = useState([]); const [active, setActive] = useState('__robot__'); const [drafts, setDrafts] = useState({}); const [notice, setNotice] = useState('');
   const load = useCallback(async () => { try { const page = await adminApi.listSettings({ size: 100 }); const items = page.content ?? []; setSettings(items); const initial = Object.fromEntries(items.map((item) => [item.systemSettingId, JSON.stringify(item.settingValue, null, 2)])); setDrafts(initial); setActive((current) => current || items[0]?.category || ''); } catch (error) { setNotice(error.message); } }, []);
   useEffect(() => { load(); }, [load]);
   const categories = useMemo(() => [...new Set(settings.map((setting) => setting.category))], [settings]);
   const visible = settings.filter((setting) => setting.category === active);
   const save = async (setting) => { try { const settingValue = JSON.parse(drafts[setting.systemSettingId]); await adminApi.updateSetting(setting.systemSettingId, { settingValue, dataType: setting.dataType, category: setting.category, description: setting.description, publicSetting: setting.publicSetting }); setNotice(`${setting.settingKey} saved.`); await load(); } catch (error) { setNotice(error instanceof SyntaxError ? 'Setting value must be valid JSON.' : error.message); } };
-  return <section className="system-settings"><aside className="settings-nav"><b>{vi("Settings")}</b>{vi(categories.map((category) => <button className={active === category ? 'active' : ''} onClick={() => { setActive(category); setNotice(''); }} key={category}>{vi(category)}</button>))}</aside><article className="settings-panel"><small>{vi(active || 'System')}{vi(" settings")}</small><h2>{vi(active ? `${active} configuration` : 'System configuration')}</h2><div className="settings-form">{vi(visible.map((setting) => <label key={setting.systemSettingId}><b>{vi(setting.settingKey)}</b><span>{vi(setting.description || 'Runtime configuration value')}</span><textarea className="setting-json" value={drafts[setting.systemSettingId] ?? ''} onChange={(event) => setDrafts((current) => ({ ...current, [setting.systemSettingId]: event.target.value }))} /><button type="button" onClick={() => save(setting)}>{vi("Save ")}{vi(setting.settingKey)}</button></label>))}{vi(!visible.length && <p>{vi("No runtime settings are available for this category.")}</p>)}</div><footer><span>{vi(notice || 'Changes are stored in the backend and recorded in audit logs.')}</span><button onClick={load}>{vi("Refresh")}</button></footer></article></section>;
+  return <section className="system-settings"><aside className="settings-nav"><b>{vi("Settings")}</b><button className={active === '__robot__' ? 'active' : ''} onClick={() => { setActive('__robot__'); setNotice(''); }}>Kết nối robot & phiên quét</button>{vi(categories.map((category) => <button className={active === category ? 'active' : ''} onClick={() => { setActive(category); setNotice(''); }} key={category}>{vi(category)}</button>))}</aside><article className="settings-panel">{active === '__robot__' ? <><small>Thiết bị và phiên quét</small><h2>Kết nối robot & phiên quét</h2><RobotCameraSettings /><LiveMapping configurationOnly /></> : <><small>{vi(active || 'System')}{vi(" settings")}</small><h2>{vi(active ? `${active} configuration` : 'System configuration')}</h2><div className="settings-form">{vi(visible.map((setting) => <label key={setting.systemSettingId}><b>{vi(setting.settingKey)}</b><span>{vi(setting.description || 'Runtime configuration value')}</span><textarea className="setting-json" value={drafts[setting.systemSettingId] ?? ''} onChange={(event) => setDrafts((current) => ({ ...current, [setting.systemSettingId]: event.target.value }))} /><button type="button" onClick={() => save(setting)}>{vi("Save ")}{vi(setting.settingKey)}</button></label>))}{vi(!visible.length && <p>{vi("No runtime settings are available for this category.")}</p>)}</div><footer><span>{vi(notice || 'Changes are stored in the backend and recorded in audit logs.')}</span><button onClick={load}>{vi("Refresh")}</button></footer></>}</article></section>;
 }
