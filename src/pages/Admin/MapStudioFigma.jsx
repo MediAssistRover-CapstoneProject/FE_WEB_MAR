@@ -11,7 +11,9 @@ import { ZoneProperties, EndpointProperties, ZoneTypePicker } from './MapFeature
 import { MAP, SCAN_START } from './lidarGeometry.js';
 import { STAGES, STORAGE_KEY, ZONE_TYPES, ENDPOINT_TYPES, ROBOT_SAFETY_GAP_METERS, createDraft, loadDraft, changeDraft, removeEndpoint, removeEndpointGroup, stageEnabled, validPoint, driveRobotStep, zoneError, endpointError, polygonArea, mapIssues, saveMap, exportMap } from './mapStudioModel.js';
 import SimulationCamera from './SimulationCamera.jsx';
-import RobotConsole from './robotOperations/RobotConsole.jsx';
+import LiveMapping from './robotOperations/LiveMapping.jsx';
+import FacilityCatalogEditor from './FacilityCatalogEditor.jsx';
+import { readTracking } from '../../features/robotOperations/api.js';
 
 const styles = String.raw`
 .ls-group-toolbar{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:12px 0}.ls-group-toolbar .ls-field{flex:1;min-width:180px;margin:0}.ls-group-toolbar>.ls-btn{flex-shrink:0}
@@ -56,12 +58,13 @@ const emptyEndpoint=()=>({id:'',name:'',description:'',type:'WAYPOINT',x:580,y:3
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const DRIVE_LABELS={forward:'Tiến',left:'Quay trái',right:'Quay phải'};
 export default function MapStudioFigma({initialStage='scan'}) {
-  const [mode, setMode] = useState('robot');
-  return <><nav aria-label="Nguồn bản đồ"><button aria-pressed={mode === 'robot'} onClick={() => setMode('robot')}>Robot thật</button><button aria-pressed={mode === 'simulation'} onClick={() => setMode('simulation')}>Mô phỏng</button></nav>{mode === 'robot' ? <RobotConsole /> : <SimulatedMapStudio initialStage={initialStage}/>}</>;
+  return <SimulatedMapStudio initialStage={initialStage}/>;
 }
 function SimulatedMapStudio({initialStage='scan'}) {
   const goTo=useNavigate();
   const [draft,setDraft]=useState(()=>loadDraft(window.localStorage));
+  const [realScan,setRealScan]=useState(()=>Boolean(readTracking('mapping')?.jobId));
+  const [serverMapId,setServerMapId]=useState('');
   const [endpointTab,setEndpointTab]=useState('points');
   const [groupDirty,setGroupDirty]=useState(false);
   const [stage,setStage]=useState(()=>stageEnabled(draft,initialStage)?initialStage:'scan');
@@ -71,8 +74,10 @@ function SimulatedMapStudio({initialStage='scan'}) {
   const [driveDirection,setDriveDirection]=useState('');
   const [collisionWarning,setCollisionWarning]=useState(false);
   const draftRef=useRef(draft);
+  const realScanRef=useRef(realScan);
   const confirmRef=useRef(null);
   draftRef.current=draft;
+  realScanRef.current=realScan;
   const index=STAGES.findIndex(([id])=>id===stage);
   const zoneType=ZONE_TYPES.find(t=>t.id===zone.type);
   const zoneOriginal=draft.zones.find(z=>z.id===zone.id);
@@ -120,7 +125,7 @@ function SimulatedMapStudio({initialStage='scan'}) {
     const editing=target=>target instanceof HTMLElement && (target.isContentEditable || ['INPUT','TEXTAREA','SELECT'].includes(target.tagName));
     const keyDown=event=>{
       const direction=directions[event.key];
-      if(!direction||editing(event.target)||['captured','complete'].includes(draftRef.current.scan.status))return;
+      if(!direction||realScanRef.current||editing(event.target)||['captured','complete'].includes(draftRef.current.scan.status))return;
       event.preventDefault();
       if(event.repeat)return;
       if(draftRef.current.scan.status!=='running')setDraft(current=>({...current,scan:{...current.scan,status:'running'}}));
@@ -128,7 +133,7 @@ function SimulatedMapStudio({initialStage='scan'}) {
     };
     const keyUp=event=>{
       const direction=directions[event.key];
-      if(!direction||editing(event.target))return;
+      if(!direction||realScanRef.current||editing(event.target))return;
       event.preventDefault();setDriveDirection(current=>current===direction?'':current);
     };
     window.addEventListener('keydown',keyDown);
@@ -210,9 +215,11 @@ function SimulatedMapStudio({initialStage='scan'}) {
     setDriveDirection('');
   };
   return <section className="ls-studio">
-    <WorkspaceTabs label={vi('Map Studio stages')} active={stage} onSelect={navigate} items={STAGES.map(([id,name],i)=>({id,label:`${i+1}. ${vi(name)}`,disabled:!stageEnabled(draft,id),hint:!stageEnabled(draft,id)?vi('Finish the scan first'):undefined}))}/>
-    <div className="ls-topline"><span>{draft.name}</span><span>{vi(storageError?'Storage unavailable — export your map':saved?'Map saved in this browser':'Draft autosaved in this browser')}</span></div>
-    <header className="ls-heading"><div><h2>{index+1}. {vi(STAGES[index][1])}</h2><p>{vi(STAGES[index][2])}</p></div><div className="ls-actions">{vi(index>0&&<Button onClick={()=>navigate(STAGES[index-1][0])}>{vi("← Back")}</Button>)}{vi(stage==='zone'&&<Button tone="primary" onClick={()=>navigate('endpoint')}>{vi("Continue to Endpoint →")}</Button>)}{vi(stage==='endpoint'&&<Button tone="primary" disabled={!!issues.length||unsaved||saved} onClick={()=>{setDraft(current=>saveMap(current,new Date().toISOString()));setNotice('Map saved locally with scan, zones and endpoints.');}}>{vi(saved?'Map saved':'Save map')}</Button>)}</div></header>
+    <WorkspaceTabs label={vi('Map Studio stages')} active={stage} onSelect={target=>{if(serverMapId && target==='scan'){setServerMapId('');setRealScan(true);setStage('scan');return;}if(serverMapId && ['zone','endpoint'].includes(target)){setStage(target);return;}navigate(target);}} items={STAGES.map(([id,name],i)=>({id,label:`${i+1}. ${vi(name)}`,disabled:serverMapId?false:!stageEnabled(draft,id),hint:!serverMapId&&!stageEnabled(draft,id)?vi('Finish the scan first'):undefined}))}/>
+    {serverMapId && stage!=='scan' ? <><div className="ls-topline"><span>Bản đồ robot đã lưu trên máy chủ</span><span>Map ID: {serverMapId}</span></div><header className="ls-heading"><div><h2>{index+1}. {vi(STAGES[index][1])}</h2><p>Thiết lập trực tiếp trên bản đồ máy chủ vừa quét.</p></div></header><FacilityCatalogEditor stage={stage} initialMapId={serverMapId}/></> : <>
+    <div className="ls-topline"><span>{stage==='scan'&&realScan?'Bản đồ robot · dữ liệu máy chủ':draft.name}</span><span>{stage==='scan'&&realScan?'Ảnh quét được cập nhật từ BE':vi(storageError?'Storage unavailable — export your map':saved?'Map saved in this browser':'Draft autosaved in this browser')}</span></div>
+    <header className="ls-heading"><div><h2>{index+1}. {vi(STAGES[index][1])}</h2><p>{stage==='scan'&&realScan?'Quét LiDAR từ robot và theo dõi bản đồ trực tiếp tại đây.':vi(STAGES[index][2])}</p></div><div className="ls-actions">{stage==='scan'&&(realScan?<Button onClick={()=>setRealScan(false)}>Xem bản đồ mô phỏng</Button>:<Button tone="primary" onClick={()=>{setDriveDirection('');setRealScan(true);}}>Quét map mới</Button>)}{vi(index>0&&<Button onClick={()=>navigate(STAGES[index-1][0])}>{vi("← Back")}</Button>)}{vi(stage==='zone'&&<Button tone="primary" onClick={()=>navigate('endpoint')}>{vi("Continue to Endpoint →")}</Button>)}{vi(stage==='endpoint'&&<Button tone="primary" disabled={!!issues.length||unsaved||saved} onClick={()=>{setDraft(current=>saveMap(current,new Date().toISOString()));setNotice('Map saved locally with scan, zones and endpoints.');}}>{vi(saved?'Map saved':'Save map')}</Button>)}</div></header>
+    {stage==='scan'&&realScan ? <LiveMapping embedded onMapSaved={id=>{setServerMapId(id);setStage('zone');}}/> : <>
     {notice&&<div className="ls-notice" role="status"><span>{vi(notice)}</span><Button className="small" aria-label="Đóng thông báo" onClick={()=>setNotice('')}>×</Button></div>}
     {confirm&&<dialog ref={confirmRef} onCancel={()=>setConfirm(null)} className="ls-confirm" role="alertdialog" aria-label={confirm.kind==='delete-endpoint'?'Xóa điểm đích':vi(confirm.kind==='reset'?'Start a new scan?':'Unsaved changes')}>
       <strong>{confirm.kind==='delete-endpoint'?`Xóa điểm đích “${confirm.name}”?`:vi(confirm.kind==='reset'?'Start a new scan?':'Discard unsaved changes?')}</strong>
@@ -258,7 +265,7 @@ function SimulatedMapStudio({initialStage='scan'}) {
               <p className="ls-safety-note">Tự động dừng cách tường hoặc vật cản tối thiểu {ROBOT_SAFETY_GAP_METERS.toLocaleString('vi-VN')} m. Chế độ demo chưa gửi lệnh tới robot vật lý.</p>
             </div>
           </Panel>
-          <Panel title="Phiên quét"><Field label="Tên bản đồ" maxLength={60} value={draft.name} onChange={e=>update({name:e.target.value})}/><Stat label="Nguồn">Mô phỏng LiDAR thủ công</Stat><Stat label="Vị trí đã ghi nhận">{draft.scan.trail?.length||0}</Stat><Stat label="Độ phân giải">0,05 m / ô</Stat><Button tone="danger" className="ls-full" disabled={draft.scan.status==='idle'} onClick={()=>setConfirm({kind:'reset'})}>Quét mới</Button></Panel>
+          <Panel title="Phiên quét"><Field label="Tên bản đồ" maxLength={60} value={draft.name} onChange={e=>update({name:e.target.value})}/><Stat label="Nguồn">Mô phỏng LiDAR thủ công</Stat><Stat label="Vị trí đã ghi nhận">{draft.scan.trail?.length||0}</Stat><Stat label="Độ phân giải">0,05 m / ô</Stat><Button tone="danger" className="ls-full" disabled={draft.scan.status==='idle'} onClick={()=>setConfirm({kind:'reset'})}>Quét lại mô phỏng</Button></Panel>
         </>}
         {vi(stage==='zone'&&<><Panel title={vi(zone.id?'Edit zone':'Create zone')}><form onSubmit={storeZone}><Field label="Zone name" required maxLength={40} placeholder={vi("e.g. Pharmacy")} value={zone.name} onChange={e=>setZone(z=>({...z,name:e.target.value}))}/><ZoneTypePicker value={zone.type} onChange={type=>setZone(z=>({...z,type}))}/><p>{vi(zoneType.help)}</p><ZoneProperties zone={zone} setZone={setZone}/>
           {vi(zone.type==='SPEED'&&<Field label="Maximum speed (m/s)" type="number" min=".1" max="1.5" step=".05" required value={zone.speed} onChange={e=>setZone(z=>({...z,speed:e.target.value===''?'':Number(e.target.value)}))}/>)}
@@ -277,6 +284,8 @@ function SimulatedMapStudio({initialStage='scan'}) {
         <Panel title={vi("Map configuration")}><Stat label="Zones">{vi(draft.zones.length)}</Stat><Stat label="Endpoints">{vi(draft.endpoints.length)}</Stat><Stat label="Status">{vi(saved?<span className="ls-saved">{vi("Saved locally")}</span>:'Draft')}</Stat>{vi(unsaved?<div className="ls-error">{vi("Save or discard the open endpoint edits before saving the map.")}</div>:issues.length>0&&<div className="ls-error">{vi(issues[0])}</div>)}<Button tone="primary" className="ls-full" disabled={!!issues.length||unsaved||saved} onClick={()=>{setDraft(current=>saveMap(current,new Date().toISOString()));setNotice('Map saved locally with scan, zones and endpoints.');}}>{vi(saved?'Map saved':'Save map configuration')}</Button><Button className="ls-full" disabled={!!issues.length||unsaved} onClick={download}>{vi("Export map JSON")}</Button><p>{vi("Bản đã lưu là nguồn dữ liệu cho Điều phối. Bản nháp mới không thay đổi phiên mô phỏng đang chạy. Không triển khai đến robot thật.")}</p><Button className="ls-full" tone="primary" disabled={!draft.saved||storageError||unsaved} onClick={()=>goTo('/workstations')}>{vi("Mở Điều phối với bản đã lưu →")}</Button></Panel></>)}
       </aside>
     </div>}
+    </>}
+    </>}
   </section>;
 }
 export const workflow=STAGES.map(([id,label])=>[id,label]);

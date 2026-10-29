@@ -75,7 +75,8 @@ test('Patrol has only PATROL choices and no robot/scheduler writes; Map Studio h
   assert.match(patrol, /<LidarMap/);
   assert.match(patrol, /Chạy mô phỏng/);
   const map = readFileSync(new URL('../src/pages/Admin/MapStudioFigma.jsx', import.meta.url), 'utf8');
-  assert.doesNotMatch(map, /<LiveMapping|<FacilityCatalogEditor|Robot thật · Máy chủ|Mô phỏng · Trình duyệt/);
+  assert.match(map, /<LiveMapping embedded/);
+  assert.doesNotMatch(map, /<RobotConsole|aria-pressed=\{mode === 'robot'\}/);
   const move = readFileSync(new URL('../src/pages/Workflows/MoveDestinationFields.jsx', import.meta.url), 'utf8');
   assert.doesNotMatch(move, /workflowApi|listEndpoints|listMaps/);
 });

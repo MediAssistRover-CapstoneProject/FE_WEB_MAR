@@ -50,7 +50,7 @@ function Camera({ jobId, enabled }) {
   </section>;
 }
 
-export default function LiveMapping({ onMapSaved }) {
+export default function LiveMapping({ onMapSaved, embedded = false }) {
   const operator = isOperator(getSession());
   const { catalog, loading, error: catalogError, reload } = useCatalog('MAPPING', operator);
   const [tracking, setTracking] = useState(() => readTracking('mapping'));
@@ -176,11 +176,11 @@ export default function LiveMapping({ onMapSaved }) {
     onContextMenu: e => e.preventDefault(),
   });
   const mapId = committedMapId(detail);
-  return <section className="ro-workspace" aria-label="Quét bằng robot thật">
-    <header className="ro-card ro-hero"><div><span className="ro-badge">Robot thật · Dữ liệu máy chủ</span><h2>Quét bản đồ</h2><p>Chọn robot, theo dõi camera và điều khiển trong phiên quét.</p></div><button disabled={busy || jog.current.active} onClick={() => { reload(); setRevision(v => v + 1); }}>Tải lại trạng thái</button></header>
+  return <section className={'ro-workspace' + (embedded ? ' ro-embedded' : '')} aria-label="Quét bằng robot thật">
+    {!embedded && <header className="ro-card ro-hero"><div><span className="ro-badge">Robot thật · Dữ liệu máy chủ</span><h2>Quét bản đồ</h2><p>Chọn robot, theo dõi camera và điều khiển trong phiên quét.</p></div><button disabled={busy || jog.current.active} onClick={() => { reload(); setRevision(v => v + 1); }}>Tải lại trạng thái</button></header>}
     {!operator ? <p className="ro-help">Chỉ quản trị viên đăng nhập thật được tạo phiên quét và điều khiển robot. Chế độ mô phỏng vẫn dùng được trên trình duyệt.</p> : <>
       <ErrorNotice error={catalogError} />
-      <details className="ro-card ro-setup" open={!jobId}><summary>Thiết lập phiên quét{jobId ? ' · Đang theo dõi nhiệm vụ' : ''}</summary>{loading && <p role="status">Đang tải robot, tầng và quy trình…</p>}
+      <details className="ro-card ro-setup" open={!jobId}><summary>Chi tiết quét map mới{jobId ? ' · Đang theo dõi nhiệm vụ' : ''}</summary>{loading && <p role="status">Đang tải robot, tầng và quy trình…</p>}
         <form onSubmit={create}><fieldset disabled={busy || loading || Boolean(activeJob)}><div className="ro-fields">
           <Picker label="Robot" value={robotId} onChange={id => { track(null); setRobotId(id); }} items={catalog.robots} idKey="robotId" nameKey="robotName" empty="Chưa có robot trên máy chủ" />
           <Picker label="Tầng" value={floorId} onChange={setFloorId} items={catalog.floors} idKey="floorId" nameKey="floorName" empty="Chưa có tầng đang hoạt động" />
@@ -193,7 +193,8 @@ export default function LiveMapping({ onMapSaved }) {
       </details>
       <ErrorNotice error={error} />
       <ErrorNotice error={actionError} />
-      <div className="ro-columns"><div className="ro-stack"><section className="ro-card"><h3>Bản đồ đang quét</h3><SnapshotImage jobId={jobId} kind="map" enabled={!!session && !!checkedAt && !error} /><p className="ro-muted">Hình ảnh do robot gửi về. Bản mô phỏng trong trình duyệt được giữ riêng.</p></section><JobStatus detail={detail} session={session} saving={saving} />{detail?.job.status === 'SUCCEEDED' && <section className="ro-card"><h3>Phiên quét đã hoàn tất</h3><p>{mapId ? 'Máy chủ đã lưu bản đồ. Bạn có thể cấu hình vùng và điểm đích trên bản đồ này.' : 'Chưa tìm thấy mã bản đồ trong kết quả lưu. Kiểm tra chi tiết nhiệm vụ trước khi cấu hình vùng.'}</p>{mapId && <button className="primary" onClick={() => onMapSaved(mapId)}>Cấu hình vùng trên bản đồ đã lưu</button>}</section>}</div>
+      {embedded && <div className="ro-actions"><button disabled={busy || jog.current.active} onClick={() => { reload(); setRevision(v => v + 1); }}>Tải lại trạng thái</button></div>}
+      <div className="ro-columns"><div className="ro-stack"><section className="ro-card ro-map-card"><h3>{embedded ? detail?.job.status === 'SUCCEEDED' ? 'Bản đồ vật cản LiDAR · đã lưu' : 'Bản đồ vật cản LiDAR · đang quét' : 'Bản đồ đang quét'}</h3><SnapshotImage jobId={jobId} kind="map" enabled={!!session && !!checkedAt && !error} /><p className="ro-muted">Ảnh bản đồ do robot gửi về qua BE. Bản nháp mô phỏng được lưu riêng.</p></section><JobStatus detail={detail} session={session} saving={saving} />{detail?.job.status === 'SUCCEEDED' && <section className="ro-card"><h3>Phiên quét đã hoàn tất</h3><p>{mapId ? 'Máy chủ đã lưu bản đồ. Bạn có thể cấu hình vùng và điểm đích trên bản đồ này.' : 'Chưa tìm thấy mã bản đồ trong kết quả lưu. Kiểm tra chi tiết nhiệm vụ trước khi cấu hình vùng.'}</p>{mapId && <button className="primary" onClick={() => onMapSaved?.(mapId)}>Cấu hình vùng trên bản đồ đã lưu</button>}</section>}</div>
       <aside className="ro-stack"><Camera jobId={jobId} enabled={!!session && !!checkedAt && !error} /><section className="ro-card"><h3>Di chuyển khi quét</h3><p>Giữ nút để di chuyển, nhả để dừng. Tự dừng khi hết thời gian đã chọn.</p><div className="ro-fields"><Field label="Tốc độ tiến"><select value={speed} disabled={jog.current.active} onChange={e => setSpeed(e.target.value)}><option value="0.05">0,05 m/s</option><option value="0.08">0,08 m/s</option><option value="0.10">0,10 m/s</option></select></Field><Field label="Thời gian tối đa (giây)"><input type="number" min="0.4" max="10" step="0.2" value={seconds} disabled={jog.current.active} onChange={e => setSeconds(e.target.value)} /></Field></div>
         <div className="ro-drive"><button disabled={!!block || busy} {...handlers(Number(speed), 0)}>↑ Tiến</button><button disabled={!!block || busy} {...handlers(0, 0.2)}>↶ Quay trái</button><button disabled={!!block || busy} {...handlers(0, -0.2)}>Quay phải ↷</button><button className="stop" disabled={!session?.potentially_open} onClick={() => void jog.current.stop().catch(() => {})}>Dừng di chuyển</button></div>
         {block && <p className="ro-help">{block}</p>}<p role="status">{jogMessage}</p>{receipt && <p className="ro-status">{receiptLabels[receipt.status] || 'Đang cập nhật phản hồi'}</p>}<small>Pi chấp nhận lệnh chưa chứng minh robot đã di chuyển; quan sát camera. Cấu hình xe hiện tại không hỗ trợ lùi/ngang.</small>

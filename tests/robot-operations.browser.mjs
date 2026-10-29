@@ -48,6 +48,9 @@ const hold = async (name, ms = 720) => { await btn(name).hover(); await page.mou
 try {
   await mkdir('.workstation-build/robot-operations', { recursive: true });
   await page.goto(`${base}/admin?screen=Map+Studio`);
+  assert.equal(await btn('Robot thật').count(), 0);
+  await btn('Quét map mới').click();
+  await page.getByText('Chi tiết quét map mới').waitFor();
   await page.getByLabel('Robot', { exact: true }).selectOption('robot-1');
   await page.getByLabel('Tầng', { exact: true }).selectOption('floor-1');
   await page.getByLabel('Quy trình quét đã phát hành').selectOption('map-workflow');
@@ -63,6 +66,7 @@ try {
   await waitUntil(async () => !(await btn('↑ Tiến').isDisabled()));
   await page.getByText('Chưa có ảnh mới hoặc ảnh đã quá 10 giây.').first().waitFor();
   camera = true;
+  await page.getByAltText('Bản đồ đang quét từ robot').waitFor();
   await page.getByAltText('Ảnh camera robot qua MQTT').waitFor();
   await hold('↑ Tiến');
   const commands = writes.filter(w => w.path.endsWith('/mapping-control'));
@@ -110,18 +114,18 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: '.workstation-build/robot-operations/speech-mobile.png', fullPage: true });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
-  await page.goto(`${base}/admin?screen=Map+Studio`); await page.getByRole('heading', { name: 'Quét bản đồ', exact: true }).waitFor();
+  await page.goto(`${base}/admin?screen=Map+Studio`); await page.getByRole('region', { name: 'Quét bằng robot thật' }).waitFor();
   await page.screenshot({ path: '.workstation-build/robot-operations/mapping-mobile.png', fullPage: true });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
-  // Explicit simulation mode makes zero robot writes.
-  const beforeDemo = writes.length; await btn('Mô phỏng · Trình duyệt').click(); await hold('Giữ để robot tiến thẳng'); assert.equal(writes.length, beforeDemo);
+  // The local simulation remains available without sending robot commands.
+  const beforeDemo = writes.length; await btn('Xem bản đồ mô phỏng').click(); await hold('Giữ để robot tiến thẳng'); assert.equal(writes.length, beforeDemo);
   assert.equal(await page.getByRole('button', { name: 'Giữ để robot lùi', exact: true }).count(), 0);
   // UI permission guard, then empty catalog and server permission rejection.
   await page.evaluate(() => sessionStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { username: 'test', role: 'STAFF' }, tokens: { accessToken: 'test-only' } })));
   await page.reload(); await page.getByText('Chỉ quản trị viên đăng nhập thật được tạo phiên quét và điều khiển robot.', { exact: false }).waitFor();
   assert.equal(await btn('Tạo nhiệm vụ quét').count(), 0);
   await page.evaluate(() => { sessionStorage.clear(); }); emptyCatalog = true;
-  await page.reload(); await page.getByText('Cần robot đã đăng ký, tầng đang hoạt động và quy trình quét đã phát hành.', { exact: false }).waitFor();
+  await page.reload(); await btn('Quét map mới').click(); await page.getByText('Cần robot đã đăng ký, tầng đang hoạt động và quy trình quét đã phát hành.', { exact: false }).waitFor();
   assert.equal(await btn('Tạo nhiệm vụ quét').isDisabled(), true);
   forbidCatalog = true; await btn('Tải lại trạng thái').click(); await page.getByRole('alert').getByText('Tài khoản không có quyền thực hiện thao tác này.').waitFor();
   assert.deepEqual(errors, []);
