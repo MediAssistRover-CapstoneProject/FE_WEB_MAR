@@ -46,7 +46,7 @@ export class MappingJog {
     if (this.active) return;
     const reason = this.allowed();
     if (reason) throw Error(reason);
-    if (!Number.isFinite(seconds) || seconds < 0.4 || seconds > 10 || !Number.isFinite(x) || x < 0 || x > 0.1 || !Number.isFinite(z) || Math.abs(z) > 0.3) throw Error('Tốc độ hoặc thời gian chạy không hợp lệ.');
+    if (!Number.isFinite(seconds) || seconds < 0.4 || seconds > 10 || !Number.isFinite(x) || Math.abs(x) > 0.30 || !Number.isFinite(z) || Math.abs(z) > 1.0) throw Error('Tốc độ hoặc thời gian chạy không hợp lệ.');
     this.active = true; this.commandIds.clear();
     const generation = ++this.generation;
     this.onState('Đang gửi lệnh ngắn; nhả nút để dừng.');

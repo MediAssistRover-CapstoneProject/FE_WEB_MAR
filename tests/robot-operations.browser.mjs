@@ -49,7 +49,6 @@ try {
   await mkdir('.workstation-build/robot-operations', { recursive: true });
   await page.goto(`${base}/admin?screen=Map+Studio`);
   assert.equal(await btn('Robot thật').count(), 0);
-  await btn('Quét map mới').click();
   await page.getByText('Chi tiết quét map mới').waitFor();
   await page.getByLabel('Robot', { exact: true }).selectOption('robot-1');
   await page.getByLabel('Tầng', { exact: true }).selectOption('floor-1');
@@ -125,7 +124,7 @@ try {
   await page.reload(); await page.getByText('Chỉ quản trị viên đăng nhập thật được tạo phiên quét và điều khiển robot.', { exact: false }).waitFor();
   assert.equal(await btn('Tạo nhiệm vụ quét').count(), 0);
   await page.evaluate(() => { sessionStorage.clear(); }); emptyCatalog = true;
-  await page.reload(); await btn('Quét map mới').click(); await page.getByText('Cần robot đã đăng ký, tầng đang hoạt động và quy trình quét đã phát hành.', { exact: false }).waitFor();
+  await page.reload(); await page.getByText('Cần robot đã đăng ký, tầng đang hoạt động và quy trình quét đã phát hành.', { exact: false }).waitFor();
   assert.equal(await btn('Tạo nhiệm vụ quét').isDisabled(), true);
   forbidCatalog = true; await btn('Tải lại trạng thái').click(); await page.getByRole('alert').getByText('Tài khoản không có quyền thực hiện thao tác này.').waitFor();
   assert.deepEqual(errors, []);

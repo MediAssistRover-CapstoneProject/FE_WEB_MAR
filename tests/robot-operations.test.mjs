@@ -3,6 +3,20 @@ import assert from 'node:assert/strict';
 import { eligibleWorkflows, movementBlock, MappingJog, committedMapId, isOperator } from '../src/features/robotOperations/model.js';
 
 const valid = () => ({ operator: true, checkedAt: 10000, now: 10001, snapshot: { mqttConnected: true, heartbeatFresh: true, dispatchReady: true }, session: { state: 'MAPPING', job_status: 'RUNNING', potentially_open: true }, detail: { job: { status: 'RUNNING', selectedJobStepId: 'step' }, steps: [{ jobStepId: 'step', status: 'RUNNING', stepTypeSnapshot: 'WAIT', resolvedInputsJson: { event_type: 'MAPPING_SAVE_REQUESTED' } }] } });
+test('reverse and turning match BE velocity limits and still send stop', async () => {
+  for (const [x, z] of [[-.30, 0], [.30, 0], [0, -1], [0, 1]]) {
+    const calls = [];
+    const jog = new MappingJog({ allowed: () => '', send: async (x, z) => { calls.push([x, z]); return {}; } });
+    jog.start(x, z, .4);
+    await jog.stop();
+    assert.deepEqual(calls, [[x, z], [0, 0]]);
+  }
+  const jog = new MappingJog({ allowed: () => '', send: async () => { throw Error('Must not send'); } });
+  for (const [x, z] of [[-.31, 0], [.31, 0], [0, -1.01], [0, 1.01], [NaN, 0]]) {
+    assert.throws(() => jog.start(x, z, 4));
+    assert.equal(jog.active, false);
+  }
+});
 test('controls require permission, fresh Pi state and the exact mapping WAIT step', () => {
   assert.equal(movementBlock(valid()), '');
   for (const change of [{ operator: false }, { checkedAt: 0 }, { now: 13000 }, { saving: true }, { snapshot: { dispatchReady: false } }, { session: { state: 'MAPPING', job_status: 'RUNNING', potentially_open: false } }, { detail: { job: { status: 'RECOVERY_REQUIRED' } } }, { detail: { ...valid().detail, steps: [] } }]) assert.ok(movementBlock({ ...valid(), ...change }));

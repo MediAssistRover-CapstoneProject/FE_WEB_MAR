@@ -3,15 +3,24 @@ import { getSession } from '../../../features/auth/session.js';
 import { jobPath, post, readTracking, request, writeTracking } from '../../../features/robotOperations/api.js';
 import { committedMapId, isOperator, MappingJog, movementBlock, receiptLabels, terminalJobs } from '../../../features/robotOperations/model.js';
 import { ErrorNotice, Field, JobStatus, Picker, useCatalog } from './Shared.jsx';
+import { mapPose } from '../../../features/robotOperations/mapPose.js';
+import SavedMappingImage from './SavedMappingImage.jsx';
 
 function SnapshotImage({ jobId, kind, enabled }) {
   const [frame, setFrame] = useState(null), [message, setMessage] = useState('Đang chờ ảnh từ Pi.');
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (kind !== 'map' || !enabled) return;
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, [kind, enabled]);
   useEffect(() => {
     setFrame(null); setMessage('Đang chờ ảnh từ Pi.');
     if (!enabled || !jobId) return;
     const controller = new AbortController(); let timer, objectUrl;
     const poll = async () => {
       try {
+        const state = kind === 'map' ? await request(`${jobPath(jobId)}/mapping-session?includePreview=false`, { signal: controller.signal }) : null;
         const response = await request(`${jobPath(jobId)}/${kind === 'map' ? 'mapping-preview.png' : 'camera-preview.jpg'}`, { responseType: 'response', signal: controller.signal });
         if (controller.signal.aborted) return;
         if (response.status === 204) { setFrame(null); setMessage('Chưa có ảnh mới hoặc ảnh đã quá 10 giây.'); }
@@ -20,7 +29,7 @@ function SnapshotImage({ jobId, kind, enabled }) {
           if (controller.signal.aborted) return;
           if (objectUrl) URL.revokeObjectURL(objectUrl);
           objectUrl = URL.createObjectURL(blob);
-          setFrame({ url: objectUrl, captured: response.headers.get('X-Captured-At') });
+          setFrame({ url: objectUrl, captured: response.headers.get('X-Captured-At'), revision: response.headers.get('X-Frame-Revision'), state });
           setMessage(`Nhận ảnh lúc ${new Date().toLocaleTimeString('vi-VN')}`);
         }
       } catch { if (!controller.signal.aborted) { setFrame(null); setMessage('Không tải được ảnh. Kiểm tra kết nối hoặc phiên quét.'); } }
@@ -29,7 +38,8 @@ function SnapshotImage({ jobId, kind, enabled }) {
     void poll();
     return () => { controller.abort(); clearTimeout(timer); if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [jobId, kind, enabled]);
-  return <><div className={'ro-preview ' + (kind === 'map' ? 'map' : '')}>{frame ? <img src={frame.url} alt={kind === 'map' ? 'Bản đồ đang quét từ robot' : 'Ảnh camera robot qua MQTT'} /> : <p>{enabled ? message : 'Chưa có phiên quét đang kết nối.'}</p>}</div><small>{frame?.captured ? `Ảnh chụp lúc ${new Date(frame.captured).toLocaleString('vi-VN')}` : message}</small></>;
+  const position = kind === 'map' && frame ? mapPose(frame.state, frame.revision, now) : null;
+  return <><div className={'ro-preview ' + (kind === 'map' ? 'map' : '')}>{frame ? <div className="ro-map-frame" key={frame.url}><img src={frame.url} alt={kind === 'map' ? 'Bản đồ đang quét từ robot' : 'Ảnh camera robot qua MQTT'} />{position?.x !== undefined && <svg className="ro-pose-overlay" viewBox={`0 0 ${position.width} ${position.height}`} role="img" aria-label="Vị trí và hướng robot trên bản đồ"><g transform={`translate(${position.x} ${position.y}) rotate(${position.angle})`}><circle r={position.radius} fill="#0879ee" fillOpacity=".7" stroke="white" strokeWidth="1"/><path d={`M ${position.radius * 1.8} 0 L ${position.radius * .3} ${-position.radius * .55} L ${position.radius * .3} ${position.radius * .55} Z`} fill="#ff7900" stroke="white" strokeWidth=".6"/></g></svg>}</div> : <p>{enabled ? message : 'Chưa có phiên quét đang kết nối.'}</p>}</div>{kind === 'map' && <div className="ro-pose-status"><strong>● Robot</strong><span>{position?.message || 'Chờ bản đồ và tọa độ từ robot.'}</span><small>Chấm xanh: vị trí · Mũi tên cam: hướng phía trước</small></div>}<small>{frame?.captured ? `Ảnh chụp lúc ${new Date(frame.captured).toLocaleString('vi-VN')}` : message}</small></>;
 }
 
 function Camera({ jobId, enabled }) {
@@ -61,6 +71,7 @@ export default function LiveMapping({ onMapSaved, embedded = false }) {
   const [actionError, setActionError] = useState(null);
   const [saving, setSaving] = useState(() => Boolean(readTracking('mapping')?.saving));
   const [receipt, setReceipt] = useState(null), [jogMessage, setJogMessage] = useState('Chưa gửi lệnh.');
+  const [turnSpeed, setTurnSpeed] = useState('0.20');
   const [speed, setSpeed] = useState('0.05'), [seconds, setSeconds] = useState('4'), [recent, setRecent] = useState([]), [recentError, setRecentError] = useState(null);
   const [revision, setRevision] = useState(0), [uncertain, setUncertain] = useState(false);
   const current = useRef({}), mounted = useRef(true), writeLock = useRef(false), controlSequence = useRef(0), controlSessionId = useRef(crypto.randomUUID());
@@ -72,7 +83,7 @@ export default function LiveMapping({ onMapSaved, embedded = false }) {
     send: (x, z) => {
       const state = current.current;
       if (!isOperator(getSession()) || !state.jobId || !state.session?.mapping_session_id) return Promise.reject(Error('Chưa có quyền hoặc phiên quét.'));
-      return post(`${jobPath(state.jobId)}/mapping-control`, { mappingSessionId: state.session.mapping_session_id, linearX: x, angularZ: z, durationMs: 600, controlSessionId: controlSessionId.current, controlSequence: ++controlSequence.current, requestedAt: new Date().toISOString() }, { signal: AbortSignal.timeout(1200), retry: false, keepalive: x === 0 && z === 0 });
+      return post(`${jobPath(state.jobId)}/mapping-control`, { mappingSessionId: state.session.mapping_session_id, linearX: x, angularZ: z, durationMs: 900, controlSessionId: controlSessionId.current, controlSequence: ++controlSequence.current, requestedAt: new Date().toISOString() }, { signal: AbortSignal.timeout(1200), retry: false, keepalive: x === 0 && z === 0 });
     },
     onState: (message, value) => { if (mounted.current) { setJogMessage(message); if (value) setReceipt(value); } },
   });
@@ -179,6 +190,7 @@ export default function LiveMapping({ onMapSaved, embedded = false }) {
   return <section className={'ro-workspace' + (embedded ? ' ro-embedded' : '')} aria-label="Quét bằng robot thật">
     {!embedded && <header className="ro-card ro-hero"><div><span className="ro-badge">Robot thật · Dữ liệu máy chủ</span><h2>Quét bản đồ</h2><p>Chọn robot, theo dõi camera và điều khiển trong phiên quét.</p></div><button disabled={busy || jog.current.active} onClick={() => { reload(); setRevision(v => v + 1); }}>Tải lại trạng thái</button></header>}
     {!operator ? <p className="ro-help">Chỉ quản trị viên đăng nhập thật được tạo phiên quét và điều khiển robot. Chế độ mô phỏng vẫn dùng được trên trình duyệt.</p> : <>
+      <p className="ro-help">Chọn robot, tầng và quy trình → Tạo nhiệm vụ quét → Giữ nút di chuyển và quan sát map, camera → Lưu bản đồ và kết thúc.</p>
       <ErrorNotice error={catalogError} />
       <details className="ro-card ro-setup" open={!jobId}><summary>Chi tiết quét map mới{jobId ? ' · Đang theo dõi nhiệm vụ' : ''}</summary>{loading && <p role="status">Đang tải robot, tầng và quy trình…</p>}
         <form onSubmit={create}><fieldset disabled={busy || loading || Boolean(activeJob)}><div className="ro-fields">
@@ -194,10 +206,17 @@ export default function LiveMapping({ onMapSaved, embedded = false }) {
       <ErrorNotice error={error} />
       <ErrorNotice error={actionError} />
       {embedded && <div className="ro-actions"><button disabled={busy || jog.current.active} onClick={() => { reload(); setRevision(v => v + 1); }}>Tải lại trạng thái</button></div>}
-      <div className="ro-columns"><div className="ro-stack"><section className="ro-card ro-map-card"><h3>{embedded ? detail?.job.status === 'SUCCEEDED' ? 'Bản đồ vật cản LiDAR · đã lưu' : 'Bản đồ vật cản LiDAR · đang quét' : 'Bản đồ đang quét'}</h3><SnapshotImage jobId={jobId} kind="map" enabled={!!session && !!checkedAt && !error} /><p className="ro-muted">Ảnh bản đồ do robot gửi về qua BE. Bản nháp mô phỏng được lưu riêng.</p></section><JobStatus detail={detail} session={session} saving={saving} />{detail?.job.status === 'SUCCEEDED' && <section className="ro-card"><h3>Phiên quét đã hoàn tất</h3><p>{mapId ? 'Máy chủ đã lưu bản đồ. Bạn có thể cấu hình vùng và điểm đích trên bản đồ này.' : 'Chưa tìm thấy mã bản đồ trong kết quả lưu. Kiểm tra chi tiết nhiệm vụ trước khi cấu hình vùng.'}</p>{mapId && <button className="primary" onClick={() => onMapSaved?.(mapId)}>Cấu hình vùng trên bản đồ đã lưu</button>}</section>}</div>
-      <aside className="ro-stack"><Camera jobId={jobId} enabled={!!session && !!checkedAt && !error} /><section className="ro-card"><h3>Di chuyển khi quét</h3><p>Giữ nút để di chuyển, nhả để dừng. Tự dừng khi hết thời gian đã chọn.</p><div className="ro-fields"><Field label="Tốc độ tiến"><select value={speed} disabled={jog.current.active} onChange={e => setSpeed(e.target.value)}><option value="0.05">0,05 m/s</option><option value="0.08">0,08 m/s</option><option value="0.10">0,10 m/s</option></select></Field><Field label="Thời gian tối đa (giây)"><input type="number" min="0.4" max="10" step="0.2" value={seconds} disabled={jog.current.active} onChange={e => setSeconds(e.target.value)} /></Field></div>
-        <div className="ro-drive"><button disabled={!!block || busy} {...handlers(Number(speed), 0)}>↑ Tiến</button><button disabled={!!block || busy} {...handlers(0, 0.2)}>↶ Quay trái</button><button disabled={!!block || busy} {...handlers(0, -0.2)}>Quay phải ↷</button><button className="stop" disabled={!session?.potentially_open} onClick={() => void jog.current.stop().catch(() => {})}>Dừng di chuyển</button></div>
-        {block && <p className="ro-help">{block}</p>}<p role="status">{jogMessage}</p>{receipt && <p className="ro-status">{receiptLabels[receipt.status] || 'Đang cập nhật phản hồi'}</p>}<small>Pi chấp nhận lệnh chưa chứng minh robot đã di chuyển; quan sát camera. Cấu hình xe hiện tại không hỗ trợ lùi/ngang.</small>
+      <div className="ro-columns"><div className="ro-stack"><section className="ro-card ro-map-card"><h3>{embedded ? detail?.job.status === 'SUCCEEDED' ? 'Bản đồ vật cản LiDAR · đã lưu' : 'Bản đồ vật cản LiDAR · đang quét' : 'Bản đồ đang quét'}</h3>{mapId ? <SavedMappingImage key={mapId} mapId={mapId} /> : detail?.job.status === 'SUCCEEDED' ? <p className="ro-help">Nhiệm vụ đã kết thúc nhưng chưa có mã bản đồ đăng ký. Kiểm tra bước COMMIT_MAP_ARTIFACT.</p> : <SnapshotImage jobId={jobId} kind="map" enabled={!!session && !!checkedAt && !error} />}<p className="ro-muted">Ảnh bản đồ do robot gửi về qua BE. Bản nháp mô phỏng được lưu riêng.</p></section><JobStatus detail={detail} session={session} saving={saving} />{detail?.job.status === 'SUCCEEDED' && <section className="ro-card"><h3>Phiên quét đã hoàn tất</h3><p>{mapId ? 'Máy chủ đã lưu bản đồ. Bạn có thể cấu hình vùng và điểm đích trên bản đồ này.' : 'Chưa tìm thấy mã bản đồ trong kết quả lưu. Kiểm tra chi tiết nhiệm vụ trước khi cấu hình vùng.'}</p>{mapId && <button className="primary" onClick={() => onMapSaved?.(mapId)}>Cấu hình vùng trên bản đồ đã lưu</button>}</section>}</div>
+      <aside className="ro-stack"><Camera jobId={jobId} enabled={!!session && !!checkedAt && !error} /><section className="ro-card"><h3>Di chuyển khi quét</h3><p>Giữ nút để di chuyển, nhả để dừng. Tự dừng khi hết thời gian đã chọn.</p><div className="ro-fields"><Field label="Tốc độ tiến"><select value={speed} disabled={jog.current.active} onChange={e => setSpeed(e.target.value)}><option value="0.05">0,05 m/s</option><option value="0.08">0,08 m/s</option><option value="0.10">0,10 m/s</option><option value="0.15">0,15 m/s</option><option value="0.20">0,20 m/s</option><option value="0.25">0,25 m/s</option><option value="0.30">0,30 m/s</option></select></Field><Field label="Thời gian tối đa (giây)"><input type="number" min="0.4" max="10" step="0.2" value={seconds} disabled={jog.current.active} onChange={e => setSeconds(e.target.value)} /></Field></div>
+        <Field label="Tốc độ quay"><select value={turnSpeed} disabled={jog.current.active} onChange={e => setTurnSpeed(e.target.value)}>{[0.20, 0.35, 0.45, 0.50, 0.80, 1.00].map(value => <option key={value} value={value.toFixed(2)}>{value.toFixed(2).replace('.', ',')} rad/s</option>)}</select></Field>
+        <div className="ro-drive ro-drive-pad" aria-label="Điều khiển robot quét bản đồ">
+          <button className="ro-forward" disabled={!!block || busy} {...handlers(Number(speed), 0)}>↑ Tiến</button>
+          <button className="ro-left" disabled={!!block || busy} {...handlers(0, Number(turnSpeed))}>↶ Quay trái</button>
+          <button className="stop" disabled={!session?.potentially_open} onClick={() => void jog.current.stop().catch(() => {})}>Dừng di chuyển</button>
+          <button className="ro-right" disabled={!!block || busy} {...handlers(0, -Number(turnSpeed))}>Quay phải ↷</button>
+          <button className="ro-backward" disabled={!!block || busy} {...handlers(-Number(speed), 0)}>↓ Lùi</button>
+        </div>
+        {block && <p className="ro-help">{block}</p>}<p role="status">{jogMessage}</p>{receipt && <p className="ro-status">{receiptLabels[receipt.status] || 'Đang cập nhật phản hồi'}</p>}<small>Quan sát camera khi di chuyển. Lùi cần profile Pi cho phép và LiDAR phía sau sẵn sàng. Tốc độ thực tế được giới hạn theo cấu hình Pi.</small>
         {receipt?.errorCode && <details><summary>Chi tiết phản hồi</summary><p>{receipt.errorCode}</p></details>}
         <div className="ro-actions"><button className="primary" disabled={!!block || busy || jog.current.active} onClick={() => save()}>Lưu bản đồ và kết thúc</button>{saving && tracking?.saveEvent && <button disabled={busy || !!movementBlock({ ...current.current, saving: false })} onClick={() => save(true)}>Gửi lại yêu cầu lưu đã tạo</button>}</div>{saving && actionError && <p className="ro-help">Chưa xác nhận được yêu cầu lưu. Tải lại trạng thái; nếu phiên vẫn đang quét, có thể gửi lại cùng yêu cầu ở trên.</p>}<p className="ro-muted">Chờ máy chủ xác nhận hoàn tất. Pi cần được cấu hình tải bản đồ lên máy chủ.</p>
       </section></aside></div>
