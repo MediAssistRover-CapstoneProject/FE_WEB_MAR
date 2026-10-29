@@ -15,14 +15,25 @@
 .gazebo-desktop-bar a { color: #a9ceff; }
 .gazebo-desktop iframe { display: block; width: 100%; height: min(65vh, 700px); min-height: 420px; border: 0; background: #111820; }
 .gazebo-desktop p { margin: 0; padding: 10px 14px; font-size: 13px; }
+
+.simulation-badges{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.simulation-badges span{padding:7px 12px;border-radius:20px;background:#fff1df;color:#805515}.simulation-badges .is-ready{background:#dff6ed;color:#096045}
+
+.gazebo-desktop-bar small{display:block;color:#b3c6df;margin-top:4px}
+.gazebo-window-actions{display:flex;flex-wrap:wrap;gap:8px}
+.gazebo-window-actions button{padding:8px 12px;border:1px solid #69809c;border-radius:8px;background:#243b55;color:white;cursor:pointer}
+.gazebo-window-actions button:disabled{opacity:.45;cursor:default}
+.gazebo-desktop-expanded{position:fixed;inset:12px;z-index:2000;display:flex;flex-direction:column;box-shadow:0 0 0 30px #0c162bce}
+.gazebo-desktop-expanded iframe,.gazebo-desktop:fullscreen iframe{flex:1;min-height:0;height:auto}
+.gazebo-desktop:fullscreen{display:flex;flex-direction:column;width:100%;height:100%;border-radius:0}
+.gazebo-desktop-expanded .gazebo-desktop-bar,.gazebo-desktop:fullscreen .gazebo-desktop-bar{flex-shrink:0}
+
 @media (max-width: 620px) {
   .gazebo-panel .patrol-actions > button { flex: 1 1 100%; }
   .patrol-view-switch { flex-wrap: wrap; }
   .gazebo-display-switch { width: 100%; }
   .gazebo-display-switch button { flex: 1; }
   .gazebo-desktop iframe { min-height: 320px; }
+  .gazebo-desktop-expanded { inset: 0; border-radius: 0; }
+  .gazebo-window-actions button { font-size: 12px; padding: 8px; }
+  .gazebo-desktop-expanded p { font-size: 11px; }
 }
-
-.simulation-badges{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.simulation-badges span{padding:7px 12px;border-radius:20px;background:#fff1df;color:#805515}.simulation-badges .is-ready{background:#dff6ed;color:#096045}
-
-.gazebo-desktop-bar small{display:block;color:#b3c6df;margin-top:4px}.gazebo-window-actions{display:flex;flex-wrap:wrap;gap:8px}.gazebo-window-actions button{padding:8px 12px;border:1px solid #69809c;border-radius:8px;background:#243b55;color:white;cursor:pointer}.gazebo-window-actions button:disabled{opacity:.45;cursor:default}.gazebo-desktop-expanded{position:fixed;inset:12px;z-index:2000;display:flex;flex-direction:column;box-shadow:0 0 0 30px #0c162bce}.gazebo-desktop-expanded iframe,.gazebo-desktop:fullscreen iframe{flex:1;min-height:0;height:auto}.gazebo-desktop:fullscreen{display:flex;flex-direction:column;width:100%;height:100%;border-radius:0}.gazebo-desktop-expanded .gazebo-desktop-bar,.gazebo-desktop:fullscreen .gazebo-desktop-bar{flex-shrink:0}@media(max-width:620px){.gazebo-desktop-expanded{inset:0;border-radius:0}.gazebo-window-actions button{font-size:12px;padding:8px}.gazebo-desktop-expanded p{font-size:11px}}

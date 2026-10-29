@@ -1,6 +1,6 @@
 import { localMockMap as model, viewTransform } from '../../features/maps/MapProvider.js';
 import { vi } from '../../i18n/vi.js';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, memo } from 'react';
 import { FLOOR, MAP, OBSTACLES, SCAN_START, WALLS, inPolygon, rayHits, scanPosition } from './lidarGeometry.js';
 import { ZONE_TYPES } from './mapStudioModel.js';
 import { dragFeature } from './mapFeatureDrag.js';
@@ -42,7 +42,7 @@ function decodePgm(bytes) {
   source.getContext('2d').putImageData(image, 0, 0);
   return source;
 }
-function ScanCanvas() {
+const ScanCanvas = memo(function ScanCanvas() {
   const ref=useRef(null);
   const [error,setError]=useState('');
   useEffect(()=>{
@@ -57,7 +57,7 @@ function ScanCanvas() {
     return()=>{current=false;};
   },[]);
   return error ? <div role="alert">{error}</div> : <canvas ref={ref} width="2400" height="1360" style={{width:'100%',height:'100%',display:'block'}} aria-label="Map LiDAR gốc — xoay hiển thị, giữ nguyên tỉ lệ"/>;
-}
+});
 function Selectable({label,onSelect,onPointerDown,children}) {
   return <g role={onSelect?'button':undefined} tabIndex={onSelect?0:undefined} aria-label={vi(onSelect?label:undefined)}
     onClick={onSelect?e=>{e.stopPropagation();onSelect();}:undefined} onKeyDown={onSelect?e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();onSelect();}}:undefined}
@@ -71,7 +71,7 @@ function Endpoint({value,preview=false}) {
 }
 export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit,onSelectZone,onSelectEndpoint,onEditZone,onEditEndpoint,rectangleStart,hoverPoint,onHover,zoneDirty,endpointDirty,simulation,overlay,collisionWarning=false,artifactPreview=false}) {
   const [zoom,setZoom]=useState(1),[centre,setCentre]=useState({x:600,y:340}),[grid,setGrid]=useState(false),[rays,setRays]=useState(true),[zonesVisible,setZonesVisible]=useState(true),[endpointsVisible,setEndpointsVisible]=useState(true);
-  const drag=useRef(null),svgRef=useRef(null),suppressClick=useRef(false);
+  const drag=useRef(null),svgRef=useRef(null),suppressClick=useRef(false),rafRef=useRef(null),pendingPoint=useRef(null);
   const raw=stage==='scan',progress=draft.scan.progress;
   const robot=raw?(draft.scan.robot||SCAN_START):scanPosition(100);
   const storedTrail=Array.isArray(draft.scan.trail)?draft.scan.trail:[];
@@ -91,20 +91,48 @@ export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit
     const change=kind==='endpoint'?onEditEndpoint:onEditZone;
     const select=kind==='endpoint'?onSelectEndpoint:onSelectZone;
     if(!change || select?.(value.id)===false)return;
-    const start=coordinate(event);if(!start)return;
-    drag.current={kind,original:structuredClone(kind==='endpoint'?{...value,placed:true}:value),start,vertex,change,pointerId:event.pointerId,clientX:event.clientX,clientY:event.clientY,moved:false};
+    const ctm=svgRef.current?.getScreenCTM();
+    if(!ctm)return;
+    const inverseMatrix=ctm.inverse();
+    const start=new DOMPoint(event.clientX,event.clientY).matrixTransform(inverseMatrix);
+    drag.current={
+      kind,
+      original:structuredClone(kind==='endpoint'?{...value,placed:true}:value),
+      start:{x:start.x,y:start.y},
+      vertex,
+      change,
+      pointerId:event.pointerId,
+      clientX:event.clientX,
+      clientY:event.clientY,
+      moved:false,
+      inverseMatrix,
+      scale:ctm.a||1
+    };
     svgRef.current.setPointerCapture(event.pointerId);
   };
   const finishDrag=cancel=>{
+    if(rafRef.current){cancelAnimationFrame(rafRef.current);rafRef.current=null;}
     const current=drag.current;if(!current)return;
     drag.current=null;
-    if(cancel){if(current.kind==='pan')setCentre(current.centre);else current.change(current.original);}
+    if(cancel){
+      if(current.kind==='pan')setCentre(current.centre);
+      else current.change(current.original);
+    } else if(current.moved && pendingPoint.current && current.kind!=='pan'){
+      current.change(dragFeature(current.original,current.kind,current.start,pendingPoint.current,current.vertex));
+    }
+    pendingPoint.current=null;
     suppressClick.current=current.moved||cancel;
-    if(svgRef.current?.hasPointerCapture(current.pointerId))svgRef.current.releasePointerCapture(current.pointerId);
+    if(svgRef.current?.hasPointerCapture(current.pointerId)){
+      try{svgRef.current.releasePointerCapture(current.pointerId);}catch{}
+    }
   };
   useEffect(()=>{
     const cancel=e=>{if(e.key==='Escape'&&drag.current){e.preventDefault();finishDrag(true);}};
-    window.addEventListener('keydown',cancel);return()=>window.removeEventListener('keydown',cancel);
+    window.addEventListener('keydown',cancel);
+    return()=>{
+      window.removeEventListener('keydown',cancel);
+      if(rafRef.current)cancelAnimationFrame(rafRef.current);
+    };
   },[]);
   const renderZone=z=>{
     const c=ZONE_TYPES.find(t=>t.id===z.type)?.color||color,p=z.points[0],editing=z===activeZone;
@@ -133,14 +161,35 @@ export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit
       <svg ref={svgRef} viewBox={[centre.x-width/2,centre.y-height/2,width,height].join(' ')} preserveAspectRatio="xMidYMid meet" aria-label={vi("LiDAR map drawing surface")} style={{cursor:tool?'crosshair':zoom>1?'grab':'default',touchAction:zoom>1||onEditZone||onEditEndpoint?'none':'auto',userSelect:'none'}}
         onPointerDownCapture={()=>{if(!drag.current)suppressClick.current=false;}}
         onClickCapture={e=>{if(suppressClick.current){e.stopPropagation();suppressClick.current=false;}}}
-        onPointerDown={e=>{if(!tool&&zoom>1&&e.button===0&&!drag.current){drag.current={kind:'pan',clientX:e.clientX,clientY:e.clientY,centre,pointerId:e.pointerId,moved:false};e.currentTarget.setPointerCapture(e.pointerId);}}}
+        onPointerDown={e=>{if(!tool&&zoom>1&&e.button===0&&!drag.current){const ctm=e.currentTarget.getScreenCTM();drag.current={kind:'pan',clientX:e.clientX,clientY:e.clientY,centre,pointerId:e.pointerId,moved:false,scale:ctm?.a||1,inverseMatrix:ctm?.inverse()};e.currentTarget.setPointerCapture(e.pointerId);}}}
         onPointerMove={e=>{
-          const p=coordinate(e);if(p)onHover?.({x:Math.round(p.x),y:Math.round(p.y)});
-          const current=drag.current;if(!current||e.pointerId!==current.pointerId)return;
-          if(Math.hypot(e.clientX-current.clientX,e.clientY-current.clientY)>3)current.moved=true;
-          if(!current.moved)return;
-          if(current.kind==='pan'){const scale=svgRef.current.getScreenCTM()?.a||1;setCentre(clampCentre({x:current.centre.x-(e.clientX-current.clientX)/scale,y:current.centre.y-(e.clientY-current.clientY)/scale}));}
-          else if(p)current.change(dragFeature(current.original,current.kind,current.start,p,current.vertex));
+          const current=drag.current;
+          if(current){
+            if(e.pointerId!==current.pointerId)return;
+            if(!current.moved && Math.hypot(e.clientX-current.clientX,e.clientY-current.clientY)>3){
+              current.moved=true;
+            }
+            if(!current.moved)return;
+            if(current.kind==='pan'){
+              const scale=current.scale||1;
+              setCentre(clampCentre({x:current.centre.x-(e.clientX-current.clientX)/scale,y:current.centre.y-(e.clientY-current.clientY)/scale}));
+            } else {
+              const pt=new DOMPoint(e.clientX,e.clientY).matrixTransform(current.inverseMatrix);
+              pendingPoint.current={x:pt.x,y:pt.y};
+              if(!rafRef.current){
+                rafRef.current=requestAnimationFrame(()=>{
+                  rafRef.current=null;
+                  const cur=drag.current;
+                  if(cur && pendingPoint.current){
+                    cur.change(dragFeature(cur.original,cur.kind,cur.start,pendingPoint.current,cur.vertex));
+                  }
+                });
+              }
+            }
+          } else {
+            const p=coordinate(e);
+            if(p)onHover?.({x:Math.round(p.x),y:Math.round(p.y)});
+          }
         }}
         onPointerUp={e=>{if(e.pointerId===drag.current?.pointerId)finishDrag(false);}} onPointerCancel={e=>{if(e.pointerId===drag.current?.pointerId)finishDrag(true);}} onLostPointerCapture={e=>{if(e.pointerId===drag.current?.pointerId)finishDrag(true);}}
         onClick={e=>{if(tool){const p=coordinate(e);if(p)onPoint({x:Math.round(p.x),y:Math.round(p.y)});}}}>

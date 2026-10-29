@@ -35,7 +35,7 @@ def world_xml(data):
     root = ET.Element('sdf', version='1.9')
     world = element(root, 'world', name='default')
     physics = element(world, 'physics', name='physics', type='ignored')
-    element(physics, 'max_step_size', .001)
+    element(physics, 'max_step_size', .004)
     element(physics, 'real_time_factor', 1)
     for library, system in [('physics','Physics'),('user-commands','UserCommands'),('scene-broadcaster','SceneBroadcaster'),('sensors','Sensors'),('imu','Imu')]:
         plugin = element(world, 'plugin', filename=f'gz-sim-{library}-system', name=f'gz::sim::systems::{system}')

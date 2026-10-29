@@ -1,5 +1,5 @@
 import { vi } from '../../i18n/vi.js';
-import { cloneElement, useId } from 'react';
+import { cloneElement, useId, useMemo } from 'react';
 import { inPolygon } from './lidarGeometry.js';
 import { groupsFor } from '../../features/facility/endpointGroups.js';
 import { ZONE_SETUP_TYPES, ZONE_ROBOT_POLICY } from './zoneCatalog.js';
@@ -28,8 +28,8 @@ export function ZoneProperties({zone,setZone}){
 }
 export function EndpointProperties({endpoint,setEndpoint,draft,onOpenGroups}){
   const set=(key,value)=>setEndpoint(e=>({...e,[key]:value}));
-  const areas=draft.zones.filter(z=>inPolygon(endpoint,z.points));
-  const groups=groupsFor(draft).filter(g=>g.members.some(m=>m.endpointId===endpoint.id));
+  const areas=useMemo(()=>draft.zones.filter(z=>inPolygon(endpoint,z.points)),[draft.zones, endpoint.x, endpoint.y]);
+  const groups=useMemo(()=>groupsFor(draft).filter(g=>g.members.some(m=>m.endpointId===endpoint.id)),[draft, endpoint.id]);
   return <>
     <Input label="Mô tả điểm" value={endpoint.description||''} maxLength={160} onChange={e=>set('description',e.target.value)}/>
     <label><input type="checkbox" checked={endpoint.enabled!==false} onChange={e=>set('enabled',e.target.checked)}/>{vi("Cho phép điều phối đến điểm này")}</label>

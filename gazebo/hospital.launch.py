@@ -30,21 +30,25 @@ def start(context):
     descriptor, name = tempfile.mkstemp(prefix='mar-nav2-', suffix='.yaml')
     with os.fdopen(descriptor, 'w') as stream:
         yaml.safe_dump(params, stream)
+
     return [
-        # Nav2's bundled TB3 launch starts xacro and Gazebo in parallel. On a
-        # cold Docker start Gazebo can read the temporary world before xacro
-        # writes it, then exit with "Unable to find or download file". Our
-        # generated SDF already exists, so launch the server from that file.
+        # 1. Headless Gazebo Harmonic physics server
         ExecuteProcess(cmd=['gz', 'sim', '-r', '-s', str(folder / 'hospital.sdf')], output='screen'),
+        
+        # 2. Gazebo GUI client running on Display :98 (Web port 6080)
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(str(Path(get_package_share_directory('ros_gz_sim')) / 'launch/gz_sim.launch.py')),
             condition=UnlessCondition(LaunchConfiguration('headless')),
             launch_arguments={'gz_args': '-v4 -g'}.items()),
-        IncludeLaunchDescription(PythonLaunchDescriptionSource(str(bringup / 'launch/tb3_simulation_launch.py')),
+        
+        # 3. Nav2 TurtleBot3 stack (without rviz)
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(str(bringup / 'launch/tb3_simulation_launch.py')),
             launch_arguments={'world': str(folder / 'hospital.sdf'), 'map': str(folder / 'hospital.yaml'),
                               'params_file': name, 'use_sim_time': 'true', 'x_pose': str(spawn['x']), 'y_pose': str(spawn['y']),
                               'yaw': str(spawn['yaw']), 'headless': LaunchConfiguration('headless'),
-                              'use_rviz': LaunchConfiguration('use_rviz'), 'use_simulator': 'False'}.items()),
+                              'use_rviz': 'False', 'use_simulator': 'False'}.items()),
+
         RegisterEventHandler(OnShutdown(on_shutdown=[OpaqueFunction(function=lambda _: Path(name).unlink(missing_ok=True) or [])])),
     ]
 
@@ -52,7 +56,6 @@ def start(context):
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('map_dir', default_value=str(Path(__file__).parent / 'generated')),
-        DeclareLaunchArgument('headless', default_value='False'),
-        DeclareLaunchArgument('use_rviz', default_value='True'),
+        DeclareLaunchArgument('headless', default_value='false'),
         OpaqueFunction(function=start),
     ])

@@ -1,5 +1,5 @@
 import { vi } from '../../i18n/vi.js';
-import { cloneElement, useEffect, useId, useRef, useState } from 'react';
+import { cloneElement, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { injectStyles } from '../../styles/injectStyles.js';
 import LidarMap from './LidarMap.jsx';
 import { downloadGazeboMap } from '../../features/gazebo/gazeboModel.js';
@@ -87,10 +87,10 @@ function SimulatedMapStudio({initialStage='scan'}) {
   const endpointValue=(({placed,...value})=>value)(endpoint);
   const endpointDirty=endpoint.placed && (!endpointOriginal || !same(endpointValue,endpointOriginal));
   const unsaved=stage==='zone'?zoneDirty:stage==='endpoint'?(endpointTab==='groups'?groupDirty:endpointDirty):false;
-  const issues=mapIssues(draft);
+  const issues=useMemo(()=>mapIssues(draft),[draft]);
   const saved=draft.saved?.revision===draft.revision;
-  const zoneProblem=zone.points.length?zoneError(draft,zone):'';
-  const endpointProblem=endpoint.placed?endpointError(draft,endpointValue):'';
+  const zoneProblem=useMemo(()=>zone.points.length?zoneError(draft,zone):'',[draft,zone]);
+  const endpointProblem=useMemo(()=>endpoint.placed?endpointError(draft,endpointValue):'',[draft,endpointValue]);
   useEffect(()=>{try{window.localStorage.setItem(STORAGE_KEY,JSON.stringify(draft));window.dispatchEvent(new Event('mediassist-map-saved'));setStorageError(false);}catch{setStorageError(true);}},[draft]);
   useEffect(()=>{
     if(draft.scan.status!=='running'||!driveDirection)return;
