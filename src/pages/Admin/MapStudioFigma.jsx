@@ -13,6 +13,7 @@ import { STAGES, STORAGE_KEY, ZONE_TYPES, ENDPOINT_TYPES, ROBOT_SAFETY_GAP_METER
 import SimulationCamera from './SimulationCamera.jsx';
 import LiveMapping from './robotOperations/LiveMapping.jsx';
 import FacilityCatalogEditor from './FacilityCatalogEditor.jsx';
+import SavedMapLibrary from './SavedMapLibrary.jsx';
 
 const styles = String.raw`
 .ls-group-toolbar{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:12px 0}.ls-group-toolbar .ls-field{flex:1;min-width:180px;margin:0}.ls-group-toolbar>.ls-btn{flex-shrink:0}
@@ -63,10 +64,11 @@ function SimulatedMapStudio({initialStage='scan'}) {
   const goTo=useNavigate();
   const [draft,setDraft]=useState(()=>loadDraft(window.localStorage));
   const [realScan,setRealScan]=useState(true);
-  const [serverMapId,setServerMapId]=useState('');
+  const [serverMapId,setServerMapId]=useState(()=>new URLSearchParams(window.location.search).get('mapId')||'');
+  const [showLibrary,setShowLibrary]=useState(false);
   const [endpointTab,setEndpointTab]=useState('points');
   const [groupDirty,setGroupDirty]=useState(false);
-  const [stage,setStage]=useState(()=>stageEnabled(draft,initialStage)?initialStage:'scan');
+  const [stage,setStage]=useState(()=>serverMapId?'endpoint':stageEnabled(draft,initialStage)?initialStage:'scan');
   const [zone,setZone]=useState(emptyZone),[endpoint,setEndpoint]=useState(emptyEndpoint);
   const [tool,setTool]=useState(''),[rectangleStart,setRectangleStart]=useState(null),[hover,setHover]=useState(null);
   const [notice,setNotice]=useState(''),[storageError,setStorageError]=useState(false),[confirm,setConfirm]=useState(null);
@@ -213,7 +215,8 @@ function SimulatedMapStudio({initialStage='scan'}) {
     event.preventDefault();
     setDriveDirection('');
   };
-  return <section className="ls-studio">
+  if(showLibrary)return <section className="ls-studio"><div className="ls-heading"><h2>Thư viện bản đồ</h2><Button onClick={()=>setShowLibrary(false)}>← Quay lại</Button></div><SavedMapLibrary onOpen={(id,target)=>{setServerMapId(id);setRealScan(true);setStage(target);setShowLibrary(false);}}/></section>;
+  return <section className="ls-studio"><div className="ls-actions" style={{marginBottom:14}}><Button onClick={()=>{setDriveDirection('');setShowLibrary(true);}}>Map đã quét trong database</Button></div>
     <WorkspaceTabs label={vi('Map Studio stages')} active={stage} onSelect={target=>{if(serverMapId && target==='scan'){setServerMapId('');setRealScan(true);setStage('scan');return;}if(serverMapId && ['zone','endpoint'].includes(target)){setStage(target);return;}navigate(target);}} items={STAGES.map(([id,name],i)=>({id,label:`${i+1}. ${vi(name)}`,disabled:serverMapId?false:!stageEnabled(draft,id),hint:!serverMapId&&!stageEnabled(draft,id)?vi('Finish the scan first'):undefined}))}/>
     {serverMapId && stage!=='scan' ? <><div className="ls-topline"><span>Bản đồ robot đã lưu trên máy chủ</span><span>Map ID: {serverMapId}</span></div><header className="ls-heading"><div><h2>{index+1}. {vi(STAGES[index][1])}</h2><p>Thiết lập trực tiếp trên bản đồ máy chủ vừa quét.</p></div></header><FacilityCatalogEditor stage={stage} initialMapId={serverMapId}/></> : <>
     <div className="ls-topline"><span>{stage==='scan'&&realScan?'Bản đồ robot · dữ liệu máy chủ':draft.name}</span><span>{stage==='scan'&&realScan?'Ảnh quét được cập nhật từ BE':vi(storageError?'Storage unavailable — export your map':saved?'Map saved in this browser':'Draft autosaved in this browser')}</span></div>

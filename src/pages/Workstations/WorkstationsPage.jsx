@@ -9,6 +9,8 @@ const inlineStyles = String.raw`.ws-screen { min-width: 0; height: 100vh; overfl
 .ws-main--simulation { display: flex; flex-direction: column; }
 .ws-main--simulation .workflows-header { flex: 0 0 auto; }
 .ws-main--simulation .simulation-studio { flex: 1 1 auto; height: auto; min-height: 0; margin-top: 22px; }
+.ws-screen:has(.server-dispatch){height:auto;min-height:100vh;overflow:visible}
+.ws-main--simulation:has(.server-dispatch){height:auto;min-height:100vh;overflow:visible;display:block}
 .ws-screen h2 { font-size: 14px; font-weight: 600; line-height: 1.45; margin: 0; }
 .ws-screen p { line-height: 1.45; }
 .ws-dispatch-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 16px; height: calc(100vh - 230px); min-height: 0; margin-top: 24px; }
@@ -68,7 +70,7 @@ injectStyles('mediassist-style-pages-Workstations-WorkstationsPage-jsx', inlineS
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Sidebar, MarButton } from '../Workflows/WorkflowsPage.jsx';
-import MapDispatch from './MapDispatch.jsx';
+import DispatchWorkspace from './DispatchWorkspace.jsx';
 import routeMap from '../../assets/images/workstation-route.png';
 import { figmaScreens } from './figmaScreens.js';
 import { facilityApi } from '../../features/facility/facilityApi.js';
@@ -259,7 +261,7 @@ export default function WorkstationsPage() {
           <WorkspaceTabs label="Không gian quy trình" active="dispatch" onSelect={selectWorkspaceTab} items={workspaceTabs}/>
           <p className="preview-note">{vi("Chọn quy trình, ánh xạ các điểm đích và chạy trên bản đồ đã lưu từ Bản đồ.")}</p>
         </header>
-        <MapDispatch definitions={catalog.workflows} loading={catalog.loading} error={catalog.error} />
+        <DispatchWorkspace definitions={catalog.workflows} loading={catalog.loading} error={catalog.error} />
       </main>
     </div>;
   }

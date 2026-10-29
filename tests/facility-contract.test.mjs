@@ -50,10 +50,11 @@ test('BE zones retain category independently from local navigation rules',()=>{
 });
 test('BE endpoints use meters/radians and reject cross-map or cross-floor references',()=>{
  const form={endpointCode:'E1',endpointName:'Quầy',endpointType:'WAYPOINT',xM:-2,yM:4,yawRad:1.5708,active:true,accessible:true,publicVisible:false};
- const m={mapId:'map-a',floorId:'f1'},z=[{zoneId:'z',mapId:'map-b'}],rooms=[{roomId:'r',floorId:'f2'}];
+ const m={mapId:'map-a',floorId:'f1',originXM:-5,originYM:-2,originYawRad:0,widthM:40,heightM:20},z=[{zoneId:'z',mapId:'map-b'}],rooms=[{roomId:'r',floorId:'f2'}];
  assert.equal(endpointPayload(form,m,z,rooms).xM,-2);
  assert.throws(()=>endpointPayload({...form,zoneId:'z'},m,z,rooms),/cùng bản đồ/);
  assert.throws(()=>endpointPayload({...form,roomId:'r'},m,z,rooms),/thuộc tầng/);
  assert.throws(()=>endpointPayload({...form,yawRad:90},m,z,rooms),/radian/);
  assert.throws(()=>endpointPayload({...form,endpointType:'CHARGING'},m,z,rooms),/Loại điểm/);
+ assert.throws(()=>endpointPayload({...form,xM:1000},m,z,rooms),/trong ảnh bản đồ/);
 });

@@ -1,4 +1,5 @@
 // Test-only harness: the retained API catalog has no production Map Studio tab.
+import { BrowserRouter } from 'react-router-dom';
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../../src/pages/Admin/MapStudioFigma.jsx';
@@ -14,4 +15,4 @@ function Harness() {
     <Catalog stage={stage}/>
   </main>;
 }
-createRoot(document.getElementById('root')).render(<Harness/>);
+createRoot(document.getElementById('root')).render(<BrowserRouter><Harness/></BrowserRouter>);

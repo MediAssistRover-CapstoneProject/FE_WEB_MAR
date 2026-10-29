@@ -6,7 +6,7 @@ const browser=await chromium.launch({headless:true,executablePath:process.env.CH
 const context=await browser.newContext({viewport:{width:1440,height:1000}});
 await context.addInitScript(()=>sessionStorage.setItem('mediassist-rover.session',JSON.stringify({tokens:{accessToken:'test-not-a-real-token'},account:{role:'ADMIN'}})));
 const page=await context.newPage(),errors=[],writes=[],reads=[];page.on('pageerror',e=>errors.push(e.message));
-const map={mapId:'map-a',floorId:'f1',mapName:'Bản đồ BE thử nghiệm',mapCode:'MAP_A',versionNo:3,status:'ACTIVE',widthM:40,heightM:20,resolutionMPerPixel:.05,originXM:-5,originYM:-2,originYawRad:0,frameId:'map'};
+const map={mapId:'map-a',floorId:'f1',mapName:'Bản đồ BE thử nghiệm',mapCode:'MAP_A',versionNo:3,status:'DRAFT',widthM:40,heightM:20,resolutionMPerPixel:.05,originXM:-5,originYM:-2,originYawRad:0,frameId:'map'};
 const endpoint=(id,mapId)=>({endpointId:id,mapId,endpointCode:id,endpointName:id==='end-a'?'Điểm quầy A':'Điểm bản đồ khác',endpointType:'WAYPOINT',xM:2,yM:3,yawRad:0,active:true,accessible:true,publicVisible:false});
 const state={maps:[map],zones:[],rooms:[],endpoints:[endpoint('end-a','map-a'),endpoint('end-other','map-other')],'endpoint-groups':[],'endpoint-group-members':[]};
 let rejectNext=false;
@@ -15,11 +15,14 @@ await page.route(url=>url.pathname.startsWith('/api/'),async route=>{
  const reply=(data,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
  if(method==='GET'){
   reads.push(url.pathname+url.search);
+  if(url.pathname.endsWith('/image-metadata'))return reply({map_id:'map-a',width_px:800,height_px:400,resolution_m_per_pixel:.05,origin_x_m:-5,origin_y_m:-2,origin_yaw_rad:0});
+  if(url.pathname.endsWith('/image.png'))return route.fulfill({status:200,contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=','base64')});
   // Ensure page 2 is fetched, not a hidden first-page-only implementation.
   if(resource==='endpoints'&&url.searchParams.get('page')==='0')return reply({content:Array.from({length:100},(_,i)=>endpoint('foreign-'+i,'map-other')),last:false,totalPages:2});
   return reply({content:state[resource]||[],last:true,totalPages:resource==='endpoints'?2:1});
  }
  const body=req.postDataJSON();writes.push({path:url.pathname,method,body});
+ if(resource==='maps'&&parts[4]==='activate'){state.maps=state.maps.map(m=>({...m,status:'ACTIVE'}));return reply(state.maps[0]);}
  if(rejectNext){rejectNext=false;return reply({message:'Sequence number already exists in this group'},409);}
  if(resource==='endpoint-groups'){
   const result={...body,endpointGroupId:parts[3]||'group-a'};state[resource]=[result];return reply(result,method==='POST'?201:200);
@@ -65,8 +68,38 @@ try{
  assert.equal(writes.at(-1).body.zoneType,'NO_STOP');assert.equal(writes.at(-1).body.capacityLimit,20);
  for(const [width,height]of[[1920,1080],[1366,768],[1024,768],[390,844]]){await page.setViewportSize({width,height});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No overflow '+width);await page.screenshot({path:`.workstation-build/facility/zones-${width}.png`,fullPage:true});}
  await page.setViewportSize({width:1366,height:900});await page.getByRole('button',{name:'3. Điểm đích',exact:true}).click();await page.getByRole('button',{name:'Điểm đích',exact:true}).click();
- await page.getByLabel('Mã điểm BE',{exact:true}).fill('END_NEW');await page.getByLabel('Tên điểm BE',{exact:true}).fill('Điểm mới');await page.getByLabel('X (m)',{exact:true}).fill('5');await page.getByLabel('Y (m)',{exact:true}).fill('7');await page.getByLabel('Hướng đến (radian)',{exact:true}).fill('1.57');
- await page.getByRole('button',{name:'Lưu điểm lên BE',exact:true}).click();await page.getByText('Chỉnh điểm BE',{exact:true}).waitFor();assert.equal(writes.at(-1).body.yawRad,1.57);
- assert.deepEqual(errors,[]);assert.ok(writes.every(w=>/\/api\/v1\/(zones|endpoints|endpoint-groups|endpoint-group-members)/.test(w.path)));
+ await page.getByText('Bản đồ quét đã lưu · Bấm vùng hoặc điểm để chỉnh sửa.',{exact:false}).waitFor();
+ await page.getByRole('button',{name:'+ Điểm mới',exact:true}).click();
+ const canvas=page.getByRole('img',{name:'Lớp vùng và điểm đích BE theo mét',exact:true});
+ await canvas.scrollIntoViewIfNeeded();
+ const bounds=await canvas.boundingBox();await page.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height/2);await page.mouse.down();await page.mouse.move(bounds.x+bounds.width/2+60,bounds.y+bounds.height/2-60,{steps:5});await page.mouse.up();
+ let selectedX=Number(await page.getByLabel('X (m)',{exact:true}).inputValue()),selectedY=Number(await page.getByLabel('Y (m)',{exact:true}).inputValue());
+ assert.ok(Math.abs(selectedX-15)<.05);assert.ok(Math.abs(selectedY-8)<.05);
+ assert.ok(Math.abs(Number(await page.getByLabel('Hướng đến (độ)',{exact:true}).inputValue())-45)<2);
+ const previousX=selectedX,previousY=selectedY,previousAngle=await page.getByLabel('Hướng đến (độ)',{exact:true}).inputValue(),previousView=await canvas.getAttribute('viewBox'),writeCount=writes.length;
+ const marker=await page.locator('[data-draft-endpoint]').evaluate(node=>{const p=new DOMPoint(0,0).matrixTransform(node.getScreenCTM());return {x:p.x,y:p.y};});
+ await page.mouse.move(marker.x,marker.y);await page.mouse.down();await page.mouse.move(marker.x+65,marker.y+35,{steps:6});await page.mouse.up();
+ selectedX=Number(await page.getByLabel('X (m)',{exact:true}).inputValue());selectedY=Number(await page.getByLabel('Y (m)',{exact:true}).inputValue());
+ assert.ok(selectedX>previousX);assert.ok(selectedY<previousY);assert.equal(await page.getByLabel('Hướng đến (độ)',{exact:true}).inputValue(),previousAngle);assert.equal(await canvas.getAttribute('viewBox'),previousView);assert.equal(writes.length,writeCount);
+ await page.getByLabel('Mã điểm',{exact:true}).fill('END_NEW');await page.getByLabel('Tên điểm',{exact:true}).fill('Điểm mới');await page.getByLabel('Hướng đến (độ)',{exact:true}).fill('90');
+ await page.getByRole('button',{name:/Lưu điểm đích|Lưu thay đổi/ }).click();await page.getByText('Chỉnh điểm đích',{exact:true}).waitFor();assert.equal(writes.at(-1).body.yawRad,Math.PI/2);
+ assert.equal(writes.at(-1).body.mapId,'map-a');assert.equal(writes.at(-1).body.xM,selectedX);assert.equal(writes.at(-1).body.yM,selectedY);
+ assert.equal(writes.at(-1).method,'POST');assert.equal(writes.at(-1).body.endpointType,'WAYPOINT');assert.equal(writes.at(-1).body.active,true);assert.equal(writes.at(-1).body.accessible,true);
+ const countBefore=writes.length;
+ await page.getByLabel('X (m)',{exact:true}).fill('1000');await page.getByRole('button',{name:/Lưu điểm đích|Lưu thay đổi/ }).click();
+ await page.getByRole('status').filter({hasText:'Điểm đích phải nằm trong ảnh bản đồ'}).waitFor();assert.equal(writes.length,countBefore);
+ await page.getByLabel('X (m)',{exact:true}).fill(String(selectedX));await page.getByLabel('Tên điểm',{exact:true}).fill('Điểm đã sửa');
+ await page.getByRole('button',{name:/Lưu điểm đích|Lưu thay đổi/ }).click();await page.getByRole('status').filter({hasText:'BE đã lưu thành công.'}).waitFor();
+ assert.equal(writes.at(-1).method,'PUT');assert.equal(writes.at(-1).path,'/api/v1/endpoints/end-new');assert.equal(writes.at(-1).body.endpointType,'WAYPOINT');
+ await page.getByRole('button',{name:'-90°',exact:true}).click();assert.equal(Number(await page.getByLabel('Hướng đến (độ)',{exact:true}).inputValue()),-90);
+ assert.equal(await page.getByRole('button',{name:'Hoàn tất & kích hoạt bản đồ',exact:true}).isDisabled(),true);
+ await page.getByRole('button',{name:'Bỏ thay đổi',exact:true}).click();assert.equal(Number(await page.getByLabel('Hướng đến (độ)',{exact:true}).inputValue()),90);
+ await page.getByRole('button',{name:'Hoàn tất & kích hoạt bản đồ',exact:true}).click();await page.getByRole('button',{name:'✓ Bản đồ đã kích hoạt',exact:true}).waitFor();
+ assert.equal(writes.at(-1).path,'/api/v1/maps/map-a/activate');assert.equal(await page.getByRole('button',{name:'Mở Điều phối →',exact:true}).isEnabled(),true);
+ await page.getByRole('button',{name:'Công khai 2 điểm đích',exact:true}).click();await page.getByRole('button',{name:'Công khai 0 điểm đích',exact:true}).waitFor();
+ assert.ok(state.endpoints.filter(p=>p.mapId==='map-a').every(p=>p.publicVisible));assert.equal(state.endpoints.find(p=>p.mapId==='map-other').publicVisible,false);
+ await page.screenshot({path:'.workstation-build/facility/endpoint-map.png',fullPage:true});
+ for(const [width,height]of[[1024,768],[390,844]]){await page.setViewportSize({width,height});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Endpoint no overflow '+width);await page.screenshot({path:`.workstation-build/facility/endpoint-${width}.png`,fullPage:true});}
+ assert.deepEqual(errors,[]);assert.ok(writes.every(w=>/\/api\/v1\/(maps|zones|endpoints|endpoint-groups|endpoint-group-members)/.test(w.path)));
  console.log('PASS: paginated API catalog, map scoping, group/member CRUD + 409/204, zone + endpoint payload, responsive sizes. All writes mocked; no real BE mutations.');
 }catch(e){console.error(errors);await page.screenshot({path:'.workstation-build/facility/failure.png',fullPage:true});throw e;}finally{await browser.close();}

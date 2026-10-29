@@ -3,7 +3,10 @@ import { facilityApi as api, allFacilityPages } from '../../features/facility/fa
 import { ZONE_CATEGORIES,ENDPOINT_CATEGORIES,zonePayload,endpointPayload,groupFromApi,groupPayload } from '../../features/facility/facilityContract.js';
 import EndpointGroupEditor from './EndpointGroupEditor.jsx';
 import WorkspaceTabs from '../../components/WorkspaceTabs.jsx';
+import EndpointMapEditor from './EndpointMapEditor.jsx';
 import FacilityGeometryPreview, { polygonPoints } from './FacilityGeometryPreview.jsx';
+import { useNavigate } from 'react-router-dom';
+import { dispatchEndpoints, endpointDraftDirty } from '../../features/facility/mapPublishing.js';
 
 const zoneDefault={zoneCode:'',zoneName:'',zoneType:'KEEP_OUT',polygonJson:'{"points":[]}',speedLimitMps:'',capacityLimit:'',calibratedAreaM2:'',cameraSourceRef:'',cameraRoiJson:'',active:true,publicVisible:false,description:''};
 const endpointDefault={endpointCode:'',endpointName:'',endpointType:'WAYPOINT',xM:'',yM:'',yawRad:0,zoneId:'',roomId:'',active:true,accessible:true,publicVisible:false,description:''};
@@ -13,6 +16,7 @@ function Field({label,children,...props}){return <label className="ls-field">{la
 function Check({label,...props}){return <label className="ls-field"><span><input type="checkbox" {...props}/> {label}</span></label>;}
 
 export default function FacilityCatalogEditor({stage, initialMapId = ''}) {
+  const navigate=useNavigate();
   const [catalog,setCatalog]=useState(emptyCatalog),[mapId,setMapId]=useState(''),[status,setStatus]=useState('Đang tải danh mục…'),[busy,setBusy]=useState(false),[ready,setReady]=useState(false);
   const [zone,setZone]=useState(zoneDefault),[endpoint,setEndpoint]=useState(endpointDefault),[endpointTab,setEndpointTab]=useState('point');
   const [drawing,setDrawing]=useState(false);
@@ -36,15 +40,32 @@ export default function FacilityCatalogEditor({stage, initialMapId = ''}) {
   const upsert=(key,id,value)=>setCatalog(c=>({...c,[key]:[...c[key].filter(item=>item[id]!==value[id]),value]}));
   const editZone=id=>{const z=zones.find(z=>z.zoneId===id);setZone(z?{...z,polygonJson:jsonString(z.polygonJson),cameraRoiJson:jsonString(z.cameraRoiJson)}:{...zoneDefault});};
   const setZ=(key,value)=>setZone(z=>({...z,[key]:value}));
-  const setE=(key,value)=>setEndpoint(e=>({...e,[key]:value}));
+  const dirty=map&&endpointDraftDirty(endpoint,map,endpoints,zones,rooms);
+  const usable=dispatchEndpoints(endpoints,mapId);
+  const privatePoints=usable.filter(p=>!p.publicVisible);
+  const activate=()=>write(async()=>{
+    if(dirty)throw Error('Lưu hoặc bỏ thay đổi điểm đích trước khi kích hoạt.');
+    const result=await api.activateMap(mapId);
+    setCatalog(c=>({...c,maps:c.maps.map(m=>m.mapId===result.mapId?result:m.floorId===result.floorId&&m.status==='ACTIVE'?{...m,status:'INACTIVE'}:m)}));
+    window.dispatchEvent(new Event('mediassist-facility-updated'));
+  }).catch(()=>{});
+  const publishPoints=()=>write(async()=>{
+    for(const point of privatePoints){
+      const result=await api.updateEndpoint(point.endpointId,{...endpointPayload(point,map,zones,rooms),publicVisible:true});
+      upsert('endpoints','endpointId',result);
+      if(endpoint.endpointId===result.endpointId)setEndpoint({...result});
+    }
+    window.dispatchEvent(new Event('mediassist-facility-updated'));
+  }).catch(()=>{});
   return <div className="facility-catalog">
     <div className="ls-notice" role="status">{status}</div>
-    <section className="ls-panel"><div className="ls-actions"><strong>Danh mục máy chủ · không dùng tọa độ bản đồ mô phỏng</strong><button type="button" className="ls-btn" disabled={busy} onClick={reload}>Tải lại danh mục BE</button></div>
+    <section className="ls-panel facility-source"><div className="ls-actions"><strong>Bản đồ đang chỉnh sửa</strong><button type="button" className="ls-btn" disabled={busy} onClick={reload}>Tải lại danh mục BE</button></div>
       <Field label="Bản đồ BE"><select disabled={busy||!ready} value={mapId} onChange={e=>{setMapId(e.target.value);setZone({...zoneDefault});setEndpoint({...endpointDefault});}}><option value="">Chọn bản đồ</option>{catalog.maps.map(m=><option key={m.mapId} value={m.mapId}>{m.mapName} · v{m.versionNo} · {({ACTIVE:'Đang hoạt động',DRAFT:'Nháp',INACTIVE:'Không hoạt động',ARCHIVED:'Lưu trữ'})[m.status]||m.status}</option>)}</select></Field>
       {ready&&!catalog.maps.length&&<p>BE chưa có bản đồ. Cần bản đồ và dữ liệu quét hợp lệ do quy trình mapping của BE tạo; FE không tạo URI hoặc mã băm giả.</p>}
     </section>
     {map&&<>
-      <div className="ls-hint">{map.mapName} · Khung tọa độ {map.frameId} · {map.widthM} × {map.heightM} m · độ phân giải {map.resolutionMPerPixel} m/ô. Gốc ({map.originXM}, {map.originYM}) m, góc {map.originYawRad} rad. Bản mô phỏng cục bộ không được tự ghép vào bản đồ này.</div>
+      <div className="ls-hint">{map.mapName} · {map.widthM} × {map.heightM} m · {Number(map.resolutionMPerPixel)*100} cm/ô</div>
+      {stage==='endpoint'&&<section className="ls-panel ep-publish" aria-label="Hoàn tất bản đồ"><div><h3>Hoàn tất và đưa vào sử dụng <span className={'ep-mode '+(map.status==='ACTIVE'?'ep-live':'')}>{({DRAFT:'Nháp',ACTIVE:'Đang hoạt động',INACTIVE:'Không hoạt động',ARCHIVED:'Lưu trữ'})[map.status]||map.status}</span></h3><p>{usable.length} điểm có thể điều phối · {usable.filter(p=>p.publicVisible).length} điểm công khai</p><p>Kích hoạt để dùng map trong Điều phối. Mỗi tầng có một map hoạt động; map đang hoạt động trước đó sẽ chuyển sang không hoạt động.</p><p className="ls-error" style={{visibility:dirty?'visible':'hidden'}}>Lưu hoặc bỏ thay đổi điểm đích trước khi hoàn tất.</p></div><div className="ls-actions"><button type="button" className="ls-btn primary" disabled={busy||dirty||!usable.length||map.status==='ACTIVE'||map.status==='ARCHIVED'} onClick={activate}>{map.status==='ACTIVE'?'✓ Bản đồ đã kích hoạt':'Hoàn tất & kích hoạt bản đồ'}</button><button type="button" className="ls-btn" disabled={busy||dirty||!privatePoints.length||map.status==='ARCHIVED'} onClick={publishPoints}>Công khai {privatePoints.length} điểm đích</button><button type="button" className="ls-btn" disabled={busy||dirty||map.status!=='ACTIVE'||!usable.length} onClick={()=>navigate('/workstations?mapId='+encodeURIComponent(mapId))}>Mở Điều phối →</button></div></section>}
       {stage==='scan'&&<section className="ls-panel"><h3>Bản đồ đã có trên BE</h3><p>Quét thật cần robot, phiên mapping và artifact được BE xác minh. Trang này quản lý danh mục vùng/điểm trên bản đồ đã tồn tại; nút quét mô phỏng không gọi thiết bị hoặc thay thế bản quét thật.</p><p>Chuyển sang Vùng hoặc Điểm đích để cấu hình trên đúng mapId.</p><p><strong>Không có nhãn phòng trong dữ liệu quét gốc.</strong> Vùng, phòng và điểm đích là các lớp cấu hình thêm sau khi có hình học.</p></section>}
       {stage==='zone'&&<div className="ls-layout" style={{marginTop:16}}><section className="ls-panel"><h3>Vùng trên bản đồ · {zones.length}</h3><FacilityGeometryPreview map={map} zones={zones} endpoints={endpoints} zoneEdit={zone} drawing={drawing&&!busy} onZone={id=>{editZone(id);setDrawing(false);}} onPoint={p=>setZ('polygonJson',JSON.stringify({points:[...polygonPoints(zone.polygonJson),[p.xM,p.yM]]},null,2))}/><div className="ls-actions"><button className="ls-btn" disabled={busy} onClick={()=>setDrawing(d=>!d)}>{drawing?'Dừng vẽ vùng':'Vẽ thêm đỉnh vùng'}</button><button className="ls-btn" disabled={busy||!polygonPoints(zone.polygonJson).length} onClick={()=>setZ('polygonJson',JSON.stringify({points:polygonPoints(zone.polygonJson).slice(0,-1)},null,2))}>Bỏ đỉnh cuối</button><button className="ls-btn" disabled={busy} onClick={()=>setZ('polygonJson','{"points":[] }')}>Vẽ lại đa giác</button></div><p>Loại vùng BE chỉ gồm KEEP_OUT, SPEED và NO_STOP. Robot có thể đi qua NO_STOP nhưng không được đặt điểm đích hoặc dừng trong vùng.</p><div className="ls-item-list">{zones.map(z=><button type="button" className="ls-item" key={z.zoneId} disabled={busy} onClick={()=>editZone(z.zoneId)}><span><strong>{z.zoneName}</strong><small>{ZONE_CATEGORIES[z.zoneType]} · {z.zoneCode} · {z.active?'Bật':'Tắt'}</small></span></button>)}</div><button className="ls-btn" disabled={busy} onClick={()=>editZone('')}>+ Vùng BE mới</button><p>Đa giác dùng tọa độ mét trong khung bản đồ BE. Không bị giới hạn bởi tường; không thay đổi dữ liệu quét.</p></section>
         <section className="ls-panel"><h3>{zone.zoneId?'Chỉnh vùng BE':'Tạo vùng BE'}</h3><form onSubmit={e=>{e.preventDefault();write(async()=>{const payload=zonePayload(zone,mapId);const result=await(zone.zoneId?api.updateZone(zone.zoneId,payload):api.createZone(payload));upsert('zones','zoneId',result);setZone({...result,polygonJson:jsonString(result.polygonJson),cameraRoiJson:jsonString(result.cameraRoiJson)});}).catch(()=>{});}}><fieldset disabled={busy||map.status==='ARCHIVED'} style={{border:0,padding:0,minWidth:0}}>
@@ -60,14 +81,8 @@ export default function FacilityCatalogEditor({stage, initialMapId = ''}) {
           onSave={g=>write(async()=>{const result=await(g.id?api.updateEndpointGroup(g.id,groupPayload(g,mapId)):api.createEndpointGroup(groupPayload(g,mapId)));upsert('groups','endpointGroupId',result);return groupFromApi(result,catalog.members);})}
           onMember={(g,m,existing)=>write(async()=>{const body={endpointGroupId:g.id,...m};const result=await(existing?api.updateEndpointGroupMember(g.id,m.endpointId,body):api.createEndpointGroupMember(body));setCatalog(c=>({...c,members:[...c.members.filter(row=>!(row.endpointGroupId===g.id&&row.endpointId===m.endpointId)),result]}));})}
           onRemove={(g,m)=>write(async()=>{await api.removeEndpointGroupMember(g.id,m.endpointId);setCatalog(c=>({...c,members:c.members.map(row=>row.endpointGroupId===g.id&&row.endpointId===m.endpointId?{...row,active:false}:row)}));})}/>
-        :<div className="ls-layout" style={{marginTop:16}}><section className="ls-panel"><h3>Điểm đích BE · {endpoints.length}</h3><FacilityGeometryPreview map={map} zones={zones} endpoints={endpoints} endpointEdit={endpoint} drawing={drawing&&!busy} onEndpoint={p=>{setEndpoint({...p});setDrawing(false);}} onPoint={p=>{setEndpoint(e=>({...e,...p}));setDrawing(false);}}/><button className="ls-btn" disabled={busy} onClick={()=>setDrawing(d=>!d)}>{drawing?'Hủy đặt điểm':'Đặt điểm BE trên khung tọa độ'}</button><div className="ls-item-list">{endpoints.map(p=><button className="ls-item" type="button" key={p.endpointId} disabled={busy} onClick={()=>setEndpoint({...p})}><span><strong>{p.endpointName}</strong><small>{ENDPOINT_CATEGORIES[p.endpointType]} · ({p.xM}, {p.yM}) m · {p.active?'Bật':'Tắt'}</small></span></button>)}</div><button className="ls-btn" disabled={busy} onClick={()=>setEndpoint({...endpointDefault})}>+ Điểm BE mới</button><p>Điểm đích là vị trí chức năng kèm hướng đến, không phải vùng. Tác vụ, hàng chờ, quyền sở hữu và mẫu điểm OTTO không nằm trong EndpointRequest hiện tại.</p></section>
-          <section className="ls-panel"><h3>{endpoint.endpointId?'Chỉnh điểm BE':'Tạo điểm BE'}</h3><form onSubmit={e=>{e.preventDefault();write(async()=>{const payload=endpointPayload(endpoint,map,zones,rooms);const result=await(endpoint.endpointId?api.updateEndpoint(endpoint.endpointId,payload):api.createEndpoint(payload));upsert('endpoints','endpointId',result);setEndpoint({...result});}).catch(()=>{});}}><fieldset disabled={busy||map.status==='ARCHIVED'} style={{border:0,padding:0,minWidth:0}}>
-            <Field label="Mã điểm BE" required maxLength={64} value={endpoint.endpointCode} onChange={e=>setE('endpointCode',e.target.value)}/><Field label="Tên điểm BE" required maxLength={160} value={endpoint.endpointName} onChange={e=>setE('endpointName',e.target.value)}/><Field label="Chức năng điểm BE"><select value={endpoint.endpointType} onChange={e=>setE('endpointType',e.target.value)}>{Object.entries(ENDPOINT_CATEGORIES).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></Field>
-            <Field label="Vùng liên kết"><select value={endpoint.zoneId||''} onChange={e=>setE('zoneId',e.target.value)}><option value="">Không liên kết</option>{zones.map(z=><option key={z.zoneId} value={z.zoneId}>{z.zoneName}</option>)}</select></Field><Field label="Phòng liên kết"><select value={endpoint.roomId||''} onChange={e=>setE('roomId',e.target.value)}><option value="">Không liên kết</option>{rooms.map(r=><option key={r.roomId} value={r.roomId}>{r.roomName}</option>)}</select></Field>
-            {[['xM','X (m)'],['yM','Y (m)'],['yawRad','Hướng đến (radian)']].map(([key,label])=><Field key={key} label={label} type="number" step="any" required value={endpoint[key]} min={key==='yawRad'?-3.141593:undefined} max={key==='yawRad'?3.141593:undefined} onChange={e=>setE(key,e.target.value)}/>)}
-            <Field label="Mô tả điểm BE" value={endpoint.description||''} onChange={e=>setE('description',e.target.value)}/><Check label="Điểm hoạt động" checked={endpoint.active} onChange={e=>setE('active',e.target.checked)}/><Check label="Có thể tiếp cận" checked={endpoint.accessible} onChange={e=>setE('accessible',e.target.checked)}/><Check label="Hiển thị công khai điểm" checked={endpoint.publicVisible} onChange={e=>setE('publicVisible',e.target.checked)}/><button className="ls-btn primary" type="submit">Lưu điểm lên BE</button>
-          </fieldset></form></section></div>}
-        <p className="ls-hint">Nhóm BE dùng được trong quy trình hỗ trợ ENDPOINT_GROUP. BE thực hiện RESOLVE_TARGETS → SELECT_TARGET → MOVE; không ghép ID nhóm BE với bản đồ mô phỏng. Mô phỏng Điều phối sử dụng các nhóm đã lưu trong bản đồ cục bộ.</p>
+        :<EndpointMapEditor map={map} zones={zones} rooms={rooms} endpoints={endpoints} endpoint={endpoint} setEndpoint={setEndpoint} drawing={drawing} setDrawing={setDrawing} busy={busy} onSave={()=>write(async()=>{const payload=endpointPayload(endpoint,map,zones,rooms);const result=await(endpoint.endpointId?api.updateEndpoint(endpoint.endpointId,payload):api.createEndpoint(payload));upsert('endpoints','endpointId',result);setEndpoint({...result});setDrawing(false);}).catch(()=>{})}/>}
+        {endpointTab==='group'&&<p className="ls-hint">Nhóm điểm giúp sắp xếp thứ tự và chọn điểm đích khi thiết lập quy trình.</p>}
       </>}
     </>}
   </div>;

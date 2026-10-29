@@ -1,3 +1,4 @@
+import { insideMap } from './mapCoordinates.js';
 export const ZONE_CATEGORIES={KEEP_OUT:'Khu vực cấm',SPEED:'Khu vực giới hạn tốc độ',NO_STOP:'Khu vực không được dừng'};
 export const ENDPOINT_CATEGORIES={WAYPOINT:'Điểm đường',CHARGER:'Điểm sạc',PARK:'Điểm đỗ',STAGING:'Điểm tập kết'};
 const text=(value,name,max)=>{if(typeof value!=='string'||!value.trim()||value.length>max)throw Error(`${name} bắt buộc, tối đa ${max} ký tự.`);return value.trim();};
@@ -35,6 +36,7 @@ export function endpointPayload(form,map,zones,rooms) {
   if(form.roomId&&!rooms.some(r=>r.roomId===form.roomId&&r.floorId===map.floorId))throw Error('Phòng phải thuộc tầng của bản đồ.');
   const yawRad=number(form.yawRad,'Góc hướng');
   if(yawRad < -3.141593 || yawRad > 3.141593)throw Error('Góc hướng từ -π đến π radian.');
+  if(!insideMap(map,number(form.xM,'X (m)'),number(form.yM,'Y (m)')))throw Error('Điểm đích phải nằm trong ảnh bản đồ đã chọn.');
   return {mapId:map.mapId,zoneId:form.zoneId||null,roomId:form.roomId||null,endpointCode:text(form.endpointCode,'Mã điểm',64),endpointName:text(form.endpointName,'Tên điểm',160),endpointType:form.endpointType,
     xM:number(form.xM,'X (m)'),yM:number(form.yM,'Y (m)'),yawRad,active:!!form.active,accessible:!!form.accessible,publicVisible:!!form.publicVisible,description:form.description||''};
 }

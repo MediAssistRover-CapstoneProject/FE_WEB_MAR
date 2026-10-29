@@ -2,7 +2,7 @@ import { clearSession, getRefreshToken, getSession, updateTokens } from '../auth
 
 // Local development uses the backend configured in Be/BE_MAR/.env.
 // Deployments override this through VITE_API_BASE_URL during their build.
-const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? 'http://localhost:8080').trim().replace(/\/+$/, '');
+const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? (import.meta.env?.DEV && import.meta.env?.VITE_DEV_PROXY_TARGET ? '' : 'http://localhost:8080')).trim().replace(/\/+$/, '');
 let refreshing = null;
 
 export class ApiError extends Error {
