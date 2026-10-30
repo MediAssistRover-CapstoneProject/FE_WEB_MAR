@@ -10,8 +10,7 @@ import ListFilters from './ListFilters.jsx';
 import OperationsReport from './OperationsReport.jsx';
 import FacilityCatalogEditor from '../FacilityCatalogEditor.jsx';
 import SpeechAnnouncement from '../robotOperations/SpeechAnnouncement.jsx';
-import LiveMapping from '../robotOperations/LiveMapping.jsx';
-import { RobotCameraSettings } from '../SystemSettings.jsx';
+import { RobotConnectionSettings } from '../SystemSettings.jsx';
 import { CatalogNavigation, DataSource, EmptyRecords, JobSteps, RecordSummary, WorkspaceIntro, enhancedSection, resourceHints } from './WorkspaceOverview.jsx';
 import './backend.css';
 import './presentation.css';
@@ -38,7 +37,7 @@ function ChargingWorkspace() {
 }
 function ResourceWorkspace({ section }) {
   const role = getSession()?.account?.role;
-  const available = [...(section === 'Voice & Scripts' ? [{ id: 'speech-announcement', title: 'Phát thông báo' }] : []), ...resources.filter(r => r.section === section && (!r.adminOnly || role === 'ADMIN') && (!r.staffOnly || role === 'STAFF')), ...(section === 'System Settings' && role === 'ADMIN' ? [{ id: 'mapping-session', title: 'Phiên quét robot' }] : [])];
+  const available = [...(section === 'Voice & Scripts' ? [{ id: 'speech-announcement', title: 'Phát thông báo' }] : []), ...resources.filter(r => r.section === section && (!r.adminOnly || role === 'ADMIN') && (!r.staffOnly || role === 'STAFF')), ...(section === 'System Settings' && role === 'ADMIN' ? [{ id: 'robot-camera', title: 'Nguồn camera' }] : [])];
   const [tab, setTab] = useState(available[0]?.id);
   const [geometry, setGeometry] = useState('');
   const resource = available.find(r => r.id === tab) || available[0];
@@ -47,7 +46,7 @@ function ResourceWorkspace({ section }) {
     {section === 'Facility Management' && role === 'ADMIN' && <div className="be-actions"><button type="button" aria-pressed={!geometry} onClick={() => setGeometry('')}>Danh mục máy chủ</button><button type="button" aria-pressed={geometry === 'zone'} onClick={() => setGeometry('zone')}>Vẽ vùng trên bản đồ máy chủ</button><button type="button" aria-pressed={geometry === 'endpoint'} onClick={() => setGeometry('endpoint')}>Đặt điểm và nhóm trên bản đồ máy chủ</button></div>}
     {geometry ? <div className="ls-studio"><FacilityCatalogEditor key={geometry} stage={geometry} /></div> : <>
     {available.length > 1 && (['Facility Management', 'Public Catalog'].includes(section) ? <CatalogNavigation available={available} resource={resource} onSelect={setTab} section={section} /> : <nav className="be-tabs" aria-label="Danh mục chức năng">{available.map(r => <button type="button" key={r.id} className={resource?.id === r.id ? 'selected' : ''} aria-pressed={resource?.id === r.id} onClick={() => setTab(r.id)}>{r.title}</button>)}</nav>)}
-    {resource?.id === 'speech-announcement' ? <SpeechAnnouncement /> : resource?.id === 'mapping-session' ? <div className="be-card"><h2>Phiên quét robot</h2><p>Thiết lập phiên quét và nguồn camera. Xem ảnh LiDAR và camera tại Bản đồ → Quét.</p><RobotCameraSettings /><LiveMapping configurationOnly /></div> : resource ? <ResourcePanel key={resource.id} resource={resource} role={role} /> : <p role="status">Tài khoản này không có quyền sử dụng mục này.</p>}
+    {resource?.id === 'speech-announcement' ? <SpeechAnnouncement /> : resource?.id === 'robot-camera' ? <div className="be-card"><h2>Nguồn camera robot</h2><p>Cấu hình nguồn video dùng chung khi theo dõi robot.</p><RobotConnectionSettings /></div> : resource ? <ResourcePanel key={resource.id} resource={resource} role={role} /> : <p role="status">Tài khoản này không có quyền sử dụng mục này.</p>}
     </>}
   </section>;
 }

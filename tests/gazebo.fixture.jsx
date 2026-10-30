@@ -4,7 +4,7 @@ import GazeboPanel from '../src/pages/Admin/GazeboPanel.jsx';
 import { createDraft } from '../src/pages/Admin/mapStudioModel.js';
 import {localMockMap,rosToWeb,mapBinding} from '../src/features/maps/MapProvider.js';
 import '../src/pages/Admin/patrol.css';
-import '../src/pages/Admin/MapStudioFigma.jsx';
+import '../src/pages/Admin/mapStudio.css';
 if(location.port!=='5175')throw Error('Fixture requires isolated origin 5175');
 localStorage.setItem('mediassist-rover.session',JSON.stringify({account:{role:'ADMIN'},tokens:{accessToken:'browser-fixture-only'}}));
 const map={...createDraft(),mapSource:mapBinding(),name:'Bản đồ LiDAR · Kiểm thử',scan:{status:'complete',progress:100},endpoints:[0,.4].map((dx,i)=>({id:'ep'+i,name:'Điểm '+i,...rosToWeb({...localMockMap.spawn,x:localMockMap.spawn.x+dx})}))};

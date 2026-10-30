@@ -6,8 +6,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_EXECUTABLE });
 const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:5175';
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
-await context.addInitScript(() => { if (!sessionStorage.getItem('mediassist-rover.session')) sessionStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { role: 'ADMIN', username: 'test' }, tokens: { accessToken: 'test-only' } })); });
-let job = null, speechJob = null, receipt = null, mappingOpen = false, ready = true, failPoll = false, camera = false, pendingTts = 0, ttsFailure = false, emptyCatalog = false, rejectMotion = false, forbidCatalog = false, saveFailure = true;
+await context.addInitScript(() => { if (!localStorage.getItem('mediassist-rover.session')) localStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { role: 'ADMIN', username: 'test' }, tokens: { accessToken: 'test-only' } })); });
+let job = null, speechJob = null, receipt = null, mappingOpen = false, ready = true, failPoll = false, camera = false, pendingTts = 0, ttsFailure = false, emptyCatalog = false, rejectMotion = false, forbidCatalog = false, saveFailure = true, accountRole = 'ADMIN';
 const writes = [], errors = [];
 const workflow = (id, type) => ({ workflow: { workflowId: id, workflowName: type === 'MAPPING' ? 'Quét và lưu' : 'Thông báo chung', serviceType: type, schemaVersion: 3, status: 'PUBLISHED', acceptsNewJobs: true, definitionHash: 'fixture', versionNo: 1 }, steps: [{ enabled: true, stepTypeCode: 'INTERACT', paramsJson: { action: 'SPEAK' } }] });
 const robot = () => ({ robotId: 'robot-1', robotName: 'Robot thử nghiệm', status: job && ['RUNNING', 'QUEUED', 'RECOVERY_REQUIRED'].includes(job.status) ? 'BUSY' : 'IDLE' });
@@ -16,7 +16,7 @@ await context.route('**/api/v1/**', async route => {
   const req = route.request(), path = new URL(req.url()).pathname, method = req.method();
   const json = (value, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) });
   if (method === 'POST') writes.push({ path, body: req.postDataJSON(), at: Date.now(), headers: req.headers() });
-  if (path === '/api/v1/auth/me') return json({ role: 'ADMIN', username: 'test' });
+  if (path === '/api/v1/auth/me') return json({ role: accountRole, username: 'test' });
   if (path === '/api/v1/robots') return forbidCatalog ? json({ message: 'Forbidden' }, 403) : json({ content: emptyCatalog ? [] : [robot()], last: true });
   if (path === '/api/v1/floors') return json({ content: emptyCatalog ? [] : [{ floorId: 'floor-1', floorName: 'Tầng 1', active: true }], last: true });
   if (path.endsWith('/published/all')) return json(emptyCatalog ? [] : [workflow('map-workflow', 'MAPPING'), workflow('speech-workflow', 'SPEECH'), { workflow: { ...workflow('wrong', 'MAPPING').workflow, schemaVersion: 2 } }]);
@@ -33,6 +33,7 @@ await context.route('**/api/v1/**', async route => {
     return receipt ? json(receipt) : route.fulfill({ status: 204 });
   }
   if (path.endsWith('/events') && method === 'POST') { if (saveFailure) { saveFailure = false; return json({ message: 'Temporary failure' }, 503); } return json({ accepted: true }); }
+  if(path.endsWith('/image-metadata'))return json({map_id:'server-map',width_px:200,height_px:200,resolution_m_per_pixel:.05,origin_x_m:0,origin_y_m:0,origin_yaw_rad:0});
   if (path.endsWith('.jpg') || path.endsWith('.png')) return camera ? route.fulfill({ status: 200, contentType: 'image/png', headers: { 'X-Captured-At': new Date().toISOString(), 'X-Frame-Revision': '3', 'Access-Control-Expose-Headers': 'X-Captured-At, X-Frame-Revision' }, body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=', 'base64') }) : route.fulfill({ status: 204 });
   if (path === '/api/v1/pi/speech/prepare') return ttsFailure ? json({ message: 'TTS_DISABLED' }, 503) : json({ state: pendingTts++ === 0 ? 'PENDING' : 'READY' });
   if (path === '/api/v1/speech-jobs') { speechJob = { jobId: 'speech-job', status: 'QUEUED', robotId: 'robot-1', queuedAt: new Date().toISOString(), inputJson: { speech_text: req.postDataJSON().text } }; return json({ jobId: 'speech-job' }, 201); }
@@ -47,14 +48,35 @@ const waitUntil = async check => { for (let i = 0; i < 60; i++) { if (await chec
 const hold = async (name, ms = 720) => { await btn(name).hover(); await page.mouse.down(); await page.waitForTimeout(ms); await page.mouse.up(); await page.waitForTimeout(100); };
 try {
   await mkdir('.workstation-build/robot-operations', { recursive: true });
-  await page.goto(`${base}/admin?screen=Map+Studio`);
+  await page.goto(`${base}/admin/system-settings`);
+  await btn('Nguồn camera').click();
+  await page.getByLabel('URL video trực tiếp từ robot').waitFor();
+  assert.equal(await page.getByText('Chi tiết quét map mới',{exact:true}).count(),0,'Session setup moved out of settings');
+  assert.equal(await btn('Tạo nhiệm vụ quét').count(),0);
+  assert.equal(writes.length,0);
+  await page.getByRole('link',{name:'Mở Quét map mới →',exact:true}).click();
+  assert.ok(page.url().includes('stage=scan'),'Settings opens the scan directly');
   assert.equal(await btn('Robot thật').count(), 0);
   await page.getByText('Chi tiết quét map mới').waitFor();
+  const setup=page.locator('.ro-setup'),setupSummary=setup.locator(':scope>summary');
+  assert.equal(await setup.evaluate(node=>node.open),false,'Setup starts collapsed');
+  await page.screenshot({path:'.workstation-build/robot-operations/mapping-compact.png',fullPage:true});
+  await setupSummary.click();
   await page.getByLabel('Robot', { exact: true }).selectOption('robot-1');
   await page.getByLabel('Tầng', { exact: true }).selectOption('floor-1');
   await page.getByLabel('Quy trình quét đã phát hành').selectOption('map-workflow');
   assert.equal(await page.getByLabel('Quy trình quét đã phát hành').locator('option').count(), 2);
   await page.getByLabel('Tên bản đồ', { exact: true }).fill('Bản đồ kiểm thử');
+  await setupSummary.click();
+  await setupSummary.getByText(/Robot thử nghiệm · Tầng 1 · Bản đồ kiểm thử/).waitFor();
+  assert.equal(await page.getByLabel('Tên bản đồ',{exact:true}).isVisible(),false);
+  await page.setViewportSize({width:390,height:844});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  await page.screenshot({path:'.workstation-build/robot-operations/mapping-compact-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1440,height:1000});
+  await setupSummary.click();
+  assert.equal(await page.getByLabel('Tên bản đồ',{exact:true}).inputValue(),'Bản đồ kiểm thử','Collapsing retains the form');
+  await page.screenshot({path:'.workstation-build/robot-operations/mapping-setup.png',fullPage:true});
   await waitUntil(async () => !(await btn('Tạo nhiệm vụ quét').isDisabled()));
   await btn('Tạo nhiệm vụ quét').click();
   await page.getByText('Đang chờ robot', { exact: true }).waitFor();
@@ -67,10 +89,23 @@ try {
   camera = true;
   await page.getByAltText('Bản đồ đang quét từ robot').waitFor();
   await page.getByAltText('Ảnh camera robot qua MQTT').waitFor();
+  const mapViewport=page.locator('.ro-map-card .ro-preview.map');
+  assert.equal((await mapViewport.boundingBox()).height,700,'Map uses the requested desktop height');
+  const beforeZoom=writes.length;
+  await btn('Phóng to bản đồ').click();
+  assert.ok(await mapViewport.evaluate(node=>node.scrollWidth>node.clientWidth),'Zoom allows scrolling the map');
+  await btn('Vừa khung').click();
+  assert.equal(writes.length,beforeZoom,'Map display controls send no robot commands');
+  if(await page.evaluate(()=>document.fullscreenEnabled)){
+    await btn('Toàn màn hình').click();
+    await page.waitForFunction(()=>document.fullscreenElement?.classList.contains('ro-map-card'));
+    await btn('Thoát toàn màn hình').click();
+    await page.waitForFunction(()=>!document.fullscreenElement);
+  }
   await hold('↑ Tiến');
   const commands = writes.filter(w => w.path.endsWith('/mapping-control'));
   assert.ok(commands.length >= 3); assert.equal(commands.at(-1).body.linearX, 0);
-  for (const c of commands) { assert.equal(c.body.durationMs, 600); assert.ok(c.body.controlSessionId); assert.ok(c.body.requestedAt); assert.ok(c.headers.authorization === 'Bearer test-only'); }
+  for (const c of commands) { assert.equal(c.body.durationMs, 900); assert.ok(c.body.controlSessionId); assert.ok(c.body.requestedAt); assert.ok(c.headers.authorization === 'Bearer test-only'); }
   for (let i = 1; i < commands.length; i++) { assert.ok(commands[i].body.controlSequence > commands[i-1].body.controlSequence); if (commands[i].body.linearX) assert.ok(commands[i].at - commands[i-1].at >= 250); }
   await page.screenshot({ path: '.workstation-build/robot-operations/mapping-desktop.png', fullPage: true });
   // Focus loss and disconnected polling both stop renewal.
@@ -90,8 +125,8 @@ try {
   await waitUntil(async () => !(await btn('Gửi lại yêu cầu lưu đã tạo').isDisabled())); await btn('Gửi lại yêu cầu lưu đã tạo').click();
   await waitUntil(() => writes.filter(w => w.path.endsWith('/events')).length === 2);
   assert.deepEqual(writes.filter(w => w.path.endsWith('/events'))[1].body, saved.body, 'Save retry must preserve event ID AND timestamp');
-  assert.equal(await btn('Cấu hình vùng trên bản đồ đã lưu').count(), 0);
-  job.status = 'SUCCEEDED'; await btn('Cấu hình vùng trên bản đồ đã lưu').waitFor(); await btn('Cấu hình vùng trên bản đồ đã lưu').click();
+  assert.equal(await btn('Vẽ Zone trên map này →').count(), 0);
+  job.status = 'SUCCEEDED'; await btn('Vẽ Zone trên map này →').waitFor(); await btn('Vẽ Zone trên map này →').click();
   await waitUntil(async () => await page.getByLabel('Bản đồ BE', { exact: true }).inputValue() === 'server-map');
   // Speech is in Automation; no duplication in scan.
   await page.goto(`${base}/admin?screen=Voice+%26+Scripts`);
@@ -113,22 +148,23 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: '.workstation-build/robot-operations/speech-mobile.png', fullPage: true });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
-  await page.goto(`${base}/admin?screen=Map+Studio`); await page.getByRole('region', { name: 'Quét bằng robot thật' }).waitFor();
+  await page.goto(`${base}/admin/map?stage=scan`); await page.getByRole('region', { name: 'Quét bằng robot thật' }).waitFor();
   await page.screenshot({ path: '.workstation-build/robot-operations/mapping-mobile.png', fullPage: true });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
-  // The local simulation remains available without sending robot commands.
-  const beforeDemo = writes.length; await btn('Xem bản đồ mô phỏng').click(); await hold('Giữ để robot tiến thẳng'); assert.equal(writes.length, beforeDemo);
-  assert.equal(await page.getByRole('button', { name: 'Giữ để robot lùi', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: /mô phỏng/i }).count(), 0);
   // UI permission guard, then empty catalog and server permission rejection.
-  await page.evaluate(() => sessionStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { username: 'test', role: 'STAFF' }, tokens: { accessToken: 'test-only' } })));
+  accountRole='STAFF';
+  await page.evaluate(() => localStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { username: 'test', role: 'STAFF' }, tokens: { accessToken: 'test-only' } })));
   await page.reload(); await page.getByText('Chỉ quản trị viên đăng nhập thật được tạo phiên quét và điều khiển robot.', { exact: false }).waitFor();
   assert.equal(await btn('Tạo nhiệm vụ quét').count(), 0);
-  await page.evaluate(() => { sessionStorage.clear(); }); emptyCatalog = true;
-  await page.reload(); await page.getByText('Cần robot đã đăng ký, tầng đang hoạt động và quy trình quét đã phát hành.', { exact: false }).waitFor();
+  accountRole='ADMIN';await page.evaluate(() => { sessionStorage.clear();localStorage.removeItem('mediassist-rover.session'); }); emptyCatalog = true;
+  await page.reload(); await page.locator('.ro-setup>summary').waitFor();
+  if(!await page.locator('.ro-setup').evaluate(node=>node.open))await page.locator('.ro-setup>summary').click();
+  await page.getByText('Cần robot đã đăng ký, tầng đang hoạt động và quy trình quét đã phát hành.', { exact: false }).waitFor();
   assert.equal(await btn('Tạo nhiệm vụ quét').isDisabled(), true);
   forbidCatalog = true; await btn('Tải lại trạng thái').click(); await page.getByRole('alert').getByText('Tài khoản không có quyền thực hiện thao tác này.').waitFor();
   assert.deepEqual(errors, []);
-  console.log('PASS: mapping lifecycle, payloads, pulse pacing/release, blur, offline, Pi rejection, recovery, reload, save handoff, speech pending/ready/failure, mobile, demo isolation, permissions and empty catalog. All API writes intercepted.');
+  console.log('PASS: mapping lifecycle, payloads, pulse pacing/release, blur, offline, Pi rejection, recovery, reload, save handoff, speech pending/ready/failure, mobile, permissions and empty catalog. All API writes intercepted.');
 } catch (error) {
   console.error('PAGE ERRORS', errors, 'URL', page.url(), (await page.locator('body').innerText()).slice(0, 4000));
   await page.screenshot({ path: '.workstation-build/robot-operations/failure.png', fullPage: true });

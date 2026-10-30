@@ -1,5 +1,32 @@
 # Kiểm tra FE
 
+## Bản đồ chọn từ database (31/10/2026)
+
+Trang `/admin/map` mở thư viện map database trước. Vùng và Điểm đích dùng
+map đã chọn, giữ lựa chọn khi đổi tab hoặc quay lại từ Quét. Bản nháp mô phỏng
+trong localStorage không còn được đọc hoặc ghi bởi trang Bản đồ. Đã gỡ luồng
+xem bản đồ mô phỏng, điều khiển/quét giả và xuất bản nháp mô phỏng khỏi trang này.
+Danh sách map nằm trong khung mở/đóng, tự thu gọn sau khi chọn và giữ map đang
+dùng khi quay lại thư viện. Phần xem trước có chiều cao giới hạn trên desktop/mobile.
+“Quét map mới” mở trực tiếp thiết lập robot/tầng/tên map/quy trình ngay trên
+trang Quét (`/admin/map?stage=scan`), cùng trạng thái, camera, điều khiển và lưu map.
+Form mặc định thu gọn, có nút Hiện/Ẩn chi tiết và tóm tắt lựa chọn; giữ dữ liệu
+khi đóng/mở và tự thu gọn sau khi tạo phiên. Cài đặt hệ thống
+giữ cấu hình kết nối/nguồn camera và đường dẫn sang trang Quét.
+Khung map cao 700px trên desktop, 280px trên mobile; giữ tỉ lệ ảnh,
+có phóng to/thu nhỏ, vừa khung và toàn màn hình cho cả ảnh đang quét và ảnh đã lưu.
+
+Chạy Vite tại cổng 5175 và đặt `PLAYWRIGHT_MODULE`, `CHROME_EXECUTABLE` theo
+hướng dẫn bên dưới:
+
+```powershell
+node tests/map-database-flow.browser.mjs
+```
+
+Kiểm tra bản nháp cũ, trình duyệt chưa quét, đổi map/tab, URL `mapId`, database
+trống/lỗi và màn hình 390px. Toàn bộ API được giả lập; không ghi vào BE thật.
+Ảnh kết quả tại `.workstation-build/map-database-flow/`.
+
 ## Tuần tra dùng bản đồ cục bộ (22/10/2026)
 
 Quy trình tuần tra lấy điểm từ cùng snapshot đã lưu của Bản đồ/Điều phối.
@@ -55,12 +82,9 @@ node --test tests/map-setup.test.mjs tests/map-studio.test.mjs tests/map-feature
 Yêu cầu Chrome, Playwright và FE đang chạy tại cổng 5173. Đặt `PLAYWRIGHT_MODULE` trỏ đến module Playwright và `CHROME_EXECUTABLE` trỏ đến Chrome đã cài, sau đó chạy:
 
 ```powershell
-node tests/map-studio.browser.mjs
-node tests/map-feature-drag.browser.mjs
-node tests/endpoint-group-delete.browser.mjs
+node tests/map-database-flow.browser.mjs
 node tests/facility-catalog.browser.mjs
 node tests/dispatch.browser.mjs
-node tests/zone-traffic.browser.mjs
 ```
 
 Ảnh kiểm tra được lưu trong `.workstation-build/`, thư mục này đã được Git bỏ qua.

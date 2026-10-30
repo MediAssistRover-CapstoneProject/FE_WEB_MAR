@@ -2,7 +2,7 @@
 import { BrowserRouter } from 'react-router-dom';
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import '../../src/pages/Admin/MapStudioFigma.jsx';
+import '../../src/pages/Admin/mapStudio.css';
 import Catalog from '../../src/pages/Admin/FacilityCatalogEditor.jsx';
 import WorkspaceTabs from '../../src/components/WorkspaceTabs.jsx';
 

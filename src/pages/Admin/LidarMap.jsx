@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, memo } from 'react';
 import { FLOOR, MAP, OBSTACLES, SCAN_START, WALLS, inPolygon, rayHits, scanPosition } from './lidarGeometry.js';
 import { ZONE_TYPES } from './mapStudioModel.js';
 import { dragFeature } from './mapFeatureDrag.js';
+import './lidarMap.css';
 
 const LOCAL_MAP_ARTIFACT = { src:model.imagePath, widthPx:model.width, heightPx:model.height, widthM:model.width*model.resolution, heightM:model.height*model.resolution, resolution:model.resolution };
 const MOCK_MAP_ROTATION_DEG = viewTransform().angle*180/Math.PI;

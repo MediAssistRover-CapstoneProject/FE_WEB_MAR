@@ -2,9 +2,8 @@ import { vi } from '../../i18n/vi.js';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LidarMap from '../Admin/LidarMap.jsx';
-import '../Admin/MapStudioFigma.jsx';
+import '../Admin/mapStudio.css';
 import { loadDraft } from '../Admin/mapStudioModel.js';
-import { TASK_NAMES } from '../Admin/MapFeatureProperties.jsx';
 import { createDispatchPlan, samplePlan } from './mapDispatchModel.js';
 import { injectStyles } from '../../styles/injectStyles.js';
 import { groupsFor, SELECTION_POLICIES } from '../../features/facility/endpointGroups.js';
@@ -12,6 +11,7 @@ import { applyTrafficScenario, trafficState } from './trafficSimulation.js';
 import TrafficScenarioControls from './TrafficScenarioControls.jsx';
 import '../Admin/patrol.css';
 const ThreePreview = lazy(() => import('../Admin/PatrolThreePreview.jsx'));
+const TASK_NAMES={WAIT:'Chờ tại điểm',LOAD:'Nhận hàng',UNLOAD:'Giao hàng',CHARGE:'Sạc mô phỏng',NOTIFY:'Thông báo hoàn tất'};
 
 injectStyles('map-dispatch-linked',`
 .ls-map-frame{background:#121416}
