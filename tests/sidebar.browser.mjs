@@ -12,13 +12,14 @@ await context.addInitScript(() => { if (!sessionStorage.getItem('mediassist-rove
   account: { username: 'admin', role: 'ADMIN' }, tokens: { accessToken: 'sidebar-test' },
 })); });
 const page = await context.newPage();
+const base=process.env.TEST_URL||'http://127.0.0.1:5175';
 await page.route('**/api/v1/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [], totalElements: 0, totalPages: 0 }) }));
 
 try {
   const screens = navigationGroups.flatMap(([, items]) => items);
   assert.equal(new Set(screens).size, screens.length, 'Mỗi màn hình chỉ xuất hiện một lần trong cấu trúc menu');
 
-  await page.goto('http://127.0.0.1:5173/admin');
+  await page.goto(base+'/admin');
   const sidebar = page.locator('aside.sidebar');
   const menu = sidebar.getByRole('navigation', { name: 'Điều hướng quản trị' });
   await menu.getByRole('button', { name: vi('Overview') }).waitFor();
@@ -32,29 +33,32 @@ try {
   await menu.getByRole('button', { name: vi('Automation') }).click();
   await menu.getByRole('button', { name: 'Thiết kế quy trình' }).waitFor();
   await menu.getByRole('button', { name: 'Danh mục quy trình' }).click();
-  await page.waitForFunction(() => new URLSearchParams(location.search).get('screen') === 'Workflow Management');
+  await page.waitForURL('**/admin/workflow-catalog');
   assert.equal(await menu.getByRole('button', { name: vi('Automation') }).getAttribute('aria-expanded'), 'true');
   await menu.getByRole('button', { name: 'Thiết kế quy trình' }).click();
-  await page.waitForURL('**/workflows');
+  await page.waitForURL(/\/workflow(s)?$/);
   const workflowSidebar = page.locator('aside.mediassist-sidebar');
   await workflowSidebar.getByRole('button', { name: vi('Automation') }).waitFor();
   assert.equal(Math.round((await workflowSidebar.boundingBox()).width), 248);
   assert.equal(await workflowSidebar.getByRole('button', { name: vi('Automation') }).getAttribute('aria-expanded'), 'true');
-  assert.equal(await workflowSidebar.getByRole('button', { name: vi('Automation') }).evaluate(element => getComputedStyle(element).backgroundColor), 'rgb(234, 242, 255)');
+  assert.equal(await workflowSidebar.getByRole('button', { name: vi('Automation') }).evaluate(element => getComputedStyle(element).backgroundColor), 'rgb(245, 248, 254)');
   await page.screenshot({ path: '.workstation-build/sidebar-workflows.png' });
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('http://127.0.0.1:5173/admin');
+  await page.goto(base+'/admin');
   await page.getByRole('button', { name: 'Mở menu' }).click();
   assert.equal(await sidebar.isVisible(), true);
   await page.waitForTimeout(250);
   assert.ok((await sidebar.boundingBox()).x >= 0, 'Menu mobile phải nằm trong khung nhìn');
   await page.screenshot({ path: '.workstation-build/sidebar-mobile.png' });
-  await sidebar.getByRole('button', { name: 'Tài khoản của tôi' }).click();
-  await page.waitForFunction(() => new URLSearchParams(location.search).get('screen') === 'My Account');
+  await page.keyboard.press('Escape');
   assert.equal(await sidebar.isVisible(), false);
-  await page.evaluate(() => sessionStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { username: 'staff', role: 'STAFF' }, tokens: { accessToken: 'sidebar-test' } })));
-  await page.goto('http://127.0.0.1:5173/admin');
+  await page.getByRole('button', { name: 'Mở menu' }).click();
+  await sidebar.getByRole('button', { name: 'Tài khoản của tôi' }).click();
+  await page.waitForURL('**/admin/my-account');
+  assert.equal(await sidebar.isVisible(), false);
+  await page.evaluate(() => localStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { username: 'staff', role: 'STAFF' }, tokens: { accessToken: 'sidebar-test' } })));
+  await page.goto(base+'/admin');
   await page.getByRole('button', { name: 'Mở menu' }).click();
   assert.equal(await menu.getByRole('button', { name: vi('Administration') }).count(), 0);
   assert.equal(await sidebar.getByRole('button', { name: 'Tài khoản của tôi' }).count(), 1);
