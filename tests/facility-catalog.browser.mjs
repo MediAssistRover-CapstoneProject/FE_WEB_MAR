@@ -8,8 +8,9 @@ await context.addInitScript(()=>sessionStorage.setItem('mediassist-rover.session
 const page=await context.newPage(),errors=[],writes=[],reads=[];page.on('pageerror',e=>errors.push(e.message));
 const map={mapId:'map-a',floorId:'f1',mapName:'Bản đồ BE thử nghiệm',mapCode:'MAP_A',versionNo:3,status:'DRAFT',widthM:40,heightM:20,resolutionMPerPixel:.05,originXM:-5,originYM:-2,originYawRad:0,frameId:'map'};
 const endpoint=(id,mapId)=>({endpointId:id,mapId,endpointCode:id,endpointName:id==='end-a'?'Điểm quầy A':'Điểm bản đồ khác',endpointType:'WAYPOINT',xM:2,yM:3,yawRad:0,active:true,accessible:true,publicVisible:false});
-const state={maps:[map],zones:[],rooms:[],endpoints:[endpoint('end-a','map-a'),endpoint('end-other','map-other')],'endpoint-groups':[],'endpoint-group-members':[]};
-let rejectNext=false;
+const existingZone={zoneId:'zone-existing',mapId:'map-a',zoneCode:'zone_001',zoneName:'Vùng đã cấu hình',zoneType:'SPEED',polygonJson:{points:[[-3,-1],[-2,-1],[-2,0],[-3,0]]},speedLimitMps:.3,capacityLimit:20,calibratedAreaM2:6,cameraSourceRef:'cam-existing',cameraRoiJson:{roi:[0,0,1,1]},active:false,publicVisible:true,description:'Ghi chú cũ'};
+const state={maps:[map],zones:[existingZone],rooms:[],endpoints:[endpoint('end-a','map-a'),endpoint('end-other','map-other')],'endpoint-groups':[],'endpoint-group-members':[]};
+let rejectNext=false,zoneSequence=0;
 await page.route(url=>url.pathname.startsWith('/api/'),async route=>{
  const req=route.request(),url=new URL(req.url()),parts=url.pathname.split('/').filter(Boolean),resource=parts[2],method=req.method();
  const reply=(data,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
@@ -31,7 +32,7 @@ await page.route(url=>url.pathname.startsWith('/api/'),async route=>{
   if(method==='DELETE'){state[resource]=state[resource].map(m=>({...m,active:false}));return route.fulfill({status:204});}
   const result={...body,mapId:'map-a'};state[resource]=[result];return reply(result,method==='POST'?201:200);
  }
- if(resource==='zones'){const result={...body,zoneId:'zone-a'};state.zones=[result];return reply(result,201);}
+ if(resource==='zones'){const result={...body,zoneId:parts[3]||'zone-'+(++zoneSequence)};state.zones=[...state.zones.filter(z=>z.zoneId!==result.zoneId),result];return reply(result,method==='POST'?201:200);}
  if(resource==='endpoints'){const result={...body,endpointId:parts[3]||'end-new'};state.endpoints=[...state.endpoints.filter(p=>p.endpointId!==result.endpointId),result];return reply(result,201);}
  throw Error('Unexpected write: '+url.pathname);
 });
@@ -60,12 +61,41 @@ try{
  await group.getByRole('button',{name:'Tắt thành viên',exact:true}).click();await page.waitForFunction(()=>document.querySelector('[aria-label="Quản lý nhóm điểm đích"] .ls-task small')?.textContent.includes('Tắt'));
  assert.equal(writes.at(-1).method,'DELETE');
  await page.getByRole('button',{name:'2. Vùng',exact:true}).click();
- await page.getByLabel('Mã vùng BE',{exact:true}).fill('WAIT_A');await page.getByLabel('Tên vùng BE',{exact:true}).fill('Sảnh chờ');
- await page.getByLabel('Chức năng vùng BE',{exact:true}).selectOption('NO_STOP');
- await page.getByText('Tọa độ đa giác nâng cao',{exact:true}).click();await page.getByLabel('Đa giác BE (mét)',{exact:true}).fill('{"points":[[0,0],[10,0],[10,8],[0,8]]}');
- await page.getByLabel('Giới hạn tốc độ (m/s)',{exact:true}).fill('.4');await page.getByLabel('Sức chứa (người)',{exact:true}).fill('20');
- await page.getByRole('button',{name:'Lưu vùng lên BE',exact:true}).click();await page.getByText('Chỉnh vùng BE',{exact:true}).waitFor();
- assert.equal(writes.at(-1).body.zoneType,'NO_STOP');assert.equal(writes.at(-1).body.capacityLimit,20);
+ // A simple zone needs a name, type and a polygon; all extra fields stay collapsed.
+ assert.equal(await page.getByLabel('Nguồn camera',{exact:true}).isVisible(),false);
+ assert.equal(await page.getByLabel('Mã vùng',{exact:true}).isVisible(),false);
+ assert.equal(await page.getByLabel('Giới hạn tốc độ (m/s)',{exact:true}).count(),0);
+ await page.getByLabel('Tên vùng',{exact:true}).fill('Vùng cấm mới');
+ assert.equal(await page.getByRole('button',{name:'Lưu vùng',exact:true}).isDisabled(),true);
+ await page.getByText('Bản đồ quét đã lưu · Bấm vùng hoặc điểm để chỉnh sửa.',{exact:false}).waitFor();
+ const zoneCanvas=page.getByRole('img',{name:'Lớp vùng và điểm đích BE theo mét',exact:true});
+ await page.getByRole('button',{name:'Vẽ vùng',exact:true}).click();await zoneCanvas.scrollIntoViewIfNeeded();
+ const zoneBox=await zoneCanvas.boundingBox(),beforeDraw=writes.length;
+ for(const [x,y]of[[.2,.35],[.4,.35],[.4,.6],[.2,.6]])await page.mouse.click(zoneBox.x+zoneBox.width*x,zoneBox.y+zoneBox.height*y);
+ assert.equal(writes.length,beforeDraw,'Drawing does not save automatically');
+ await page.getByRole('button',{name:'Lưu vùng',exact:true}).click();await page.getByRole('heading',{name:'Chỉnh sửa vùng',exact:true}).waitFor();
+ assert.equal(writes.at(-1).method,'POST');assert.equal(writes.at(-1).body.zoneCode,'ZONE_002','Auto code avoids existing codes ignoring case');
+ assert.equal(writes.at(-1).body.zoneName,'Vùng cấm mới');assert.equal(writes.at(-1).body.zoneType,'KEEP_OUT');assert.equal(writes.at(-1).body.polygonJson.points.length,4);
+ for(const key of ['speedLimitMps','capacityLimit','calibratedAreaM2','cameraSourceRef','cameraRoiJson'])assert.equal(writes.at(-1).body[key],null);
+ assert.equal(writes.at(-1).body.active,true);assert.equal(writes.at(-1).body.publicVisible,false);
+ // Editing only the name preserves all advanced fields from the existing API record.
+ await page.getByRole('button',{name:/Vùng đã cấu hình/}).click();
+ assert.equal(await page.getByLabel('Giới hạn tốc độ (m/s)',{exact:true}).isVisible(),true);
+ assert.equal(await page.getByLabel('Nguồn camera',{exact:true}).isVisible(),false);
+ await page.getByLabel('Tên vùng',{exact:true}).fill('Vùng giảm tốc đã sửa');
+ await page.getByRole('button',{name:'Lưu thay đổi',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('.zm-saved')?.textContent.includes('Vùng giảm tốc đã sửa'));
+ assert.equal(writes.at(-1).method,'PUT');assert.equal(writes.at(-1).path,'/api/v1/zones/zone-existing');
+ for(const key of ['zoneCode','speedLimitMps','capacityLimit','calibratedAreaM2','cameraSourceRef','cameraRoiJson','active','publicVisible','description'])assert.deepEqual(writes.at(-1).body[key],existingZone[key],key+' retained while advanced section is closed');
+ // Speed-specific input is shown only for SPEED; geometry can still be entered manually.
+ await page.getByRole('button',{name:'+ Vùng mới',exact:true}).click();await page.getByLabel('Tên vùng',{exact:true}).fill('Khu vực giảm tốc');
+ await page.getByLabel('Loại vùng',{exact:true}).selectOption('SPEED');
+ assert.equal(await page.getByLabel('Giới hạn tốc độ (m/s)',{exact:true}).evaluate(input=>input.required&&!input.checkValidity()),true);
+ await page.getByLabel('Giới hạn tốc độ (m/s)',{exact:true}).fill('.4');
+ await page.getByText('Nhập tọa độ thủ công',{exact:true}).click();await page.getByLabel('Tọa độ vùng (mét)',{exact:true}).fill('{"points":[[0,0],[10,0],[10,8],[0,8]]}');
+ await page.getByText('Nhập tọa độ thủ công',{exact:true}).click();
+ await page.getByRole('button',{name:'Lưu vùng',exact:true}).click();await page.getByRole('heading',{name:'Chỉnh sửa vùng',exact:true}).waitFor();
+ assert.equal(writes.at(-1).body.zoneType,'SPEED');assert.equal(writes.at(-1).body.speedLimitMps,.4);assert.equal(writes.at(-1).body.zoneCode,'ZONE_003');
  for(const [width,height]of[[1920,1080],[1366,768],[1024,768],[390,844]]){await page.setViewportSize({width,height});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No overflow '+width);await page.screenshot({path:`.workstation-build/facility/zones-${width}.png`,fullPage:true});}
  await page.setViewportSize({width:1366,height:900});await page.getByRole('button',{name:'3. Điểm đích',exact:true}).click();await page.getByRole('button',{name:'Điểm đích',exact:true}).click();
  await page.getByText('Bản đồ quét đã lưu · Bấm vùng hoặc điểm để chỉnh sửa.',{exact:false}).waitFor();

@@ -1,10 +1,10 @@
-import { cloneElement, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { facilityApi as api, allFacilityPages } from '../../features/facility/facilityApi.js';
-import { ZONE_CATEGORIES,zonePayload,endpointPayload,groupFromApi,groupPayload } from '../../features/facility/facilityContract.js';
+import { zonePayload,endpointPayload,groupFromApi,groupPayload } from '../../features/facility/facilityContract.js';
 import EndpointGroupEditor from './EndpointGroupEditor.jsx';
 import WorkspaceTabs from '../../components/WorkspaceTabs.jsx';
 import EndpointMapEditor from './EndpointMapEditor.jsx';
-import FacilityGeometryPreview, { polygonPoints } from './FacilityGeometryPreview.jsx';
+import ZoneMapEditor from './ZoneMapEditor.jsx';
 import { useNavigate } from 'react-router-dom';
 import { dispatchEndpoints, endpointDraftDirty } from '../../features/facility/mapPublishing.js';
 
@@ -12,8 +12,6 @@ const zoneDefault={zoneCode:'',zoneName:'',zoneType:'KEEP_OUT',polygonJson:'{"po
 const endpointDefault={endpointCode:'',endpointName:'',endpointType:'WAYPOINT',xM:'',yM:'',yawRad:0,zoneId:'',roomId:'',active:true,accessible:true,publicVisible:false,description:''};
 const emptyCatalog={maps:[],zones:[],endpoints:[],groups:[],members:[],rooms:[]};
 const jsonString=value=>value==null?'':JSON.stringify(value,null,2);
-function Field({label,children,...props}){return <label className="ls-field">{label}{children?cloneElement(children,{'aria-label':label}):<input {...props} aria-label={label}/>}</label>;}
-function Check({label,...props}){return <label className="ls-field"><span><input type="checkbox" {...props}/> {label}</span></label>;}
 
 export default function FacilityCatalogEditor({stage, initialMapId = '', onMapChange}) {
   const navigate=useNavigate();
@@ -43,7 +41,6 @@ export default function FacilityCatalogEditor({stage, initialMapId = '', onMapCh
   };
   const upsert=(key,id,value)=>setCatalog(c=>({...c,[key]:[...c[key].filter(item=>item[id]!==value[id]),value]}));
   const editZone=id=>{const z=zones.find(z=>z.zoneId===id);setZone(z?{...z,polygonJson:jsonString(z.polygonJson),cameraRoiJson:jsonString(z.cameraRoiJson)}:{...zoneDefault});};
-  const setZ=(key,value)=>setZone(z=>({...z,[key]:value}));
   const dirty=map&&endpointDraftDirty(endpoint,map,endpoints,zones,rooms);
   const usable=dispatchEndpoints(endpoints,mapId);
   const privatePoints=usable.filter(p=>!p.publicVisible);
@@ -68,15 +65,11 @@ export default function FacilityCatalogEditor({stage, initialMapId = '', onMapCh
     {map&&<>
       {stage!=='endpoint'&&<div className="facility-map-context" data-map-id={mapId}><strong>{map.mapName}</strong><span>v{map.versionNo} · {map.widthM} × {map.heightM} m · {Number(map.resolutionMPerPixel)*100} cm/ô</span></div>}
       {stage==='scan'&&<section className="ls-panel"><h3>Bản đồ đã có trên BE</h3><p>Quét thật cần robot, phiên mapping và artifact được BE xác minh. Trang này quản lý danh mục vùng/điểm trên bản đồ đã tồn tại.</p><p>Chuyển sang Vùng hoặc Điểm đích để cấu hình trên đúng mapId.</p><p><strong>Không có nhãn phòng trong dữ liệu quét gốc.</strong> Vùng, phòng và điểm đích là các lớp cấu hình thêm sau khi có hình học.</p></section>}
-      {stage==='zone'&&<div className="ls-layout" style={{marginTop:16}}><section className="ls-panel"><h3>Vùng trên bản đồ · {zones.length}</h3><FacilityGeometryPreview map={map} zones={zones} endpoints={endpoints} zoneEdit={zone} drawing={drawing&&!busy} onZone={id=>{editZone(id);setDrawing(false);}} onPoint={p=>setZ('polygonJson',JSON.stringify({points:[...polygonPoints(zone.polygonJson),[p.xM,p.yM]]},null,2))}/><div className="ls-actions"><button className="ls-btn" disabled={busy} onClick={()=>setDrawing(d=>!d)}>{drawing?'Dừng vẽ vùng':'Vẽ thêm đỉnh vùng'}</button><button className="ls-btn" disabled={busy||!polygonPoints(zone.polygonJson).length} onClick={()=>setZ('polygonJson',JSON.stringify({points:polygonPoints(zone.polygonJson).slice(0,-1)},null,2))}>Bỏ đỉnh cuối</button><button className="ls-btn" disabled={busy} onClick={()=>setZ('polygonJson','{"points":[] }')}>Vẽ lại đa giác</button></div><p>Loại vùng BE chỉ gồm KEEP_OUT, SPEED và NO_STOP. Robot có thể đi qua NO_STOP nhưng không được đặt điểm đích hoặc dừng trong vùng.</p><div className="ls-item-list">{zones.map(z=><button type="button" className="ls-item" key={z.zoneId} disabled={busy} onClick={()=>editZone(z.zoneId)}><span><strong>{z.zoneName}</strong><small>{ZONE_CATEGORIES[z.zoneType]} · {z.zoneCode} · {z.active?'Bật':'Tắt'}</small></span></button>)}</div><button className="ls-btn" disabled={busy} onClick={()=>editZone('')}>+ Vùng BE mới</button><p>Đa giác dùng tọa độ mét trong khung bản đồ BE. Không bị giới hạn bởi tường; không thay đổi dữ liệu quét.</p></section>
-        <section className="ls-panel"><h3>{zone.zoneId?'Chỉnh vùng BE':'Tạo vùng BE'}</h3><form onSubmit={e=>{e.preventDefault();write(async()=>{const payload=zonePayload(zone,mapId);const result=await(zone.zoneId?api.updateZone(zone.zoneId,payload):api.createZone(payload));upsert('zones','zoneId',result);setZone({...result,polygonJson:jsonString(result.polygonJson),cameraRoiJson:jsonString(result.cameraRoiJson)});}).catch(()=>{});}}><fieldset disabled={busy||map.status==='ARCHIVED'} style={{border:0,padding:0,minWidth:0}}>
-          <Field label="Mã vùng BE" required maxLength={64} value={zone.zoneCode} onChange={e=>setZ('zoneCode',e.target.value)}/><Field label="Tên vùng BE" required maxLength={160} value={zone.zoneName} onChange={e=>setZ('zoneName',e.target.value)}/>
-          <Field label="Chức năng vùng BE"><select value={zone.zoneType} onChange={e=>setZ('zoneType',e.target.value)}>{Object.entries(ZONE_CATEGORIES).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></Field>
-          <details><summary>Tọa độ đa giác nâng cao</summary><Field label="Đa giác BE (mét)"><textarea rows={6} required value={zone.polygonJson} onChange={e=>setZ('polygonJson',e.target.value)}/></Field><p>Dạng: {JSON.stringify({points:[[0,0],[2,0],[2,2],[0,2]]})}</p></details>
-          {[['speedLimitMps','Giới hạn tốc độ (m/s)'],['capacityLimit','Sức chứa (người)'],['calibratedAreaM2','Diện tích hiệu chuẩn (m²)']].map(([key,label])=><Field key={key} label={label} type="number" min={key==='capacityLimit'?0:0.000001} step={key==='capacityLimit'?1:'any'} value={zone[key]??''} onChange={e=>setZ(key,e.target.value)}/>)}
-          <Field label="Nguồn camera" maxLength={255} value={zone.cameraSourceRef||''} onChange={e=>setZ('cameraSourceRef',e.target.value)}/><Field label="ROI camera (JSON tùy chọn)"><textarea rows={3} value={zone.cameraRoiJson||''} onChange={e=>setZ('cameraRoiJson',e.target.value)}/></Field>
-          <Field label="Mô tả vùng BE" value={zone.description||''} onChange={e=>setZ('description',e.target.value)}/><Check label="Vùng hoạt động" checked={zone.active} onChange={e=>setZ('active',e.target.checked)}/><Check label="Hiển thị công khai vùng" checked={zone.publicVisible} onChange={e=>setZ('publicVisible',e.target.checked)}/><button className="ls-btn primary" type="submit">Lưu vùng lên BE</button>
-        </fieldset></form></section></div>}
+      {stage==='zone'&&<ZoneMapEditor map={map} zones={zones} endpoints={endpoints} zone={zone} setZone={setZone} drawing={drawing} setDrawing={setDrawing} busy={busy} onSelect={editZone} onSave={draft=>{
+        let payload;
+        try{payload=zonePayload(draft,mapId);}catch(error){setStatus(error.message);return;}
+        write(async()=>{const result=await(draft.zoneId?api.updateZone(draft.zoneId,payload):api.createZone(payload));upsert('zones','zoneId',result);setZone({...result,polygonJson:jsonString(result.polygonJson),cameraRoiJson:jsonString(result.cameraRoiJson)});setDrawing(false);}).catch(()=>{});
+      }}/>}
       {stage==='endpoint'&&<><WorkspaceTabs label="Quản lý điểm đích" active={endpointTab} onSelect={setEndpointTab} items={[{id:'point',label:'Điểm đích'},{id:'group',label:'Nhóm điểm đích'}]}/>
         {endpointTab==='group'?<EndpointGroupEditor key={mapId} remote busy={busy||map.status==='ARCHIVED'} groups={groups} endpoints={localEndpoints}
           onSave={g=>write(async()=>{const result=await(g.id?api.updateEndpointGroup(g.id,groupPayload(g,mapId)):api.createEndpointGroup(groupPayload(g,mapId)));upsert('groups','endpointGroupId',result);return groupFromApi(result,catalog.members);})}
