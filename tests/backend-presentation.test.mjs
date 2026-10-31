@@ -10,10 +10,10 @@ test('retention policies and metadata lists have distinct domain titles and corr
   const titles = datasets.map(dataset => recordTitle({ dataset, retentionDays: 365, mode: 'DISABLED' }));
   assert.equal(new Set(titles).size, 10);
   assert.ok(titles.every(title => !title.includes('_') && title !== 'Bản ghi'));
-  assert.equal(recordTitle({ crowdDensityRecordId: '1', personCount: 0 }), 'Mật độ người · 0 người');
   assert.equal(recordTitle({ voiceCommandId: '1', sequenceNo: 2 }), 'Lệnh giọng nói · Lượt 2');
   assert.equal(recordTitle({}, { title: 'Ca trực' }), 'Ca trực');
-  for (const [name, id] of Object.entries({ detections: 'detectionEventId', crowd: 'crowdDensityRecordId', heatmaps: 'heatmapRecordId', interactions: 'voiceInteractionId', commands: 'voiceCommandId' })) assert.equal(resources.find(r => r.id === name).idField, id);
+  for (const [name, id] of Object.entries({ detections: 'detectionEventId', interactions: 'voiceInteractionId', commands: 'voiceCommandId' })) assert.equal(resources.find(r => r.id === name).idField, id);
+  assert.ok(!resources.some(r => ['crowd', 'heatmaps'].includes(r.id)));
 });
 
 test('all known response fields and enum values have display labels', () => {

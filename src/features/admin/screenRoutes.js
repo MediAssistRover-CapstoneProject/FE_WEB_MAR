@@ -10,7 +10,6 @@ const screenRoutes = {
   'Staff Shifts': '/admin/staff-shifts',
   'Robot Status': '/admin/robots',
   Alerts: '/admin/alerts',
-  'Crowd Heatmap': '/admin/crowd-heatmap',
   'History & Replay': '/admin/history-replay',
   Analytics: '/admin/analytics',
   'Audit Logs': '/admin/audit-logs',

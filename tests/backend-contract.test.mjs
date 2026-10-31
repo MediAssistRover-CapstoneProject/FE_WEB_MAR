@@ -5,10 +5,14 @@ import { operations, buildRequest, prepareBody, prepareValue, requestSchema, ini
 import { resources, resourceFor, managedOperations } from '../src/features/api/workspaceCatalog.js';
 const id = '11111111-1111-4111-8111-111111111111';
 
-test('every human API has a UI resource or auth flow; device APIs stay separate', () => {
+test('supported human APIs have a UI resource or auth flow; removed density screens and device APIs stay separate', () => {
   assert.equal(Object.keys(operations).length, 207);
   assert.equal(snapshot.excluded.length, 37);
   for (const op of Object.values(operations)) {
+    if (/^\/api\/v1\/admin\/monitoring\/(crowd-density|heatmaps)(\/|$)/.test(op.path)) {
+      assert.equal(resourceFor(op), undefined, 'Removed density feature must not expose a generic UI: '+op.key);
+      continue;
+    }
     assert.ok(resourceFor(op) || managedOperations.has(op.key), op.key);
     assert.ok(!op.path.startsWith('/api/v1/pi/'));
     if (!op.public && !managedOperations.has(op.key)) assert.ok(op.roles.length, op.key);

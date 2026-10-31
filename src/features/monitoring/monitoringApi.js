@@ -7,6 +7,4 @@ function query(path, params = {}) {
 
 export const monitoringApi = {
   listDetections: (params) => apiRequest(query('/api/v1/admin/monitoring/detections', params)),
-  listCrowdDensity: (params) => apiRequest(query('/api/v1/admin/monitoring/crowd-density', params)),
-  listHeatmaps: (params) => apiRequest(query('/api/v1/admin/monitoring/heatmaps', params)),
 };

@@ -33,8 +33,6 @@ export const resources = [
   resource('retention', 'Lưu trữ dữ liệu', 'System Settings', 'admin/operations/retention/policies', 'dataset', { adminOnly: true }),
   resource('audit', 'Nhật ký kiểm toán', 'Audit Logs', 'admin/audit-logs', 'auditLogId', { adminOnly: true }),
   resource('detections', 'Sự kiện phát hiện', 'History & Replay', 'admin/monitoring/detections', 'detectionEventId', { adminOnly: true }),
-  resource('crowd', 'Mật độ người', 'Crowd Heatmap', 'admin/monitoring/crowd-density', 'crowdDensityRecordId', { adminOnly: true }),
-  resource('heatmaps', 'Bản đồ mật độ', 'Crowd Heatmap', 'admin/monitoring/heatmaps', 'heatmapRecordId', { adminOnly: true }),
   resource('reports', 'Tổng quan vận hành', 'Analytics', 'admin/reports/overview', '', { adminOnly: true }),
   resource('analytics', 'Phân tích', 'Analytics', 'admin/reports/analytics', '', { adminOnly: true }),
   resource('job-reports', 'Báo cáo công việc', 'Analytics', 'admin/reports/jobs', 'jobId', { adminOnly: true }),
@@ -138,8 +136,6 @@ export function recordTitle(row, resource) {
   if (row?.jobCode || row?.jobId) return 'Công việc robot';
   if (row?.requestCode || row?.serviceRequestId) return 'Yêu cầu dịch vụ';
   if (row?.eventType) return vi(row.eventType);
-  if (row?.crowdDensityRecordId) return `Mật độ người · ${row.personCount ?? '—'} người`;
-  if (row?.heatmapRecordId) return 'Bản đồ mật độ';
   if (row?.voiceCommandId) return row.normalizedText || row.rawText || `Lệnh giọng nói${row.sequenceNo != null ? ` · Lượt ${row.sequenceNo}` : ''}`;
   if (row?.voiceInteractionId) return row.transcriptSummary || 'Hội thoại với robot';
   if (row?.endpointGroupId && row?.endpointId) return `Điểm thành viên${row.sequenceNo != null ? ` · Thứ tự ${row.sequenceNo}` : ''}`;

@@ -18,7 +18,7 @@
 - Danh mục bệnh viện: thông tin, bài hướng dẫn, tầng, phòng, bản đồ, vùng, điểm đích, nhóm và thành viên. Có lối vào bộ vẽ vùng/đặt điểm trên danh mục BE.
 - Quản lý quy trình: CRUD, tác vụ, bước, liên kết, đồ thị, chọn bước bắt đầu, kiểm tra/phát hành/nhân bản/lưu trữ; danh sách đã phát hành và thư viện bước. Trình biên tập `/workflows` vẫn được giữ.
 - Ca trực: nhân viên, ca, khung giờ và chuyển trạng thái; Staff xem ca của mình.
-- Giám sát: cảnh báo, sự cố, phát hiện, mật độ, heatmap, báo cáo và CSV; hội thoại/lệnh giọng nói chỉ hiển thị thao tác BE hỗ trợ.
+- Giám sát: cảnh báo, sự cố, phát hiện, báo cáo và CSV; hội thoại/lệnh giọng nói chỉ hiển thị thao tác BE hỗ trợ.
 - Quản trị: nhân viên/tài khoản, mật khẩu, cài đặt, MQTT rollout, retention và audit; các mục Admin không hiển thị thao tác ghi cho Staff.
 - Thông tin công khai: các danh mục public không gửi Bearer token.
 - Phân trang, lọc, danh mục chọn ID theo tên, biểu mẫu lồng nhau, lỗi từ BE, trạng thái đang lưu và xác nhận thao tác nhạy cảm được dùng chung. Một số cấu hình nâng cao của BE vẫn nhập JSON.

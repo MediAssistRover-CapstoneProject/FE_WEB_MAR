@@ -11,23 +11,19 @@ const inlineStyles = String.raw`.monitor-screen{color:#0f172a;font-family:Inter,
 /* History & Replay — Figma node 79:2 */
 .history-replay__tools{align-items:center;color:#475569;display:flex;font-size:10px;justify-content:space-between;margin:-2px 0 12px}.history-replay__tools>div{display:flex;gap:8px}.history-replay__tools button{font-size:10px;height:32px;padding:0 12px}.history-replay__layout{display:grid;gap:12px;grid-template-columns:minmax(180px,.8fr) minmax(350px,1.62fr) minmax(210px,.94fr)}.history-replay__sessions,.history-replay__map-card{min-height:512px;padding:12px}.history-replay__sessions>button{align-items:flex-start;background:#f1f5f9;border:1px solid #cbd5e1;color:#0f172a;display:grid;gap:8px;grid-template-columns:22px minmax(0,1fr) 8px;margin:8px 0 0;min-height:75px;padding:10px;text-align:left;width:100%}.history-replay__sessions>button.is-selected{background:#fff;border-color:#2f80ff;box-shadow:inset 0 0 0 1px #2f80ff}.history-replay__sessions>button>img{height:22px;width:22px}.history-replay__sessions>button span{min-width:0}.history-replay__sessions>button b,.history-replay__sessions>button small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.history-replay__sessions>button b{font-size:10px}.history-replay__sessions>button small{color:#475569;font-size:8px;font-weight:400;margin-top:4px}.history-replay__sessions>button em{border-radius:4px;color:#fff;display:inline-block;font-size:8px;font-style:normal;margin-top:7px;padding:3px 7px}.history-replay__sessions em.is-complete{background:#28d17c}.history-replay__sessions em.is-failed{background:#f05252}.history-replay__sessions em.is-interrupted{background:#f5b82e}.history-replay__sessions>button>i{font-size:17px;font-style:normal;grid-column:3;grid-row:1}.history-replay__sessions>button time{color:#475569;font-size:8px;grid-column:2 / span 2;text-align:right}.history-replay__sessions footer{align-items:center;color:#64748b;display:flex;font-size:9px;justify-content:space-between;margin-top:11px}.history-replay__sessions footer button{background:#fff;border:1px solid #cbd5e1;color:#475569;font-size:12px;height:20px;margin-left:5px;padding:0;width:20px}.history-replay__map-card img{border:1px solid #cbd5e1;border-radius:5px;display:block;height:405px;margin-top:12px;object-fit:contain;width:100%}.history-replay__map-card .monitor-panel__head button{font-size:9px;height:23px;padding:0 11px}.history-replay__right-column{display:grid;gap:10px;grid-template-rows:1.25fr 1fr}.history-replay__details,.history-replay__events{padding:12px}.history-replay__details .monitor-panel__head em{background:#dcfce7;border-radius:3px;color:#15803d;font-size:8px;font-style:normal;padding:4px 7px}.history-replay__details p{display:grid;gap:5px;grid-template-columns:82px minmax(0,1fr);margin:8px 0}.history-replay__details p span,.history-replay__details p b{font-size:8px}.history-replay__details p span{color:#64748b}.history-replay__details p b{font-weight:500}.history-replay__events .monitor-panel__head button{font-size:8px;height:24px;padding:0 8px}.history-replay__events p{align-items:center;display:grid;gap:7px;grid-template-columns:43px 10px minmax(0,1fr);margin:9px 0}.history-replay__events p time,.history-replay__events p span{font-size:8px}.history-replay__events p time{color:#64748b}.history-replay__events p img{height:10px;width:10px}.history-replay__player{align-items:center;display:grid;gap:16px;grid-template-columns:180px minmax(230px,1fr) 132px;margin-top:12px;min-height:86px;padding:12px}.history-replay__transport{align-items:center;display:flex;justify-content:center;gap:8px}.history-replay__transport button{font-size:9px;height:28px;padding:0 8px}.history-replay__transport .history-replay__play{align-items:center;border-radius:50%;display:inline-flex;font-size:14px;height:30px;justify-content:center;padding:0;width:30px}.history-replay__timeline{display:grid;grid-template-columns:1fr;position:relative}.history-replay__timeline>span{color:#475569;font-size:8px;margin-bottom:2px}.history-replay__timeline input{accent-color:#2f80ff;width:100%}.history-replay__timeline div{display:flex;justify-content:space-around;margin-top:-5px;pointer-events:none}.history-replay__timeline div img{height:10px;width:10px}.history-replay__timeline small{color:#64748b;font-size:7px;margin-top:5px}.history-replay__player-actions{display:flex;gap:8px}.history-replay__player-actions button{font-size:9px;height:28px;padding:0 11px}
 
-/* Crowd Heatmap — Figma node 7:117 */
-.crowd-heatmap__tabs{margin-bottom:14px}.crowd-heatmap__layout{display:grid;gap:12px;grid-template-columns:minmax(400px,1fr) minmax(220px,.34fr)}.crowd-heatmap__map-card{padding:12px}.crowd-heatmap__map-card>img{border:1px solid #cbd5e1;border-radius:5px;display:block;height:auto;margin-top:8px;width:100%}.crowd-heatmap__legend{align-items:center;color:#0e7490;display:flex;font-size:8px;gap:0;margin:7px 18px 0}.crowd-heatmap__legend i{height:7px;max-width:120px;flex:1}.crowd-heatmap__legend i:nth-of-type(1){background:#2fc6e5;margin-left:8px}.crowd-heatmap__legend i:nth-of-type(2){background:#f5b82e}.crowd-heatmap__legend i:nth-of-type(3){background:#f05252;margin-right:8px}.crowd-heatmap__side{display:grid;gap:12px;grid-template-rows:.86fr 1fr}.crowd-heatmap__density,.crowd-heatmap__rules{padding:12px}.crowd-heatmap__density p{align-items:center;display:grid;grid-template-columns:1fr 30px 33px;margin:18px 0}.crowd-heatmap__density p span,.crowd-heatmap__density p b,.crowd-heatmap__density p em{font-size:9px}.crowd-heatmap__density p b{text-align:right}.crowd-heatmap__density p em{font-size:8px;font-style:normal;text-align:right;text-transform:uppercase}.crowd-heatmap__density .is-high{color:#b91c1c}.crowd-heatmap__density .is-med{color:#a16207}.crowd-heatmap__density .is-low{color:#15803d}.crowd-heatmap__rules p{align-items:center;display:flex;justify-content:space-between;margin:17px 0}.crowd-heatmap__rules p span,.crowd-heatmap__rules p b{font-size:9px}.crowd-heatmap__rules p b{color:#15803d;font-size:8px;text-transform:uppercase}.crowd-heatmap__rules small{color:#64748b;display:block;font-size:9px;margin-top:32px}.crowd-heatmap__rules strong{color:#a16207;display:block;font-size:9px;font-weight:500;margin-top:8px}.crowd-heatmap__rules button{bottom:12px;font-size:11px;height:26px;position:absolute;right:12px}.crowd-heatmap__rules{position:relative}
-
 /* Alerts & Notifications — Figma node 7:2 */
 .alerts-notifications__tools{align-items:center;display:flex;justify-content:space-between;margin-bottom:12px}.alerts-notifications__tools>button{font-size:11px;height:36px;padding:0 16px}.monitor-tab-list{display:flex;gap:12px}.monitor-tab-list button{background:transparent;color:#475569;font-size:10px;height:36px;min-width:82px;padding:0 13px}.monitor-tab-list button.is-selected{background:#dbeafe;color:#0f172a}.alerts-notifications__table-card{min-height:398px;padding:12px}.alerts-notifications__table-scroll{overflow-x:auto}.alerts-notifications__table-card table{border-collapse:separate;border-spacing:0 9px;min-width:800px;width:100%}.alerts-notifications__table-card th{color:#475569;font-size:8px;font-weight:500;padding:0 3px 2px;text-align:left}.alerts-notifications__table-card td{background:#f1f5f9;border-bottom:1px solid #cbd5e1;border-top:1px solid #cbd5e1;font-size:8px;padding:11px 3px}.alerts-notifications__table-card td:first-child{border-left:1px solid #cbd5e1;border-radius:4px 0 0 4px}.alerts-notifications__table-card td:last-child{border-radius:0 4px 4px 0;border-right:1px solid #cbd5e1}.alerts-notifications__table-card tr.is-selected td{background:#fff1f1}.alerts-notifications__table-card td em{font-size:8px;font-style:normal;font-weight:600;text-transform:uppercase}.alerts-notifications__table-card .is-critical{color:#b91c1c}.alerts-notifications__table-card .is-warning{color:#a16207}.alerts-notifications__table-card .is-info{color:#0e7490}.alerts-notifications__table-card td button{background:transparent;color:#2f80ff;font-size:8px;padding:0}.alerts-notifications__bottom{display:grid;gap:12px;grid-template-columns:1fr 1.05fr;margin-top:12px}.alerts-notifications__detail,.alerts-notifications__routing{min-height:105px;padding:12px}.alerts-notifications__detail h2{color:#a16207;font-size:12px;margin:7px 0 4px}.alerts-notifications__detail p{color:#475569;font-size:8px;margin:0}.alerts-notifications__detail>div:last-child{display:flex;gap:8px;margin-top:14px}.alerts-notifications__detail>div:last-child button{font-size:9px;height:25px;padding:0 11px}.alerts-notifications__routing{position:relative}.alerts-notifications__routing p{font-size:8px;margin:12px 0}.alerts-notifications__routing p b{font-weight:600}.alerts-notifications__routing button{bottom:12px;font-size:10px;height:25px;position:absolute;right:12px}
 
 .alerts-notifications__table-card .alerts-notifications__empty{color:#64748b;font-size:11px;margin:38px 4px;text-align:center}.alerts-notifications__table-card .alerts-notifications__error{color:#b91c1c}.alerts-notifications__detail .alert-status{color:#475569;font-size:8px;margin-top:5px}.alerts-notifications__detail .alert-status b{color:#0f172a}.alerts-notifications__detail .api-action{min-width:102px}.alerts-notifications__detail .api-action:disabled,.alerts-notifications__tools button:disabled{cursor:not-allowed;opacity:.65}
 
-@media(max-width:1150px){.voice-scripts__layout{grid-template-columns:260px minmax(0,1fr)}.voice-scripts__usage{grid-column:span 2;min-height:auto}.analytics-reports__metrics{grid-template-columns:repeat(3,1fr)}.history-replay__layout{grid-template-columns:minmax(190px,.75fr) minmax(340px,1.5fr)}.history-replay__right-column{grid-column:span 2;grid-template-columns:1fr 1fr;grid-template-rows:none}.history-replay__details,.history-replay__events{min-height:260px}.crowd-heatmap__layout{grid-template-columns:minmax(340px,1fr) 245px}}
-@media(max-width:820px){.voice-scripts__layout,.analytics-reports__grid,.history-replay__layout,.crowd-heatmap__layout,.alerts-notifications__bottom{grid-template-columns:1fr}.voice-scripts__usage,.history-replay__right-column{grid-column:auto}.voice-scripts__library,.voice-scripts__editor,.voice-scripts__usage{min-height:auto}.analytics-reports__metrics{grid-template-columns:repeat(2,1fr)}.analytics-reports__insights{grid-template-columns:1fr 1fr;grid-template-rows:none}.history-replay__right-column{grid-template-columns:1fr}.history-replay__map-card img{height:auto}.history-replay__player{grid-template-columns:1fr}.crowd-heatmap__side{grid-template-columns:1fr 1fr;grid-template-rows:none}.crowd-heatmap__density,.crowd-heatmap__rules{min-height:260px}.alerts-notifications__detail,.alerts-notifications__routing{min-height:150px}.monitor-notice{margin-bottom:14px}}
-@media(max-width:560px){.monitor-segmented,.monitor-tab-list{gap:6px;overflow-x:auto;padding-bottom:3px}.monitor-segmented button,.monitor-tab-list button{min-width:auto;white-space:nowrap}.analytics-reports__tools,.alerts-notifications__tools,.history-replay__tools{align-items:flex-start;gap:10px;flex-direction:column}.analytics-reports__metrics{grid-template-columns:1fr 1fr}.voice-scripts__selects{grid-template-columns:1fr}.voice-scripts__editor-actions,.alerts-notifications__detail>div:last-child{flex-wrap:wrap}.voice-scripts__variables{flex-wrap:wrap}.voice-scripts__variables button{flex:0 0 calc(50% - 3px)}.analytics-reports__insights,.crowd-heatmap__side{grid-template-columns:1fr}.history-replay__sessions,.history-replay__map-card{min-height:auto}.history-replay__transport{justify-content:flex-start}.history-replay__player-actions{justify-content:flex-start}}
+@media(max-width:1150px){.voice-scripts__layout{grid-template-columns:260px minmax(0,1fr)}.voice-scripts__usage{grid-column:span 2;min-height:auto}.analytics-reports__metrics{grid-template-columns:repeat(3,1fr)}.history-replay__layout{grid-template-columns:minmax(190px,.75fr) minmax(340px,1.5fr)}.history-replay__right-column{grid-column:span 2;grid-template-columns:1fr 1fr;grid-template-rows:none}.history-replay__details,.history-replay__events{min-height:260px}}
+@media(max-width:820px){.voice-scripts__layout,.analytics-reports__grid,.history-replay__layout,.alerts-notifications__bottom{grid-template-columns:1fr}.voice-scripts__usage,.history-replay__right-column{grid-column:auto}.voice-scripts__library,.voice-scripts__editor,.voice-scripts__usage{min-height:auto}.analytics-reports__metrics{grid-template-columns:repeat(2,1fr)}.analytics-reports__insights{grid-template-columns:1fr 1fr;grid-template-rows:none}.history-replay__right-column{grid-template-columns:1fr}.history-replay__map-card img{height:auto}.history-replay__player{grid-template-columns:1fr}.alerts-notifications__detail,.alerts-notifications__routing{min-height:150px}.monitor-notice{margin-bottom:14px}}
+@media(max-width:560px){.monitor-segmented,.monitor-tab-list{gap:6px;overflow-x:auto;padding-bottom:3px}.monitor-segmented button,.monitor-tab-list button{min-width:auto;white-space:nowrap}.analytics-reports__tools,.alerts-notifications__tools,.history-replay__tools{align-items:flex-start;gap:10px;flex-direction:column}.analytics-reports__metrics{grid-template-columns:1fr 1fr}.voice-scripts__selects{grid-template-columns:1fr}.voice-scripts__editor-actions,.alerts-notifications__detail>div:last-child{flex-wrap:wrap}.voice-scripts__variables{flex-wrap:wrap}.voice-scripts__variables button{flex:0 0 calc(50% - 3px)}.analytics-reports__insights{grid-template-columns:1fr}.history-replay__sessions,.history-replay__map-card{min-height:auto}.history-replay__transport{justify-content:flex-start}.history-replay__player-actions{justify-content:flex-start}}
 `;
 injectStyles('mediassist-style-pages-Admin-MonitoringScreens-jsx', inlineStyles);
 
 import { useEffect, useMemo, useState } from 'react';
 import ReportChart from './ReportChart.jsx';
-import crowdHeatmapMap from '../../assets/images/figma-heatmap-raw-1.png';
 import dotBlue from '../../assets/images/figma-history-dot-6.svg';
 import dotGreen from '../../assets/images/figma-history-dot-2.svg';
 import dotViolet from '../../assets/images/figma-history-dot-4.svg';
@@ -451,70 +447,6 @@ export function HistoryReplay() {
       <div className="history-replay__player-actions"><button className="secondary" type="button" onClick={() => setNotice('Snapshot is not available because the backend has no route playback API.')} disabled={!selected}>{vi("Snapshot")}</button><button type="button" onClick={() => setNotice('Job events are displayed from the backend. CSV export is available from the analytics report.')} disabled={!selected}>{vi("Event data")}</button></div>
     </footer>
     <Notice>{vi(notice || requestError)}</Notice>
-  </section>;
-}
-
-export function CrowdHeatmap() {
-  const [range, setRange] = useState('Live');
-  const [notice, setNotice] = useState('');
-  const [records, setRecords] = useState([]);
-  const [densityError, setDensityError] = useState('');
-  const [loadingDensity, setLoadingDensity] = useState(true);
-
-  const loadDensity = async () => {
-    const period = range === 'Live' ? 'Today' : range === '1 Hour' ? 'Today' : range === 'Today' ? 'Today' : '7 Days';
-    let { from, to } = reportRange(period);
-    if (range === '1 Hour') {
-      const hour = new Date(to);
-      hour.setHours(hour.getHours() - 1);
-      from = hour.toISOString();
-    }
-    setLoadingDensity(true);
-    try {
-      const page = await monitoringApi.listCrowdDensity({ from, to, page: 0, size: 100 });
-      setRecords(page.content ?? []);
-      setDensityError('');
-    } catch (requestError) {
-      setDensityError(requestError.message || 'Crowd-density data is unavailable.');
-    } finally {
-      setLoadingDensity(false);
-    }
-  };
-
-  useEffect(() => { loadDensity(); }, [range]);
-
-  const density = useMemo(() => records.slice(0, 6).map((item) => [
-    item.metrics?.zoneName ?? item.metrics?.locationName ?? (item.zoneId ? `Zone ${String(item.zoneId).slice(0, 8)}` : 'Unassigned zone'),
-    String(item.personCount),
-    item.densityLevel === 'MEDIUM' ? 'Med' : titleCase(item.densityLevel),
-  ]), [records]);
-
-  return <section className="monitor-screen crowd-heatmap" aria-label={vi("Crowd heatmap")}>
-    <div className="monitor-segmented crowd-heatmap__tabs" aria-label={vi("Heatmap period")}>
-      {vi(['Live', '1 Hour', 'Today', '7 Days'].map((item) => <button className={range === item ? 'is-selected' : ''} key={item} type="button" onClick={() => { setRange(item); setNotice(''); }}>{vi(item)}</button>))}
-    </div>
-    <div className="crowd-heatmap__layout">
-      <article className="monitor-panel crowd-heatmap__map-card">
-        <div className="monitor-panel__head">{vi("Crowd density — Hospital Floor 1")}</div>
-        <img src={crowdHeatmapMap} alt={vi(`${range} crowd density map for Hospital Floor 1`)} />
-        <div className="crowd-heatmap__legend"><span>{vi("Low")}</span><i /><i /><i /><span>{vi("High")}</span></div>
-      </article>
-      <aside className="crowd-heatmap__side">
-        <article className="monitor-panel crowd-heatmap__density">
-          <div className="monitor-panel__head">{vi("Recorded density")}</div>
-          {vi(density.map(([area, people, state]) => <p key={area}><span>{vi(area)}</span><b>{vi(people)}</b><em className={`is-${state.toLowerCase()}`}>{vi(state)}</em></p>))}
-          {vi(!loadingDensity && density.length === 0 && <p>{vi("No crowd records for this range.")}</p>)}
-        </article>
-        <article className="monitor-panel crowd-heatmap__rules">
-          <div className="monitor-panel__head">{vi("Crowd-aware robot rules")}</div>
-          {vi(['Slow down if HIGH', 'Avoid zone if critical', 'Alert Admin > 60 people', 'Replan through low density'].map((rule) => <p key={rule}><span>{vi(rule)}</span><b>{vi("On")}</b></p>))}
-          <small>{vi("Current effect")}</small>
-          <strong>{vi("Robot speed reduced to 0.25 m/s")}</strong>
-          <button className="secondary" type="button" onClick={() => setNotice('Crowd rule editor opened.')}>{vi("Edit Crowd Rules")}</button>
-        </article>
-      </aside>
-    </div>
-    <Notice>{vi(notice || densityError)}</Notice>
   </section>;
 }
 

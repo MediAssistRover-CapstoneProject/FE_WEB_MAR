@@ -7,7 +7,7 @@ import { screenTitles } from '../../api/workspaceCatalog.js';
 import { pathForScreen } from '../screenRoutes.js';
 import './AdminSidebar.css';
 
-const adminOnly = new Set(['Users & Roles', 'System Settings', 'Audit Logs', 'Analytics', 'Crowd Heatmap', 'History & Replay']);
+const adminOnly = new Set(['Users & Roles', 'System Settings', 'Audit Logs', 'Analytics', 'History & Replay']);
 const menuLabels = {
   Workflows: 'Thiết kế quy trình',
   'Workflow Management': 'Danh mục quy trình',

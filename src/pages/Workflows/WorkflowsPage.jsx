@@ -639,16 +639,6 @@ import { buildPatrolGraph, loadAllPages, orderedPatrolSteps } from '../../featur
 import MoveDestinationFields from './MoveDestinationFields.jsx';
 import { LOCAL_MAP_ID, localMapCatalog, mergeLocalDesigns, getDesign, saveLocalGraph, removeLocalDesign } from '../../features/workflows/localPatrolDesign.js';
 
-const navGroups = [
-  ['Overview', ['Dashboard']],
-  ['Operations', ['Live Operations', 'Emergency Center', 'Missions', 'Patrol']],
-  ['Map & Navigation', ['Map Studio']],
-  ['Robot', ['Robot Status', 'Charging']],
-  ['Monitoring', ['Alerts', 'Crowd Heatmap', 'History & Replay', 'Analytics']],
-  ['Automation', ['Workflows', 'Voice & Scripts']],
-  ['Administration', ['Users & Roles', 'System Settings', 'Audit Logs']],
-];
-
 const workflows = [
   ['Patient Guidance and Escort', 'WF_PATIENT_ESCORT', 16],
   ['Outpatient Information Assistance', 'WF_INFORMATION_ASSISTANCE', 15],

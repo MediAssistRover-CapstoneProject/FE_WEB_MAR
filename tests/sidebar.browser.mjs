@@ -13,11 +13,13 @@ await context.addInitScript(() => { if (!sessionStorage.getItem('mediassist-rove
 })); });
 const page = await context.newPage();
 const base=process.env.TEST_URL||'http://127.0.0.1:5175';
-await page.route('**/api/v1/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [], totalElements: 0, totalPages: 0 }) }));
+const apiCalls=[];
+await page.route('**/api/v1/**', route => { apiCalls.push(new URL(route.request().url()).pathname);return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [], totalElements: 0, totalPages: 0 }) }); });
 
 try {
   const screens = navigationGroups.flatMap(([, items]) => items);
   assert.equal(new Set(screens).size, screens.length, 'Mỗi màn hình chỉ xuất hiện một lần trong cấu trúc menu');
+  assert.equal(screens.includes('Crowd Heatmap'),false);
 
   await page.goto(base+'/admin');
   const sidebar = page.locator('aside.sidebar');
@@ -43,6 +45,11 @@ try {
   assert.equal(await workflowSidebar.getByRole('button', { name: vi('Automation') }).getAttribute('aria-expanded'), 'true');
   assert.equal(await workflowSidebar.getByRole('button', { name: vi('Automation') }).evaluate(element => getComputedStyle(element).backgroundColor), 'rgb(245, 248, 254)');
   await page.screenshot({ path: '.workstation-build/sidebar-workflows.png' });
+  await page.goto(base+'/admin/crowd-heatmap');
+  await page.getByRole('heading',{name:'Bảng điều khiển',exact:true,level:1}).waitFor();
+  await page.goto(base+'/admin?screen=Crowd%20Heatmap');
+  await page.getByRole('heading',{name:'Bảng điều khiển',exact:true,level:1}).waitFor();
+  assert.ok(!apiCalls.some(path=>/monitoring\/(crowd-density|heatmaps)/.test(path)));
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(base+'/admin');
