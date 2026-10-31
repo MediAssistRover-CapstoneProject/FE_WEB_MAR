@@ -7,7 +7,10 @@ map đã chọn, giữ lựa chọn khi đổi tab hoặc quay lại từ Quét.
 trong localStorage không còn được đọc hoặc ghi bởi trang Bản đồ. Đã gỡ luồng
 xem bản đồ mô phỏng, điều khiển/quét giả và xuất bản nháp mô phỏng khỏi trang này.
 Danh sách map nằm trong khung mở/đóng, tự thu gọn sau khi chọn và giữ map đang
-dùng khi quay lại thư viện. Phần xem trước có chiều cao giới hạn trên desktop/mobile.
+dùng khi quay lại thư viện. Trang chỉnh sửa dùng trực tiếp map đã chọn, không có
+dropdown chọn map thứ hai hoặc thông báo tải danh mục BE. Nút “← Thư viện bản đồ”
+cho phép đổi map; khu vực kích hoạt/công khai nằm dưới form và bản đồ.
+Phần xem trước có chiều cao giới hạn trên desktop/mobile.
 “Quét map mới” mở trực tiếp thiết lập robot/tầng/tên map/quy trình ngay trên
 trang Quét (`/admin/map?stage=scan`), cùng trạng thái, camera, điều khiển và lưu map.
 Form mặc định thu gọn, có nút Hiện/Ẩn chi tiết và tóm tắt lựa chọn; giữ dữ liệu
@@ -88,3 +91,22 @@ node tests/dispatch.browser.mjs
 ```
 
 Ảnh kiểm tra được lưu trong `.workstation-build/`, thư mục này đã được Git bỏ qua.
+
+## Điều phối chỉ sửa FE (31/10/2026)
+
+Chọn bản đồ + robot một lần; mở phiên để lấy ID và lệnh Pi luôn hiển thị,
+có nút sao chép. Chọn endpoint đã lưu làm vị trí khởi tạo (danh sách hoặc
+bấm trên bản đồ), xác nhận để gửi `SEED` với X/Y/yaw qua API hiện có.
+Điểm đến chỉ chọn ở bước cuối; MOVE vẫn đợi phiên READY và pose mới đúng map.
+Không sửa endpoint để khởi tạo, không sửa mã BE. Ảnh PNG thiếu header hash do
+CORS được kiểm tra lại metadata trước/sau; header sai hoặc hình học đổi vẫn bị chặn.
+
+Chạy Vite cổng 5175 rồi đặt `PLAYWRIGHT_MODULE`, `CHROME_EXECUTABLE` như trên:
+
+```powershell
+node tests/navigation-dispatch.browser.mjs
+```
+
+Toàn bộ API được giả lập, không chạy robot thật. Bao phủ mở phiên khi Pi chưa
+kết nối, sao chép ID/lệnh, endpoint đổi tọa độ, xác minh, MOVE + submit,
+hủy, đóng phiên và kích thước 1440/1024/390px. Ảnh: `.workstation-build/navigation-dispatch/`.

@@ -40,8 +40,8 @@ await mkdir('.workstation-build/facility',{recursive:true});
 // API component in an isolated test page, not by adding a production menu back.
 await page.route('**/__test/facility-catalog',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><html lang="vi"><head><meta name="viewport" content="width=device-width,initial-scale=1"/></head><body><div id="root"></div><script type="module" src="/tests/fixtures/facility-catalog.jsx"></script></body></html>`}));
 try{
- await page.goto('http://127.0.0.1:5173/__test/facility-catalog');
- await page.getByText('Đã đọc danh mục từ BE. Chưa thay đổi dữ liệu máy chủ.',{exact:true}).waitFor();
+ await page.goto((process.env.TEST_URL||'http://127.0.0.1:5175')+'/__test/facility-catalog');
+ await page.locator('[data-map-id="map-a"]').waitFor();
  assert.equal(writes.length,0);assert.ok(reads.some(p=>p.includes('endpoints?page=1')));
  await page.getByRole('button',{name:'3. Điểm đích',exact:true}).click();
  await page.getByRole('button',{name:'Nhóm điểm đích',exact:true}).click();
@@ -89,14 +89,14 @@ try{
  await page.getByLabel('X (m)',{exact:true}).fill('1000');await page.getByRole('button',{name:/Lưu điểm đích|Lưu thay đổi/ }).click();
  await page.getByRole('status').filter({hasText:'Điểm đích phải nằm trong ảnh bản đồ'}).waitFor();assert.equal(writes.length,countBefore);
  await page.getByLabel('X (m)',{exact:true}).fill(String(selectedX));await page.getByLabel('Tên điểm',{exact:true}).fill('Điểm đã sửa');
- await page.getByRole('button',{name:/Lưu điểm đích|Lưu thay đổi/ }).click();await page.getByRole('status').filter({hasText:'BE đã lưu thành công.'}).waitFor();
+ await page.getByRole('button',{name:/Lưu điểm đích|Lưu thay đổi/ }).click();await page.getByRole('status').filter({hasText:'Đã lưu thay đổi.'}).waitFor();
  assert.equal(writes.at(-1).method,'PUT');assert.equal(writes.at(-1).path,'/api/v1/endpoints/end-new');assert.equal(writes.at(-1).body.endpointType,'WAYPOINT');
  await page.getByRole('button',{name:'-90°',exact:true}).click();assert.equal(Number(await page.getByLabel('Hướng đến (độ)',{exact:true}).inputValue()),-90);
- assert.equal(await page.getByRole('button',{name:'Hoàn tất & kích hoạt bản đồ',exact:true}).isDisabled(),true);
+ assert.equal(await page.getByRole('button',{name:'Kích hoạt bản đồ',exact:true}).isDisabled(),true);
  await page.getByRole('button',{name:'Bỏ thay đổi',exact:true}).click();assert.equal(Number(await page.getByLabel('Hướng đến (độ)',{exact:true}).inputValue()),90);
- await page.getByRole('button',{name:'Hoàn tất & kích hoạt bản đồ',exact:true}).click();await page.getByRole('button',{name:'✓ Bản đồ đã kích hoạt',exact:true}).waitFor();
+ await page.getByRole('button',{name:'Kích hoạt bản đồ',exact:true}).click();await page.getByText('Bản đồ sẵn sàng điều phối',{exact:false}).waitFor();
  assert.equal(writes.at(-1).path,'/api/v1/maps/map-a/activate');assert.equal(await page.getByRole('button',{name:'Mở Điều phối →',exact:true}).isEnabled(),true);
- await page.getByRole('button',{name:'Công khai 2 điểm đích',exact:true}).click();await page.getByRole('button',{name:'Công khai 0 điểm đích',exact:true}).waitFor();
+ await page.getByRole('button',{name:'Công khai 2 điểm đích',exact:true}).click();await page.getByRole('button',{name:'Công khai 2 điểm đích',exact:true}).waitFor({state:'detached'});
  assert.ok(state.endpoints.filter(p=>p.mapId==='map-a').every(p=>p.publicVisible));assert.equal(state.endpoints.find(p=>p.mapId==='map-other').publicVisible,false);
  await page.screenshot({path:'.workstation-build/facility/endpoint-map.png',fullPage:true});
  for(const [width,height]of[[1024,768],[390,844]]){await page.setViewportSize({width,height});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Endpoint no overflow '+width);await page.screenshot({path:`.workstation-build/facility/endpoint-${width}.png`,fullPage:true});}

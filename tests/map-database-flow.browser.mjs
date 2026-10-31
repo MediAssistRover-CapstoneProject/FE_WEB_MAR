@@ -36,7 +36,7 @@ await page.route(url=>url.pathname.startsWith('/api/'),async route=>{
 const base=process.env.TEST_URL||'http://127.0.0.1:5175';
 const tab=name=>page.getByRole('navigation',{name:vi('Map Studio stages'),exact:true}).getByRole('button',{name,exact:true});
 const expectMap=async id=>{
-  await page.waitForFunction(id=>document.querySelector('select[aria-label="Bản đồ BE"]')?.value===id,id);
+  await page.locator(`[data-map-id="${id}"]`).waitFor();
   await page.getByText('Bản đồ quét đã lưu · Bấm vùng hoặc điểm để chỉnh sửa.',{exact:false}).waitFor();
   assert.equal(await page.locator('.ls-map').count(),0,'No local simulation canvas');
   assert.equal(await page.getByText('Vùng mô phỏng cũ',{exact:true}).count(),0);
@@ -68,12 +68,24 @@ try{
   await summary.click();await page.setViewportSize({width:1440,height:1000});
   await page.getByRole('button',{name:'Mở bản đồ',exact:true}).click();
   await expectMap('b');
-  await page.getByRole('button',{name:'Map đã quét trong database',exact:true}).click();
+  await page.getByRole('button',{name:'← Thư viện bản đồ',exact:true}).click();
   await summary.getByText('Map database b',{exact:true}).waitFor();
   await page.getByRole('button',{name:'← Quay lại bản đồ đang chỉnh',exact:true}).click();
   await expectMap('b');
   await tab('3. Điểm đích').click();await expectMap('b');
-  await page.getByLabel('Bản đồ BE',{exact:true}).selectOption('a');
+  assert.equal(await page.getByLabel('Bản đồ BE',{exact:true}).count(),0,'Editor uses the map selected in the library');
+  assert.equal(await page.getByText('Đã đọc danh mục từ BE. Chưa thay đổi dữ liệu máy chủ.',{exact:true}).count(),0);
+  assert.equal(await page.getByRole('button',{name:'Công khai 0 điểm đích',exact:true}).count(),0);
+  for(const width of [2560,1440,1024,390]){
+    await page.setViewportSize({width,height:1000});
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Endpoint fits '+width);
+    await page.screenshot({path:`.workstation-build/map-database-flow/endpoint-${width}.png`,fullPage:true});
+  }
+  await page.setViewportSize({width:1440,height:1000});
+  await page.getByRole('button',{name:'← Thư viện bản đồ',exact:true}).click();
+  await summary.click();
+  await page.getByRole('button',{name:/Map database a/}).click();
+  await page.getByRole('button',{name:'Mở bản đồ',exact:true}).click();
   await tab('2. Vùng').click();await expectMap('a');
   await tab('1. Quét').click();
   assert.equal(await page.getByRole('button',{name:/mô phỏng/i}).count(),0);
@@ -100,7 +112,7 @@ try{
   await page.getByText('Database chưa có bản đồ.',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Quét map mới',exact:true}).click();
   await tab('2. Vùng').click();
-  await page.getByText(/BE chưa có bản đồ/).waitFor();
+  await page.getByText('Chưa có bản đồ để chỉnh sửa',{exact:true}).waitFor();
   assert.equal(await page.locator('.ls-map').count(),0);
   failMaps=true;await page.goto(base+'/admin/map');
   await page.getByRole('alert').filter({hasText:'Database unavailable'}).waitFor();

@@ -15,9 +15,9 @@ export default function EndpointMapEditor({ map, zones, rooms, endpoints, endpoi
   const setAngle = value => set('yawRad', value === '' ? '' : Number(value) * Math.PI / 180);
   const reset = () => { setEndpoint(selected ? { ...selected } : { endpointCode:'', endpointName:'', endpointType:'WAYPOINT', xM:'', yM:'', yawRad:0, zoneId:'', roomId:'', active:true, accessible:true, publicVisible:false, description:'' }); setDrawing(false); };
   const create = () => { setEndpoint({ endpointCode:'', endpointName:'', endpointType:'WAYPOINT', xM:'', yM:'', yawRad:0, zoneId:'', roomId:'', active:true, accessible:true, publicVisible:false, description:'' }); setDrawing(true); };
-  return <div className="ep-editor">
+  return <div className="ep-editor" data-map-id={map.mapId}>
     <section className="ls-panel ep-map-panel">
-      <div className="ep-panel-heading"><div><h3>{map.mapName}</h3><p>Bấm chọn vị trí, kéo để đặt hướng đến.</p></div><span className={'ep-mode '+(drawing?'placing':'')}>{drawing?'Đang đặt điểm':'Xem bản đồ'}</span></div>
+      <div className="ep-panel-heading"><div><h3>{map.mapName}</h3><p>v{map.versionNo} · {map.widthM} × {map.heightM} m · {Number(map.resolutionMPerPixel)*100} cm/ô</p></div><span className={'ep-mode '+(drawing?'placing':'')}>{drawing?'Đang đặt điểm':'Xem bản đồ'}</span></div>
       <div className="ep-map-actions"><button type="button" className={'ls-btn '+(drawing?'primary':'')} disabled={locked} onClick={()=>setDrawing(d=>!d)}>{drawing?'Hủy đặt điểm':selected?'Đặt lại vị trí / hướng':'Đặt điểm trên map'}</button><span>{drawing?'Giữ chuột trên sàn → kéo theo hướng đến → thả':'Bản đồ cố định · Bấm điểm đã lưu để chỉnh sửa'}</span></div>
       <FacilityGeometryPreview map={map} zones={zones} endpoints={endpoints} endpointEdit={endpoint} drawing={drawing&&!locked} allowDraftMove={!locked} onEndpoint={p=>{setEndpoint({...p});setDrawing(false);}} onPoint={p=>setEndpoint(e=>({...e,...p}))} onPlacementEnd={()=>setDrawing(false)}/>
       <div className="ep-legend"><span><i className="saved"/>Điểm đã lưu</span><span><i className="draft"/>Điểm đang chỉnh</span><span>→ Hướng robot khi đến điểm</span><span>{endpoints.length} điểm trên map</span></div>

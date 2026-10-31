@@ -38,23 +38,19 @@ export default function MapStudioFigma({initialStage='scan'}) {
   </section>;
 
   return <section className="ls-studio">
-    <div className="ls-actions" style={{marginBottom:14}}>
-      <Button onClick={()=>setShowLibrary(true)}>Map đã quét trong database</Button>
-    </div>
-    <WorkspaceTabs label={vi('Map Studio stages')} active={stage} onSelect={setStage}
-      items={workflow.map(([id,label],i)=>({id,label:`${i+1}. ${vi(label)}`}))}/>
-    <div className="ls-topline"><span>{stage==='scan'?'Bản đồ robot · dữ liệu máy chủ':'Bản đồ robot đã lưu trên máy chủ'}</span></div>
     <header className="ls-heading">
       <div>
-        <h2>{index+1}. {vi(workflow[index][1])}</h2>
-        <p>{stage==='scan'?'Camera robot và bản đồ LiDAR được cập nhật từ phiên quét.':'Chọn bản đồ trong database để thiết lập vùng và điểm đích.'}</p>
+        <h2>{vi(workflow[index][1])}</h2>
+        <p>{stage==='scan'?'Quét không gian để tạo bản đồ cho robot.':stage==='zone'?'Thiết lập vùng di chuyển trên bản đồ đã chọn.':'Đặt vị trí và hướng đến của robot trên bản đồ.'}</p>
       </div>
       <div className="ls-actions">
+        <Button onClick={()=>setShowLibrary(true)}>← Thư viện bản đồ</Button>
         {stage==='scan'&&<Button onClick={()=>navigate('/admin/system-settings')}>Cấu hình kết nối robot →</Button>}
-        {stage==='zone'&&<Button tone="primary" onClick={()=>setStage('endpoint')}>Tiếp tục đặt Endpoint →</Button>}
-        {stage==='endpoint'&&<Button onClick={()=>setStage('zone')}>← Quay lại Zone</Button>}
+        {stage==='zone'&&<Button tone="primary" onClick={()=>setStage('endpoint')}>Tiếp tục: Điểm đích →</Button>}
       </div>
     </header>
+    <div className="ls-stage-nav"><WorkspaceTabs label={vi('Map Studio stages')} active={stage} onSelect={setStage}
+      items={workflow.map(([id,label],i)=>({id,label:`${i+1}. ${vi(label)}`}))}/></div>
     {stage==='scan'
       ? <LiveMapping embedded onMapSaved={id=>openMap(id,'zone')}/>
       : <FacilityCatalogEditor stage={stage} initialMapId={mapId} onMapChange={setMapId}/>}
