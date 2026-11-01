@@ -12,11 +12,13 @@ export function eligibleWorkflows(details, type) {
     return steps.length > 0 && steps.every(s => s.stepTypeCode === 'INTERACT' && s.paramsJson?.action === 'SPEAK');
   }).map(d => d.workflow);
 }
-export function movementBlock({ operator, detail, session, snapshot, checkedAt, saving, now = Date.now() }) {
+export function movementBlock({ operator, detail, session, snapshot, checkedAt, saving, manual = true, now = Date.now() }) {
   if (!operator) return 'Chỉ quản trị viên đăng nhập thật mới được điều khiển.';
   if (saving) return 'Đang lưu và kết thúc phiên quét.';
   if (!checkedAt || now - checkedAt > 2500) return 'Chưa có trạng thái kết nối mới. Đang khóa điều khiển.';
   if (!snapshot?.mqttConnected || !snapshot.heartbeatFresh || !snapshot.dispatchReady) return 'Pi chưa sẵn sàng. Kiểm tra kết nối robot.';
+  if (manual && session?.autonomy?.manual_control?.source === 'gamepad') return 'Robot đang dùng tay cầm. Chuyển nguồn điều khiển trên Pi trước khi dùng các nút di chuyển.';
+  if (session?.autonomy?.control_selected) return 'Robot đang tự quét. Dừng chế độ tự chạy trước khi điều khiển tay.';
   const job = detail?.job;
   if (job?.status === 'RECOVERY_REQUIRED') return 'Cần kiểm tra và khôi phục nhiệm vụ trước khi tiếp tục.';
   if (job?.status !== 'RUNNING' || job.cancelRequestedAt || session?.job_status !== 'RUNNING' || session?.state !== 'MAPPING' || !session.potentially_open) return 'Chờ nhiệm vụ vào bước quét đang hoạt động.';

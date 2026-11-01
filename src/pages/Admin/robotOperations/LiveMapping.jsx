@@ -45,20 +45,54 @@ function SnapshotImage({ jobId, kind, enabled }) {
 
 export const ROBOT_CAMERA_URL_KEY = 'mar.robotCameraUrl';
 
+function MotionStatus({ session }) {
+  let gate;
+  try { gate = JSON.parse(session?.motionTelemetry?.gate?.value ?? 'null'); } catch { /* Await a valid sample. */ }
+  const age = Date.now() - Date.parse(session?.motionObservedAt);
+  const labels = {
+    CLEAR: 'Đường điều khiển cho phép chuyển động', NO_LEASE: 'Robot đang dừng hoặc chờ lệnh',
+    STALE_COMMAND: 'Robot chưa nhận được lệnh mới', SIDE_OBSTACLE: 'Robot dừng: có vật cản bên cạnh',
+    REAR_OBSTACLE: 'Robot dừng: có vật cản phía sau', REVERSE_NOT_ENABLED: 'Pi chưa bật chế độ lùi',
+    STALE_OR_INVALID_US100: 'Robot dừng: dữ liệu siêu âm chưa hợp lệ hoặc đã cũ',
+    REAR_LIDAR_NOT_READY: 'LiDAR phía sau chưa sẵn sàng', REAR_LIDAR_TF_NOT_READY: 'Chưa xác định được hướng LiDAR phía sau',
+    STALE_REAR_LIDAR: 'Dữ liệu LiDAR phía sau đã cũ', NOT_COMMISSIONED: 'Pi chưa bật cấu hình chuyển động',
+  };
+  return <p className="ro-help" role="status">{gate && Number.isFinite(age) && age >= -1000 && age < 10000
+    ? (labels[gate.reason] || `Robot dừng hoặc giới hạn: ${gate.reason || 'chưa rõ nguyên nhân'}`)
+    : 'Chưa có phản hồi chuyển động mới từ Pi.'}</p>;
+}
+
 function Camera({ jobId, enabled }) {
   const [stream, setStream] = useState(''), [message, setMessage] = useState('');
+  const [streamUrl, setStreamUrl] = useState('');
   useEffect(() => {
     setMessage('');
     const saved = localStorage.getItem(ROBOT_CAMERA_URL_KEY) || import.meta.env.VITE_ROBOT_CAMERA_URL || '';
+    setStreamUrl(saved);
     try {
       const value = new URL(saved);
       setStream(['http:', 'https:'].includes(value.protocol) && !value.username && !value.password && (location.protocol !== 'https:' || value.protocol === 'https:') ? value.href : '');
     } catch { setStream(''); }
   }, [jobId]);
+  const connect = event => {
+    event.preventDefault();
+    try {
+      const value = new URL(streamUrl.trim());
+      if (!['http:', 'https:'].includes(value.protocol) || value.username || value.password) throw Error('Nhập URL video HTTP hoặc HTTPS, không kèm tài khoản.');
+      if (location.protocol === 'https:' && value.protocol !== 'https:') throw Error('Trang HTTPS cần nguồn video HTTPS.');
+      setStream(value.href); setMessage('Đang kết nối video từ robot…');
+      try { localStorage.setItem(ROBOT_CAMERA_URL_KEY, value.href); } catch { /* Video still works without persistence. */ }
+    } catch (error) { setMessage(error instanceof TypeError ? 'URL video chưa hợp lệ.' : error.message); }
+  };
   return <section className="ro-card"><h3>Camera robot <span className="ro-badge">{stream ? 'Video cùng mạng' : 'Ảnh MQTT'}</span></h3>
     {stream ? <div className="ro-preview"><img src={stream} alt="Video trực tiếp từ robot" onLoad={() => setMessage('Đã nhận hình từ nguồn video.')} onError={() => { setStream(''); setMessage('Không kết nối được video. Đã chuyển về ảnh MQTT.'); }} /></div> : <SnapshotImage jobId={jobId} kind="camera" enabled={enabled} />}
     {stream && <button type="button" onClick={() => { setStream(''); setMessage('Đã chuyển về ảnh MQTT.'); }}>Dùng ảnh MQTT</button>}
     {message && <p role="status">{message}</p>}
+    <details className="ro-details"><summary>Kết nối video trực tiếp</summary><form onSubmit={connect}>
+      <Field label="URL video từ robot"><input type="url" required value={streamUrl} onChange={event => setStreamUrl(event.target.value)} placeholder="http://IP_PI:8080/stream?topic=/ascamera/camera_publisher/rgb0/image&type=mjpeg" /></Field>
+      <div className="ro-actions"><button type="submit">Xem video trực tiếp</button></div>
+      <small>Máy này cần truy cập được Pi. Nếu video lỗi, camera tự chuyển về ảnh MQTT của phiên quét.</small>
+    </form></details>
   </section>;
 }
 
@@ -156,6 +190,7 @@ export default function LiveMapping({ onMapSaved, embedded = false }) {
   };
   const activeJob = jobId && (!detail || !terminalJobs.has(detail.job.status) || session?.potentially_open);
   const block = movementBlock(current.current);
+  const saveBlock = movementBlock({ ...current.current, manual: false });
   const ready = snapshot?.mqttConnected && snapshot?.heartbeatFresh && snapshot?.dispatchReady;
   const setupSummary=[catalog.robots.find(r=>r.robotId===robotId)?.robotName,catalog.floors.find(f=>f.floorId===floorId)?.floorName,mapName.trim()].filter(Boolean).join(' · ') || 'Chọn robot, tầng và tên bản đồ để bắt đầu';
   const create = async e => {
@@ -169,7 +204,7 @@ export default function LiveMapping({ onMapSaved, embedded = false }) {
     finally { writeLock.current = false; setBusy(false); }
   };
   const save = async (retrySave = false) => {
-    if (writeLock.current || movementBlock({ ...current.current, saving: retrySave ? false : current.current.saving })) return;
+    if (writeLock.current || movementBlock({ ...current.current, manual: false, saving: retrySave ? false : current.current.saving })) return;
     writeLock.current = true; setBusy(true); setActionError(null); setSaving(true); current.current.saving = true;
     const event = tracking?.saveEvent || { eventId: crypto.randomUUID(), eventType: 'MAPPING_SAVE_REQUESTED', correlationKey: session.mapping_session_id, occurredAt: new Date().toISOString(), data: {} };
     const next = { ...tracking, saving: true, saveEvent: event }; setTracking(next); writeTracking('mapping', next);
@@ -207,9 +242,9 @@ export default function LiveMapping({ onMapSaved, embedded = false }) {
       <button className="ro-right" disabled={!!block || busy} {...handlers(0, -Number(turnSpeed))}>Quay phải ↷</button>
       <button className="ro-backward" disabled={!!block || busy} {...handlers(-Number(speed), 0)}>↓ Lùi</button>
     </div>
-    {block && <p className="ro-help">{block}</p>}<p role="status">{jogMessage}</p>{receipt && <p className="ro-status">{receiptLabels[receipt.status] || 'Đang cập nhật phản hồi'}</p>}<small>Quan sát camera khi di chuyển. Lùi cần profile Pi cho phép và LiDAR phía sau sẵn sàng. Tốc độ thực tế được giới hạn theo cấu hình Pi.</small>
+    {block && <p className="ro-help">{block}</p>}<MotionStatus session={session}/><p role="status">{jogMessage}</p>{receipt && <p className="ro-status">{receiptLabels[receipt.status] || 'Đang cập nhật phản hồi'}</p>}<small>Quan sát camera khi di chuyển. Lùi cần profile Pi cho phép và LiDAR phía sau sẵn sàng. Tốc độ thực tế được giới hạn theo cấu hình Pi.</small>
     {receipt?.errorCode && <details><summary>Chi tiết phản hồi</summary><p>{receipt.errorCode}</p></details>}
-    <div className="ro-actions"><button className="primary" disabled={!!block || busy || jog.current.active} onClick={() => save()}>Lưu bản đồ và kết thúc</button>{saving && tracking?.saveEvent && <button disabled={busy || !!movementBlock({ ...current.current, saving: false })} onClick={() => save(true)}>Gửi lại yêu cầu lưu đã tạo</button>}</div>{saving && actionError && <p className="ro-help">Chưa xác nhận được yêu cầu lưu. Tải lại trạng thái; nếu phiên vẫn đang quét, có thể gửi lại cùng yêu cầu ở trên.</p>}<p className="ro-muted">Chờ máy chủ xác nhận hoàn tất. Pi cần được cấu hình tải bản đồ lên máy chủ.</p>
+    <div className="ro-actions"><button className="primary" disabled={!!saveBlock || busy || jog.current.active} onClick={() => save()}>Lưu bản đồ và kết thúc</button>{saving && tracking?.saveEvent && <button disabled={busy || !!movementBlock({ ...current.current, manual: false, saving: false })} onClick={() => save(true)}>Gửi lại yêu cầu lưu đã tạo</button>}</div>{saving && actionError && <p className="ro-help">Chưa xác nhận được yêu cầu lưu. Tải lại trạng thái; nếu phiên vẫn đang quét, có thể gửi lại cùng yêu cầu ở trên.</p>}<p className="ro-muted">Chờ máy chủ xác nhận hoàn tất. Pi cần được cấu hình tải bản đồ lên máy chủ.</p>
   </section>;
   return <section className={'ro-workspace' + (embedded ? ' ro-embedded' : '')} aria-label="Quét bằng robot thật">
     {!embedded && <header className="ro-card ro-hero"><div><span className="ro-badge">Robot thật · Dữ liệu máy chủ</span><h2>Quét bản đồ</h2><p>Chọn robot, theo dõi camera và điều khiển trong phiên quét.</p></div></header>}

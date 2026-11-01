@@ -1,5 +1,30 @@
 # Kiểm tra FE
 
+## Điều khiển robot tại Workstations (01/11/2026)
+
+`/workstations?mode=mapping` dùng giao diện React cho các API của `mapping.html`:
+tạo mapping-job, theo dõi mapping-session/snapshot, ảnh map/camera, mapping-control
+và sự kiện lưu map. Chọn robot, tầng, quy trình đã phát hành và tên map trong
+“Chi tiết quét map mới”. Giữ nút để di chuyển; nhả, rời trang, đổi mục hoặc mất
+kết nối thì ngừng gia hạn và gửi lệnh dừng. Tay cầm hoặc tự quét đang giữ quyền
+điều khiển sẽ khóa nút di chuyển. Hiển thị phản hồi vật cản từ Pi; camera có thể
+nhập URL video trực tiếp và chuyển về ảnh MQTT nếu nguồn video lỗi.
+
+`?mode=speech` dùng API chuẩn bị TTS và speech-jobs. Mục Bản đồ máy chủ giữ luồng
+mở navigation-session, xác nhận vị trí, MOVE, theo dõi và hủy yêu cầu đã có.
+Các thao tác thật yêu cầu ADMIN, Pi kết nối và cấu hình BE/robot phù hợp.
+
+```powershell
+node --test tests/robot-operations.test.mjs tests/api-client.test.mjs
+node tests/workstation-control.browser.mjs
+node tests/navigation-dispatch.browser.mjs
+npm run build
+```
+
+Browser tests dùng Vite cổng 5175, `PLAYWRIGHT_MODULE`, `CHROME_EXECUTABLE` như
+hướng dẫn bên dưới. API được giả lập toàn bộ, không gửi lệnh đến robot thật.
+Ảnh giao diện: `.workstation-build/workstation-control/`.
+
 ## Bản đồ chọn từ database (31/10/2026)
 
 Trang `/admin/map` mở thư viện map database trước. Vùng và Điểm đích dùng

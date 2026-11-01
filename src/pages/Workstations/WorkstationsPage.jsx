@@ -259,7 +259,7 @@ export default function WorkstationsPage() {
         <header className="workflows-header">
           <h1>{vi("Dispatch")}</h1>
           <WorkspaceTabs label="Không gian quy trình" active="dispatch" onSelect={selectWorkspaceTab} items={workspaceTabs}/>
-          <p className="preview-note">{vi("Chọn quy trình, ánh xạ các điểm đích và chạy trên bản đồ đã lưu từ Bản đồ.")}</p>
+          <p className="preview-note">Chọn robot để quét bản đồ, điều khiển, phát thông báo hoặc dẫn đường tới điểm đã lưu.</p>
         </header>
         <DispatchWorkspace definitions={catalog.workflows} loading={catalog.loading} error={catalog.error} />
       </main>

@@ -127,9 +127,10 @@ try {
   assert.deepEqual(writes.filter(w => w.path.endsWith('/events'))[1].body, saved.body, 'Save retry must preserve event ID AND timestamp');
   assert.equal(await btn('Vẽ Zone trên map này →').count(), 0);
   job.status = 'SUCCEEDED'; await btn('Vẽ Zone trên map này →').waitFor(); await btn('Vẽ Zone trên map này →').click();
-  await waitUntil(async () => await page.getByLabel('Bản đồ BE', { exact: true }).inputValue() === 'server-map');
-  // Speech is in Automation; no duplication in scan.
-  await page.goto(`${base}/admin?screen=Voice+%26+Scripts`);
+  await btn('Vẽ vùng').waitFor();
+  await page.getByText('Bản đồ kiểm thử', { exact: true }).first().waitFor();
+  // The shared announcement UI is also available directly in Workstations.
+  await page.goto(`${base}/workstations?mode=speech`);
   await page.getByLabel('Robot phát thông báo').selectOption('robot-1');
   await page.getByLabel('Quy trình phát loa đã phát hành').selectOption('speech-workflow');
   await page.getByLabel('Nội dung thông báo').fill('Xin chào, đây là thông báo thử nghiệm.');

@@ -29,6 +29,15 @@ test('only published schema 3 workflows of the requested type are offered', () =
   for (const change of [{ schemaVersion: 2 }, { status: 'DRAFT' }, { acceptsNewJobs: false }, { definitionHash: null }, { serviceType: 'MAPPING' }]) assert.equal(eligibleWorkflows([{ ...d, workflow: { ...w, ...change } }], 'SPEECH').length, 0);
   assert.equal(eligibleWorkflows([{ ...d, steps: [{ enabled: true, stepTypeCode: 'MOVE' }] }], 'SPEECH').length, 0);
 });
+
+test('manual motion never competes with a gamepad or autonomous mapping', () => {
+  const state = valid();
+  for (const autonomy of [{ manual_control: { source: 'gamepad' } }, { control_selected: true }]) {
+    assert.ok(movementBlock({ ...state, session: { ...state.session, autonomy } }));
+  }
+  assert.equal(movementBlock({ ...state, session: { ...state.session, autonomy: { control_selected: false, manual_control: { source: 'web' } } } }), '');
+  assert.equal(movementBlock({ ...state, manual: false, session: { ...state.session, autonomy: { manual_control: { source: 'gamepad' } } } }), '', 'A gamepad does not prevent saving the map');
+});
 test('map handoff only uses a successful commit from a successful job', () => {
   const detail = { job: { status: 'RUNNING' }, steps: [{ status: 'SUCCEEDED', resolvedInputsJson: { service_key: 'COMMIT_MAP_ARTIFACT' }, resultJson: { data: { map_id: 'server-map' } } }] };
   assert.equal(committedMapId(detail), ''); detail.job.status = 'SUCCEEDED'; assert.equal(committedMapId(detail), 'server-map');
