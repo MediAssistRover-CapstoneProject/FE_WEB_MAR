@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { callBackend, readCatalog } from '../../../features/api/backendApi.js';
 import { getSession } from '../../../features/auth/session.js';
+import { collectMediaReferences, listMedia, mediaKind, resolveMediaReference } from '../../../features/media/mediaApi.js';
 import { INCIDENT_ACTIONS, INCIDENT_STATUSES, assertIncidentAction, incidentActions, incidentPresentation, incidentQuery, incidentTimeline, newerIncident } from '../../../features/operations/emergencyCenter.js';
 import './emergencyCenter.css';
 
@@ -38,6 +39,65 @@ function Freshness({ at, failed }) {
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
   const stale = failed || !at || now - at >= 45000;
   return <span className={`ec-freshness ${stale ? 'is-stale' : ''}`} role="status"><i />{!at ? 'Chưa có dữ liệu' : stale ? `Dữ liệu có thể đã cũ · nhận lúc ${stamp(at)}` : `Đã nhận từ máy chủ lúc ${stamp(at)}`}</span>;
+}
+
+function MediaCard({ item, compact = false }) {
+  const [failed, setFailed] = useState(false);
+  const kind = item.mediaType || mediaKind(item.url || item.objectKey);
+  return <article className={`ec-media-card ${compact ? 'is-compact' : ''}`}>
+    <div className="ec-media-preview">{failed ? <span>Không tải được media</span> : kind === 'VIDEO'
+      ? <video src={item.url} controls playsInline preload="metadata" onError={() => setFailed(true)}>Trình duyệt không hỗ trợ video.</video>
+      : <img src={item.url} alt="Bằng chứng hình ảnh từ máy chủ" loading="lazy" onError={() => setFailed(true)} />}</div>
+    <footer><span>{kind === 'VIDEO' ? 'Video' : 'Hình ảnh'}</span><a href={item.url} target="_blank" rel="noreferrer">Mở bản gốc</a></footer>
+  </article>;
+}
+
+function MediaLibrary() {
+  const [type, setType] = useState(''), [items, setItems] = useState([]), [cursor, setCursor] = useState('');
+  const [loading, setLoading] = useState(true), [error, setError] = useState(''), [revision, setRevision] = useState(0);
+  const request = useRef(null);
+  const load = async (nextCursor = '', append = false) => {
+    request.current?.abort(); const controller = new AbortController(); request.current = controller;
+    setLoading(true); setError('');
+    try {
+      const result = await listMedia({ mediaType: type, cursor: nextCursor, size: 12, signal: controller.signal });
+      if (!Array.isArray(result?.content)) throw Error('Danh sách media không đúng định dạng.');
+      setItems(previous => append ? [...previous, ...result.content] : result.content);
+      setCursor(result.nextCursor || '');
+    } catch (cause) { if (!controller.signal.aborted) setError(cause.message || 'Không tải được media.'); }
+    finally { if (!controller.signal.aborted) setLoading(false); if (request.current === controller) request.current = null; }
+  };
+  useEffect(() => { load(); return () => request.current?.abort(); }, [type, revision]);
+  return <section className="ec-media-library" aria-label="Thư viện hình ảnh và video">
+    <header><div><h3>Hình ảnh & video từ máy chủ</h3><p>Dữ liệu media đã tải lên và đang được BE cung cấp cho giao diện.</p></div><button className="ec-button" onClick={() => setRevision(value => value + 1)} disabled={loading}><Icon name="refresh" />Tải lại</button></header>
+    <div className="ec-media-tabs" role="group" aria-label="Loại media">{[['', 'Tất cả'], ['IMAGE', 'Hình ảnh'], ['VIDEO', 'Video']].map(([value, label]) => <button key={label} className={type === value ? 'is-active' : ''} aria-pressed={type === value} onClick={() => setType(value)}>{label}</button>)}</div>
+    {error && <div className="ec-notice ec-error" role="alert"><span>{error}</span><button className="ec-text-button" onClick={() => setRevision(value => value + 1)}>Thử lại</button></div>}
+    {!items.length && loading ? <div className="ec-media-empty">Đang tải hình ảnh và video…</div> : !items.length ? <div className="ec-media-empty">Máy chủ chưa có media thuộc nhóm này.</div> : <div className="ec-media-grid">{items.map(item => <MediaCard key={item.objectKey} item={item} />)}</div>}
+    {cursor && <button className="ec-button ec-media-more" disabled={loading} onClick={() => load(cursor, true)}>{loading ? 'Đang tải…' : 'Tải thêm media'}</button>}
+  </section>;
+}
+
+function IncidentEvidence({ incident }) {
+  const references = collectMediaReferences([incident.sourceEvidenceRef, incident.resolutionEvidence]);
+  const signature = references.join('|');
+  const [items, setItems] = useState([]), [error, setError] = useState('');
+  useEffect(() => {
+    const controller = new AbortController(); setItems([]); setError('');
+    if (!references.length) return () => controller.abort();
+    Promise.allSettled(references.map(reference => resolveMediaReference(reference, { signal: controller.signal }))).then(results => {
+      if (controller.signal.aborted) return;
+      setItems(results.filter(result => result.status === 'fulfilled').map(result => result.value));
+      if (results.some(result => result.status === 'rejected')) setError('Một số bằng chứng media không còn truy cập được.');
+    });
+    return () => controller.abort();
+  }, [signature]);
+  if (!references.length && !incident.resolutionNote) return null;
+  return <section className="ec-evidence"><header><div><h4>Bằng chứng sự cố</h4><p>Ảnh và video được liên kết với bản ghi trong DB.</p></div></header>
+    {incident.resolutionNote && <p className="ec-resolution-note"><strong>Kết quả xử lý:</strong> {incident.resolutionNote}</p>}
+    {error && <p className="ec-inline-warning">{error}</p>}
+    {references.length > 0 && !items.length && !error && <div className="ec-media-empty">Đang tải bằng chứng…</div>}
+    {items.length > 0 && <div className="ec-media-grid ec-evidence-grid">{items.map((item, index) => <MediaCard compact key={`${item.objectKey || item.url}-${index}`} item={item} />)}</div>}
+  </section>;
 }
 
 export default function EmergencyCenterPage() {
@@ -105,6 +165,7 @@ export default function EmergencyCenterPage() {
     {monitoring && <p className="ec-monitoring-note">Chế độ giám sát · Staff tiếp nhận và cập nhật kết quả xử lý SOS.</p>}
     <div className="ec-overview-caption"><span>Toàn bộ sự cố trong phạm vi tài khoản{total != null ? ` · ${total} sự cố` : ''}</span><span>{auto ? 'Làm mới mỗi 15 giây' : 'Tự cập nhật đang tắt'}</span></div>
     <div className="ec-metrics">{metrics.map(metric => <article key={metric.label} className={`ec-metric ec-${metric.tone}`}><div><span>{metric.label}</span><strong>{metric.value ?? '—'}</strong></div><span className="ec-metric-icon"><Icon name={metric.icon} /></span></article>)}</div>
+    <MediaLibrary />
     {countError && <p className="ec-inline-warning" role="status">Chưa cập nhật được số liệu tổng quan. {counts ? 'Đang giữ số liệu lần trước.' : 'Số liệu sẽ hiện khi máy chủ kết nối lại.'}</p>}
     {catalogWarning && <p className="ec-inline-warning">{catalogWarning}</p>}
     {toast && <div className="ec-notice ec-success" role="status"><span>{toast}</span><button className="ec-text-button" onClick={() => setToast('')}>Đóng thông báo</button></div>}
@@ -140,6 +201,7 @@ function IncidentDetail({ id, account, catalogs, tick, retained, onSaved }) {
     {error && <div className="ec-notice ec-error" role="alert"><span>{error} {monitoring ? 'Đang giữ chi tiết lần tải trước.' : 'Đang giữ chi tiết cũ; tạm khóa thao tác.'}</span><button className="ec-text-button" onClick={() => setRetry(value => value + 1)}>Thử lại</button></div>}
     <section className={`ec-next-step ${incident.status === 'OPEN' && incident.severity === 'CRITICAL' ? 'is-urgent' : ''}`}><div><strong>{INCIDENT_STATUSES[incident.status]?.label || incident.status}</strong><p>{restricted ? 'Sự cố do nhân viên khác tiếp nhận. Chỉ staff phụ trách có thể tiếp tục xử lý trên giao diện này.' : guidance}</p></div>{primary && <button className="ec-button ec-primary" disabled={!!error} onClick={() => setDialog({ action: primary, snapshot: incident })}>{INCIDENT_ACTIONS[primary].title}<Icon name="arrow" /></button>}</section>
     <section className="ec-description"><h4>Nội dung sự cố</h4><p>{incident.description || 'Máy chủ chưa ghi nhận mô tả.'}</p></section>
+    <IncidentEvidence incident={incident} />
     <div className="ec-info-grid"><section className="ec-info-card"><h4><Icon name="pin" />Vị trí & nguồn ghi nhận</h4><dl><div><dt>Điểm xảy ra</dt><dd>{info.endpoint}</dd></div><div><dt>Bản đồ</dt><dd>{info.map}</dd></div><div><dt>Robot</dt><dd>{info.robot}</dd></div>{info.coordinates && <div><dt>Tọa độ X · Y</dt><dd>{info.coordinates}</dd></div>}</dl></section><section className="ec-info-card"><h4><Icon name="user" />Người phụ trách</h4><dl><div><dt>Tiếp nhận</dt><dd>{info.owner}</dd></div>{info.resolver && <div><dt>Xác nhận kết quả</dt><dd>{info.resolver}</dd></div>}<div><dt>Ghi nhận lúc</dt><dd>{stamp(incident.occurredAt)}</dd></div></dl></section></div>
     <section className="ec-timeline"><h4>Tiến trình xử lý</h4><p>Các mốc thời gian do máy chủ ghi nhận.</p><ol>{incidentTimeline(incident).map((item, index) => <li className={`${item.done ? 'is-done' : ''} ${item.current ? 'is-current' : ''}`} key={`${item.label}-${index}`}><span className="ec-timeline-dot">{item.done ? <Icon name="check" /> : <Icon name="clock" />}</span><div><strong>{item.label}</strong><time>{item.at ? stamp(item.at) : 'Chưa ghi nhận thời điểm'}</time></div></li>)}</ol></section>
     <div className="ec-detail-footer"><p>Việc xử lý sự cố và việc robot thực thi được theo dõi riêng.</p><Link to="/admin/live-operations">Mở vận hành trực tiếp <Icon name="arrow" /></Link>{actions.includes('false-alarm') && <button className="ec-text-button ec-false-alarm" disabled={!!error} onClick={() => setDialog({ action: 'false-alarm', snapshot: incident })}>Đánh dấu báo động nhầm</button>}</div>
