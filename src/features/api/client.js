@@ -60,7 +60,9 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
   }
   const requestHeaders = new Headers(headers);
   if (!requestHeaders.has('Accept')) requestHeaders.set('Accept', responseType === 'json' ? 'application/json' : '*/*');
-  if (body !== undefined) requestHeaders.set('Content-Type', 'application/json');
+  const multipart = typeof FormData !== 'undefined' && body instanceof FormData;
+  if (multipart) requestHeaders.delete('Content-Type');
+  else if (body !== undefined) requestHeaders.set('Content-Type', 'application/json');
   if (!skipAuth && session?.tokens?.accessToken) requestHeaders.set('Authorization', `Bearer ${session.tokens.accessToken}`);
 
   let response;
@@ -68,7 +70,7 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
     response = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers: requestHeaders,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : multipart ? body : JSON.stringify(body),
       signal,
       keepalive,
     });
