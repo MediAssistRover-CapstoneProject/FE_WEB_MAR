@@ -1,5 +1,33 @@
 # Kiểm tra FE
 
+## Trang vận hành trực tiếp (03/11/2026)
+
+Trang `/admin/live-operations` dùng UI riêng: nhóm Đang hoạt động / Cần xử lý /
+Lịch sử; danh sách có tên quy trình, robot, điểm đến; tìm kiếm và lọc theo trạng thái,
+robot, quy trình, ngày. Chi tiết đưa lỗi và yêu cầu xác nhận lên trước tiến trình.
+Nhật ký tải trực tiếp và phân trang; phục hồi có bảng bằng chứng riêng.
+Các thao tác phụ thuộc trạng thái, quyền tài khoản và bước hiện tại.
+SSE đồng bộ cả danh sách và chi tiết; REST tự làm mới mỗi 15 giây, giữ dữ liệu
+gần nhất khi lỗi và không ghi đè phiên bản SSE mới bằng phản hồi REST cũ.
+
+```powershell
+node --test tests/live-operations.test.mjs tests/backend-contract.test.mjs tests/backend-presentation.test.mjs
+node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5175 --strictPort
+# Chạy ở terminal khác với PLAYWRIGHT_MODULE và CHROME_EXECUTABLE đã cấu hình:
+node tests/live-operations.browser.mjs
+node tests/live-operations-reliability.browser.mjs
+npm run build
+```
+
+Browser test giả lập toàn bộ API; không gửi lệnh đến robot thật. Bao phủ xác nhận
+bước, robot đang rảnh, hủy đang chờ xử lý, công việc đã kết thúc, phục hồi, nhật ký
+lỗi/phân trang, đổi lựa chọn khi phản hồi chậm, đồng bộ SSE, dữ liệu REST cũ,
+quyền STAFF và bố cục 390/1024/1440px. Ảnh nằm trong `.workstation-build/live-operations/`.
+
+Reliability test kiểm tra phản hồi REST chậm sau SSE, phiên bản từng bước,
+giữ chi tiết khi công việc kết thúc, chỉ báo dữ liệu cũ khi lỗi đọc,
+kiểm tra lại bước trước khi gửi xác nhận và robot thay đổi khả dụng trong lúc mở biểu mẫu.
+
 ## Điều khiển robot tại Workstations (01/11/2026)
 
 `/workstations?mode=mapping` dùng giao diện React cho các API của `mapping.html`:
@@ -100,6 +128,20 @@ Kiểm tra này không chứng minh robot vật lý đã di chuyển, camera Pi 
 Các bài kiểm tra dùng bản đồ LiDAR mô phỏng và trình duyệt cô lập. Mọi API ghi đều được giả lập; không dùng tài khoản thật hoặc gửi lệnh đến robot.
 
 ## Kiểm tra logic
+
+Vận hành trực tiếp: `node --test tests/live-operations.test.mjs`.
+Chạy Vite tại cổng 5175, đặt `PLAYWRIGHT_MODULE` và `CHROME_EXECUTABLE`, rồi chạy:
+
+```powershell
+node tests/live-operations.browser.mjs
+node tests/live-operations-reliability.browser.mjs
+node tests/live-operations-interventions.browser.mjs
+```
+
+Các API đều được giả lập. Bộ interventions kiểm tra hủy trong lúc xác nhận,
+bằng chứng/phiên kết nối đổi trước khi đối soát, phục hồi chưa có lệnh MQTT,
+chuyển về tiến trình sau phục hồi, giữ đúng công việc ở trang lịch sử thứ hai,
+cập nhật chi tiết khi danh sách lỗi và giao diện 390px.
 
 ```powershell
 node --test tests/map-setup.test.mjs tests/map-studio.test.mjs tests/map-feature-drag.test.mjs tests/facility-contract.test.mjs tests/dispatch.test.mjs tests/zone-traffic.test.mjs

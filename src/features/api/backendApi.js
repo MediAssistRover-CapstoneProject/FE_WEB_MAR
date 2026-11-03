@@ -5,10 +5,10 @@ export async function callBackend(key, input = {}, options = {}) {
   const { url, ...request } = buildRequest(key, input);
   return apiRequest(url, { ...request, ...options, headers: { ...request.headers, ...options.headers } });
 }
-export async function readCatalog(key, { signal } = {}) {
+export async function readCatalog(key, { signal, query = {} } = {}) {
   const rows = [];
   for (let page = 0; page < 1000; page++) {
-    const result = await callBackend(key, { query: { page, size: 100 } }, { signal });
+    const result = await callBackend(key, { query: { ...query, page, size: 100 } }, { signal });
     if (Array.isArray(result)) return result;
     if (!Array.isArray(result?.content)) throw Error('Danh mục không đúng định dạng.');
     rows.push(...result.content);

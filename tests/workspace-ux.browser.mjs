@@ -77,9 +77,9 @@ try {
   await page.locator('.be-records button').first().waitFor();
   await page.screenshot({ path: '.workstation-build/workspace-ux/missions.png', fullPage: true });
   await go('Live Operations');
-  await page.locator('.be-records button').first().click();
-  await page.getByText('Các bước thực thi · 2', { exact: true }).waitFor();
-  assert.equal(await page.locator('.be-job-progress li').count(), 2);
+  await page.locator('.lo-job-item').first().click();
+  await page.getByText('Các bước đã ghi nhận', { exact: true }).waitFor();
+  assert.equal(await page.locator('.lo-steps li').count(), 2);
   await page.screenshot({ path: '.workstation-build/workspace-ux/jobs.png', fullPage: true });
   for (const section of ['Missions', 'Facility Management', 'Public Catalog']) {
     await page.setViewportSize({ width: 390, height: 844 }); await go(section);
