@@ -8,6 +8,7 @@ import { vi } from '../../../i18n/vi.js';
 import SchemaFields from './SchemaFields.jsx';
 import RecordDetails, { displayValue } from './RecordDetails.jsx';
 import ListFilters from './ListFilters.jsx';
+import ShiftCalendar from './ShiftCalendar.jsx';
 import OperationsReport from './OperationsReport.jsx';
 import FacilityCatalogEditor from '../FacilityCatalogEditor.jsx';
 import { AiAdminPanel } from '../AiWorkspace.jsx';
@@ -29,7 +30,21 @@ const keyFor = (r, row) => unwrap(row)?.[r.idField];
 const sensitiveAction = op => op.method === 'DELETE' || /\/(cancel|archive|retire|deactivate|lock|reset-password|rotate-secret|runs)$/.test(op.path);
 
 export default function BackendWorkspace({ section = 'Missions' }) {
+  if (section === 'Staff Shifts') return <ShiftWorkspace />;
   return section === 'Charging' ? <ChargingWorkspace /> : <ResourceWorkspace section={section} />;
+}
+function ShiftWorkspace() {
+  const role = getSession()?.account?.role;
+  if (!['ADMIN', 'STAFF'].includes(role)) return <p>Tài khoản này không có quyền xem lịch trực.</p>;
+  const resource = resources.find(item => item.id === 'shifts');
+  const create = operations['POST /api/v1/admin/shifts'];
+  const update = operations['PUT /api/v1/admin/shifts/{shiftId}'];
+  return <section className="be-workspace">
+    <header><h2>Lịch ca trực</h2><p>Chọn ngày để xem người trực, giờ trực và phòng phụ trách.</p></header>
+    <ShiftCalendar role={role}
+      renderShift={({ preset, row }, close, saved) => canUse(row ? update : create, role) && <OperationDialog op={row ? update : create}
+        resource={resource} row={row} bindings={{ shiftId: row?.shiftId }} role={role} preset={preset} lockShiftTimes onClose={close} onSaved={saved} />} />
+  </section>;
 }
 function ChargingWorkspace() {
   const [open, setOpen] = useState(false);
