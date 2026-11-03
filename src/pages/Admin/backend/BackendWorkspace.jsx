@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { getSession, clearSession } from '../../../features/auth/session.js';
 import { callBackend, watchJob } from '../../../features/api/backendApi.js';
 import { operations, canUse, requestSchema, initialValue, prepareBody, prepareValue } from '../../../features/api/contract.js';
@@ -9,6 +10,7 @@ import RecordDetails, { displayValue } from './RecordDetails.jsx';
 import ListFilters from './ListFilters.jsx';
 import OperationsReport from './OperationsReport.jsx';
 import FacilityCatalogEditor from '../FacilityCatalogEditor.jsx';
+import { AiAdminPanel } from '../AiWorkspace.jsx';
 import SpeechAnnouncement from '../robotOperations/SpeechAnnouncement.jsx';
 import { RobotConnectionSettings } from '../SystemSettings.jsx';
 import { CatalogNavigation, DataSource, EmptyRecords, JobSteps, RecordSummary, WorkspaceIntro, enhancedSection, resourceHints } from './WorkspaceOverview.jsx';
@@ -36,17 +38,38 @@ function ChargingWorkspace() {
   return <section className="be-workspace"><div className="be-card"><h2>Sạc pin</h2><p>Tạo yêu cầu sạc cho robot. Máy chủ sẽ kiểm tra quy trình đã phát hành và điều kiện vận hành trước khi điều phối.</p><button type="button" className="primary" disabled={!canUse(op, role)} onClick={() => setOpen(true)}>Tạo yêu cầu sạc</button></div><ResourceWorkspace section="Robot Status" />{open && <OperationDialog op={op} resource={resources.find(r => r.id === 'requests')} bindings={{}} role={role} preset={{ requestType: 'AUTO_CHARGING' }} onClose={() => setOpen(false)} onSaved={() => {}} />}</section>;
 }
 function ResourceWorkspace({ section }) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const role = getSession()?.account?.role;
-  const available = [...(section === 'Voice & Scripts' ? [{ id: 'speech-announcement', title: 'Phát thông báo' }] : []), ...resources.filter(r => r.section === section && (!r.adminOnly || role === 'ADMIN') && (!r.staffOnly || role === 'STAFF')), ...(section === 'System Settings' && role === 'ADMIN' ? [{ id: 'robot-camera', title: 'Nguồn camera' }] : [])];
-  const [tab, setTab] = useState(available[0]?.id);
+  const available = [
+    ...(section === 'Voice & Scripts' 
+      ? [{ id: 'ai-voice', title: 'Giọng AI' }, { id: 'ai-knowledge', title: 'Dữ liệu AI' }] 
+      : []),
+    ...resources.filter(r => r.section === section && r.section !== 'Voice & Scripts' && (!r.adminOnly || role === 'ADMIN') && (!r.staffOnly || role === 'STAFF')),
+    ...(section === 'System Settings' && role === 'ADMIN' ? [{ id: 'robot-camera', title: 'Nguồn camera' }] : [])
+  ];
+  const queryTab = searchParams.get('tab');
+  const activeTabId = (queryTab && available.some(r => r.id === queryTab)) ? queryTab : available[0]?.id;
+  const [tab, setTab] = useState(activeTabId);
   const [geometry, setGeometry] = useState('');
+  useEffect(() => {
+    const nextTab = searchParams.get('tab');
+    if (nextTab && available.some(r => r.id === nextTab)) setTab(nextTab);
+  }, [searchParams, available]);
+  const selectTab = id => {
+    setTab(id);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', id);
+      return next;
+    }, { replace: true });
+  };
   const resource = available.find(r => r.id === tab) || available[0];
   return <section className="be-workspace" aria-label={screenTitles[section] || vi(section)}>
     <WorkspaceIntro section={section} role={role} />
     {section === 'Facility Management' && role === 'ADMIN' && <div className="be-actions"><button type="button" aria-pressed={!geometry} onClick={() => setGeometry('')}>Danh mục máy chủ</button><button type="button" aria-pressed={geometry === 'zone'} onClick={() => setGeometry('zone')}>Vẽ vùng trên bản đồ máy chủ</button><button type="button" aria-pressed={geometry === 'endpoint'} onClick={() => setGeometry('endpoint')}>Đặt điểm và nhóm trên bản đồ máy chủ</button></div>}
     {geometry ? <div className="ls-studio"><FacilityCatalogEditor key={geometry} stage={geometry} /></div> : <>
-    {available.length > 1 && (['Facility Management', 'Public Catalog'].includes(section) ? <CatalogNavigation available={available} resource={resource} onSelect={setTab} section={section} /> : <nav className="be-tabs" aria-label="Danh mục chức năng">{available.map(r => <button type="button" key={r.id} className={resource?.id === r.id ? 'selected' : ''} aria-pressed={resource?.id === r.id} onClick={() => setTab(r.id)}>{r.title}</button>)}</nav>)}
-    {resource?.id === 'speech-announcement' ? <SpeechAnnouncement /> : resource?.id === 'robot-camera' ? <div className="be-card"><h2>Nguồn camera robot</h2><p>Cấu hình nguồn video dùng chung khi theo dõi robot.</p><RobotConnectionSettings /></div> : resource ? <ResourcePanel key={resource.id} resource={resource} role={role} /> : <p role="status">Tài khoản này không có quyền sử dụng mục này.</p>}
+    {available.length > 1 && (['Facility Management', 'Public Catalog'].includes(section) ? <CatalogNavigation available={available} resource={resource} onSelect={selectTab} section={section} /> : <nav className="be-tabs" aria-label="Danh mục chức năng">{available.map(r => <button type="button" key={r.id} className={resource?.id === r.id ? 'selected' : ''} aria-pressed={resource?.id === r.id} onClick={() => selectTab(r.id)}>{r.title}</button>)}</nav>)}
+    {['ai-voice', 'ai-knowledge'].includes(resource?.id) ? <AiAdminPanel key={resource.id} section={resource.id} /> : resource?.id === 'speech-announcement' ? <SpeechAnnouncement /> : resource?.id === 'robot-camera' ? <div className="be-card"><h2>Nguồn camera robot</h2><p>Cấu hình nguồn video dùng chung khi theo dõi robot.</p><RobotConnectionSettings /></div> : resource ? <ResourcePanel key={resource.id} resource={resource} role={role} /> : <p role="status">Tài khoản này không có quyền sử dụng mục này.</p>}
     </>}
   </section>;
 }
