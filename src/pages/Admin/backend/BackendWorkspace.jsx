@@ -18,7 +18,7 @@ import './backend.css';
 import './presentation.css';
 import './workspaceOverview.css';
 
-export const backendScreens = new Set([...resources.map(r => r.section).filter(section => !['Patrol', 'Live Operations'].includes(section)), 'Charging']);
+export const backendScreens = new Set([...resources.map(r => r.section).filter(section => !['Patrol', 'Live Operations', 'Emergency Center'].includes(section)), 'Charging']);
 const unwrap = value => ({ ...value?.account, ...value?.request, ...value?.workflow, ...value?.job, ...value });
 const paths = op => op.parameters.filter(p => p.in === 'path');
 const filters = op => op.parameters.filter(p => p.in === 'query' && !['page', 'size'].includes(p.name));

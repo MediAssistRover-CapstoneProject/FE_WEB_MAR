@@ -44,7 +44,7 @@ await page.route('**/api/v1/**', async route => {
   const rows = name === 'service-requests' ? request ? [request] : [] : data[name] || [];
   return reply({ content: rows, totalElements: rows.length, totalPages: 1, last: true });
 });
-const go = async section => { await page.goto(`http://127.0.0.1:5173/admin?screen=${encodeURIComponent(section)}`); await page.locator(section === 'Patrol' ? '.patrol-workspace' : section === 'Live Operations' ? '.lo-header h2' : '.be-heading h2').first().waitFor(); };
+const go = async section => { await page.goto(`http://127.0.0.1:5173/admin?screen=${encodeURIComponent(section)}`); await page.locator(section === 'Patrol' ? '.patrol-workspace' : section === 'Emergency Center' ? '.ec-header h2' : section === 'Live Operations' ? '.lo-header h2' : '.be-heading h2').first().waitFor(); };
 try {
   await go('Missions');
   await page.getByRole('button', { name: 'Yêu cầu dẫn đường', exact: true }).click();
@@ -102,8 +102,8 @@ try {
   for (const section of new Set(resources.filter(r => !r.staffOnly).map(r => r.section))) {
     await go(section);
     // Patrol is now a local route designer, covered by patrol.browser.mjs.
-    if (section === 'Patrol' || section === 'Live Operations') {
-      await page.locator(section === 'Patrol' ? '.patrol-workspace' : '.lo-page').waitFor();
+    if (section === 'Patrol' || section === 'Live Operations' || section === 'Emergency Center') {
+      await page.locator(section === 'Patrol' ? '.patrol-workspace' : section === 'Emergency Center' ? '.ec-page' : '.lo-page').waitFor();
       continue;
     }
     for (const r of resources.filter(r => r.section === section && !r.staffOnly)) {

@@ -129,6 +129,22 @@ Các bài kiểm tra dùng bản đồ LiDAR mô phỏng và trình duyệt cô 
 
 ## Kiểm tra logic
 
+Trung tâm khẩn cấp dùng API thật ở runtime, không có dữ liệu mẫu trong trang.
+Admin xem trang “Giám sát SOS”, không có nút tiếp nhận/xử lý/đóng/báo động nhầm.
+Các thao tác xử lý trên FE dành cho staff; BE và cách phân staff nhận SOS chưa thay đổi.
+Kiểm thử độc lập (API giả lập, không thay đổi sự cố trong database):
+
+```powershell
+node --test tests/emergency-center.test.mjs
+# Vite cổng 5175; đặt PLAYWRIGHT_MODULE và CHROME_EXECUTABLE như các bộ browser khác.
+node tests/emergency-center.browser.mjs
+```
+
+Bao phủ vòng đời sự cố, quyền người phụ trách, ghi chú bắt buộc, thay đổi trạng thái
+trước khi xác nhận, phân trang/lọc trên máy chủ, giữ nội dung khi cập nhật nền hoặc
+mất kết nối, báo động nhầm và bố cục 1440/1024/390px.
+Ảnh kiểm tra ở `.workstation-build/emergency-center/`.
+
 Vận hành trực tiếp: `node --test tests/live-operations.test.mjs`.
 Chạy Vite tại cổng 5175, đặt `PLAYWRIGHT_MODULE` và `CHROME_EXECUTABLE`, rồi chạy:
 

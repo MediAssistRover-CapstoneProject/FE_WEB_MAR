@@ -72,7 +72,7 @@ export default function AdminSidebar({ active, onSelect, onLogout }) {
           <h3><button type="button" className="sidebar-group-toggle" aria-expanded={open} aria-controls={panelId} onClick={() => setExpanded(open ? null : group)}>
             <SidebarIcon name={group}/><span className="sidebar-group-label">{vi(group)}</span><span className="sidebar-chevron" aria-hidden="true" />
           </button></h3>
-          {open && <div id={panelId} className="sidebar-group-items">{items.map(item => <button type="button" key={item} className={active === item ? 'nav-item active' : 'nav-item'} aria-current={active === item ? 'page' : undefined} onClick={() => select(item)}>{menuLabels[item] || screenTitles[item] || vi(item)}</button>)}</div>}
+          {open && <div id={panelId} className="sidebar-group-items">{items.map(item => <button type="button" key={item} className={active === item ? 'nav-item active' : 'nav-item'} aria-current={active === item ? 'page' : undefined} onClick={() => select(item)}>{item === 'Emergency Center' && role === 'ADMIN' ? 'Giám sát SOS' : menuLabels[item] || screenTitles[item] || vi(item)}</button>)}</div>}
         </section>;
       })}</nav>
       <div className="sidebar-footer">
