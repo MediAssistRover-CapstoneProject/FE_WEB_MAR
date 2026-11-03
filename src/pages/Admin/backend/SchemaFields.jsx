@@ -78,14 +78,15 @@ function QuickRoomCreate({ onCreated, disabled }) {
     </dialog>}</>;
 }
 
-export default function SchemaFields({ schema, value = {}, onChange, context = {}, prefix = '', disabled = false }) {
+export default function SchemaFields({ schema, value = {}, onChange, context = {}, prefix = '', disabled = false, lockedFields = [], visibleFields }) {
   const s = schemaOf(schema);
   if (!s.properties) return <Field name="data" label="Cấu hình" definition={s} value={value} onChange={onChange} required context={context} disabled={disabled} />;
   return <div className="be-fields">{Object.entries(s.properties).filter(([name]) => {
+    if (visibleFields && !visibleFields.includes(name)) return false;
     if (value.targetMode === 'ENDPOINT_GROUP' && ['destinationEndpointId', 'deliveryEndpointId'].includes(name)) return false;
     if (value.targetMode === 'ENDPOINT' && ['destinationGroupId', 'deliveryGroupId'].includes(name)) return false;
     return true;
-  }).map(([name, def]) => <Field key={name} name={name} definition={def} label={prefix + fieldLabel(name)} value={value[name]} required={s.required?.includes(name)} disabled={disabled} context={{ ...context, mapId: value.mapId || context.mapId }} onChange={next => {
+  }).map(([name, def]) => <Field key={name} name={name} definition={def} label={prefix + fieldLabel(name)} value={value[name]} required={s.required?.includes(name)} disabled={disabled || lockedFields.includes(name)} context={{ ...context, mapId: value.mapId || context.mapId }} onChange={next => {
     const updated = { ...value, [name]: next };
     if (name === 'mapId' && next !== value.mapId) for (const field of ['zoneId', 'destinationEndpointId', 'destinationGroupId', 'pickupEndpointId', 'deliveryEndpointId', 'deliveryGroupId', 'originEndpointId', 'endpointId', 'endpointGroupId']) delete updated[field];
     onChange(updated);

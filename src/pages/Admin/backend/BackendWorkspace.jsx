@@ -8,6 +8,7 @@ import { vi } from '../../../i18n/vi.js';
 import SchemaFields from './SchemaFields.jsx';
 import RecordDetails, { displayValue } from './RecordDetails.jsx';
 import ListFilters from './ListFilters.jsx';
+import ShiftCalendar from './ShiftCalendar.jsx';
 import OperationsReport from './OperationsReport.jsx';
 import FacilityCatalogEditor from '../FacilityCatalogEditor.jsx';
 import { AiAdminPanel } from '../AiWorkspace.jsx';
@@ -29,7 +30,21 @@ const keyFor = (r, row) => unwrap(row)?.[r.idField];
 const sensitiveAction = op => op.method === 'DELETE' || /\/(cancel|archive|retire|deactivate|lock|reset-password|rotate-secret|runs)$/.test(op.path);
 
 export default function BackendWorkspace({ section = 'Missions' }) {
+  if (section === 'Staff Shifts') return <ShiftWorkspace />;
   return section === 'Charging' ? <ChargingWorkspace /> : <ResourceWorkspace section={section} />;
+}
+function ShiftWorkspace() {
+  const role = getSession()?.account?.role;
+  if (!['ADMIN', 'STAFF'].includes(role)) return <p>Tài khoản này không có quyền xem lịch trực.</p>;
+  const resource = resources.find(item => item.id === 'shifts');
+  const create = operations['POST /api/v1/admin/shifts'];
+  const update = operations['PUT /api/v1/admin/shifts/{shiftId}'];
+  return <section className="be-workspace">
+    <header><h2>Lịch ca trực</h2><p>Chọn ngày để xem người trực, giờ trực và phòng phụ trách.</p></header>
+    <ShiftCalendar role={role}
+      renderShift={({ preset, row }, close, saved) => canUse(row ? update : create, role) && <OperationDialog op={row ? update : create}
+        resource={resource} row={row} bindings={{ shiftId: row?.shiftId }} role={role} preset={preset} lockShiftTimes onClose={close} onSaved={saved} />} />
+  </section>;
 }
 function ChargingWorkspace() {
   const [open, setOpen] = useState(false);
@@ -195,7 +210,7 @@ function JobInstruction({ detail, open }) {
   return <section className="be-instruction"><h4>Bước đang chờ xác nhận</h4><p>{input.message || input.text || input.prompt_key || step.stepCodeSnapshot}</p>{input.items && <RecordDetails value={input.items} />}<button type="button" onClick={() => open(operations[key])}>Xác nhận bước hiện tại</button></section>;
 }
 
-function OperationDialog({ op, resource, row: raw, bindings, role, preset, onClose, onSaved }) {
+function OperationDialog({ op, resource, row: raw, bindings, role, preset, lockShiftTimes, onClose, onSaved }) {
   const ref = useRef(null), lock = useRef(false), requestIdentity = useRef(null);
   const row = unwrap(raw), choices = useMemo(() => localChoices(raw), [raw]);
   const currentStep = raw?.steps?.find(s => s.jobStepId === raw.job?.selectedJobStepId);
@@ -244,7 +259,7 @@ function OperationDialog({ op, resource, row: raw, bindings, role, preset, onClo
       <fieldset disabled={busy} className="be-form-body">
         {!!missingPaths.length && <SchemaFields schema={paramsSchema(missingPaths)} value={path} onChange={selectPath} context={{ role, choices }} />}
         {!!queryParams(op).length && <SchemaFields schema={paramsSchema(queryParams(op))} value={query} onChange={setQuery} context={{ role }} />}
-        {hasBody && (responseAction ? <StepConfirmation step={currentStep} value={body} onChange={setBody} /> : <SchemaFields key={JSON.stringify(path)} schema={schema} value={body} onChange={setBody} context={{ role, choices, quickRoomCreate: op.key === 'POST /api/v1/admin/shifts' || op.key === 'PUT /api/v1/admin/shifts/{shiftId}' }} />)}
+        {hasBody && (responseAction ? <StepConfirmation step={currentStep} value={body} onChange={setBody} /> : <SchemaFields key={JSON.stringify(path)} schema={schema} value={body} onChange={setBody} visibleFields={lockShiftTimes && op.method === 'PUT' ? ['staffProfileId', 'roomId', 'note'] : undefined} lockedFields={lockShiftTimes ? ['startsAt', 'endsAt'] : undefined} context={{ role, choices, quickRoomCreate: op.key === 'POST /api/v1/admin/shifts' || op.key === 'PUT /api/v1/admin/shifts/{shiftId}' }} />)}
         {!hasBody && write(op) && <p>Thực hiện “{title}” cho bản ghi đang chọn.</p>}
         {op.path.endsWith('/retention/runs') && <p className={query.dryRun ? 'be-muted' : 'be-error'}>{query.dryRun ? 'Chỉ xem trước; không xóa dữ liệu.' : 'Thao tác thật có thể lưu trữ hoặc xóa dữ liệu theo chính sách máy chủ. Hãy kiểm tra kết quả xem trước trước khi tiếp tục.'}</p>}
         {sensitiveAction(op) && <label className="be-check be-confirm"><input type="checkbox" checked={confirm} onChange={e => setConfirm(e.target.checked)} />Tôi xác nhận thực hiện thao tác này.</label>}
