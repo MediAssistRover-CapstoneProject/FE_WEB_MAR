@@ -12,9 +12,9 @@ const page = await context.newPage(), errors = [], writes = [], reads = [];
 page.on('pageerror', e => errors.push(e.message));
 let request = null, failRequest = true;
 const staff = { staffProfileId: id(4), staffCode: 'NV01', account: { accountId: id(5), username: 'nurse', fullName: 'Nhân viên kiểm thử', email: 'nurse@example.test', role: 'STAFF' } };
-const job = { jobId: id(9), jobCode: 'JOB01', status: 'RUNNING', selectedJobStepId: id(10) };
+const job = { jobId: id(9), jobCode: 'JOB01', status: 'RUNNING', beOrchestrated: true, schemaVersion: 3, selectedJobStepId: id(10) };
 const cargo = [{ itemCode: 'MED01', quantity: 2 }];
-const jobDetail = { job, steps: [{ jobStepId: id(10), status: 'RUNNING', stepTypeSnapshot: 'HANDLE_PAYLOAD', stepCodeSnapshot: 'LOAD', resolvedInputsJson: { items: cargo } }] };
+const jobDetail = { job, steps: [{ jobStepId: id(10), status: 'RUNNING', startedAt: new Date().toISOString(), timeoutSecSnapshot: 180, stepTypeSnapshot: 'HANDLE_PAYLOAD', stepCodeSnapshot: 'LOAD', resolvedInputsJson: { items: cargo } }] };
 const data = {
   maps: [{ mapId: id(1), mapName: 'Bản đồ thử nghiệm', floorId: id(6), status: 'ACTIVE' }],
   endpoints: [{ endpointId: id(2), endpointName: 'Quầy thuốc', mapId: id(1), active: true }],
@@ -44,7 +44,7 @@ await page.route('**/api/v1/**', async route => {
   const rows = name === 'service-requests' ? request ? [request] : [] : data[name] || [];
   return reply({ content: rows, totalElements: rows.length, totalPages: 1, last: true });
 });
-const go = async section => { await page.goto(`http://127.0.0.1:5173/admin?screen=${encodeURIComponent(section)}`); await page.locator(section === 'Patrol' ? '.patrol-workspace' : '.be-heading h2').first().waitFor(); };
+const go = async section => { await page.goto(`http://127.0.0.1:5173/admin?screen=${encodeURIComponent(section)}`); await page.locator(section === 'Patrol' ? '.patrol-workspace' : section === 'Emergency Center' ? '.ec-header h2' : section === 'Live Operations' ? '.lo-header h2' : '.be-heading h2').first().waitFor(); };
 try {
   await go('Missions');
   await page.getByRole('button', { name: 'Yêu cầu dẫn đường', exact: true }).click();
@@ -78,18 +78,17 @@ try {
   await dialog.getByRole('button', { name: 'Hoàn tất' }).click();
 
   await go('Live Operations');
-  await page.locator('.be-records button').filter({ hasText: 'Công việc robot' }).click();
+  await page.locator('.lo-job-item').first().click();
   await page.getByRole('button', { name: 'Xác nhận bước hiện tại', exact: true }).click();
   await dialog.getByRole('button', { name: 'Xác nhận', exact: true }).click();
   await dialog.getByRole('alert').getByText('Vui lòng kiểm tra và xác nhận trước khi gửi.').waitFor();
   await dialog.getByLabel('Tôi đã kiểm tra hàng đúng danh sách').check();
   await dialog.getByRole('button', { name: 'Xác nhận', exact: true }).click();
-  await dialog.getByText('Đã lưu thành công.', { exact: true }).waitFor();
+  await dialog.waitFor({ state: 'hidden' });
   assert.equal(writes.at(-1).path, `/api/v1/job-steps/${id(10)}/responses`);
   assert.equal(writes.at(-1).body.responseType, 'PAYLOAD_CONFIRMED');
   assert.deepEqual(writes.at(-1).body.data, { confirmed: true, items: cargo });
   assert.ok(writes.at(-1).key);
-  await dialog.getByRole('button', { name: 'Hoàn tất' }).click();
 
   // A child collection can be created even before its first record exists.
   await go('Facility Management');
@@ -103,8 +102,8 @@ try {
   for (const section of new Set(resources.filter(r => !r.staffOnly).map(r => r.section))) {
     await go(section);
     // Patrol is now a local route designer, covered by patrol.browser.mjs.
-    if (section === 'Patrol') {
-      await page.locator('.patrol-workspace').waitFor();
+    if (section === 'Patrol' || section === 'Live Operations' || section === 'Emergency Center') {
+      await page.locator(section === 'Patrol' ? '.patrol-workspace' : section === 'Emergency Center' ? '.ec-page' : '.lo-page').waitFor();
       continue;
     }
     for (const r of resources.filter(r => r.section === section && !r.staffOnly)) {

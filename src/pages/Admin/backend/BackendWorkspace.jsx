@@ -19,7 +19,7 @@ import './backend.css';
 import './presentation.css';
 import './workspaceOverview.css';
 
-export const backendScreens = new Set([...resources.map(r => r.section).filter(section => section !== 'Patrol'), 'Charging']);
+export const backendScreens = new Set([...resources.map(r => r.section).filter(section => !['Patrol', 'Live Operations', 'Emergency Center'].includes(section)), 'Charging']);
 const unwrap = value => ({ ...value?.account, ...value?.request, ...value?.workflow, ...value?.job, ...value });
 const paths = op => op.parameters.filter(p => p.in === 'path');
 const filters = op => op.parameters.filter(p => p.in === 'query' && !['page', 'size'].includes(p.name));
@@ -210,7 +210,7 @@ function JobInstruction({ detail, open }) {
   return <section className="be-instruction"><h4>Bước đang chờ xác nhận</h4><p>{input.message || input.text || input.prompt_key || step.stepCodeSnapshot}</p>{input.items && <RecordDetails value={input.items} />}<button type="button" onClick={() => open(operations[key])}>Xác nhận bước hiện tại</button></section>;
 }
 
-function OperationDialog({ op, resource, row: raw, bindings, role, preset, lockShiftTimes, onClose, onSaved }) {
+export function OperationDialog({ op, resource, row: raw, bindings, role, preset, onClose, onSaved, title: customTitle, description, choiceOverrides, beforeSubmit }) {
   const ref = useRef(null), lock = useRef(false), requestIdentity = useRef(null);
   const row = unwrap(raw), choices = useMemo(() => localChoices(raw), [raw]);
   const currentStep = raw?.steps?.find(s => s.jobStepId === raw.job?.selectedJobStepId);
@@ -241,6 +241,7 @@ function OperationDialog({ op, resource, row: raw, bindings, role, preset, lockS
       const signature = JSON.stringify({ path, query: typedQuery, body: payload });
       if (requestIdentity.current?.signature !== signature) requestIdentity.current = { signature, key: crypto.randomUUID() };
       lock.current = true; setBusy(true);
+      if (beforeSubmit) await beforeSubmit({ path, body: payload });
       const download = op.path.endsWith('/export.csv');
       const output = await callBackend(op.key, { path, query: typedQuery, body: payload, idempotencyKey: requestIdentity.current.key }, download ? { responseType: 'blob', headers: { Accept: 'text/csv' } } : {});
       if (download) {
@@ -252,14 +253,14 @@ function OperationDialog({ op, resource, row: raw, bindings, role, preset, lockS
     } catch (e) { setError(e.message || 'Không thực hiện được thao tác.'); }
     finally { lock.current = false; setBusy(false); }
   };
-  const title = actionLabel(op);
+  const title = customTitle || actionLabel(op);
   return <dialog className="be-dialog be-workspace" ref={ref} aria-label={title} onCancel={e => { if (busy) e.preventDefault(); else onClose(); }}>
-    <header className="be-heading"><div><h2>{title}</h2><p>{resource.title}{raw ? ` · ${recordTitle(row)}` : ''}</p></div><button type="button" disabled={busy} aria-label="Đóng biểu mẫu" onClick={onClose}>Đóng</button></header>
+    <header className="be-heading"><div><h2>{title}</h2><p>{description || <>{resource.title}{raw ? ` · ${recordTitle(row)}` : ''}</>}</p></div><button type="button" disabled={busy} aria-label="Đóng biểu mẫu" onClick={onClose}>Đóng</button></header>
     {completed ? <><p className="be-success" role="status">{write(op) ? 'Đã lưu thành công.' : 'Đã tải dữ liệu.'}</p><RecordDetails value={result} /><button className="primary" onClick={onClose}>Hoàn tất</button></> : <form onSubmit={submit}>
       <fieldset disabled={busy} className="be-form-body">
-        {!!missingPaths.length && <SchemaFields schema={paramsSchema(missingPaths)} value={path} onChange={selectPath} context={{ role, choices }} />}
+        {!!missingPaths.length && <SchemaFields schema={paramsSchema(missingPaths)} value={path} onChange={selectPath} context={{ role, choices: { ...choices, ...choiceOverrides } }} />}
         {!!queryParams(op).length && <SchemaFields schema={paramsSchema(queryParams(op))} value={query} onChange={setQuery} context={{ role }} />}
-        {hasBody && (responseAction ? <StepConfirmation step={currentStep} value={body} onChange={setBody} /> : <SchemaFields key={JSON.stringify(path)} schema={schema} value={body} onChange={setBody} visibleFields={lockShiftTimes && op.method === 'PUT' ? ['staffProfileId', 'roomId', 'note'] : undefined} lockedFields={lockShiftTimes ? ['startsAt', 'endsAt'] : undefined} context={{ role, choices, quickRoomCreate: op.key === 'POST /api/v1/admin/shifts' || op.key === 'PUT /api/v1/admin/shifts/{shiftId}' }} />)}
+        {hasBody && (responseAction ? <StepConfirmation step={currentStep} value={body} onChange={setBody} /> : <SchemaFields key={JSON.stringify(path)} schema={schema} value={body} onChange={setBody} context={{ role, choices: { ...choices, ...choiceOverrides }, quickRoomCreate: op.key === 'POST /api/v1/admin/shifts' || op.key === 'PUT /api/v1/admin/shifts/{shiftId}' }} />)}
         {!hasBody && write(op) && <p>Thực hiện “{title}” cho bản ghi đang chọn.</p>}
         {op.path.endsWith('/retention/runs') && <p className={query.dryRun ? 'be-muted' : 'be-error'}>{query.dryRun ? 'Chỉ xem trước; không xóa dữ liệu.' : 'Thao tác thật có thể lưu trữ hoặc xóa dữ liệu theo chính sách máy chủ. Hãy kiểm tra kết quả xem trước trước khi tiếp tục.'}</p>}
         {sensitiveAction(op) && <label className="be-check be-confirm"><input type="checkbox" checked={confirm} onChange={e => setConfirm(e.target.checked)} />Tôi xác nhận thực hiện thao tác này.</label>}

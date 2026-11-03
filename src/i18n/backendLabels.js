@@ -59,6 +59,7 @@ Object.assign(auditLabels, {
 });
 
 export const backendMessages = {
+  COMMAND_NOT_ACCEPTED: 'Lệnh bị từ chối trước khi robot tiếp nhận',
   alert_recipient: 'Người nhận cảnh báo', audit_log: 'Nhật ký kiểm toán', job_event: 'Sự kiện công việc', emergency_incident: 'Sự cố khẩn cấp', detection_event: 'Sự kiện phát hiện', robot_status_history: 'Lịch sử trạng thái robot', robot_location_history: 'Lịch sử vị trí robot', crowd_density_record: 'Dữ liệu mật độ người', heatmap_record: 'Dữ liệu bản đồ mật độ',
   ...settingLabels, ...auditLabels,
   CANCEL_REQUESTED: 'Đã yêu cầu hủy', DELIVERY_CANCEL_AFTER_PHYSICAL_ACTION: 'Yêu cầu hủy sau khi robot đã thực hiện thao tác thực tế', DELIVERY_SEND: 'Gửi hàng', DELIVERY_RECEIVE: 'Nhận hàng',

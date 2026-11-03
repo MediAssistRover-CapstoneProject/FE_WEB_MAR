@@ -22,6 +22,7 @@ const confirm = object({ verificationId: uuid, jobStepId: uuid, items: { type: '
 const setting = { settingValue: { ...json, minProperties: 1 }, dataType: enumeration('STRING', 'NUMBER', 'BOOLEAN', 'OBJECT', 'ARRAY'), category: str(64), description: str(4000), publicSetting: bool };
 
 export const requestOverrides = {
+  'POST /api/v1/jobs/{jobId}/operations/{jobStepId}/reconcile': object({ commandId: uuid, operationKey: str(150, { minLength: 1 }), transportSessionId: uuid, evidence: enumeration('PI_STOP_CONFIRMED', 'STAFF_INSPECTED_STOP', 'COMMAND_NOT_ACCEPTED'), confirmedStopped: { ...bool, const: true }, outcome: enumeration('RESUME_AS_FAILED', 'CONFIRM_CANCELLED'), note: str(2000, { minLength: 1 }) }, ['commandId', 'operationKey', 'transportSessionId', 'evidence', 'confirmedStopped', 'outcome', 'note']),
   'POST /api/v1/mapping-jobs': object({ workflowId: uuid, robotId: uuid, floorId: uuid, mapName: str(160) }, ['workflowId', 'robotId', 'floorId', 'mapName']),
   'POST /api/v1/admin/staff': object({ username: str(100, { minLength: 4, pattern: '^[a-zA-Z0-9._-]+$' }), temporaryPassword: str(72, { minLength: 8, format: 'password' }), ...staff }, ['username', 'temporaryPassword', 'fullName', 'email', 'staffCode']),
   'PUT /api/v1/admin/staff/{id}': object(staff, ['fullName', 'email', 'staffCode']),
