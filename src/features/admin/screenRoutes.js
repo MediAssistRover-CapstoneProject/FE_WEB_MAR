@@ -15,6 +15,7 @@ const screenRoutes = {
   'Audit Logs': '/admin/audit-logs',
   'Workflow Management': '/admin/workflow-catalog',
   'Voice & Scripts': '/admin/voice-scripts',
+  'AI Test': '/admin/ai-test',
   Charging: '/admin/charging',
   'Users & Roles': '/admin/users-roles',
   'System Settings': '/admin/system-settings',
@@ -32,4 +33,3 @@ export function pathForScreen(screen) {
 export function screenForSlug(slug) {
   return slugToScreen[slug] || null;
 }
-
