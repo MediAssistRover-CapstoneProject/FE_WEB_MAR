@@ -1,8 +1,8 @@
 import { clearSession, getRefreshToken, getSession, updateTokens } from '../auth/session.js';
 
-// Local development uses the backend configured in Be/BE_MAR/.env.
-// Deployments override this through VITE_API_BASE_URL during their build.
-const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? (import.meta.env?.DEV && import.meta.env?.VITE_DEV_PROXY_TARGET ? '' : 'http://localhost:8080')).trim().replace(/\/+$/, '');
+// REST, streams and map images use the deployed backend by default.
+// VITE_API_BASE_URL can override it; an explicit dev proxy still uses /api.
+const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? (import.meta.env?.DEV && import.meta.env?.VITE_DEV_PROXY_TARGET ? '' : 'https://mediassistrover.duckdns.org')).trim().replace(/\/+$/, '');
 let refreshing = null;
 
 export class ApiError extends Error {

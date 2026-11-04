@@ -3,9 +3,9 @@ import FacilityGeometryPreview, { polygonPoints } from './FacilityGeometryPrevie
 import './zoneMapEditor.css';
 
 const descriptions={
-  KEEP_OUT:'Robot không đi vào vùng này.',
-  SPEED:'Robot giảm tốc khi đi qua vùng này.',
-  NO_STOP:'Robot được đi qua, nhưng không dừng hoặc nhận điểm đến trong vùng.',
+  KEEP_OUT:'Quy tắc vùng cấm gửi tới Pi. Cần xác minh bộ điều hướng trên Pi hỗ trợ và áp dụng vùng này.',
+  SPEED:'Quy tắc tốc độ gửi tới Pi. Cần xác minh bộ điều hướng trên Pi áp dụng giới hạn theo vùng.',
+  NO_STOP:'Chỉ lưu thông tin vùng không dừng. Phiên bản điều hướng hiện tại chưa thực thi quy tắc NO_STOP.',
 };
 const colors={KEEP_OUT:'#e45b69',SPEED:'#3b82f6',NO_STOP:'#e5a020'};
 function Field({label,children,...props}){return <label className="ls-field"><span>{label}</span>{children||<input aria-label={label} {...props}/>}</label>;}
@@ -41,7 +41,7 @@ export default function ZoneMapEditor({map,zones,endpoints,zone,setZone,drawing,
           <Field label="Tên vùng" required maxLength={160} placeholder="VD: Khu vực trước cửa thang máy" value={zone.zoneName} onChange={event=>set('zoneName',event.target.value)}/>
           <Field label="Loại vùng"><select aria-label="Loại vùng" value={zone.zoneType} onChange={event=>set('zoneType',event.target.value)}>{Object.entries(ZONE_CATEGORIES).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></Field>
           <p className="zm-type-help"><i style={{background:colors[zone.zoneType]}}/>{descriptions[zone.zoneType]}</p>
-          {zone.zoneType==='SPEED'&&<Field label="Giới hạn tốc độ (m/s)" required type="number" min="0.000001" step="any" placeholder="VD: 0.3" value={zone.speedLimitMps??''} onChange={event=>set('speedLimitMps',event.target.value)}/>}
+          {zone.zoneType==='SPEED'&&<><Field label="Giới hạn tốc độ (m/s)" required type="number" min="0.000001" max="0.8" step="any" placeholder="VD: 0.3" value={zone.speedLimitMps??''} onChange={event=>set('speedLimitMps',event.target.value)}/><small>Lớn hơn 0, tối đa 0,8 m/s. Tốc độ thực còn phụ thuộc giới hạn robot.</small></>}
           <div className={'zm-geometry '+(points.length>=3&&area>0?'is-ready':'')}><strong>{points.length>=3&&area>0?'Đã có ranh giới vùng':'Chưa hoàn tất ranh giới'}</strong><span>{points.length>=3?`${points.length} đỉnh · ${area.toLocaleString('vi-VN',{maximumFractionDigits:2})} m²`:'Bấm “Vẽ vùng”, rồi chọn ít nhất 3 góc trên bản đồ.'}</span></div>
           <details className="zm-options"><summary>Nhập tọa độ thủ công</summary><Field label="Tọa độ vùng (mét)"><textarea aria-label="Tọa độ vùng (mét)" rows={5} value={zone.polygonJson} onChange={event=>set('polygonJson',event.target.value)}/></Field><small>Dạng: {'{"points":[[0,0],[2,0],[2,2],[0,2]]}'}</small></details>
           <details className="zm-options"><summary>Cài đặt nâng cao</summary><p>Mã vùng được tạo tự động. Các thông tin bên dưới không bắt buộc.</p>

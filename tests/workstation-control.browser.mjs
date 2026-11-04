@@ -4,6 +4,7 @@ import { mkdir } from 'node:fs/promises';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const base = process.env.TEST_URL || 'http://127.0.0.1:5175';
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_EXECUTABLE });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const calls = [], errors = [];
@@ -51,17 +52,22 @@ const waitForMotion = async count => {
 };
 try {
   await mkdir('.workstation-build/workstation-control', { recursive: true });
-  await page.goto((process.env.TEST_URL || 'http://127.0.0.1:5175') + '/workstations?mode=mapping');
+  await page.goto(base + '/workstations');
+  await page.getByRole('group', { name: 'Chế độ điều phối', exact: true }).waitFor();
+  assert.equal(await button('Quét & điều khiển').count(), 0, 'Dispatch has no duplicated scan tab');
+  assert.equal(await button('Tạo nhiệm vụ quét').count(), 0, 'Dispatch does not mount mapping controls');
+  await page.goto(base + '/workstations?mode=mapping');
+  await page.waitForURL('**/admin/map?stage=scan');
   await page.getByText('Chi tiết quét map mới', { exact: true }).click();
   await page.getByLabel('Robot', { exact: true }).selectOption('robot-1');
   await page.getByLabel('Tầng', { exact: true }).selectOption('floor-1');
   await page.getByLabel('Quy trình quét đã phát hành').selectOption('map-workflow');
-  await page.getByLabel('Tên bản đồ', { exact: true }).fill('Map điều phối');
+  await page.getByLabel('Tên bản đồ', { exact: true }).fill('Map kiểm thử');
   assert.equal(calls.filter(call => call.method !== 'GET').length, 0, 'Loading and choosing do not send robot commands');
   await button('Tạo nhiệm vụ quét').click();
   await button('↑ Tiến').waitFor();
   await page.waitForFunction(() => !Array.from(document.querySelectorAll('button')).find(node => node.textContent === '↑ Tiến').disabled);
-  assert.deepEqual(calls.find(call => call.path.endsWith('/mapping-jobs')).body, { workflowId: 'map-workflow', robotId: 'robot-1', floorId: 'floor-1', mapName: 'Map điều phối' });
+  assert.deepEqual(calls.find(call => call.path.endsWith('/mapping-jobs')).body, { workflowId: 'map-workflow', robotId: 'robot-1', floorId: 'floor-1', mapName: 'Map kiểm thử' });
 
   await button('↑ Tiến').focus();
   await page.keyboard.down('Enter');
@@ -87,15 +93,17 @@ try {
   await page.keyboard.down('Enter');
   await waitForMotion(beforeSwitch + 1);
   assert.equal(motion().at(-1).body.linearX, -.05);
-  await button('Phát thông báo').evaluate(node => node.click());
+  await button('← Thư viện bản đồ').evaluate(node => node.click());
   await page.keyboard.up('Enter');
   await waitForMotion(beforeSwitch + 2);
-  assert.equal(motion().at(-1).body.linearX, 0, 'Switching modes sends stop');
+  assert.equal(motion().at(-1).body.linearX, 0, 'Leaving the mapping workspace sends stop');
+  await page.goto(base + '/workstations?mode=speech');
   await page.getByLabel('Nội dung thông báo').waitFor();
   assert.match(page.url(), /mode=speech/);
   await page.reload();
   await page.getByLabel('Nội dung thông báo').waitFor();
-  await button('Quét & điều khiển').click();
+  assert.equal(await button('Quét & điều khiển').count(), 0);
+  await page.goto(base + '/admin/map?stage=scan');
   await page.waitForFunction(() => !Array.from(document.querySelectorAll('button')).find(node => node.textContent === '↑ Tiến').disabled);
   assert.equal(calls.filter(call => call.path.endsWith('/mapping-jobs')).length, 1, 'Returning resumes tracking without creating another job');
   online = false;
@@ -106,7 +114,7 @@ try {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({ path: '.workstation-build/workstation-control/desktop.png', fullPage: true });
   assert.deepEqual(errors, []);
-  console.log('Workstations: authenticated mapping, motion/stop, camera validation, Pi feedback, mode-switch stop, speech, resume, offline lock and mobile layout passed. All robot APIs mocked.');
+  console.log('PASS: Dispatch has no scan tab or controls; legacy mapping URL redirects to Map Studio; map motion/stop, leaving-page stop, speech, resume, offline lock and mobile layout. All robot APIs mocked.');
 } finally {
   await browser.close();
 }

@@ -4,7 +4,7 @@
 
 ## Kết nối và phạm vi
 
-- FE giữ mặc định `https://bemar-production.up.railway.app`; có thể đổi bằng `VITE_API_BASE_URL` rồi khởi động lại Vite/build lại.
+- FE dùng mặc định `https://mediassistrover.duckdns.org`; cấu hình thực tế trên máy nằm trong `.env.local`. Có thể đổi bằng `VITE_API_BASE_URL` rồi khởi động lại Vite/build lại.
 - Đã đọc OpenAPI Railway và so với BE main: 207 thao tác dành cho người dùng/công khai có cùng đường dẫn, tham số và schema trong snapshot. 37 API Pi/thiết bị được tách riêng, không đưa khóa thiết bị vào trình duyệt.
 - Snapshot: `src/features/api/backendContract.json`; bộ gọi API: `backendApi.js`; kiểm tra/chuẩn hóa dữ liệu: `contract.js`.
 - Swagger hiện trùng tên các record `Create`, `Update`, `Confirm`. `contractOverrides.js` dùng đúng DTO Java của từng thao tác, gồm nhân viên, ca trực, cài đặt, giao nhận, xác thực giao nhận và tạo phiên quét.

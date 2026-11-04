@@ -25,8 +25,10 @@ export function zonePayload(form,mapId) {
   const capacity=optionalNumber(form.capacityLimit,'Sức chứa');
   if(capacity!==null&&!Number.isInteger(capacity))throw Error('Sức chứa phải là số nguyên không âm.');
   if((form.cameraSourceRef||'').length>255)throw Error('Nguồn camera tối đa 255 ký tự.');
+  const speed=optionalNumber(form.speedLimitMps,'Giới hạn tốc độ',0,true);
+  if(form.zoneType==='SPEED'&&(speed===null||speed>0.8))throw Error('Vùng giới hạn tốc độ cần tốc độ lớn hơn 0 và không quá 0,8 m/s.');
   return {mapId,zoneCode:text(form.zoneCode,'Mã vùng',64),zoneName:text(form.zoneName,'Tên vùng',160),zoneType:form.zoneType,polygonJson:polygon,
-    speedLimitMps:optionalNumber(form.speedLimitMps,'Giới hạn tốc độ',0,true),capacityLimit:capacity,calibratedAreaM2:optionalNumber(form.calibratedAreaM2,'Diện tích hiệu chuẩn',0,true),
+    speedLimitMps:speed,capacityLimit:capacity,calibratedAreaM2:optionalNumber(form.calibratedAreaM2,'Diện tích hiệu chuẩn',0,true),
     cameraSourceRef:form.cameraSourceRef?.trim()||null,cameraRoiJson:parseJson(form.cameraRoiJson,'Vùng camera'),active:!!form.active,publicVisible:!!form.publicVisible,description:form.description||''};
 }
 export function endpointPayload(form,map,zones,rooms) {

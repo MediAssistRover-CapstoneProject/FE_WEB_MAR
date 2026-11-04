@@ -2,7 +2,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import WorkflowsPage from '../src/pages/Workflows/WorkflowsPage.jsx';
+import WorkflowsPage from '../src/pages/Workflows/WorkflowDesignerPage.jsx';
 import AdminApp from '../src/pages/Admin/AdminApp.jsx';
 import { workflowApi } from '../src/features/workflows/workflowApi.js';
 import { buildPatrolGraph } from '../src/features/workflows/patrolWorkflowModel.js';

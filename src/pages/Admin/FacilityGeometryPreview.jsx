@@ -5,7 +5,8 @@ import { endpointHeading, mapGeometry, snapMapPoint } from '../../features/facil
 import EndpointMarker from './EndpointMarker.jsx';
 
 export function polygonPoints(value){try{const object=typeof value==='string'?JSON.parse(value):value;return Array.isArray(object?.points)?object.points.filter(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)):[];}catch{return [];}}
-export default function FacilityGeometryPreview({map,zones,endpoints,zoneEdit,endpointEdit,onPoint,onZone,onEndpoint,drawing,onPlacementEnd,allowDraftMove=false}){
+export default function FacilityGeometryPreview({map,zones,endpoints,zoneEdit,endpointEdit,onPoint,onZone,onEndpoint,drawing,onPlacementEnd,allowDraftMove=false,showInactiveEndpoints=false}){
+  endpoints=endpoints.filter(point=>point.mapId===map.mapId&&(showInactiveEndpoints||point.active===true));
   const id=useId().replaceAll(':','');
   const [asset,setAsset]=useState(null),[error,setError]=useState(''),[revision,setRevision]=useState(0);
   const [zoom,setZoom]=useState(1);

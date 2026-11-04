@@ -5,7 +5,7 @@ import LoginPage from '../pages/Auth/LoginPage.jsx';
 import RegisterPage from '../pages/Auth/RegisterPage.jsx';
 import ChangePasswordPage from '../pages/Auth/ChangePasswordPage.jsx';
 import AdminApp from '../pages/Admin/AdminApp.jsx';
-import WorkflowsPage from '../pages/Workflows/WorkflowsPage.jsx';
+import WorkflowsPage from '../pages/Workflows/WorkflowDesignerPage.jsx';
 import WorkstationsPage from '../pages/Workstations/WorkstationsPage.jsx';
 import { useEffect, useState } from 'react';
 import { getSession, hasSession } from '../features/auth/session.js';

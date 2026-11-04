@@ -69,7 +69,7 @@ injectStyles('mediassist-style-pages-Workstations-WorkstationsPage-jsx', inlineS
 
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Sidebar, MarButton } from '../Workflows/WorkflowsPage.jsx';
+import { Sidebar, MarButton } from '../../components/WorkflowWorkspaceShared.jsx';
 import DispatchWorkspace from './DispatchWorkspace.jsx';
 import routeMap from '../../assets/images/workstation-route.png';
 import { figmaScreens } from './figmaScreens.js';

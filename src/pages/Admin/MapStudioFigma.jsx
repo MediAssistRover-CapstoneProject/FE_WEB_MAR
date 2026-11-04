@@ -15,15 +15,18 @@ function Button({children,tone='',...props}) {
 
 export default function MapStudioFigma({initialStage='scan'}) {
   const navigate=useNavigate();
-  const requestedStage=new URLSearchParams(window.location.search).get('stage')||initialStage;
+  const stageParam=new URLSearchParams(window.location.search).get('stage');
+  const requestedStage=stageParam||initialStage;
   const [mapId,setMapId]=useState(()=>new URLSearchParams(window.location.search).get('mapId')||'');
-  const [stage,setStage]=useState(()=>mapId?'endpoint':workflow.some(([id])=>id===requestedStage)?requestedStage:'scan');
+  const [stage,setStage]=useState(()=>mapId?(workflow.some(([id])=>id===stageParam)?stageParam:'endpoint'):workflow.some(([id])=>id===requestedStage)?requestedStage:'scan');
   const [showLibrary,setShowLibrary]=useState(()=>!mapId&&stage==='scan'&&new URLSearchParams(window.location.search).get('stage')!=='scan');
+  const [copyNotice,setCopyNotice]=useState('');
   const index=workflow.findIndex(([id])=>id===stage);
   const openMap=(id,target)=>{
     setMapId(id);
     setStage(target);
     setShowLibrary(false);
+    navigate('/admin/map?'+new URLSearchParams({mapId:id,stage:target}),{replace:true});
   };
 
   if(showLibrary)return <section className="ls-studio">
@@ -51,8 +54,9 @@ export default function MapStudioFigma({initialStage='scan'}) {
     </header>
     <div className="ls-stage-nav"><WorkspaceTabs label={vi('Map Studio stages')} active={stage} onSelect={setStage}
       items={workflow.map(([id,label],i)=>({id,label:`${i+1}. ${vi(label)}`}))}/></div>
+    {copyNotice&&<p className="ls-notice" role="status">{copyNotice}</p>}
     {stage==='scan'
       ? <LiveMapping embedded onMapSaved={id=>openMap(id,'zone')}/>
-      : <FacilityCatalogEditor stage={stage} initialMapId={mapId} onMapChange={setMapId}/>}
+      : <FacilityCatalogEditor key={mapId||'catalog'} stage={stage} initialMapId={mapId} onMapChange={setMapId} onOpenLibrary={()=>setShowLibrary(true)} onMapCopied={id=>{setCopyNotice('Đã mở bản đồ tương thích dẫn đường. BE giữ nguyên bản gốc và sao chép điểm đích; kiểm tra lại vùng, nhóm điểm và liên kết phòng trên bản này trước khi kích hoạt.');openMap(id,'zone');}}/>}
   </section>;
 }
