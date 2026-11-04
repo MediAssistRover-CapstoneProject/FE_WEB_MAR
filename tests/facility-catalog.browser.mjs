@@ -10,19 +10,26 @@ const map={mapId:'map-a',floorId:'f1',mapName:'Bản đồ BE thử nghiệm',ma
 const endpoint=(id,mapId)=>({endpointId:id,mapId,endpointCode:id,endpointName:id==='end-a'?'Điểm quầy A':'Điểm bản đồ khác',endpointType:'WAYPOINT',xM:2,yM:3,yawRad:0,active:true,accessible:true,publicVisible:false});
 const existingZone={zoneId:'zone-existing',mapId:'map-a',zoneCode:'zone_001',zoneName:'Vùng đã cấu hình',zoneType:'SPEED',polygonJson:{points:[[-3,-1],[-2,-1],[-2,0],[-3,0]]},speedLimitMps:.3,capacityLimit:20,calibratedAreaM2:6,cameraSourceRef:'cam-existing',cameraRoiJson:{roi:[0,0,1,1]},active:false,publicVisible:true,description:'Ghi chú cũ'};
 const state={maps:[map],zones:[existingZone],rooms:[],endpoints:[endpoint('end-a','map-a'),endpoint('end-other','map-other')],'endpoint-groups':[],'endpoint-group-members':[]};
-let rejectNext=false,zoneSequence=0;
+let rejectNext=false,rejectPoint=false,reloadSafe=true,uncertainCopy=false,rejectEndpointState=false,zoneSequence=0;
 await page.route(url=>url.pathname.startsWith('/api/'),async route=>{
  const req=route.request(),url=new URL(req.url()),parts=url.pathname.split('/').filter(Boolean),resource=parts[2],method=req.method();
  const reply=(data,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
  if(method==='GET'){
   reads.push(url.pathname+url.search);
-  if(url.pathname.endsWith('/image-metadata'))return reply({map_id:'map-a',width_px:800,height_px:400,resolution_m_per_pixel:.05,origin_x_m:-5,origin_y_m:-2,origin_yaw_rad:0});
+  if(url.pathname.endsWith('/image-metadata'))return reply({map_id:parts[3],width_px:800,height_px:400,resolution_m_per_pixel:.05,origin_x_m:-5,origin_y_m:-2,origin_yaw_rad:0,navigation_reload_safe:reloadSafe});
   if(url.pathname.endsWith('/image.png'))return route.fulfill({status:200,contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=','base64')});
   // Ensure page 2 is fetched, not a hidden first-page-only implementation.
   if(resource==='endpoints'&&url.searchParams.get('page')==='0')return reply({content:Array.from({length:100},(_,i)=>endpoint('foreign-'+i,'map-other')),last:false,totalPages:2});
   return reply({content:state[resource]||[],last:true,totalPages:resource==='endpoints'?2:1});
  }
  const body=req.postDataJSON();writes.push({path:url.pathname,method,body});
+ if(resource==='maps'&&parts[4]==='validate-navigation-point')return rejectPoint?reply({message:'Point is occupied or unknown'},400):reply({mapId:parts[3],knownFree:true});
+ if(resource==='maps'&&parts[4]==='navigation-copy'){
+  if(uncertainCopy)return reply({message:'Connection lost while creating map'},503);
+  const source=state.maps.find(m=>m.mapId===parts[3]),copy={...source,mapId:'map-nav',mapName:'Bản đồ tương thích mới',status:'DRAFT'};
+  state.maps.push(copy);state.endpoints.push(...state.endpoints.filter(p=>p.mapId===source.mapId).map(p=>({...p,mapId:copy.mapId,endpointId:p.endpointId+'-copy'})));reloadSafe=true;
+  return reply({mapId:copy.mapId,status:copy.status,assetHash:'test-hash'});
+ }
  if(resource==='maps'&&parts[4]==='activate'){state.maps=state.maps.map(m=>({...m,status:'ACTIVE'}));return reply(state.maps[0]);}
  if(rejectNext){rejectNext=false;return reply({message:'Sequence number already exists in this group'},409);}
  if(resource==='endpoint-groups'){
@@ -33,6 +40,12 @@ await page.route(url=>url.pathname.startsWith('/api/'),async route=>{
   const result={...body,mapId:'map-a'};state[resource]=[result];return reply(result,method==='POST'?201:200);
  }
  if(resource==='zones'){const result={...body,zoneId:parts[3]||'zone-'+(++zoneSequence)};state.zones=[...state.zones.filter(z=>z.zoneId!==result.zoneId),result];return reply(result,method==='POST'?201:200);}
+ if(resource==='endpoints'&&['activate','deactivate'].includes(parts[4])){
+  if(rejectEndpointState){rejectEndpointState=false;return reply({message:'Endpoint state temporarily unavailable'},503);}
+  const point=state.endpoints.find(p=>p.endpointId===parts[3]);
+  const result={...point,active:parts[4]==='activate'};
+  state.endpoints=state.endpoints.map(p=>p.endpointId===result.endpointId?result:p);return reply(result);
+ }
  if(resource==='endpoints'){const result={...body,endpointId:parts[3]||'end-new'};state.endpoints=[...state.endpoints.filter(p=>p.endpointId!==result.endpointId),result];return reply(result,201);}
  throw Error('Unexpected write: '+url.pathname);
 });
@@ -91,6 +104,8 @@ try{
  await page.getByRole('button',{name:'+ Vùng mới',exact:true}).click();await page.getByLabel('Tên vùng',{exact:true}).fill('Khu vực giảm tốc');
  await page.getByLabel('Loại vùng',{exact:true}).selectOption('SPEED');
  assert.equal(await page.getByLabel('Giới hạn tốc độ (m/s)',{exact:true}).evaluate(input=>input.required&&!input.checkValidity()),true);
+ await page.getByLabel('Giới hạn tốc độ (m/s)',{exact:true}).fill('.9');
+ assert.equal(await page.getByLabel('Giới hạn tốc độ (m/s)',{exact:true}).evaluate(input=>input.checkValidity()),false,'SPEED cannot exceed BE limit .8');
  await page.getByLabel('Giới hạn tốc độ (m/s)',{exact:true}).fill('.4');
  await page.getByText('Nhập tọa độ thủ công',{exact:true}).click();await page.getByLabel('Tọa độ vùng (mét)',{exact:true}).fill('{"points":[[0,0],[10,0],[10,8],[0,8]]}');
  await page.getByText('Nhập tọa độ thủ công',{exact:true}).click();
@@ -113,6 +128,8 @@ try{
  assert.ok(selectedX>previousX);assert.ok(selectedY<previousY);assert.equal(await page.getByLabel('Hướng đến (độ)',{exact:true}).inputValue(),previousAngle);assert.equal(await canvas.getAttribute('viewBox'),previousView);assert.equal(writes.length,writeCount);
  await page.getByLabel('Mã điểm',{exact:true}).fill('END_NEW');await page.getByLabel('Tên điểm',{exact:true}).fill('Điểm mới');await page.getByLabel('Hướng đến (độ)',{exact:true}).fill('90');
  await page.getByRole('button',{name:/Lưu điểm đích|Lưu thay đổi/ }).click();await page.getByText('Chỉnh điểm đích',{exact:true}).waitFor();assert.equal(writes.at(-1).body.yawRad,Math.PI/2);
+ assert.equal(writes.at(-2).path,'/api/v1/maps/map-a/validate-navigation-point');
+ assert.deepEqual(writes.at(-2).body,{xM:selectedX,yM:selectedY});
  assert.equal(writes.at(-1).body.mapId,'map-a');assert.equal(writes.at(-1).body.xM,selectedX);assert.equal(writes.at(-1).body.yM,selectedY);
  assert.equal(writes.at(-1).method,'POST');assert.equal(writes.at(-1).body.endpointType,'WAYPOINT');assert.equal(writes.at(-1).body.active,true);assert.equal(writes.at(-1).body.accessible,true);
  const countBefore=writes.length;
@@ -121,15 +138,74 @@ try{
  await page.getByLabel('X (m)',{exact:true}).fill(String(selectedX));await page.getByLabel('Tên điểm',{exact:true}).fill('Điểm đã sửa');
  await page.getByRole('button',{name:/Lưu điểm đích|Lưu thay đổi/ }).click();await page.getByRole('status').filter({hasText:'Đã lưu thay đổi.'}).waitFor();
  assert.equal(writes.at(-1).method,'PUT');assert.equal(writes.at(-1).path,'/api/v1/endpoints/end-new');assert.equal(writes.at(-1).body.endpointType,'WAYPOINT');
+ const writesBeforeRejectedPoint=writes.length;rejectPoint=true;
+ await page.getByLabel('Tên điểm',{exact:true}).fill('Điểm không được lưu');
+ await page.getByRole('button',{name:/Lưu điểm đích|Lưu thay đổi/}).click();await page.getByRole('status').filter({hasText:'Point is occupied or unknown'}).waitFor();
+ assert.equal(writes.length,writesBeforeRejectedPoint+1,'Occupied point only calls verification');assert.equal(writes.at(-1).path,'/api/v1/maps/map-a/validate-navigation-point');
+ assert.notEqual(state.endpoints.find(p=>p.endpointId==='end-new').endpointName,'Điểm không được lưu');
+ rejectPoint=false;await page.getByRole('button',{name:'Bỏ thay đổi',exact:true}).click();
+ // Lifecycle actions operate on the saved endpoint only, without deleting it or saving a draft.
+ const pointState=page.getByRole('region',{name:'Trạng thái điểm đích',exact:true});
+ await pointState.getByText('Đang hoạt động',{exact:true}).waitFor();
+ const beforeDirtyState=writes.length;
+ await page.getByLabel('Tên điểm',{exact:true}).fill('Bản nháp chưa lưu');
+ assert.equal(await pointState.getByRole('button',{name:'Ngừng sử dụng điểm',exact:true}).isDisabled(),true);
+ assert.equal(writes.length,beforeDirtyState);
+ await page.getByRole('button',{name:'Bỏ thay đổi',exact:true}).click();
+ rejectEndpointState=true;
+ await pointState.getByRole('button',{name:'Ngừng sử dụng điểm',exact:true}).click();
+ await page.getByRole('status').filter({hasText:'Endpoint state temporarily unavailable'}).waitFor();
+ assert.equal(state.endpoints.find(p=>p.endpointId==='end-new').active,true);
+ await pointState.getByText('Đang hoạt động',{exact:true}).waitFor();
+ const beforeDisable=writes.length,savedPoint=structuredClone(state.endpoints.find(p=>p.endpointId==='end-new'));
+ rejectPoint=true; // Stopping use must work without requiring the point to pass occupancy validation again.
+ await pointState.getByRole('button',{name:'Ngừng sử dụng điểm',exact:true}).click();
+ await pointState.getByRole('button',{name:'Kích hoạt lại điểm',exact:true}).waitFor();
+ assert.equal(writes.length,beforeDisable+1);assert.equal(writes.at(-1).method,'POST');assert.equal(writes.at(-1).path,'/api/v1/endpoints/end-new/deactivate');
+ assert.deepEqual(state.endpoints.find(p=>p.endpointId==='end-new'),{...savedPoint,active:false});
+ assert.match(await page.getByLabel('Điểm đã lưu',{exact:true}).locator('option:checked').innerText(),/Ngừng sử dụng/);
+ assert.equal(await page.locator('[data-endpoint-state="inactive"]').count(),1);
+ assert.equal(writes.some(w=>w.path.startsWith('/api/v1/endpoints/')&&w.method==='DELETE'),false);
+ await page.screenshot({path:'.workstation-build/facility/endpoint-inactive.png',fullPage:true});
+ await page.getByRole('button',{name:'2. Vùng',exact:true}).click();
+ assert.equal(await page.locator('[data-endpoint-state="inactive"]').count(),0,'Other map views hide inactive endpoints');
+ await page.getByRole('button',{name:'3. Điểm đích',exact:true}).click();
+ assert.equal(await page.locator('[data-endpoint-state="inactive"]').count(),1,'Endpoint management retains inactive points for reactivation');
+ rejectPoint=false;
+ await pointState.getByRole('button',{name:'Kích hoạt lại điểm',exact:true}).click();
+ await pointState.getByRole('button',{name:'Ngừng sử dụng điểm',exact:true}).waitFor();
+ assert.equal(writes.at(-1).path,'/api/v1/endpoints/end-new/activate');assert.equal(writes.at(-1).method,'POST');
+ assert.deepEqual(state.endpoints.find(p=>p.endpointId==='end-new'),savedPoint);
  await page.getByRole('button',{name:'-90°',exact:true}).click();assert.equal(Number(await page.getByLabel('Hướng đến (độ)',{exact:true}).inputValue()),-90);
  assert.equal(await page.getByRole('button',{name:'Kích hoạt bản đồ',exact:true}).isDisabled(),true);
  await page.getByRole('button',{name:'Bỏ thay đổi',exact:true}).click();assert.equal(Number(await page.getByLabel('Hướng đến (độ)',{exact:true}).inputValue()),90);
- await page.getByRole('button',{name:'Kích hoạt bản đồ',exact:true}).click();await page.getByText('Bản đồ sẵn sàng điều phối',{exact:false}).waitFor();
+ await page.getByRole('button',{name:'Kích hoạt bản đồ',exact:true}).click();await page.getByText('Bản đồ đã kích hoạt',{exact:false}).waitFor();
  assert.equal(writes.at(-1).path,'/api/v1/maps/map-a/activate');assert.equal(await page.getByRole('button',{name:'Mở Điều phối →',exact:true}).isEnabled(),true);
  await page.getByRole('button',{name:'Công khai 2 điểm đích',exact:true}).click();await page.getByRole('button',{name:'Công khai 2 điểm đích',exact:true}).waitFor({state:'detached'});
  assert.ok(state.endpoints.filter(p=>p.mapId==='map-a').every(p=>p.publicVisible));assert.equal(state.endpoints.find(p=>p.mapId==='map-other').publicVisible,false);
  await page.screenshot({path:'.workstation-build/facility/endpoint-map.png',fullPage:true});
  for(const [width,height]of[[1024,768],[390,844]]){await page.setViewportSize({width,height});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Endpoint no overflow '+width);await page.screenshot({path:`.workstation-build/facility/endpoint-${width}.png`,fullPage:true});}
+ await page.setViewportSize({width:1366,height:900});reloadSafe=false;
+ await page.getByRole('button',{name:'Kiểm tra lại khả năng dẫn đường',exact:true}).click();
+ await page.getByText('Map cần bản sao tương thích dẫn đường',{exact:true}).waitFor();
+ assert.equal(await page.getByRole('button',{name:'Mở Điều phối →',exact:true}).isDisabled(),true);
+ await page.getByText('Vùng, nhóm điểm và liên kết phòng không được sao chép',{exact:false}).waitFor();
+ const beforeCopy=writes.length;
+ await page.getByRole('button',{name:'Tạo bản đồ tương thích dẫn đường',exact:true}).click();
+ await page.locator('[data-map-id="map-nav"]').waitFor();
+ assert.equal(writes.length,beforeCopy+1);assert.equal(writes.at(-1).path,'/api/v1/maps/map-a/navigation-copy');
+ assert.equal(state.maps.find(m=>m.mapId==='map-a').status,'ACTIVE','Original map is preserved');
+ assert.equal(state.maps.find(m=>m.mapId==='map-nav').status,'DRAFT');
+ assert.equal(state.zones.some(z=>z.mapId==='map-nav'),false,'Zones must be reviewed on new map');
+ assert.equal(await page.getByRole('button',{name:'Kích hoạt bản đồ',exact:true}).isEnabled(),true);
+ // A lost copy response must not invite another create, including automatic retry.
+ reloadSafe=false;uncertainCopy=true;
+ await page.getByRole('button',{name:'Kiểm tra lại khả năng dẫn đường',exact:true}).click();
+ await page.getByText('Map cần bản sao tương thích dẫn đường',{exact:true}).waitFor();
+ const beforeUncertain=writes.length;
+ await page.getByRole('button',{name:'Tạo bản đồ tương thích dẫn đường',exact:true}).click();
+ await page.getByRole('status').filter({hasText:'Chưa xác nhận được kết quả tạo bản sao'}).waitFor();
+ assert.equal(writes.length,beforeUncertain+1);assert.equal(await page.getByRole('button',{name:'Tạo bản đồ tương thích dẫn đường',exact:true}).isDisabled(),true);
  assert.deepEqual(errors,[]);assert.ok(writes.every(w=>/\/api\/v1\/(maps|zones|endpoints|endpoint-groups|endpoint-group-members)/.test(w.path)));
  console.log('PASS: paginated API catalog, map scoping, group/member CRUD + 409/204, zone + endpoint payload, responsive sizes. All writes mocked; no real BE mutations.');
 }catch(e){console.error(errors);await page.screenshot({path:'.workstation-build/facility/failure.png',fullPage:true});throw e;}finally{await browser.close();}

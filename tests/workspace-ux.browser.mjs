@@ -44,7 +44,7 @@ try {
   await page.locator('.be-records button').first().click();
   await page.getByRole('region', { name: 'Tóm tắt bản ghi' }).getByText(hospital.content, { exact: true }).waitFor();
   assert.equal(await page.locator('.be-catalog-navigation').getByText('Không gian', { exact: true }).count(), 1);
-  assert.match(await page.locator('.be-source-strip').innerText(), /Đã nhận dữ liệu.*localhost:8080/s);
+  assert.match(await page.locator('.be-source-strip').innerText(), /Đã nhận dữ liệu.*mediassistrover\.duckdns\.org/s);
   assert.equal(await page.locator('.be-full-record').getAttribute('open'), null);
   await page.screenshot({ path: '.workstation-build/workspace-ux/facility.png', fullPage: true });
   await page.getByRole('button', { name: 'Tạo mới', exact: true }).click();

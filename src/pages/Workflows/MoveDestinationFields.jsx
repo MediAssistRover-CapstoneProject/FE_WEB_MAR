@@ -19,7 +19,7 @@ export default function MoveDestinationFields({ step, onChange }) {
   }, [attempt]);
   const values = step.values;
   const dynamic = Object.keys(step.inputMappingJson ?? {}).length > 0 || Object.values(values).some(value => value && typeof value === 'object') || [values.map_id, values.endpoint_id].some(value => typeof value === 'string' && value.includes('${'));
-  const endpoints = catalog.endpoints.filter(item => item.mapId === values.map_id);
+  const endpoints = catalog.endpoints.filter(item => item.mapId === values.map_id && item.active === true);
   const selected = endpoints.find(item => item.endpointId === values.endpoint_id);
   const update = patch => onChange({ ...step, values: { ...values, ...patch } });
   return <div className="move-destination-fields">
@@ -35,7 +35,7 @@ export default function MoveDestinationFields({ step, onChange }) {
       </select></label>
       <label>Điểm đích<select disabled={loading || !!error || dynamic || !values.map_id} value={typeof values.endpoint_id === 'string' ? values.endpoint_id : ''} onChange={event => update({ endpoint_id: event.target.value })}>
         <option value="">{!values.map_id ? 'Chọn bản đồ trước' : 'Chọn điểm đích'}</option>
-        {values.endpoint_id && !selected && <option value={values.endpoint_id} disabled>Điểm đã chọn không còn thuộc bản đồ này</option>}
+        {values.endpoint_id && !selected && <option value={values.endpoint_id} disabled>Điểm đã chọn không còn khả dụng trên bản đồ này</option>}
         {endpoints.map(endpoint => <option key={endpoint.endpointId} value={endpoint.endpointId} disabled={endpoint.active === false || endpoint.accessible === false}>{endpoint.endpointName}{endpoint.active === false || endpoint.accessible === false ? ' · Không khả dụng' : ''}</option>)}
       </select></label>
       <label>Chế độ<select disabled={dynamic} value={values.mode || ''} onChange={event => update({ mode: event.target.value })}><option value="">Chọn chế độ</option><option value="NORMAL">Di chuyển thông thường</option><option value="PATROL">Tuần tra</option><option value="ESCORT">Dẫn đường</option></select></label>

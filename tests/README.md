@@ -1,5 +1,21 @@
 # Kiểm tra FE
 
+## Workflow Designer kéo thả
+
+Trang `/workflow` đã thay trình tạo workflow cũ. Xem [hướng dẫn và contract đầu vào](../docs/workflow-designer.md).
+
+```powershell
+node --test tests/workflow-designer.test.mjs tests/workflow-step-contracts.test.mjs tests/patrol-workflow.test.mjs tests/api-client.test.mjs tests/backend-contract.test.mjs
+node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5186 --strictPort
+# Terminal khác:
+node tests/workflow-designer.browser.mjs
+node tests/workflow-step-config.browser.mjs
+```
+
+Browser test dùng `@playwright/test`, Chrome cài sẵn và API giả lập; không gọi BE thật.
+Đặt `CHROME_EXECUTABLE` hoặc `WORKFLOW_TEST_URL` nếu cần. File `workflow-crud.browser.mjs`
+chuyển sang chạy bộ test mới. Các fixture minh họa editor cũ bên dưới là tài liệu lịch sử.
+
 ## Trang vận hành trực tiếp (03/11/2026)
 
 Trang `/admin/live-operations` dùng UI riêng: nhóm Đang hoạt động / Cần xử lý /
@@ -28,9 +44,9 @@ Reliability test kiểm tra phản hồi REST chậm sau SSE, phiên bản từn
 giữ chi tiết khi công việc kết thúc, chỉ báo dữ liệu cũ khi lỗi đọc,
 kiểm tra lại bước trước khi gửi xác nhận và robot thay đổi khả dụng trong lúc mở biểu mẫu.
 
-## Điều khiển robot tại Workstations (01/11/2026)
+## Quét tại Bản đồ và điều phối robot
 
-`/workstations?mode=mapping` dùng giao diện React cho các API của `mapping.html`:
+`/admin/map?stage=scan` dùng giao diện React cho các API quét của `mapping.html`:
 tạo mapping-job, theo dõi mapping-session/snapshot, ảnh map/camera, mapping-control
 và sự kiện lưu map. Chọn robot, tầng, quy trình đã phát hành và tên map trong
 “Chi tiết quét map mới”. Giữ nút để di chuyển; nhả, rời trang, đổi mục hoặc mất
@@ -38,7 +54,9 @@ kết nối thì ngừng gia hạn và gửi lệnh dừng. Tay cầm hoặc t�
 điều khiển sẽ khóa nút di chuyển. Hiển thị phản hồi vật cản từ Pi; camera có thể
 nhập URL video trực tiếp và chuyển về ảnh MQTT nếu nguồn video lỗi.
 
-`?mode=speech` dùng API chuẩn bị TTS và speech-jobs. Mục Bản đồ máy chủ giữ luồng
+Workstations chỉ giữ Bản đồ máy chủ, Phát thông báo và Mô phỏng cục bộ; không nhúng
+giao diện quét map. Link cũ `/workstations?mode=mapping` chuyển đến trang quét trong
+Bản đồ. `/workstations?mode=speech` dùng API chuẩn bị TTS và speech-jobs. Mục Bản đồ máy chủ giữ luồng
 mở navigation-session, xác nhận vị trí, MOVE, theo dõi và hủy yêu cầu đã có.
 Các thao tác thật yêu cầu ADMIN, Pi kết nối và cấu hình BE/robot phù hợp.
 

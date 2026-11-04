@@ -29,6 +29,7 @@ export const workflowApi = {
   validate: (id) => apiRequest(`/api/v1/admin/workflows/${id}/validate`, { method: 'POST' }),
   publish: (id) => apiRequest(`/api/v1/admin/workflows/${id}/publish`, { method: 'POST' }),
   archive: (id) => apiRequest(`/api/v1/admin/workflows/${id}/archive`, { method: 'POST' }),
+  clone: (id, body = {}) => apiRequest(`/api/v1/admin/workflows/${id}/clone`, { method: 'POST', body }),
   createSchedule: body => apiRequest('/api/v1/schedules', { method: 'POST', body }),
   activateSchedule: id => apiRequest(`/api/v1/schedules/${id}/activate`, { method: 'POST' }),
 };

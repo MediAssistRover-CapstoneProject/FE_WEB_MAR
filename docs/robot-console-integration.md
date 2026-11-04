@@ -1,18 +1,18 @@
 # Robot thật và cấu hình mạng
 
-Map Studio có hai chế độ: Robot thật (mặc định) và Mô phỏng. Robot thật dùng bản mapping.html đối chiếu từ BE runtime ngày 2026-10-27, gồm quét/lưu map, tự quét, recovery, endpoint, phiên navigation, khởi tạo AMCL, đường Nav2, workflow MOVE và phát loa. Không lấy vị trí hoặc đường đi từ dữ liệu mô phỏng.
+Quét và quản lý map nằm tại `/admin/map`, điều phối tại `/workstations`. Các chức năng quét/lưu map, tự quét, recovery, zone, endpoint, phiên navigation, khởi tạo vị trí và tuyến MOVE dùng API BE. Chế độ mô phỏng cục bộ được tách riêng tại Workstations.
 
-## Chạy trên laptop đang chạy BE
+## Kết nối máy chủ hiện tại
 
 .env.local (không commit):
 
 ```dotenv
-VITE_API_BASE_URL=
-VITE_DEV_PROXY_TARGET=http://127.0.0.1:8080
-VITE_ROBOT_CAMERA_URL=http://10.3.90.50:8080/stream?topic=/ascamera/camera_publisher/rgb0/image&type=mjpeg&width=640&height=480&quality=60
+VITE_API_BASE_URL=https://mediassistrover.duckdns.org
 ```
 
-Chạy `npm run dev`, đăng nhập ADMIN thật, mở Map Studio → Robot thật. Khởi động lại Vite sau khi đổi .env.local. BE proxy dùng loopback vì FE và BE chạy trên cùng laptop; không cần thay IP BE mỗi lần đổi Wi-Fi. Pi camera cần cập nhật theo IP hiện tại. Cấu hình này không đổi URL upload/TTS/CA của worker Pi.
+Chạy `npm run dev`, đăng nhập bằng tài khoản trên máy chủ rồi mở Bản đồ hoặc Workstations. Khởi động lại Vite nếu chưa nhận thay đổi `.env.local`. Cấu hình API này áp dụng cả REST, SSE và ảnh map. URL camera Pi cấu hình riêng theo kết nối thực tế; cấu hình này không thay URL upload/TTS/CA của worker Pi.
+
+Nếu cần dùng Vite proxy khi phát triển, đặt `VITE_API_BASE_URL=` và `VITE_DEV_PROXY_TARGET=https://mediassistrover.duckdns.org`. Không thêm `/swagger-ui` vào API base URL.
 
 ## Deploy
 
@@ -26,4 +26,4 @@ public/robot-console/mapping.html và bốn template workflow là bản chụp t
 
 Khi BE thay hợp đồng, đồng bộ lại các file này từ src/main/resources/static và chạy build + tests/robot-console.browser.mjs. Không tự tải HTML/script từ máy chủ tùy ý. Đây là giao diện BE được nhúng, chưa chuyển toàn bộ thành component React riêng.
 
-Các mục mô phỏng/RobotControlScreens khác chưa được xác nhận là điều khiển thật. Dùng Map Studio → Robot thật cho luồng robot. Việc kiểm tra trình duyệt dùng API giả lập, không xác nhận AMCL/Nav2/phần cứng và không gửi MOVE thật.
+Chi tiết thao tác và giới hạn cần kiểm chứng trên robot: [robot-operations.md](robot-operations.md). Việc kiểm tra trình duyệt dùng API giả lập, không xác nhận AMCL/Nav2/phần cứng và không gửi MOVE thật.

@@ -35,7 +35,7 @@ export function JobStatus({ detail, session, saving, error, title = 'Trạng th�
   else if (session?.state === 'MAPPING' && job?.status === 'RUNNING') label = 'Đang quét bản đồ';
   return <section className="ro-card" aria-label={title}>
     <h3>{title}</h3><p className={'ro-status ' + (job?.status === 'SUCCEEDED' ? 'ro-success' : '')} role="status">{label}</p>
-    {job?.status === 'RECOVERY_REQUIRED' && <p className="ro-error">Robot cần được kiểm tra và xác nhận dừng. Mở Vận hành trực tiếp để xem bằng chứng và khôi phục; không tạo thêm nhiệm vụ cho robot này.</p>}
+    {job?.status === 'RECOVERY_REQUIRED' && <p className="ro-error">Robot cần được kiểm tra và xác nhận dừng. Xem bằng chứng trong phần phục hồi trên trang này hoặc Vận hành trực tiếp; không tạo thêm nhiệm vụ cho robot này.</p>}
     {job && ['FAILED', 'TIMED_OUT', 'CANCELLED'].includes(job.status) && <p>Nhiệm vụ chưa hoàn tất thành công. Kiểm tra chi tiết trước khi thử lại.</p>}
     {error && <ErrorNotice error={error} />}
     {detail?.steps?.length > 0 && <ol className="ro-steps">{detail.steps.map((step, index) => <li key={step.jobStepId || index}><span>{detail.tasks?.find(t => t.jobTaskId === step.jobTaskId)?.taskNameSnapshot || `Bước ${index + 1}`}</span><small>{jobLabels[step.status] || ({ PENDING: 'Chờ thực hiện', SKIPPED: 'Đã bỏ qua' })[step.status] || 'Đang cập nhật'}</small></li>)}</ol>}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiRequest, API_BASE_URL } from '../../../features/api/client.js';
 import { getSession } from '../../../features/auth/session.js';
 import { isOperator } from '../../../features/robotOperations/model.js';
+import { migrateNavigationPending, navigationStorageKey } from '../../../features/robotOperations/navigationScope.js';
 
 const assets = new Set(['mapping-workflow.json', 'mapping-local-workflow.json', 'speech-workflow.json', 'navigation-move-workflow.json']);
 // The reviewed BE console runs locally; all protected calls use FE token refresh.
@@ -23,24 +24,36 @@ export async function consoleRequest(path, options = {}) {
   }
 }
 
-export default function RobotConsole({ navigationOnly=false, mapId='', robotId='' }) {
+export default function RobotConsole({ navigationOnly=false, mapId='', robotId='', onNavigationState }) {
   const frame = useRef(null), frameResize = useRef(null);
+  const stateListener = useRef(onNavigationState);
+  stateListener.current = onNavigationState;
   const [html, setHtml] = useState(''), [error, setError] = useState('');
   const operator = isOperator(getSession());
   const attachFrame=useCallback(node=>{
     if(!node){frameResize.current?.disconnect();frame.current?.contentWindow?.dispatchEvent(new Event('pagehide'));}
     frame.current=node;
-    if(node){node.marRequest=consoleRequest;node.marCamera=import.meta.env.VITE_ROBOT_CAMERA_URL||'';}
+    if(node){
+      node.marRequest=consoleRequest;node.marCamera=import.meta.env.VITE_ROBOT_CAMERA_URL||'';
+      node.marNavigationState=value=>stateListener.current?.({...value,receivedAt:Date.now()});
+    }
+  },[]);
+  useEffect(()=>{
+    const refresh=()=>frame.current?.contentWindow?.dispatchEvent(new Event('mediassist-facility-updated'));
+    window.addEventListener('mediassist-facility-updated',refresh);window.addEventListener('focus',refresh);
+    return()=>{window.removeEventListener('mediassist-facility-updated',refresh);window.removeEventListener('focus',refresh);};
   },[]);
   useEffect(() => {
     if (!operator) return;
     const abort = new AbortController();
     fetch('/robot-console/mapping.html', { signal: abort.signal }).then(r => { if (!r.ok) throw Error('Không tải được giao diện robot.'); return r.text(); }).then(source => {
       const bootstrap = `<script>window.fetch=(path,options)=>window.frameElement.marRequest(path,options);document.addEventListener('DOMContentLoaded',()=>{const t=document.getElementById('token');t.value='FE_SESSION';t.closest('label').hidden=true;const c=document.getElementById('cameraStreamUrl');c.value=window.frameElement.marCamera||'';});<\/script>`;
-      const scope = encodeURIComponent(API_BASE_URL + ':' + (getSession()?.account?.accountId || getSession()?.account?.username || ''));
+      const baseStorageKey=navigationStorageKey(API_BASE_URL,getSession()?.account);
+      const storageKey=navigationStorageKey(API_BASE_URL,getSession()?.account,navigationOnly?{mapId,robotId}:undefined);
+      if(navigationOnly)migrateNavigationPending(sessionStorage,baseStorageKey,storageKey,{mapId,robotId});
       const config=JSON.stringify({mapId,robotId}).replaceAll('<','\\u003c');
-      const navigationSetup=navigationOnly?`<style>body{max-width:none;margin:0;padding:0;background:#f7f9fc;font:13px/1.5 Inter,Arial,sans-serif;color:#172b4d}body>*:not(#mapNavigation):not(style):not(script){display:none!important}#mapNavigation{margin:0;border:0;padding:16px;background:transparent}#navMapLoader,#navEndpointEditor,#navNormalize,#navActivate{display:none!important}</style><script>document.addEventListener('DOMContentLoaded',()=>{const config=${config};document.getElementById('robot').value=config.robotId;document.getElementById('navMapId').value=config.mapId;document.getElementById('navMapId').readOnly=true;document.getElementById('navLoad').click();});<\/script>`:'';
-      setHtml(source.replace('<html lang="vi">', '<html lang="vi"><script>window.marNavigationStorage='+JSON.stringify('mar-navigation-request-'+scope)+';<\/script>').replace('<html lang="vi">', '<html lang="vi">' + bootstrap).replace('</html>',navigationSetup+'</html>'));
+      const navigationSetup=navigationOnly?`<style>body{max-width:none;margin:0;padding:0;background:#f7f9fc;font:13px/1.5 Inter,Arial,sans-serif;color:#172b4d}body>*:not(#mapNavigation):not(style):not(script){display:none!important}#mapNavigation{margin:0;border:0;padding:16px;background:transparent}#navMapLoader,#navEndpointEditor,#navZoneEditor,#navNormalize,#navActivate{display:none!important}</style><script>document.addEventListener('DOMContentLoaded',()=>{const config=${config};document.getElementById('robot').value=config.robotId;document.getElementById('navMapId').value=config.mapId;document.getElementById('navMapId').readOnly=true;document.getElementById('navLoad').click();});<\/script>`:'';
+      setHtml(source.replace('<html lang="vi">', '<html lang="vi"><script>window.marNavigationStorage='+JSON.stringify(storageKey)+';<\/script>').replace('<html lang="vi">', '<html lang="vi">' + bootstrap).replace('</html>',navigationSetup+'</html>'));
     }).catch(e => { if (!abort.signal.aborted) setError(e.message); });
     return () => { abort.abort(); frameResize.current?.disconnect(); frame.current?.contentWindow?.dispatchEvent(new Event('pagehide')); };
   }, [operator,navigationOnly,mapId,robotId]);
@@ -49,7 +62,10 @@ export default function RobotConsole({ navigationOnly=false, mapId='', robotId='
     frameResize.current?.disconnect();
     const node=frame.current,content=node?.contentDocument?.getElementById('mapNavigation');
     if(!navigationOnly||!content)return;
-    const resize=()=>{const height=Math.ceil(content.getBoundingClientRect().height)+2;if(height>0&&Math.abs(node.getBoundingClientRect().height-height)>1)node.style.height=height+'px';};
-    frameResize.current=new ResizeObserver(resize);frameResize.current.observe(content);resize();
+    let scheduled=0;
+    const resize=()=>{scheduled=0;const height=Math.ceil(content.getBoundingClientRect().height)+2;if(node.isConnected&&height>0&&Math.abs(node.getBoundingClientRect().height-height)>1)node.style.height=height+'px';};
+    const observer=new ResizeObserver(()=>{if(!scheduled)scheduled=requestAnimationFrame(resize);});
+    frameResize.current={disconnect:()=>{observer.disconnect();cancelAnimationFrame(scheduled);}};
+    observer.observe(content);resize();
   }} srcDoc={html} style={{ width: '100%', height: navigationOnly?'700px':'85vh' , border: '1px solid #dce5f0',borderRadius:10 }} />}</section>;
 }
