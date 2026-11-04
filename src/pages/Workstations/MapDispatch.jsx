@@ -11,7 +11,7 @@ import { applyTrafficScenario, trafficState } from './trafficSimulation.js';
 import TrafficScenarioControls from './TrafficScenarioControls.jsx';
 import '../Admin/patrol.css';
 const ThreePreview = lazy(() => import('../Admin/PatrolThreePreview.jsx'));
-const TASK_NAMES={WAIT:'Chờ tại điểm',LOAD:'Nhận hàng',UNLOAD:'Giao hàng',CHARGE:'Sạc mô phỏng',NOTIFY:'Thông báo hoàn tất'};
+const TASK_NAMES={WAIT:'Chờ tại điểm',LOAD:'Nhận hàng',UNLOAD:'Giao hàng',NOTIFY:'Thông báo hoàn tất'};
 
 injectStyles('map-dispatch-linked',`
 .ls-map-frame{background:#121416}

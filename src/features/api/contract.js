@@ -12,7 +12,14 @@ export function schemaOf(schema = {}) {
   return schema;
 }
 export function requestSchema(key) {
-  return requestOverrides[key] || schemaOf(operations[key]?.body?.content?.['application/json']?.schema);
+  const schema = requestOverrides[key] || schemaOf(operations[key]?.body?.content?.['application/json']?.schema);
+  // Charging is no longer a frontend feature. Preserve the backend snapshot for
+  // reading historical data, but do not offer it in operational request forms.
+  if (key === 'POST /api/v1/operational-requests' && schema.properties?.requestType) {
+    const type = schemaOf(schema.properties.requestType);
+    return { ...schema, properties: { ...schema.properties, requestType: { ...type, enum: type.enum.filter(value => value !== 'AUTO_CHARGING') } } };
+  }
+  return schema;
 }
 export function canUse(operation, role) {
   return operation?.public || !!role && !!operation && (!operation.roles.length || operation.roles.includes(role));

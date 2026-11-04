@@ -63,7 +63,7 @@ export function resourceOperations(id) {
 }
 export const screenTitles = {
   'Facility Management': 'Danh mục bệnh viện', 'Workflow Management': 'Quản lý quy trình', 'Staff Shifts': 'Ca trực',
-  'My Account': 'Tài khoản của tôi', 'Public Catalog': 'Thông tin công khai',
+  'My Account': 'Tài khoản của tôi', 'Public Catalog': 'Thông tin công khai', 'Users & Roles': 'Quản lý nhân viên',
 };
 export const fieldLabels = {
   ...backendFieldLabels,

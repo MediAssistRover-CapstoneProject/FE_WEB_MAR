@@ -115,7 +115,7 @@ export function endpointError(draft, endpoint) {
   if (draft.endpoints.some(e => e.id !== endpoint.id && Math.hypot(e.x - endpoint.x, e.y - endpoint.y) < 16)) return 'Keep endpoints at least 0.8 m apart.';
   for (const key of ['queueId','exitId']) if (endpoint[key] && (endpoint[key] === endpoint.id || !draft.endpoints.some(e=>e.id===endpoint[key] && e.enabled !== false && ['WAYPOINT','PARK','STAGING'].includes(e.type)))) return 'Điểm chờ/thoát phải là một điểm đường, điểm đỗ hoặc điểm tập kết khác đang bật.';
   if (endpoint.queueId && endpoint.queueId === endpoint.exitId) return 'Điểm chờ và điểm thoát phải khác nhau.';
-  if (endpoint.tasks && (!Array.isArray(endpoint.tasks) || endpoint.tasks.length > 12 || endpoint.tasks.some(t=>!['WAIT','LOAD','UNLOAD','CHARGE','NOTIFY'].includes(t.action) || !Number.isFinite(t.seconds) || t.seconds < 0 || t.seconds > 300))) return 'Mỗi điểm có tối đa 12 tác vụ, thời gian mỗi tác vụ từ 0 đến 300 giây.';
+  if (endpoint.tasks && (!Array.isArray(endpoint.tasks) || endpoint.tasks.length > 12 || endpoint.tasks.some(t=>!['WAIT','LOAD','UNLOAD','NOTIFY'].includes(t.action) || !Number.isFinite(t.seconds) || t.seconds < 0 || t.seconds > 300))) return 'Mỗi điểm có tối đa 12 tác vụ, thời gian mỗi tác vụ từ 0 đến 300 giây.';
   return '';
 }
 export function mapIssues(draft) {
