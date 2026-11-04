@@ -647,7 +647,6 @@ const workflows = [
   ['Emergency SOS Response', 'WF_EMERGENCY_SOS_RESPONSE', 18],
   ['Patient Fall Detection and Response', 'WF_FALL_DETECTION_RESPONSE', 9],
   ['Restricted Area Monitoring', 'WF_RESTRICTED_AREA_MONITORING', 15],
-  ['Automatic Charging and Return to Ready', 'WF_AUTO_CHARGING', 19],
   ['Blocked Path Navigation Recovery', 'WF_NAVIGATION_RECOVERY', 11],
   ['Robot Startup and Standby', 'WF_ROBOT_STARTUP_STANDBY', 13],
 ].map(([name, code, steps]) => ({ name, code, steps }));
@@ -662,7 +661,6 @@ const systemWorkflowCopy = {
   WF_FALL_DETECTION_RESPONSE: ['Xử lý sự kiện nghi té ngã', 'Phát hiện, xác minh và thông báo sự cố', 'AT'],
   WF_RESTRICTED_MONITORING: ['Giám sát khu vực hạn chế', 'Theo dõi các khu vực cần kiểm soát', 'GS'],
   WF_RESTRICTED_AREA_MONITORING: ['Giám sát khu vực hạn chế', 'Theo dõi các khu vực cần kiểm soát', 'GS'],
-  WF_AUTO_CHARGING: ['Yêu cầu sạc robot', 'Gửi yêu cầu sạc thủ công đến nhân viên', 'SR'],
   WF_NAVIGATION_RECOVERY: ['Khôi phục điều hướng', 'Hỗ trợ robot xử lý tuyến đường bị gián đoạn', 'ĐH'],
   WF_ROBOT_STARTUP_STANDBY: ['Kiểm tra sẵn sàng robot', 'Xác nhận robot sẵn sàng trước khi vận hành', 'RB'],
   WF_NAVIGATION: ['Điều hướng đến điểm đích', 'Thiết lập tuyến đường và điểm đến cho robot', 'ĐH'],

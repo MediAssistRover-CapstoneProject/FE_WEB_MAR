@@ -9,6 +9,7 @@ import SchemaFields from './SchemaFields.jsx';
 import RecordDetails, { displayValue } from './RecordDetails.jsx';
 import ListFilters from './ListFilters.jsx';
 import ShiftCalendar from './ShiftCalendar.jsx';
+import UsersRoles from '../UsersRoles.jsx';
 import OperationsReport from './OperationsReport.jsx';
 import FacilityCatalogEditor from '../FacilityCatalogEditor.jsx';
 import { AiAdminPanel } from '../AiWorkspace.jsx';
@@ -19,7 +20,7 @@ import './backend.css';
 import './presentation.css';
 import './workspaceOverview.css';
 
-export const backendScreens = new Set([...resources.map(r => r.section).filter(section => !['Patrol', 'Live Operations', 'Emergency Center'].includes(section)), 'Charging']);
+export const backendScreens = new Set(resources.map(r => r.section).filter(section => !['Patrol', 'Live Operations', 'Emergency Center'].includes(section)));
 const unwrap = value => ({ ...value?.account, ...value?.request, ...value?.workflow, ...value?.job, ...value });
 const paths = op => op.parameters.filter(p => p.in === 'path');
 const filters = op => op.parameters.filter(p => p.in === 'query' && !['page', 'size'].includes(p.name));
@@ -31,26 +32,13 @@ const sensitiveAction = op => op.method === 'DELETE' || /\/(cancel|archive|retir
 
 export default function BackendWorkspace({ section = 'Missions' }) {
   if (section === 'Staff Shifts') return <ShiftWorkspace />;
-  return section === 'Charging' ? <ChargingWorkspace /> : <ResourceWorkspace section={section} />;
+  if (section === 'Users & Roles') return <UsersRoles />;
+  return <ResourceWorkspace section={section} />;
 }
 function ShiftWorkspace() {
   const role = getSession()?.account?.role;
   if (!['ADMIN', 'STAFF'].includes(role)) return <p>Tài khoản này không có quyền xem lịch trực.</p>;
-  const resource = resources.find(item => item.id === 'shifts');
-  const create = operations['POST /api/v1/admin/shifts'];
-  const update = operations['PUT /api/v1/admin/shifts/{shiftId}'];
-  return <section className="be-workspace">
-    <header><h2>Lịch ca trực</h2><p>Chọn ngày để xem người trực, giờ trực và phòng phụ trách.</p></header>
-    <ShiftCalendar role={role}
-      renderShift={({ preset, row }, close, saved) => canUse(row ? update : create, role) && <OperationDialog op={row ? update : create}
-        resource={resource} row={row} bindings={{ shiftId: row?.shiftId }} role={role} preset={preset} lockShiftTimes onClose={close} onSaved={saved} />} />
-  </section>;
-}
-function ChargingWorkspace() {
-  const [open, setOpen] = useState(false);
-  const role = getSession()?.account?.role;
-  const op = operations['POST /api/v1/operational-requests'];
-  return <section className="be-workspace"><div className="be-card"><h2>Sạc pin</h2><p>Tạo yêu cầu sạc cho robot. Máy chủ sẽ kiểm tra quy trình đã phát hành và điều kiện vận hành trước khi điều phối.</p><button type="button" className="primary" disabled={!canUse(op, role)} onClick={() => setOpen(true)}>Tạo yêu cầu sạc</button></div><ResourceWorkspace section="Robot Status" />{open && <OperationDialog op={op} resource={resources.find(r => r.id === 'requests')} bindings={{}} role={role} preset={{ requestType: 'AUTO_CHARGING' }} onClose={() => setOpen(false)} onSaved={() => {}} />}</section>;
+  return <ShiftCalendar key={role} role={role} />;
 }
 function ResourceWorkspace({ section }) {
   const [searchParams, setSearchParams] = useSearchParams();

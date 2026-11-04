@@ -41,7 +41,7 @@ export function findRoute(map,start,end){
   const path=[];for(let k=target;k!==undefined;k=previous.get(k))path.push(point(k));
   return[start,...path.reverse(),end].filter((p,i,a)=>!i||Math.hypot(p.x-a[i-1].x,p.y-a[i-1].y)>.01);
 }
-const defaultTasks={CHARGER:[{action:'CHARGE',seconds:10}],PARK:[{action:'WAIT',seconds:2}],STAGING:[{action:'WAIT',seconds:2}]};
+const defaultTasks={PARK:[{action:'WAIT',seconds:2}],STAGING:[{action:'WAIT',seconds:2}]};
 export function createDispatchPlan(map,startId,stops,options={}){
   const issues=mapIssues(map);if(issues.length)throw Error('Bản đồ chưa hợp lệ: '+vi(issues[0]));
   let current=map.endpoints.find(e=>e.id===startId);if(!current||current.enabled===false)throw Error('Chọn điểm xuất phát đang hoạt động.');
