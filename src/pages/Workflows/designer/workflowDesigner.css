@@ -3,3 +3,50 @@
 @media(max-width:900px){.wfd-main{margin-left:0;padding-top:65px}}
 .wfd-flow{position:absolute;inset:45px 0 0}.wfd-canvas .react-flow{height:100%}
 .wfd-output-panel{margin:22px 0 8px;border-top:1px solid #e6edf7;padding-top:16px}.wfd-output-panel h3{font-size:12px}.wfd-output-panel>div{padding:9px 0;border-bottom:1px solid #eff3f8}.wfd-output-panel strong{display:block;font-size:10px;color:#547194;font-weight:500}.wfd-output-panel small{font-size:9px;color:#94a3b8}.wfd-output-panel code{display:block;overflow-wrap:anywhere;font-size:9px;color:#7a94b6;margin-top:4px}.wfd-structured{padding:0 9px 12px;border:1px solid #e5edf7;border-radius:8px;margin:10px 0;background:#fbfcff}.wfd-structured>.wfd-param{margin-top:0}.wfd-repeat-row{padding:10px 0;border-bottom:1px solid #e2eaf5;margin-bottom:12px}.wfd-reference-picker{padding:1px 10px;border-radius:7px;background:#f6f9fd;margin-top:10px}.wfd-reference-picker .wfd-field input[readonly]{font-size:9px;color:#8198b6;background:#f1f5fb}.wfd-structured>.wfd-details{margin-top:12px;padding-bottom:0}
+
+.wfd-step-behaviour{margin:14px 0;padding:12px;border:1px solid #dce6f4;border-radius:8px;background:#f6f9ff;font-size:11px;line-height:1.7;color:#526d8d}.wfd-step-behaviour strong{display:block;color:#365d88}.wfd-step-behaviour p{margin:7px 0}.wfd-step-behaviour small{display:block;color:#7d6b47;font-size:10px}
+
+.wfd-delete-dialog {
+  width: 468px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid #e4eaf2;
+  border-radius: 20px;
+  background: #fff;
+  color: var(--wfd-ink);
+  box-shadow: 0 28px 90px #132a4b30, 0 4px 16px #132a4b12;
+  font: inherit;
+}
+.wfd-delete-dialog::backdrop {
+  background: #162d4b52;
+  backdrop-filter: blur(5px);
+}
+.wfd-delete-content { padding: 27px 27px 23px; }
+.wfd-delete-heading { display: flex; align-items: center; gap: 13px; }
+.wfd-delete-icon { display: grid; place-items: center; width: 48px; height: 48px; flex-shrink: 0; border: 1px solid #fadddb; border-radius: 14px; background: #fff1f0; color: #d75b55; }
+.wfd-delete-eyebrow { display: block; margin-bottom: 5px; font-size: 9px; font-weight: 600; letter-spacing: 1.1px; color: #8b9bb1; }
+.wfd-delete-heading h2 { font-size: 20px; font-weight: 650; line-height: 1.4; letter-spacing: -.35px; }
+.wfd-main .wfd-delete-close { display: grid; place-items: center; align-self: flex-start; flex-shrink: 0; margin: -6px -7px 0 auto; width: 30px; min-height: 30px; padding: 0; border-color: transparent; border-radius: 8px; color: #8b9bb1; }
+.wfd-delete-target { display: flex; align-items: flex-start; gap: 10px; margin: 23px 0 16px; padding: 13px 14px; border: 1px solid #e6ecf4; border-radius: 10px; background: #f8fafd; }
+.wfd-delete-target>span { flex-shrink: 0; padding: 4px 6px; border-radius: 5px; background: #eaf0fa; color: #6f89ae; font-size: 8px; font-weight: 600; line-height: 1.4; }
+.wfd-delete-target>strong { padding: 2px 0; font-size: 13px; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; min-width: 0; }
+.wfd-delete-content>p { font-size: 12px; line-height: 1.8; color: #75869e; }
+.wfd-delete-content>p strong { color: #526985; font-weight: 600; }
+.wfd-delete-content .wfd-delete-undo { display: flex; align-items: flex-start; gap: 7px; margin-top: 13px; font-size: 10px; color: #91a0b4; }
+.wfd-delete-undo svg { flex-shrink: 0; margin-top: 1px; }
+.wfd-delete-dialog>footer { display: flex; justify-content: flex-end; gap: 9px; padding: 17px 27px; border-top: 1px solid #edf1f6; background: #fbfcfe; }
+.wfd-main .wfd-delete-dialog>footer button { min-height: 39px; padding: 9px 20px; border-radius: 9px; font-size: 12px; font-weight: 600; }
+.wfd-main .wfd-delete-cancel { min-width: 78px; color: #627996; }
+.wfd-main .wfd-delete-confirm { background: #d95752; border-color: #d95752; color: #fff; box-shadow: 0 3px 8px #d957521f; }
+.wfd-main .wfd-delete-confirm:hover:not(:disabled) { background: #c94b46; border-color: #c94b46; }
+.wfd-main .wfd-delete-confirm:focus-visible { outline-color: #efaaa6; }
+@media(max-width:480px) {
+  .wfd-delete-content { padding: 22px 20px 20px; }
+  .wfd-delete-heading { gap: 10px; }
+  .wfd-delete-heading h2 { font-size: 18px; }
+  .wfd-delete-icon { width: 42px; height: 42px; border-radius: 12px; }
+  .wfd-delete-dialog>footer { padding: 15px 20px; }
+}

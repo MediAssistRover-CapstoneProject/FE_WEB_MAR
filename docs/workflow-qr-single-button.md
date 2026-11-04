@@ -17,9 +17,11 @@ Nút **Mẫu giao hàng QR** trong trình thiết kế thay đồ thị của b�
 9. INTERACT `CONFIRM`, `REQUEST_CLOSE_RECEIVER`: chờ nút **Đã lấy hàng — Đóng cửa**.
 10. CONTROL_HARDWARE `LOCK_COMPARTMENT`, sau đó kết thúc thành công.
 
-QR chỉ đi tiếp khi `verified = true`. Nút yêu cầu đóng chỉ đi tiếp khi `confirmed = true`. Điều kiện đặt trên dây nối, không cần các node CHECK_CONDITION riêng. Khi gửi API, kết quả của chính bước nguồn dùng `/result/verified` hoặc `/result/confirmed`; canvas hiển thị tham chiếu `/outputs/<stepCode>/<field>`.
+QR sai bị API từ chối và bước tiếp tục chờ quét lại khi mã còn hiệu lực. Chỉ QR hợp lệ mới hoàn tất AUTHENTICATE, vì vậy bước QR có một dây đi tiếp tới UNLOCK, không có dây SUCCESS “không hợp lệ” xuống hỗ trợ. Mẫu đặt thời gian xác thực 120 giây theo TTL mặc định của BE; QR thực tế có thể hết hạn sớm hơn tùy cấu hình BE. BE hiện chưa giới hạn số lượt quét sai, và `maxAttempts` không đếm số lần staff quét QR.
 
-Mọi bước có dây FAILURE và TIMEOUT về RECOVERY_REQUIRED. Kết quả xác nhận âm tính cũng về đó. Không tự lặp lệnh servo.
+Ở nút yêu cầu đóng, chưa bấm thì bước tiếp tục chờ. Chỉ phản hồi hoàn tất `confirmed = true` mới đi đóng servo. Cổng “Phản hồi sai” là hàng rào cho phản hồi hoàn tất không hợp lệ từ một client, không phải trường hợp chưa bấm. Hai cổng riêng không còn khiến dây phản hồi sai xuất phát từ cổng “Thành công”. Khi gửi API, điều kiện dùng `/result/confirmed`; canvas hiển thị `/outputs/<stepCode>/confirmed`.
+
+Mọi bước có dây FAILURE và TIMEOUT rõ ràng, với đích riêng cho lỗi thực thi, hết giờ xác thực QR, hết giờ chờ nút và hết giờ di chuyển/servo. Phản hồi nút bất thường cũng có đích riêng. Các đích này giữ trạng thái RECOVERY_REQUIRED để không bỏ qua trường hợp ngăn hàng có thể đang mở. Không tự lặp lệnh servo.
 
 Biến đầu vào bắt buộc: `map_id`, `pickup_endpoint_id`, `delivery_endpoint_id`, `service_request_id`. Endpoint thuộc bản đồ đã chọn; MOVE không nhận UUID phòng.
 

@@ -50,7 +50,16 @@ try {
   assert.deepEqual(saved.steps.filter(s => s.stepType === 'INTERACT').map(s => s.paramsJson.prompt_key), ['REQUEST_CLOSE_SENDER', 'REQUEST_CLOSE_RECEIVER']);
   assert.equal(saved.transitions.filter(t => t.outcome === 'FAILURE').length, 10);
   assert.equal(saved.transitions.filter(t => t.outcome === 'TIMEOUT').length, 10);
-  assert.deepEqual(saved.transitions.filter(t => t.conditionJson).map(t => t.conditionJson.path), ['/result/verified', '/result/confirmed', '/result/verified', '/result/confirmed']);
+  assert.deepEqual(saved.transitions.filter(t => t.conditionJson).map(t => t.conditionJson.path), ['/result/confirmed', '/result/confirmed']);
+  for (const auth of saved.steps.filter(s => s.stepType === 'AUTHENTICATE')) {
+    const success = saved.transitions.filter(t => t.fromStepCode === auth.stepCode && t.outcome === 'SUCCESS');
+    assert.equal(success.length, 1);
+    assert.ok(success[0].toStepCode, 'QR success must lead only to UNLOCK');
+    assert.equal(auth.timeoutSec, 120);
+  }
+  await expect(page.locator('.wfd-node-hint', { hasText: 'QR sai: quét lại trong thời hạn' })).toHaveCount(2);
+  await expect(page.locator('.wfd-node-hint', { hasText: 'Chưa bấm: tiếp tục chờ' })).toHaveCount(2);
+  await expect(page.locator('.wfd-node-ports', { hasText: 'Phản hồi sai' })).toHaveCount(2);
   await page.getByRole('button', { name: 'Kiểm tra', exact: true }).click();
   await expect(page.getByRole('status').first()).toContainText('BE đã kiểm tra cấu trúc');
   await expect(page.getByRole('button', { name: 'Publish', exact: true })).toBeDisabled();

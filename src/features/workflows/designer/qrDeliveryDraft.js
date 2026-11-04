@@ -20,7 +20,7 @@ export function rebuildQrDeliveryDraft(document) {
       serviceType: 'DELIVERY',
       description: 'Đến A → staff quét QR → mở servo → bấm “Đã bỏ hàng — Đóng cửa” → đóng servo → đến B → staff quét QR → mở servo → bấm “Đã lấy hàng — Đóng cửa” → đóng servo. Bản thiết kế chờ tích hợp màn robot và runtime bàn giao.',
       inputSchemaJson: { type: 'object', properties: {} },
-      inputUiJson: { ...inputUi, deliveryDraft: { mode: 'QR_SINGLE_BUTTON', runtimeReady: false, notice: QR_DELIVERY_DRAFT_NOTICE } },
+      inputUiJson: { ...inputUi, deliveryDraft: { mode: 'QR_SINGLE_BUTTON', version: 2, runtimeReady: false, notice: QR_DELIVERY_DRAFT_NOTICE } },
       defaultInputsJson: {},
       outputMappingJson: {},
       maxDurationSec: 3600,
@@ -36,8 +36,16 @@ export function rebuildQrDeliveryDraft(document) {
   for (const key of ['definitionHash', 'compiledGraphJson', 'validatedAt', 'publishedAt', 'startStepId']) delete next.workflow[key];
   next.nodes[0].position = { x: 40, y: 120 };
   next.nodes[1].position = { x: 2020, y: 510 };
-  const recoveryId = makeId('END');
-  next.nodes.push({ id: recoveryId, type: 'workflow', position: { x: 1000, y: 900 }, data: { kind: 'terminal', name: 'Cần hỗ trợ · lỗi, hết giờ hoặc không xác nhận', terminalStatus: 'RECOVERY_REQUIRED' } });
+  const end = (name, x, y) => {
+    const id = makeId('END');
+    next.nodes.push({ id, type: 'workflow', position: { x, y }, data: { kind: 'terminal', name, terminalStatus: 'RECOVERY_REQUIRED' } });
+    return id;
+  };
+  const executionError = end('Lỗi thực thi · cần hỗ trợ', 320, 920);
+  const operationTimeout = end('Hết giờ di chuyển / servo', 650, 920);
+  const qrTimeout = end('Hết thời gian xác thực QR', 980, 920);
+  const buttonTimeout = end('Hết giờ chờ nút đóng cửa', 1310, 920);
+  const invalidResponse = end('Phản hồi nút không hợp lệ', 1640, 920);
 
   const sequence = [];
   const stages = [];
@@ -56,7 +64,11 @@ export function rebuildQrDeliveryDraft(document) {
       next = addStep(next, type, { x: 320 + column * 330, y: 120 + row * 390 });
       const node = next.nodes.at(-1);
       node.data.name = `${String(sequence.length + 1).padStart(2, '0')} · ${names[column]}`;
-      if (type === 'AUTHENTICATE') node.data.params = { purpose: `DELIVERY_${stage}`, method: 'QR_CODE' };
+      if (type === 'AUTHENTICATE') {
+        node.data.params = { purpose: `DELIVERY_${stage}`, method: 'QR_CODE' };
+        node.data.timeoutSec = 120;
+        node.data.description = 'QR hợp lệ mới hoàn tất bước. Quét sai: tiếp tục quét lại trong thời hạn. BE hiện chưa giới hạn số lần quét sai; không dùng maxAttempts làm số lượt quét.';
+      }
       if (column === 2) node.data.params.action = 'UNLOCK_COMPARTMENT';
       if (type === 'INTERACT') {
         node.data.params = {
@@ -67,7 +79,7 @@ export function rebuildQrDeliveryDraft(document) {
           required_role: 'STAFF',
           compartment_id: 'CART_MAIN',
         };
-        node.data.description = 'Chờ staff bấm nút trên màn robot để yêu cầu đóng cửa sau khi đặt/lấy hàng. Đây không phải xác nhận cửa hoặc khóa đã đóng.';
+        node.data.description = 'Chưa bấm: tiếp tục chờ. Chỉ confirmed = true mới đi phát lệnh đóng servo. Phản hồi hoàn tất sai định dạng/không xác nhận là trường hợp bất thường, không phải chưa bấm nút. Nút không xác nhận cửa/khóa đã đóng.';
       }
       ids.push(node.id);
       sequence.push(node.id);
@@ -77,15 +89,13 @@ export function rebuildQrDeliveryDraft(document) {
 
   next = connect(next, { source: 'start', target: sequence[0], sourceHandle: 'SUCCESS' });
   sequence.forEach((id, index) => {
-    next = connect(next, { source: id, target: sequence[index + 1] ?? 'end', sourceHandle: 'SUCCESS' });
     const node = next.nodes.find(n => n.id === id);
-    const guardedField = node.data.stepType === 'AUTHENTICATE' ? 'verified' : node.data.stepType === 'INTERACT' ? 'confirmed' : null;
-    if (guardedField) {
-      const main = next.edges.find(edge => edge.source === id && edge.data.outcome === 'SUCCESS');
-      main.data = { ...main.data, defaultTransition: false, conditionJson: { path: `/outputs/${id}/${guardedField}`, operator: 'EQ', value: true }, priority: 1 };
-      next = connect(next, { source: id, target: recoveryId, sourceHandle: 'SUCCESS' });
-    }
-    for (const outcome of ['FAILURE', 'TIMEOUT']) next = connect(next, { source: id, target: recoveryId, sourceHandle: outcome });
+    const button = node.data.stepType === 'INTERACT';
+    next = connect(next, { source: id, target: sequence[index + 1] ?? 'end', sourceHandle: button ? 'true' : 'SUCCESS' });
+    if (button) next = connect(next, { source: id, target: invalidResponse, sourceHandle: 'false' });
+    next = connect(next, { source: id, target: executionError, sourceHandle: 'FAILURE' });
+    const timeoutTarget = node.data.stepType === 'AUTHENTICATE' ? qrTimeout : button ? buttonTimeout : operationTimeout;
+    next = connect(next, { source: id, target: timeoutTarget, sourceHandle: 'TIMEOUT' });
   });
   for (const [, auth, unlock] of stages) next.nodes.find(n => n.id === unlock).data.params.authorization = authorizationFromStep(next, unlock, auth);
 

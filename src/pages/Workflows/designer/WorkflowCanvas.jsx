@@ -3,13 +3,14 @@ import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap, Handle, Po
 import '@xyflow/react/dist/style.css';
 import { stepCatalog } from '../../../features/workflows/designer/stepCatalog.js';
 import { canConnect, connect, copy, makeId, addStep as propsAdd } from '../../../features/workflows/designer/designerModel.js';
+import { branchesOnResult, isCloseRequest, stepBehaviour, stepSuccessLabel, workflowEdgeLabel } from '../../../features/workflows/designer/designerPresentation.js';
 
 const WorkflowNode = memo(function WorkflowNode({ data, selected }) {
-  const spec = stepCatalog[data.stepType], check = data.stepType === 'CHECK_CONDITION';
+  const spec = stepCatalog[data.stepType], check = branchesOnResult(data), close = isCloseRequest(data), behaviour = stepBehaviour(data);
   return <div className={`wfd-node ${data.kind} ${selected ? 'selected' : ''} ${data.invalid ? 'invalid' : ''}`}>
     {data.kind !== 'start' && <Handle type="target" position={Position.Left} />}
     <div className="wfd-node-top"><i>{data.kind === 'start' ? '▶' : data.kind === 'terminal' ? '■' : spec?.icon ?? '◇'}</i><small>{data.kind === 'start' ? 'ĐIỂM BẮT ĐẦU' : data.kind === 'terminal' ? data.terminalStatus : data.stepType}</small></div><strong>{data.name}</strong>
-    {data.kind === 'step' && <><span className="wfd-node-hint">{Object.values(data.mapping ?? {}).some(v => v?.$ref?.startsWith('/inputs/')) ? 'Dùng biến đầu vào' : spec?.label}</span><div className="wfd-node-ports">{check ? <><span>Đúng</span><span>Còn lại</span></> : <span>Thành công</span>}<span>Lỗi</span><span>Hết giờ</span></div></>}
+    {data.kind === 'step' && <><span className="wfd-node-hint">{behaviour?.hint ?? (Object.values(data.mapping ?? {}).some(v => v?.$ref?.startsWith('/inputs/')) ? 'Dùng biến đầu vào' : spec?.label)}</span><div className="wfd-node-ports">{check ? <><span>{close ? 'Đã bấm nút' : 'Đúng'}</span><span>{close ? 'Phản hồi sai' : 'Còn lại'}</span></> : <span>{stepSuccessLabel(data)}</span>}<span>Lỗi</span><span>Hết giờ</span></div></>}
     {data.kind === 'start' && <Handle type="source" position={Position.Right} id="SUCCESS" />}
     {data.kind === 'step' && <>{check ? <><Handle type="source" position={Position.Right} id="true" style={{ top: 65 }} /><Handle type="source" position={Position.Right} id="false" style={{ top: 89 }} /></> : <Handle type="source" position={Position.Right} id="SUCCESS" style={{ top: 65 }} />}<Handle type="source" position={Position.Right} id="FAILURE" style={{ top: check ? 113 : 89, background: '#dd766f' }} /><Handle type="source" position={Position.Right} id="TIMEOUT" style={{ top: check ? 137 : 113, background: '#d39d45' }} /></>}
   </div>;
@@ -20,7 +21,7 @@ function Canvas({ document, change, recordHistory, readOnly, errors, onSelect, s
   const flow = useReactFlow(), [search, setSearch] = useState(''), [dimensions, setDimensions] = useState({}), dragStart = useRef(null);
   const invalid = new Set(errors.map(e => e.nodeId));
   const nodes = document.nodes.map(n => ({ ...n, measured: dimensions[n.id] ?? n.measured, selected: n.id === selectedNode, data: { ...n.data, invalid: invalid.has(n.id) } }));
-  const edges = document.edges.map(e => ({ ...e, selected: e.id === selectedEdge, label: e.source === 'start' ? '' : `${e.data?.outcome === 'SUCCESS' ? e.data?.defaultTransition ? 'Tiếp tục' : 'Có điều kiện' : e.data?.outcome === 'FAILURE' ? 'Lỗi' : 'Hết giờ'}${!e.data?.defaultTransition ? ' · ' + e.data?.priority : ''}`, style: { stroke: e.data?.outcome === 'FAILURE' ? '#d98d88' : e.data?.outcome === 'TIMEOUT' ? '#c69a51' : '#6c91cc', strokeWidth: 1.7 }, labelStyle: { fontSize: 10, fill: '#536781' }, markerEnd: { type: 'arrowclosed', color: '#7797c7' } }));
+  const edges = document.edges.map(e => ({ ...e, selected: e.id === selectedEdge, label: workflowEdgeLabel(e, document), style: { stroke: e.data?.outcome === 'FAILURE' ? '#d98d88' : e.data?.outcome === 'TIMEOUT' ? '#c69a51' : '#6c91cc', strokeWidth: 1.7 }, labelStyle: { fontSize: 10, fill: '#536781' }, markerEnd: { type: 'arrowclosed', color: '#7797c7' } }));
   const insert = (type, position) => {
     if (readOnly) return;
     const origin = { ...position }, placed = { ...position };

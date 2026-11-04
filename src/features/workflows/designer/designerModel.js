@@ -1,6 +1,7 @@
 import { stepCatalog, operators, terminalStatuses, valueError, variableFitsField, fieldsForStep, speechFields, variableValueError } from './stepCatalog.js';
 import { defaultOutput, lookupOutput, inferKind } from './stepOutputs.js';
 import { stepContractIssues } from './stepContractChecks.js';
+import { branchResultField, branchesOnResult } from './designerPresentation.js';
 
 export const copy = value => structuredClone(value);
 export const makeId = prefix => `${prefix}_${crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`;
@@ -72,7 +73,7 @@ export function connect(document, connection) {
   const handle = connection.sourceHandle ?? 'SUCCESS';
   const outcome = handle === 'true' || handle === 'false' ? 'SUCCESS' : handle;
   const same = next.edges.filter(e => e.source === source.id && e.data?.outcome === outcome);
-  const condition = handle === 'true' ? { path: `/outputs/${source.id}/value`, operator: 'EQ', value: true } : null;
+  const condition = handle === 'true' ? { path: `/outputs/${source.id}/${branchResultField(source.data)}`, operator: 'EQ', value: true } : null;
   // Ordinary ports have one fallback. Conditional edges are explicitly edited in the inspector.
   if (!condition && same.some(e => e.data?.defaultTransition)) return document;
   if (handle === 'true' && same.some(e => e.sourceHandle === 'true')) return document;
@@ -195,7 +196,7 @@ export function fromDetail(detail) {
       if (!document.nodes.some(n => n.id === target)) document.nodes.push({ id: target, type: 'workflow', position: designer?.positions?.[target] ?? { x: 1450, y: 80 + terminalStatuses.indexOf(t.terminalStatus) * 150 }, data: { kind: 'terminal', name: stored?.name ?? (t.terminalStatus === 'SUCCEEDED' ? 'Hoàn thành' : t.terminalStatus), terminalStatus: t.terminalStatus } });
     }
     if (!source || !target) document.readOnlyReasons.push('Có liên kết tham chiếu bước không tồn tại.');
-    const sourceNode = document.nodes.find(n => n.id === source), check = sourceNode?.data.stepType === 'CHECK_CONDITION';
+    const sourceNode = document.nodes.find(n => n.id === source), check = branchesOnResult(sourceNode?.data);
     const conditionJson = transitionCondition(t.conditionJson ?? null, sourceNode, 'canvas');
     const unsupported = !t.defaultTransition && transitionConditionIssue(conditionJson, sourceNode, t.outcome);
     if (unsupported) document.readOnlyReasons.push(unsupported);

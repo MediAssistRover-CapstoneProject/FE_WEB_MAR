@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { copy, fromDetail, newDocument, toPayload, validateDocument, visit } from '../src/features/workflows/designer/designerModel.js';
 import { rebuildQrDeliveryDraft, QR_DELIVERY_DRAFT_NOTICE } from '../src/features/workflows/designer/qrDeliveryDraft.js';
+import { stepBehaviour, workflowEdgeLabel } from '../src/features/workflows/designer/designerPresentation.js';
 
 function detailFor(payload) {
   return {
@@ -28,7 +29,7 @@ test('QR single-button draft rebuilds the same workflow without mutating its old
   assert.equal(draft.workflow.validatedAt, undefined);
   assert.deepEqual(draft.workflow.outputMappingJson, {});
   assert.deepEqual(draft.workflow.inputUiJson.custom, { retained: true });
-  assert.deepEqual(draft.workflow.inputUiJson.deliveryDraft, { mode: 'QR_SINGLE_BUTTON', runtimeReady: false, notice: QR_DELIVERY_DRAFT_NOTICE });
+  assert.deepEqual(draft.workflow.inputUiJson.deliveryDraft, { mode: 'QR_SINGLE_BUTTON', version: 2, runtimeReady: false, notice: QR_DELIVERY_DRAFT_NOTICE });
   assert.deepEqual(validateDocument(draft), []);
 });
 
@@ -69,29 +70,43 @@ test('runtime input references are limited to map, pickup, delivery and service 
   });
 });
 
-test('every step explicitly routes FAILURE/TIMEOUT to recovery and QR/buttons have success guards and fallback', () => {
+test('QR retries stay inside authentication; button rejection is separate from waiting and errors have specific exits', () => {
   const draft = rebuildQrDeliveryDraft(newDocument()), steps = draft.nodes.filter(node => node.data.kind === 'step');
-  const recovery = draft.nodes.find(node => node.data.terminalStatus === 'RECOVERY_REQUIRED');
   assert.equal(draft.edges.find(edge => edge.source === 'start').target, steps[0].id);
   for (const [index, node] of steps.entries()) {
     for (const outcome of ['FAILURE', 'TIMEOUT']) {
       const routes = draft.edges.filter(edge => edge.source === node.id && edge.data.outcome === outcome);
       assert.equal(routes.length, 1);
-      assert.equal(routes[0].target, recovery.id);
+      const target = draft.nodes.find(n => n.id === routes[0].target);
+      assert.equal(target.data.terminalStatus, 'RECOVERY_REQUIRED');
+      assert.match(target.data.name, outcome === 'FAILURE' ? /Lỗi thực thi/ : node.data.stepType === 'AUTHENTICATE' ? /xác thực QR/ : node.data.stepType === 'INTERACT' ? /chờ nút/ : /di chuyển \/ servo/);
       assert.equal(routes[0].data.defaultTransition, true);
     }
     const success = draft.edges.filter(edge => edge.source === node.id && edge.data.outcome === 'SUCCESS');
-    const field = node.data.stepType === 'AUTHENTICATE' ? 'verified' : node.data.stepType === 'INTERACT' ? 'confirmed' : null;
+    const field = node.data.stepType === 'INTERACT' ? 'confirmed' : null;
     const main = success.find(edge => edge.target === (steps[index + 1]?.id ?? 'end'));
     assert.ok(main);
     if (field) {
       assert.deepEqual(main.data.conditionJson, { path: `/outputs/${node.id}/${field}`, operator: 'EQ', value: true });
       assert.equal(main.data.defaultTransition, false);
       const fallback = success.find(edge => edge.data.defaultTransition);
-      assert.equal(fallback.target, recovery.id);
+      assert.match(draft.nodes.find(n => n.id === fallback.target).data.name, /Phản hồi nút không hợp lệ/);
       assert.equal(fallback.data.priority, 2);
+      assert.equal(main.sourceHandle, 'true');
+      assert.equal(fallback.sourceHandle, 'false');
+      assert.equal(workflowEdgeLabel(fallback, draft), 'Phản hồi không hợp lệ');
       assert.equal(success.length, 2);
-    } else assert.equal(success.length, 1);
+    } else {
+      assert.equal(success.length, 1);
+      assert.equal(main.data.defaultTransition, true);
+      if (node.data.stepType === 'AUTHENTICATE') {
+        assert.equal(node.data.timeoutSec, 120);
+        assert.equal(node.data.maxAttempts, 1);
+        assert.equal(workflowEdgeLabel(main, draft), 'QR hợp lệ');
+        assert.match(stepBehaviour(node.data).text, /không đi sang nhánh Lỗi/);
+        assert.match(stepBehaviour(node.data).limitation, /chưa đếm số lần/);
+      }
+    }
   }
   assert.deepEqual(validateDocument(draft), []);
 });
@@ -104,7 +119,7 @@ test('graph, input form metadata and positions round-trip without losing the run
   const normalizeUi = ui => ({ ...ui, designer: { ...ui.designer, terminals: [...ui.designer.terminals].sort((a, b) => a.id.localeCompare(b.id)) } });
   assert.deepEqual(normalizeUi(again.workflow.inputUiJson), normalizeUi(payload.workflow.inputUiJson));
   assert.equal(again.workflow.inputUiJson.deliveryDraft.runtimeReady, false);
-  assert.equal(payload.graph.transitions.length, 34);
+  assert.equal(payload.graph.transitions.length, 32);
   assert.equal(restored.readOnlyReasons.length, 0);
   assert.deepEqual(validateDocument(restored), []);
 });
