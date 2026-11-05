@@ -158,7 +158,7 @@ export function durationLabel(seconds) {
   return [hours && `${hours} giờ`, minutes && `${minutes} phút`, rest && `${rest} giây`].filter(Boolean).join(' ');
 }
 
-const readableText = value => typeof value === 'string' && value.trim() ? value.trim() : null;
+const readableText = value => typeof value === 'string' && value.trim() && value.trim().toLowerCase() !== 'string' ? value.trim() : null;
 const errorExplanations = {
   ENDPOINT_DRIFT_DURING_ALIGNMENT: 'Robot báo lệch khỏi điểm đích trong lúc căn chỉnh vị trí.',
   LOCALIZATION_NOT_READY: 'Robot chưa xác định được vị trí đủ điều kiện để di chuyển.',
@@ -183,7 +183,7 @@ export function stepSummary(step, catalogs = {}) {
     ? errorExplanations[step.errorCode] || readableText(step.errorDetailsJson?.message) || readableText(step.errorDetailsJson?.reason) || readableText(step.errorCode)
     : null;
   return {
-    target: target?.endpointName || target?.endpointCode || readableText(result.endpoint_name) || readableText(input.endpoint_name) || (targetId ? 'Chưa có tên điểm đến' : null),
+    target: readableText(target?.endpointName) || target?.endpointCode || readableText(result.endpoint_name) || readableText(input.endpoint_name) || (targetId ? 'Chưa có tên điểm đến' : null),
     outcome, duration, issue,
     startedAt: Number.isFinite(start) ? step.startedAt : null,
     endedAt: Number.isFinite(end) ? step.endedAt : null,
@@ -203,14 +203,14 @@ export function jobPresentation(job, catalogs = {}) {
   const input = { ...request?.requestDataJson, ...job.inputJson };
   const targetId = input.destinationEndpointId || input.deliveryEndpointId || input.endpointId || input.target_endpoint_id || input.endpoint_id;
   const target = catalogs.endpoints?.find(row => row.endpointId === targetId);
-  const targetName = target?.endpointName || input.destinationName || input.deliveryRoomName || input.destinationRoomName;
+  const targetName = readableText(target?.endpointName) || readableText(input.destinationName) || readableText(input.deliveryRoomName) || input.destinationRoomName;
   const type = request?.requestType || workflow?.serviceType || input.requestType;
   const typeLabel = type && vi(type);
   return {
-    title: workflow?.workflowName || job.workflowName || (typeLabel && typeLabel !== type ? typeLabel : null) || `Công việc ${job.jobCode?.slice(-6) || job.jobId?.slice(0, 8) || ''}`,
-    robot: robot?.robotName || robot?.robotCode || (job.robotId ? `Robot · ${job.robotId.slice(0, 8)}` : 'Chưa phân robot'),
+    title: readableText(workflow?.workflowName) || readableText(job.workflowName) || (typeLabel && typeLabel !== type ? typeLabel : null) || `Công việc ${job.jobCode?.slice(-6) || job.jobId?.slice(0, 8) || ''}`,
+    robot: readableText(robot?.robotName) || readableText(robot?.robotCode) || (job.robotId ? `Robot · ${job.robotId.slice(0, 8)}` : 'Chưa phân robot'),
     target: targetName || (targetId ? `Điểm đến · ${targetId.slice(0, 8)}` : null),
-    workflow: workflow?.workflowName || (job.workflowId ? `Quy trình · ${job.workflowId.slice(0, 8)}` : 'Chưa có thông tin'),
+    workflow: readableText(workflow?.workflowName) || (job.workflowId ? `Quy trình · ${job.workflowId.slice(0, 8)}` : 'Chưa có thông tin'),
     requestCode: request?.requestCode,
   };
 }

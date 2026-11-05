@@ -13,6 +13,7 @@ import { EventDetails, StepDetails } from './OperationDetails.jsx';
 import JobTechnicalPanel from './JobTechnicalPanel.jsx';
 import RecoveryPanel from './RecoveryPanel.jsx';
 import './liveOperations.css';
+import RobotMonitor from './RobotMonitor.jsx';
 
 const jobResource = resources.find(resource => resource.id === 'jobs');
 const PAGE_SIZE = 12;
@@ -84,6 +85,7 @@ function RobotContact({ robotId, refreshTick }) {
 
 export default function LiveOperationsPage() {
   const role = getSession()?.account?.role;
+  const [explore, setExplore] = useState(false);
   const [jobs, setJobs] = useState([]), [catalogs, setCatalogs] = useState(emptyCatalogs);
   const [loading, setLoading] = useState(true), [loadError, setLoadError] = useState(''), [catalogWarning, setCatalogWarning] = useState('');
   const [updatedAt, setUpdatedAt] = useState(null), [auto, setAuto] = useState(true), [revision, setRevision] = useState(0);
@@ -179,6 +181,8 @@ export default function LiveOperationsPage() {
     <header className="lo-header"><div className="lo-page-title"><span className="lo-title-icon"><Icon /></span><div><h2>Theo dõi công việc</h2><p>Tiến trình robot, kết quả thực thi và các việc cần can thiệp.</p></div></div><div className="lo-header-actions"><label className="lo-auto"><input type="checkbox" checked={auto} onChange={event => setAuto(event.target.checked)} /><span>Tự cập nhật</span></label><button className="lo-button" onClick={refresh} disabled={loading}><Icon name="refresh" className={loading ? 'lo-spin' : ''} />Làm mới</button></div></header>
     <div className="lo-sync" role="status"><span className={`lo-connection ${loadError ? 'lo-offline' : ''}`} />{loadError ? 'Chưa cập nhật được dữ liệu' : loading && !updatedAt ? 'Đang kết nối…' : auto ? 'Việc đang mở: mỗi 15 giây · Toàn bộ lịch sử: mỗi 60 giây' : 'Đã tạm dừng tự cập nhật'}{updatedAt && <span>Cập nhật lúc {clock(updatedAt)}</span>}{group === 'history' && historyUpdatedAt && <span>Lịch sử tải lúc {clock(historyUpdatedAt)}</span>}</div>
     <Freshness receivedAt={updatedAt} failed={!!loadError} auto={auto} title="Danh sách công việc" />
+    <RobotMonitor jobs={jobs} catalogs={catalogs} auto={auto} revision={revision} onOpen={job => { showJob(job); setExplore(true); requestAnimationFrame(() => document.getElementById("lo-explorer")?.scrollIntoView({ block: "start", behavior: "smooth" })); }} />
+    <details className="lo-explorer" id="lo-explorer" open={explore} onToggle={event => setExplore(event.currentTarget.open)}><summary>Chi tiết công việc, lịch sử và xử lý</summary>
     <div className="lo-metrics">{metrics.map(metric => <button key={metric.label} className={`lo-metric lo-metric-${metric.tone}`} onClick={() => chooseGroup(metric.group, metric.status || '')}><span><span className="lo-metric-label">{metric.label}</span><strong>{updatedAt ? metric.count : '—'}</strong></span><span className="lo-metric-icon"><Icon name={metric.icon} /></span></button>)}</div>
     {loadError && <div className="lo-notice lo-notice-error" role="alert"><Icon name="alert" /><div><strong>Không thể làm mới công việc</strong><p>{loadError}{updatedAt ? ' Dữ liệu bên dưới là lần tải thành công gần nhất.' : ''}</p></div><button className="lo-button" onClick={refresh}>Thử lại</button></div>}
     {catalogWarning && <div className="lo-notice lo-notice-warning"><Icon name="alert" /><p>{catalogWarning}</p><button className="lo-text-button" onClick={() => setCatalogRevision(value => value + 1)}>Tải lại tên</button></div>}
@@ -194,6 +198,7 @@ export default function LiveOperationsPage() {
         return <button key={job.jobId} className={`lo-job-item ${job.jobId === selectedId ? 'is-selected' : ''}`} aria-pressed={job.jobId === selectedId} onClick={() => { setSelectedId(job.jobId); if (window.innerWidth <= 760) requestAnimationFrame(() => document.querySelector('.lo-detail')?.scrollIntoView({ block: 'start', behavior: 'smooth' })); }}><div className="lo-job-item-top"><Badge status={job.status} /><span>{job.jobCode?.slice(-6)}</span></div><strong>{info.title}</strong>{(job.cancelRequestedAt || job.cancelCommandId) && !TERMINAL_STATUSES.includes(job.status) && <span className="lo-card-attention">Đang chờ hủy</span>}<span className="lo-job-robot"><Icon name="robot" />{info.robot}</span>{info.target && <span className="lo-job-target"><Icon name="pin" />{info.target}</span>}<div className="lo-job-item-bottom"><time>{stamp(job.queuedAt)}</time><Icon name="arrow" /></div></button>;
       })}</div><footer className="lo-pagination"><button className="lo-button" disabled={safePage === 0} onClick={() => setPage(safePage - 1)} aria-label="Trang công việc trước">←</button><span>{filtered.length ? safePage * PAGE_SIZE + 1 : 0}–{Math.min((safePage + 1) * PAGE_SIZE, filtered.length)} / {filtered.length}</span><button className="lo-button" disabled={safePage + 1 >= totalPages} onClick={() => setPage(safePage + 1)} aria-label="Trang công việc sau">→</button></footer></aside>{selected && <JobDetail key={selected.jobId} job={selected} catalogs={catalogs} role={role} auto={auto} retained={retained} onShowGroup={() => showJob(selected)} manualRevision={revision} integrate={integrate} onSaved={message => { setToast(message); setRevision(value => value + 1); }} />}</div>}
     </div>
+    </details>
   </section>;
 }
 
