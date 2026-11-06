@@ -204,7 +204,7 @@ export default function LiveOperationsPage() {
   </section>;
 }
 
-function JobDetail({ job: listJob, catalogs, role, auto, retained, onShowGroup, manualRevision, integrate, onSaved }) {
+export function JobDetail({ job: listJob, catalogs, role, auto, retained, onShowGroup, manualRevision, integrate, onSaved }) {
   const [detail, setDetail] = useState(null), [error, setError] = useState(''), [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('progress'), [liveStatus, setLiveStatus] = useState(''), [action, setAction] = useState(null), [retry, setRetry] = useState(0);
   const [revealStep, setRevealStep] = useState(null);

@@ -11,6 +11,7 @@ import { copy, newDocument, fromDetail, fingerprint, validateDocument, convertLo
 import { designerStorageKey, readDrafts, writeDraft, deleteDraft, deleteWorkflowDrafts } from '../../features/workflows/designer/designerStorage.js';
 import { saveDesign, publishDesign } from '../../features/workflows/designer/designerService.js';
 import { rebuildQrDeliveryDraft, QR_DELIVERY_DRAFT_NOTICE } from '../../features/workflows/designer/qrDeliveryDraft.js';
+import { ensureServoDemoDraft } from '../../features/workflows/designer/servoDemoDraft.js';
 import DesignerInspector from './designer/DesignerInspector.jsx';
 import WorkflowCanvas from './designer/WorkflowCanvas.jsx';
 import InputPreview from './designer/InputPreview.jsx';
@@ -69,7 +70,7 @@ export default function WorkflowDesignerPage() {
   }
   async function reload() {
     setLoading(true);
-    try { setDrafts(readDrafts(localStorage, storageKey)); } catch (e) { setStorageError(e.message); }
+    try { ensureServoDemoDraft(localStorage, storageKey); setDrafts(readDrafts(localStorage, storageKey)); } catch (e) { setStorageError(e.message); }
     try { setLegacy(readLocalDesigns()); } catch (e) { setError(e.message); }
     try { setRemote(await loadAllPages(workflowApi.list)); } catch (e) { setError('Không tải được danh sách máy chủ: ' + e.message); }
     finally { setLoading(false); }

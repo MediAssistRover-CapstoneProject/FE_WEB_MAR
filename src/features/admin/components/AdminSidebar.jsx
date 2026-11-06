@@ -7,10 +7,11 @@ import { screenTitles } from '../../api/workspaceCatalog.js';
 import { pathForScreen } from '../screenRoutes.js';
 import './AdminSidebar.css';
 
-const adminOnly = new Set(['AI Test', 'Users & Roles', 'System Settings', 'Audit Logs', 'Analytics', 'History & Replay']);
+const adminOnly = new Set(['Workflow Dispatch', 'AI Test', 'Users & Roles', 'System Settings', 'Audit Logs', 'Analytics', 'History & Replay']);
 const menuLabels = {
   'AI Test': 'Kiểm thử AI',
   Workflows: 'Thiết kế quy trình',
+  'Workflow Dispatch': 'Điều phối quy trình',
   'Workflow Management': 'Danh mục quy trình',
 };
 

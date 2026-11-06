@@ -65,9 +65,15 @@ export const stepCatalog = {
     fields: [f('operations', 'Các phép cập nhật', 'array', { required: true, minItems: 1, maxItems: 128, editor: 'operations' })],
   },
 };
-export function fieldsForStep(data, version = 3) {
+// Mirror BE HardwareCommissioningWorkflow; the persisted workflow flag is explicit.
+export function commissioningUnlock(data, workflow) {
+  return workflow?.schemaVersion === 3 && workflow.defaultInputsJson?.hardware_test_mode === 'COMMISSIONING_ONLY'
+    && data.stepType === 'CONTROL_HARDWARE' && ['UNLOCK', 'UNLOCK_COMPARTMENT'].includes(data.params?.action)
+    && !Object.hasOwn(data.mapping ?? {}, 'action') && !Object.hasOwn(data.params ?? {}, 'authorization') && !Object.hasOwn(data.mapping ?? {}, 'authorization');
+}
+export function fieldsForStep(data, version = 3, workflow) {
   const p = { ...data.params, ...data.mapping };
-  return (stepCatalog[data.stepType]?.fields ?? []).filter(field => !field.when || field.when(p, version)).map(field => ({ ...field, required: typeof field.required === 'function' ? field.required(p, version) : !!field.required }));
+  return (stepCatalog[data.stepType]?.fields ?? []).filter(field => !field.when || field.when(p, version)).map(field => ({ ...field, required: field.key === 'authorization' && commissioningUnlock(data, workflow) ? false : typeof field.required === 'function' ? field.required(p, version) : !!field.required }));
 }
 export const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const identityKeys = ['map_id', 'endpoint_id', 'service_request_id', 'zone_id', 'floor_id', 'artifact_id', 'mapping_session_id', 'actor_account_id', 'verification_id', 'incident_id', 'detection_event_id', 'endpoint_group_id'];

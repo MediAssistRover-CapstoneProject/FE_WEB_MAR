@@ -4,7 +4,7 @@ export const navigationGroups = [
   ['Map & Navigation', ['Map Studio', 'Facility Management', 'Public Catalog']],
   ['Robot', ['Robot Status']],
   ['Monitoring', ['Alerts', 'History & Replay', 'Analytics', 'Audit Logs']],
-  ['Automation', ['Workflows', 'Workflow Management', 'Voice & Scripts', 'AI Test']],
+  ['Automation', ['Workflows', 'Workflow Dispatch', 'Workflow Management', 'Voice & Scripts', 'AI Test']],
   ['Administration', ['Users & Roles', 'System Settings', 'My Account']],
 ];
 

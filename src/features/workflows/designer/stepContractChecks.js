@@ -1,7 +1,7 @@
-import { fieldsForStep, speechFields, stepCatalog, uuidPattern, valueError } from './stepCatalog.js';
+import { commissioningUnlock, fieldsForStep, speechFields, stepCatalog, uuidPattern, valueError } from './stepCatalog.js';
 const isObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
 const ref = value => isObject(value) && typeof value.$ref === 'string';
-export function stepContractIssues(data, version = 3) {
+export function stepContractIssues(data, version = 3, workflow) {
   const p = { ...data.params, ...data.mapping }, errors = [], add = message => errors.push(message);
   const allowed = new Set((stepCatalog[data.stepType]?.fields ?? []).map(f => f.key));
   const limit = keys => {
@@ -24,7 +24,7 @@ export function stepContractIssues(data, version = 3) {
     case 'CONTROL_HARDWARE': {
       if (data.maxAttempts !== 1) add('Lệnh servo không được thử lại tự động; số lần thử phải là 1.');
       const auth = p.authorization, unlock = ['UNLOCK_COMPARTMENT', 'UNLOCK'].includes(p.action);
-      if (version === 3 && unlock && (ref(auth) || !isObject(auth))) add('Mở ngăn hàng cần đối tượng quyền gồm mode, purpose và ba tham chiếu output xác thực; không dùng toàn bộ output làm quyền.');
+      if (version === 3 && unlock && !commissioningUnlock(data, workflow) && (ref(auth) || !isObject(auth))) add('Mở ngăn hàng cần đối tượng quyền gồm mode, purpose và ba tham chiếu output xác thực; không dùng toàn bộ output làm quyền.');
       if (isObject(auth) && !ref(auth)) {
         if (auth.mode !== 'STAFF_VERIFIED') add('authorization.mode phải là STAFF_VERIFIED.');
         if (!['DELIVERY_SENDER', 'DELIVERY_RECEIVER'].includes(auth.purpose)) add('authorization.purpose phải là mục đích người gửi/người nhận cố định.');

@@ -367,7 +367,7 @@ export function validateDocument(document, catalog = null) {
     if (!d.name?.trim()) add('Bước cần tên.', node.id);
     if (!(d.timeoutSec >= 1) || !(d.maxAttempts >= 1) || !(d.maxVisits >= 1) || d.retryDelaySec < 0) add(`${d.name}: thời gian hoặc số lần thử không hợp lệ.`, node.id);
     if (d.stepType === 'CONTROL_HARDWARE' && d.maxAttempts !== 1) add('Lệnh phần cứng chỉ được thử một lần.', node.id);
-    fieldsForStep(d, document.workflow.schemaVersion).forEach(field => {
+    fieldsForStep(d, document.workflow.schemaVersion, document.workflow).forEach(field => {
       const value = params[field.key];
       if (field.fixed && value && typeof value === 'object' && value.$ref) add(`${field.label} phải là giá trị cố định.`, node.id);
       const error = valueError(value, field); if (error) add(`${d.name} · ${field.label}: ${error}`, node.id);
@@ -379,7 +379,7 @@ export function validateDocument(document, catalog = null) {
         }
       }
     });
-    stepContractIssues(d, document.workflow.schemaVersion).forEach(message => add(`${d.name} · ${message}`, node.id));
+    stepContractIssues(d, document.workflow.schemaVersion, document.workflow).forEach(message => add(`${d.name} · ${message}`, node.id));
     const inspectDraft = value => {
       if (!value || typeof value !== 'object') return;
       if (Object.hasOwn(value, '__invalidJSON')) add('JSON trong cấu hình chi tiết chưa hợp lệ.', node.id);

@@ -14,6 +14,7 @@ const screenRoutes = {
   Analytics: '/admin/analytics',
   'Audit Logs': '/admin/audit-logs',
   'Workflow Management': '/admin/workflow-catalog',
+  'Workflow Dispatch': '/admin/workflow-dispatch',
   'Voice & Scripts': '/admin/voice-scripts',
   'AI Test': '/admin/ai-test',
   'Users & Roles': '/admin/users-roles',
