@@ -52,7 +52,7 @@ export default function SavedMapLibrary({onOpen,initialMapId=''}){
     {map&&<section className="sml-preview" aria-label="Xem trước bản đồ đã chọn">
       <header className="sml-preview-heading">
         <div className="sml-preview-title"><span className="sml-eyebrow">BẢN ĐỒ ĐANG CHỌN</span><div><h3>{map.mapName}</h3><Status value={map.status}/></div><p>Kiểm tra bản đồ trước khi thiết lập vùng và điểm đích.</p></div>
-        <div className="sml-preview-actions"><button type="button" className="ls-btn primary" disabled={loading} onClick={()=>onOpen(map.mapId,'zone')}>Mở bản đồ <span aria-hidden="true">→</span></button></div>
+        <div className="sml-preview-actions"><button type="button" className="ls-btn" disabled={loading} onClick={()=>onOpen(map.mapId,'presentation')}>Chỉnh giao diện map</button><button type="button" className="ls-btn primary" disabled={loading} onClick={()=>onOpen(map.mapId,'zone')}>Mở bản đồ <span aria-hidden="true">→</span></button></div>
       </header>
       <dl className="sml-map-facts"><div><dt>Kích thước</dt><dd>{number(map.widthM)} × {number(map.heightM)} <span>m</span></dd></div><div><dt>Độ phân giải</dt><dd>{number(map.resolutionMPerPixel*100)} <span>cm/ô</span></dd></div><div><dt>Phiên bản</dt><dd>v{map.versionNo}</dd></div></dl>
       <div className="sml-canvas"><FacilityGeometryPreview key={map.mapId} map={map} zones={[]} endpoints={[]}/></div>

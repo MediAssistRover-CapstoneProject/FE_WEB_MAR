@@ -5,9 +5,10 @@ import WorkspaceTabs from '../../components/WorkspaceTabs.jsx';
 import LiveMapping from './robotOperations/LiveMapping.jsx';
 import FacilityCatalogEditor from './FacilityCatalogEditor.jsx';
 import SavedMapLibrary from './SavedMapLibrary.jsx';
+import MapPresentationEditor from './MapPresentationEditor.jsx';
 import './mapStudio.css';
 
-export const workflow=[['scan','Scan'],['zone','Zone'],['endpoint','Endpoint']];
+export const workflow=[['scan','Scan'],['zone','Zone'],['endpoint','Endpoint'],['presentation','Chỉnh giao diện']];
 
 function Button({children,tone='',...props}) {
   return <button type="button" {...props} className={'ls-btn '+tone}>{children}</button>;
@@ -21,6 +22,10 @@ export default function MapStudioFigma({initialStage='scan'}) {
   const [stage,setStage]=useState(()=>mapId?(workflow.some(([id])=>id===stageParam)?stageParam:'endpoint'):workflow.some(([id])=>id===requestedStage)?requestedStage:'scan');
   const [showLibrary,setShowLibrary]=useState(()=>!mapId&&stage==='scan'&&new URLSearchParams(window.location.search).get('stage')!=='scan');
   const [copyNotice,setCopyNotice]=useState('');
+  const [presentationDirty,setPresentationDirty]=useState(false);
+  const canLeave=()=>!presentationDirty||window.confirm('Bản đồ còn chỉnh sửa chưa lưu. Bỏ thay đổi và rời trang chỉnh sửa?');
+  const openLibrary=()=>{if(canLeave())setShowLibrary(true);};
+  const switchStage=target=>{if(target===stage||canLeave()){setStage(target);navigate('/admin/map?'+new URLSearchParams({...(mapId?{mapId}:{}),stage:target}),{replace:true});}};
   const index=workflow.findIndex(([id])=>id===stage);
   const openMap=(id,target)=>{
     setMapId(id);
@@ -44,19 +49,20 @@ export default function MapStudioFigma({initialStage='scan'}) {
     <header className="ls-heading">
       <div>
         <h2>{vi(workflow[index][1])}</h2>
-        <p>{stage==='scan'?'Quét không gian để tạo bản đồ cho robot.':stage==='zone'?'Thiết lập vùng di chuyển trên bản đồ đã chọn.':'Đặt vị trí và hướng đến của robot trên bản đồ.'}</p>
+        <p>{stage==='scan'?'Quét không gian để tạo bản đồ cho robot.':stage==='zone'?'Thiết lập vùng di chuyển trên bản đồ đã chọn.':stage==='presentation'?'Chỉnh map thô thành bản đồ dễ đọc, thêm phòng, tường và nhãn.':'Đặt vị trí và hướng đến của robot trên bản đồ.'}</p>
       </div>
       <div className="ls-actions">
-        <Button onClick={()=>setShowLibrary(true)}>← Thư viện bản đồ</Button>
+        <Button onClick={openLibrary}>← Thư viện bản đồ</Button>
         {stage==='scan'&&<Button onClick={()=>navigate('/admin/system-settings')}>Cấu hình kết nối robot →</Button>}
         {stage==='zone'&&<Button tone="primary" onClick={()=>setStage('endpoint')}>Tiếp tục: Điểm đích →</Button>}
       </div>
     </header>
-    <div className="ls-stage-nav"><WorkspaceTabs label={vi('Map Studio stages')} active={stage} onSelect={setStage}
+    <div className="ls-stage-nav"><WorkspaceTabs label={vi('Map Studio stages')} active={stage} onSelect={switchStage}
       items={workflow.map(([id,label],i)=>({id,label:`${i+1}. ${vi(label)}`}))}/></div>
     {copyNotice&&<p className="ls-notice" role="status">{copyNotice}</p>}
     {stage==='scan'
       ? <LiveMapping embedded onMapSaved={id=>openMap(id,'zone')}/>
+      : stage==='presentation' ? <MapPresentationEditor key={mapId} mapId={mapId} onOpenLibrary={openLibrary} onDirtyChange={setPresentationDirty}/>
       : <FacilityCatalogEditor key={mapId||'catalog'} stage={stage} initialMapId={mapId} onMapChange={setMapId} onOpenLibrary={()=>setShowLibrary(true)} onMapCopied={id=>{setCopyNotice('Đã mở bản đồ tương thích dẫn đường. BE giữ nguyên bản gốc và sao chép điểm đích; kiểm tra lại vùng, nhóm điểm và liên kết phòng trên bản này trước khi kích hoạt.');openMap(id,'zone');}}/>}
   </section>;
 }
