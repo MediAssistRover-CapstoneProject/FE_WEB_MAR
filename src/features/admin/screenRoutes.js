@@ -2,7 +2,7 @@ const screenRoutes = {
   Dashboard: '/admin',
   'Map Studio': '/admin/map',
   'Facility Management': '/admin/facility',
-  'Public Catalog': '/admin/public-catalog',
+  'Public Catalog': '/admin/facility',
   'Live Operations': '/admin/live-operations',
   'Emergency Center': '/admin/emergency-center',
   Missions: '/admin/missions',
@@ -31,5 +31,6 @@ export function pathForScreen(screen) {
 }
 
 export function screenForSlug(slug) {
+  if (slug === 'public-catalog') return 'Facility Management';
   return slugToScreen[slug] || null;
 }

@@ -1,7 +1,7 @@
 export const navigationGroups = [
   ['Overview', ['Dashboard']],
   ['Operations', ['Live Operations', 'Emergency Center', 'Missions', 'Patrol', 'Staff Shifts']],
-  ['Map & Navigation', ['Map Studio', 'Facility Management', 'Public Catalog']],
+  ['Map & Navigation', ['Map Studio', 'Facility Management']],
   ['Robot', ['Robot Status']],
   ['Monitoring', ['Alerts', 'History & Replay', 'Analytics', 'Audit Logs']],
   ['Automation', ['Workflows', 'Workflow Dispatch', 'Workflow Management', 'Voice & Scripts', 'AI Test']],

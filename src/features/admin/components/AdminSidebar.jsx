@@ -9,6 +9,7 @@ import './AdminSidebar.css';
 
 const adminOnly = new Set(['Workflow Dispatch', 'AI Test', 'Users & Roles', 'System Settings', 'Audit Logs', 'Analytics', 'History & Replay']);
 const menuLabels = {
+  'Facility Management': 'Thông tin bệnh viện',
   'AI Test': 'Kiểm thử AI',
   Workflows: 'Thiết kế quy trình',
   'Workflow Dispatch': 'Điều phối quy trình',

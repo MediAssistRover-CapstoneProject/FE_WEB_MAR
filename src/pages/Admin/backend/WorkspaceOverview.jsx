@@ -27,10 +27,41 @@ export const resourceHints = {
 export function WorkspaceIntro({ section, role }) {
   const copy = workspaceCopy[section];
   if (!copy) return null;
-  return <header className="be-workspace-intro"><div><span className="be-eyebrow">{section === 'Public Catalog' ? 'TRA CỨU · CHỈ XEM' : 'KHÔNG GIAN QUẢN LÝ'}</span><h2>{copy[0]}</h2><p>{copy[1]}</p></div>
-    {section === 'Public Catalog' && role === 'ADMIN' && <a className="be-link-button" href="/admin/facility">Quản lý nội dung →</a>}
-    {section === 'Missions' && <a className="be-link-button" href="/admin/live-operations">Theo dõi công việc robot →</a>}
-  </header>;
+  const icons = {
+    'Facility Management': (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M3 21h18M5 21V7l8-4v18M13 7h6v14" />
+        <path d="M9 9h1M9 13h1M9 17h1M16 11h1M16 15h1" />
+      </svg>
+    ),
+    'Public Catalog': (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
+        <path d="M6 6h10M6 10h10" />
+      </svg>
+    ),
+    Missions: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+      </svg>
+    ),
+  };
+  return (
+    <header className="be-workspace-intro">
+      <div className="be-title-block">
+        <span className="be-title-icon">{icons[section] || icons['Facility Management']}</span>
+        <div>
+          <h2>{copy[0]}</h2>
+          <p>{copy[1]}</p>
+        </div>
+      </div>
+      <div className="be-intro-actions">
+        {section === 'Public Catalog' && role === 'ADMIN' && <a className="be-link-button" href="/admin/facility">Quản lý nội dung →</a>}
+        {section === 'Facility Management' && <a className="be-link-button" href="/admin/public-catalog">Xem danh mục công khai →</a>}
+        {section === 'Missions' && <a className="be-link-button" href="/admin/live-operations">Theo dõi công việc robot →</a>}
+      </div>
+    </header>
+  );
 }
 
 export function CatalogNavigation({ available, resource, onSelect, section }) {

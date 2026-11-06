@@ -62,8 +62,8 @@ export function resourceOperations(id) {
   return Object.values(operations).filter(o => resourceFor(o)?.id === id && !o.deprecated);
 }
 export const screenTitles = {
-  'Facility Management': 'Danh mục bệnh viện', 'Workflow Management': 'Quản lý quy trình', 'Workflow Dispatch': 'Điều phối quy trình', 'Staff Shifts': 'Ca trực',
-  'My Account': 'Tài khoản của tôi', 'Public Catalog': 'Thông tin công khai', 'Users & Roles': 'Quản lý nhân viên',
+  'Facility Management': 'Thông tin bệnh viện', 'Workflow Management': 'Quản lý quy trình', 'Workflow Dispatch': 'Điều phối quy trình', 'Staff Shifts': 'Ca trực',
+  'My Account': 'Tài khoản của tôi', 'Public Catalog': 'Thông tin bệnh viện', 'Users & Roles': 'Quản lý nhân viên',
 };
 export const fieldLabels = {
   ...backendFieldLabels,

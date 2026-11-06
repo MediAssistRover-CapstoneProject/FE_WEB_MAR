@@ -12,6 +12,7 @@ import ShiftCalendar from './ShiftCalendar.jsx';
 import UsersRoles from '../UsersRoles.jsx';
 import OperationsReport from './OperationsReport.jsx';
 import FacilityCatalogEditor from '../FacilityCatalogEditor.jsx';
+import HospitalInfoWorkspace from '../facility/HospitalInfoWorkspace.jsx';
 import { AiAdminPanel } from '../AiWorkspace.jsx';
 import SpeechAnnouncement from '../robotOperations/SpeechAnnouncement.jsx';
 import { RobotConnectionSettings } from '../SystemSettings.jsx';
@@ -33,6 +34,7 @@ const sensitiveAction = op => op.method === 'DELETE' || /\/(cancel|archive|retir
 export default function BackendWorkspace({ section = 'Missions' }) {
   if (section === 'Staff Shifts') return <ShiftWorkspace />;
   if (section === 'Users & Roles') return <UsersRoles />;
+  if (section === 'Facility Management' || section === 'Public Catalog') return <HospitalInfoWorkspace />;
   return <ResourceWorkspace section={section} />;
 }
 function ShiftWorkspace() {
