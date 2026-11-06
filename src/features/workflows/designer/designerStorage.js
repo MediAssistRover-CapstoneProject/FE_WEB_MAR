@@ -13,3 +13,8 @@ export function writeDraft(storage, key, entry) {
   return value;
 }
 export function deleteDraft(storage, key, id) { storage.setItem(key, JSON.stringify({ version: 1, drafts: readDrafts(storage, key).filter(d => d.document.localId !== id) })); }
+export function deleteWorkflowDrafts(storage, key, workflowId) {
+  const drafts = readDrafts(storage, key).filter(d => d.document.workflow.workflowId !== workflowId);
+  storage.setItem(key, JSON.stringify({ version: 1, drafts }));
+  return drafts;
+}

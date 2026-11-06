@@ -19,9 +19,11 @@ Nút **Mẫu giao hàng QR** trong trình thiết kế thay đồ thị của b�
 
 QR sai bị API từ chối và bước tiếp tục chờ quét lại khi mã còn hiệu lực. Chỉ QR hợp lệ mới hoàn tất AUTHENTICATE, vì vậy bước QR có một dây đi tiếp tới UNLOCK, không có dây SUCCESS “không hợp lệ” xuống hỗ trợ. Mẫu đặt thời gian xác thực 120 giây theo TTL mặc định của BE; QR thực tế có thể hết hạn sớm hơn tùy cấu hình BE. BE hiện chưa giới hạn số lượt quét sai, và `maxAttempts` không đếm số lần staff quét QR.
 
-Ở nút yêu cầu đóng, chưa bấm thì bước tiếp tục chờ. Chỉ phản hồi hoàn tất `confirmed = true` mới đi đóng servo. Cổng “Phản hồi sai” là hàng rào cho phản hồi hoàn tất không hợp lệ từ một client, không phải trường hợp chưa bấm. Hai cổng riêng không còn khiến dây phản hồi sai xuất phát từ cổng “Thành công”. Khi gửi API, điều kiện dùng `/result/confirmed`; canvas hiển thị `/outputs/<stepCode>/confirmed`.
+Ở nút yêu cầu đóng, chưa bấm thì bước tiếp tục chờ. Chỉ phản hồi hoàn tất `confirmed = true` mới đi đóng servo. Phản hồi hoàn tất không hợp lệ tự dừng tại bước; không hiện thêm cổng/dây “Phản hồi sai” trong chế độ mặc định. Khi gửi API, điều kiện dùng `/result/confirmed`; canvas hiển thị `/outputs/<stepCode>/confirmed`. Compiler tự thêm SUCCESS mặc định → RECOVERY_REQUIRED ở ưu tiên 2; nhánh confirmed=true ở ưu tiên 1. Không bỏ guard để làm sơ đồ gọn.
 
-Mọi bước có dây FAILURE và TIMEOUT rõ ràng, với đích riêng cho lỗi thực thi, hết giờ xác thực QR, hết giờ chờ nút và hết giờ di chuyển/servo. Phản hồi nút bất thường cũng có đích riêng. Các đích này giữ trạng thái RECOVERY_REQUIRED để không bỏ qua trường hợp ngăn hàng có thể đang mở. Không tự lặp lệnh servo.
+Mẫu phiên bản 3 chỉ có 10 step, Bắt đầu, một kết thúc thành công và 11 dây happy path. FAILURE/TIMEOUT của 10 bước và phản hồi nút bất thường của 2 bước chờ được compiler thêm vào payload, không tạo dây hay nút lỗi trên canvas. Các fallback giữ trạng thái RECOVERY_REQUIRED để không bỏ qua trường hợp ngăn hàng có thể đang mở. Không tự lặp lệnh servo. Metadata `automaticErrorRoutes` giúp mở lại vẫn gọn; payload BE vẫn có 32 transition với cùng điều kiện dừng.
+
+Nút Nhánh lỗi nâng cao vẫn mở cổng để cấu hình riêng. Những nhánh tùy chỉnh đã lưu không bị tự xóa. Với bản mẫu v1/v2 còn dây lỗi, áp dụng lại mẫu để dựng phiên bản mới; thao tác này có hộp xác nhận trong ứng dụng và có thể hoàn tác.
 
 Biến đầu vào bắt buộc: `map_id`, `pickup_endpoint_id`, `delivery_endpoint_id`, `service_request_id`. Endpoint thuộc bản đồ đã chọn; MOVE không nhận UUID phòng.
 

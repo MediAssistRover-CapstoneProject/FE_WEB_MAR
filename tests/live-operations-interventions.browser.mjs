@@ -41,7 +41,7 @@ async function fixture() {
     if (path === '/api/v1/robots') return reply([{ robotId: id(2), robotName: 'MAR-01' }]);
     return reply({ content: [], totalPages: 0, last: true });
   });
-  const start = async () => { await page.goto(`${base}/admin/live-operations`); await page.locator('.lo-groups').waitFor(); };
+  const start = async () => { await page.goto(`${base}/admin/live-operations`); await page.getByText('Chi tiết công việc, lịch sử và xử lý', { exact: true }).click(); await page.locator('.lo-groups').waitFor(); };
   const recovery = async () => { await page.locator('.lo-groups').getByRole('button', { name: /Cần xử lý/ }).click(); await page.getByRole('button', { name: 'Xử lý phục hồi', exact: true }).click(); await page.locator('.lo-recovery-actions').waitFor(); };
   return { context, page, state, writes, reads, errors, start, recovery };
 }

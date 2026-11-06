@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { copy, fromDetail, newDocument, toPayload, validateDocument, visit } from '../src/features/workflows/designer/designerModel.js';
+import { connect, copy, fromDetail, newDocument, toPayload, validateDocument, visit } from '../src/features/workflows/designer/designerModel.js';
 import { rebuildQrDeliveryDraft, QR_DELIVERY_DRAFT_NOTICE } from '../src/features/workflows/designer/qrDeliveryDraft.js';
 import { stepBehaviour, workflowEdgeLabel } from '../src/features/workflows/designer/designerPresentation.js';
 
@@ -29,7 +29,7 @@ test('QR single-button draft rebuilds the same workflow without mutating its old
   assert.equal(draft.workflow.validatedAt, undefined);
   assert.deepEqual(draft.workflow.outputMappingJson, {});
   assert.deepEqual(draft.workflow.inputUiJson.custom, { retained: true });
-  assert.deepEqual(draft.workflow.inputUiJson.deliveryDraft, { mode: 'QR_SINGLE_BUTTON', version: 2, runtimeReady: false, notice: QR_DELIVERY_DRAFT_NOTICE });
+  assert.deepEqual(draft.workflow.inputUiJson.deliveryDraft, { mode: 'QR_SINGLE_BUTTON', version: 3, runtimeReady: false, notice: QR_DELIVERY_DRAFT_NOTICE });
   assert.deepEqual(validateDocument(draft), []);
 });
 
@@ -70,34 +70,39 @@ test('runtime input references are limited to map, pickup, delivery and service 
   });
 });
 
-test('QR retries stay inside authentication; button rejection is separate from waiting and errors have specific exits', () => {
+test('QR draft draws only the happy path while payload retains every automatic stop', () => {
   const draft = rebuildQrDeliveryDraft(newDocument()), steps = draft.nodes.filter(node => node.data.kind === 'step');
+  const payload = toPayload(draft);
+  assert.equal(draft.edges.length, 11);
+  assert.ok(draft.edges.every(edge => edge.data.outcome === 'SUCCESS'));
+  assert.equal(draft.nodes.filter(node => node.data.kind === 'terminal').length, 1);
+  assert.equal(payload.workflow.inputUiJson.designer.automaticErrorRoutes.length, 22);
   assert.equal(draft.edges.find(edge => edge.source === 'start').target, steps[0].id);
   for (const [index, node] of steps.entries()) {
     for (const outcome of ['FAILURE', 'TIMEOUT']) {
-      const routes = draft.edges.filter(edge => edge.source === node.id && edge.data.outcome === outcome);
+      const routes = payload.graph.transitions.filter(route => route.fromStepCode === node.id && route.outcome === outcome);
       assert.equal(routes.length, 1);
-      const target = draft.nodes.find(n => n.id === routes[0].target);
-      assert.equal(target.data.terminalStatus, 'RECOVERY_REQUIRED');
-      assert.match(target.data.name, outcome === 'FAILURE' ? /Lỗi thực thi/ : node.data.stepType === 'AUTHENTICATE' ? /xác thực QR/ : node.data.stepType === 'INTERACT' ? /chờ nút/ : /di chuyển \/ servo/);
-      assert.equal(routes[0].data.defaultTransition, true);
+      assert.equal(routes[0].terminalStatus, 'RECOVERY_REQUIRED');
+      assert.equal(routes[0].toStepCode, null);
+      assert.equal(routes[0].defaultTransition, true);
+      assert.equal(draft.edges.filter(edge => edge.source === node.id && edge.data.outcome === outcome).length, 0);
     }
     const success = draft.edges.filter(edge => edge.source === node.id && edge.data.outcome === 'SUCCESS');
-    const field = node.data.stepType === 'INTERACT' ? 'confirmed' : null;
-    const main = success.find(edge => edge.target === (steps[index + 1]?.id ?? 'end'));
-    assert.ok(main);
-    if (field) {
-      assert.deepEqual(main.data.conditionJson, { path: `/outputs/${node.id}/${field}`, operator: 'EQ', value: true });
+    assert.equal(success.length, 1);
+    const main = success[0];
+    assert.equal(main.target, steps[index + 1]?.id ?? 'end');
+    if (node.data.stepType === 'INTERACT') {
+      assert.deepEqual(main.data.conditionJson, { path: `/outputs/${node.id}/confirmed`, operator: 'EQ', value: true });
       assert.equal(main.data.defaultTransition, false);
-      const fallback = success.find(edge => edge.data.defaultTransition);
-      assert.match(draft.nodes.find(n => n.id === fallback.target).data.name, /Phản hồi nút không hợp lệ/);
-      assert.equal(fallback.data.priority, 2);
       assert.equal(main.sourceHandle, 'true');
-      assert.equal(fallback.sourceHandle, 'false');
-      assert.equal(workflowEdgeLabel(fallback, draft), 'Phản hồi không hợp lệ');
-      assert.equal(success.length, 2);
+      const routes = payload.graph.transitions.filter(route => route.fromStepCode === node.id && route.outcome === 'SUCCESS');
+      assert.equal(routes.length, 2);
+      assert.deepEqual(routes.find(route => !route.defaultTransition).conditionJson, { path: '/result/confirmed', operator: 'EQ', value: true });
+      const fallback = routes.find(route => route.defaultTransition);
+      assert.equal(fallback.priority, 2);
+      assert.equal(fallback.toStepCode, null);
+      assert.equal(fallback.terminalStatus, 'RECOVERY_REQUIRED');
     } else {
-      assert.equal(success.length, 1);
       assert.equal(main.data.defaultTransition, true);
       if (node.data.stepType === 'AUTHENTICATE') {
         assert.equal(node.data.timeoutSec, 120);
@@ -111,6 +116,27 @@ test('QR retries stay inside authentication; button rejection is separate from w
   assert.deepEqual(validateDocument(draft), []);
 });
 
+test('changing a button guard cannot silently create an automatic success path', () => {
+  const draft = rebuildQrDeliveryDraft(newDocument());
+  const button = draft.nodes.find(node => node.data.stepType === 'INTERACT');
+  const main = draft.edges.find(edge => edge.source === button.id);
+  main.data.conditionJson.value = false;
+  assert.ok(validateDocument(draft).some(issue => issue.nodeId === button.id && issue.message.includes('mặc định')));
+  assert.equal(toPayload(draft).graph.transitions.filter(route => route.fromStepCode === button.id && route.outcome === 'SUCCESS' && route.defaultTransition).length, 0);
+});
+
+test('custom button rejection routes remain explicit and are not replaced by automatic stops', () => {
+  let draft = rebuildQrDeliveryDraft(newDocument());
+  const button = draft.nodes.find(node => node.data.stepType === 'INTERACT');
+  draft.nodes.push({ id: 'reject', type: 'workflow', position: { x: 500, y: 900 }, data: { kind: 'terminal', name: 'Từ chối riêng', terminalStatus: 'FAILED' } });
+  draft = connect(draft, { source: button.id, target: 'reject', sourceHandle: 'false' });
+  const payload = toPayload(draft), restored = fromDetail(detailFor(payload));
+  const fallback = payload.graph.transitions.find(route => route.fromStepCode === button.id && route.outcome === 'SUCCESS' && route.defaultTransition);
+  assert.equal(fallback.terminalStatus, 'FAILED');
+  assert.ok(restored.edges.some(edge => edge.source === button.id && edge.target === 'reject'));
+  assert.deepEqual(toPayload(restored).graph, payload.graph);
+});
+
 test('graph, input form metadata and positions round-trip without losing the runtime-unready warning', () => {
   const draft = rebuildQrDeliveryDraft(newDocument()), payload = toPayload(draft);
   const restored = fromDetail(detailFor(payload)), again = toPayload(restored);
@@ -120,6 +146,8 @@ test('graph, input form metadata and positions round-trip without losing the run
   assert.deepEqual(normalizeUi(again.workflow.inputUiJson), normalizeUi(payload.workflow.inputUiJson));
   assert.equal(again.workflow.inputUiJson.deliveryDraft.runtimeReady, false);
   assert.equal(payload.graph.transitions.length, 32);
+  assert.equal(restored.edges.length, 11);
+  assert.equal(restored.nodes.filter(node => node.data.kind === 'terminal').length, 1);
   assert.equal(restored.readOnlyReasons.length, 0);
   assert.deepEqual(validateDocument(restored), []);
 });

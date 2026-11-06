@@ -1,5 +1,7 @@
 # Rà soát cấu hình 11 loại step — 05/11/2026
 
+Bổ sung sau khi đối chiếu runtime: xem [đánh giá tính dùng chung và nguồn tham số](workflow-step-generality-audit.md). Việc có đủ field trong catalog không chứng minh step chạy được trong mọi nghiệp vụ. Đặc biệt, AUTHENTICATE/HANDLE_PAYLOAD gắn với giao hàng và mặc định STAFF_CONFIRMATION của FE không phù hợp runtime schema 3 hiện tại.
+
 Đối chiếu FE với `StepInputContractValidator`, `StepExecutionPolicy`, `JobStepResponseService`, các ServerStepHandler, `Schema3StepResultContractValidator` và hai schema output BE/Pi hiện có. Không thay đổi BE hoặc cơ sở dữ liệu.
 
 ## Những thiếu sót đã sửa
@@ -42,7 +44,7 @@ Trong bước mở servo, chọn **Bước xác thực cấp quyền**; designer
 
 ## Giới hạn BE đã phát hiện
 
-- Java `StepInputContractValidator.sensing()` gọi khi kiểm tra template không cho giá trị `MAPPING`, trong khi đường kiểm tra Pi có cho. FE hiển thị cấu hình nhưng chặn lưu/publish và nêu lỗi này; tiếp tục dùng màn Quét bản đồ hiện có hoặc đồng bộ BE riêng. Không bỏ qua validator.
+- Đính chính MAPPING: `validate()` truyền `modern` vào `sensing()`, nên schema 3 có nhận `MAPPING` ngay cả khi kiểm tra template. Thông báo chặn vô điều kiện của FE dựa trên đánh giá trước là sai với đường gọi này. Mapping vẫn cần integration enabled, timeout đúng cấu hình, STOP definition và các ID phiên/tệp do BE cấp; xem báo cáo bổ sung. Chưa sửa chức năng trong lần rà soát này.
 - `RESTRICTED_AREA_INTRUSION` thuộc danh sách legacy; Pi schema 3 dùng `RESTRICTED_ZONE`. FE báo khi dùng alias cũ trong schema 3.
 - Publish vẫn có thể bị BE từ chối vì rollout/runtime chưa sẵn sàng. Cấu hình đúng không thay thế phản hồi xác thực, xác nhận staff hoặc kết quả phần cứng thật.
 

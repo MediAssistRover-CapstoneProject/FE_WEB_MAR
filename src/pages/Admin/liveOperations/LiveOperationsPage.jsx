@@ -1,5 +1,6 @@
+import WorkflowFailurePanel from './WorkflowFailurePanel.jsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { callBackend, readCatalog, watchJob } from '../../../features/api/backendApi.js';
 import { canUse, operations } from '../../../features/api/contract.js';
 import { getSession } from '../../../features/auth/session.js';
@@ -85,13 +86,14 @@ function RobotContact({ robotId, refreshTick }) {
 
 export default function LiveOperationsPage() {
   const role = getSession()?.account?.role;
-  const [explore, setExplore] = useState(false);
+  const [routeParams] = useSearchParams(), linkedJobId = routeParams.get('jobId');
+  const [explore, setExplore] = useState(!!linkedJobId);
   const [jobs, setJobs] = useState([]), [catalogs, setCatalogs] = useState(emptyCatalogs);
   const [loading, setLoading] = useState(true), [loadError, setLoadError] = useState(''), [catalogWarning, setCatalogWarning] = useState('');
   const [updatedAt, setUpdatedAt] = useState(null), [auto, setAuto] = useState(true), [revision, setRevision] = useState(0);
-  const [group, setGroup] = useState('active'), [search, setSearch] = useState(''), [status, setStatus] = useState(''), [robotId, setRobotId] = useState(''), [page, setPage] = useState(0);
+  const [group, setGroup] = useState(linkedJobId ? 'attention' : 'active'), [search, setSearch] = useState(''), [status, setStatus] = useState(''), [robotId, setRobotId] = useState(''), [page, setPage] = useState(0);
   const [workflowId, setWorkflowId] = useState(''), [from, setFrom] = useState(''), [to, setTo] = useState('');
-  const [selectedId, setSelectedId] = useState(null), [toast, setToast] = useState('');
+  const [selectedId, setSelectedId] = useState(linkedJobId), [toast, setToast] = useState('');
   const [catalogRevision, setCatalogRevision] = useState(0);
   const knownJobs = useRef(jobs), lastFullLoad = useRef(0);
   knownJobs.current = jobs;
@@ -316,6 +318,7 @@ function JobDetail({ job: listJob, catalogs, role, auto, retained, onShowGroup, 
     {error && <div className="lo-notice lo-notice-error" role="alert"><p>Không cập nhật được chi tiết: {error} Các thao tác tạm khóa.</p><button className="lo-text-button" onClick={() => setRetry(value => value + 1)}>Thử lại</button></div>}
     {loading ? <div className="lo-loading" role="status"><span className="lo-spinner" />Đang tải chi tiết…</div> : detail && <>
       {problem && <section className={`lo-problem ${problem.recovery ? 'lo-problem-attention' : 'lo-problem-compact'}`}><Icon name="alert" /><div><strong>{problem.recovery ? 'Cần xác minh trước khi tiếp tục điều phối' : 'Công việc thất bại'}</strong><p>{problem.stepNumber && <span className="lo-failure-step">Bước {problem.stepNumber} · {problem.stepName}: </span>}<span>{problem.message}</span></p>{problem.recovery && <p>Kiểm tra robot và bằng chứng dừng trước khi đối soát. Đối soát không tự chạy lại công việc.</p>}{problem.stepId && <button className="lo-text-button lo-view-failed-step" onClick={() => { setTab('progress'); setRevealStep({ id: problem.stepId }); }}>Xem bước lỗi <span aria-hidden="true">→</span></button>}</div></section>}
+      {job.beOrchestrated && ['RECOVERY_REQUIRED', 'FAILED', 'CANCELLED'].includes(job.status) && <WorkflowFailurePanel key={job.jobId} job={job} refreshTick={refreshTick} disabled={!!error} onSaved={onSaved} onOpenRecovery={permissions.recover ? () => setTab('recovery') : undefined} />}
       {summary && <section className={`lo-execution-status lo-execution-${summary.tone}`}><strong>{summary.title}</strong><p>{summary.message}</p>{summary.elapsed && <small>Đã chờ / thực hiện: {summary.elapsed}{summary.timeout && ` · Thời gian chờ của bước: ${summary.timeout}`}</small>}</section>}
       {confirmationIssue && !(job.cancelRequestedAt || job.cancelCommandId) && <p className="lo-confirmation-block" role="status">{confirmationIssue}</p>}
       <dl className="lo-job-facts"><div><dt>Quy trình</dt><dd>{info.workflow}</dd></div><div><dt>Yêu cầu liên quan</dt><dd>{info.requestCode || (job.serviceRequestId ? job.serviceRequestId.slice(0, 8) : 'Không có')}</dd></div><div><dt>Vào hàng đợi</dt><dd>{stamp(job.queuedAt)}</dd></div><div><dt>{isTerminal ? 'Kết thúc' : 'Bắt đầu'}</dt><dd>{stamp(isTerminal ? job.endedAt : job.startedAt)}</dd></div></dl>

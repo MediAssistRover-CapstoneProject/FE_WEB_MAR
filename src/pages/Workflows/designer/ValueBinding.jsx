@@ -16,6 +16,7 @@ export default function ValueBinding({ field, value, onChange, document, nodeId,
     else if (e.target.value === 'input') onChange(inputRef(variables[0]?.key ?? ''));
     else onChange({ $ref: e.target.value === 'context' ? '/vars/' : '/outputs/' });
   }}><option value="fixed">Cố định</option><option value="input">Biến đầu vào</option><option value="output">Kết quả bước trước</option><option value="context">Biến ngữ cảnh</option>{source === 'custom' && <option value="custom">Tham chiếu hiện có</option>}</select>}</div>
+  {field.help && <p className="wfd-muted">{field.help}</p>}
   {source === 'input' ? <>
     <Field label={`Biến cho ${field.label}`}><select value={variableKey} disabled={disabled} onChange={e => onChange(inputRef(e.target.value))}><option value="">Chọn biến</option>{variableKey && !variables.some(v => v.key === variableKey) && <option value={variableKey} disabled>Biến không phù hợp · {variableKey}</option>}{variables.map(v => <option key={v.key} value={v.key}>{v.label} · {v.key}</option>)}</select></Field>
     {!variables.length && <p className="wfd-muted">Chưa có biến đúng kiểu cho trường này.</p>}

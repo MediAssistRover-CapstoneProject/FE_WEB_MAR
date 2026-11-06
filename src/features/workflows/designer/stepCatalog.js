@@ -22,7 +22,7 @@ export const speechFields = [f('text', 'Nội dung nói', 'string', { required: 
 export const stepCatalog = {
   MOVE: {
     label: 'Di chuyển', icon: '↗', description: 'Đi tới endpoint thuộc bản đồ đã chọn.', defaults: { mode: 'NORMAL', max_speed_mps: 0.08 }, timeout: 180,
-    fields: [uuid('map_id', 'Bản đồ', { required: true, widget: 'map' }), uuid('endpoint_id', 'Điểm đến', { required: true, widget: 'endpoint' }), choice('mode', 'Chế độ', ['NORMAL', 'ESCORT', 'PATROL'], { required: modern }), f('max_speed_mps', 'Tốc độ tối đa (m/s)', 'number', { required: modern, exclusiveMin: 0, max: .8 })],
+    fields: [uuid('map_id', 'Bản đồ', { required: true, widget: 'map', help: 'Dùng chung biến map_id cho các bước di chuyển trên cùng bản đồ.' }), uuid('endpoint_id', 'Điểm đến', { required: true, widget: 'endpoint', help: 'Chỉ truyền UUID endpoint. BE kiểm tra bản đồ, Pi tra điểm để di chuyển. Chọn rõ điểm A/B; dây nối không tự đổi điểm đến.' }), choice('mode', 'Chế độ', ['NORMAL', 'ESCORT', 'PATROL'], { required: modern }), f('max_speed_mps', 'Tốc độ tối đa (m/s)', 'number', { required: modern, exclusiveMin: 0, max: .8 })],
   },
   INTERACT: {
     label: 'Tương tác', icon: '☏', description: 'Phát lời nói hoặc chờ phản hồi: đóng cửa, kiểm tra khóa, nhập dữ liệu.', defaults: { action: 'SPEAK', prompt_key: 'CUSTOM', data: { text: '', language_code: 'vi' } }, timeout: 300,
@@ -70,15 +70,20 @@ export function fieldsForStep(data, version = 3) {
   return (stepCatalog[data.stepType]?.fields ?? []).filter(field => !field.when || field.when(p, version)).map(field => ({ ...field, required: typeof field.required === 'function' ? field.required(p, version) : !!field.required }));
 }
 export const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const identityKeys = ['map_id', 'endpoint_id', 'service_request_id', 'zone_id', 'floor_id', 'artifact_id', 'mapping_session_id', 'actor_account_id', 'verification_id', 'incident_id', 'detection_event_id', 'endpoint_group_id'];
+function variableIdentity(variable) {
+  const key = variable.key ?? variable.path?.split('/').at(-1);
+  return identityKeys.find(id => key === id || key?.endsWith('_' + id))
+    ?? ({ map: 'map_id', endpoint: 'endpoint_id' })[variable.kind];
+}
 export function variableFitsField(variable, field) {
   const kind = ['map', 'endpoint', 'select'].includes(variable.kind) ? 'string' : variable.kind;
   const expected = field.kind === 'enum' ? 'string' : field.kind;
   if (kind !== expected && !(expected === 'number' && kind === 'integer')) return false;
   if (field.key === 'service_request_id' && ['map', 'endpoint'].includes(variable.kind)) return false;
   if (field.widget === 'map' && variable.kind === 'endpoint' || field.widget === 'endpoint' && variable.kind === 'map') return false;
-  const outputId = variable.path?.split('/').at(-1);
-  const identities = ['map_id', 'endpoint_id', 'service_request_id', 'zone_id', 'floor_id', 'artifact_id', 'mapping_session_id', 'actor_account_id', 'verification_id', 'incident_id', 'detection_event_id', 'endpoint_group_id'];
-  if (field.format === 'uuid' && identities.includes(field.key) && identities.includes(outputId) && outputId !== field.key) return false;
+  const identity = variableIdentity(variable);
+  if (field.format === 'uuid' && identityKeys.includes(field.key) && identity && identity !== field.key) return false;
   return true;
 }
 export function variableValueError(value, variable) {

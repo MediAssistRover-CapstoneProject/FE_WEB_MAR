@@ -19,6 +19,7 @@ export const workflowApi = {
   replaceGraph: (id, body) => apiRequest(`/api/v1/admin/workflows/${id}/graph`, { method: 'PUT', body }),
   update: (id, body) => apiRequest(`/api/v1/admin/workflows/${id}`, { method: 'PUT', body }),
   remove: (id) => apiRequest(`/api/v1/admin/workflows/${id}`, { method: 'DELETE' }),
+  forceDelete: (id) => apiRequest(`/api/v1/admin/workflows/${id}/force`, { method: 'DELETE' }),
   addTask: (id, body) => apiRequest(`/api/v1/admin/workflows/${id}/tasks`, { method: 'POST', body }),
   updateTask: (id, taskId, body) => apiRequest(`/api/v1/admin/workflows/${id}/tasks/${taskId}`, { method: 'PUT', body }),
   deleteTask: (id, taskId) => apiRequest(`/api/v1/admin/workflows/${id}/tasks/${taskId}`, { method: 'DELETE' }),

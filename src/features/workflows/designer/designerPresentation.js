@@ -19,7 +19,7 @@ export function stepBehaviour(data) {
   if (isCloseRequest(data)) return {
     hint: 'Chưa bấm: tiếp tục chờ',
     text: 'Chưa bấm nút thì giữ nguyên bước chờ. Phản hồi confirmed = true mới phát lệnh đóng servo. Bấm nút không phải bằng chứng cửa hoặc khóa đã đóng.',
-    limitation: 'Nhánh “Phản hồi sai” chỉ bảo vệ khi một client gửi kết quả hoàn tất không có xác nhận hợp lệ; đây không phải trường hợp staff chưa bấm nút.',
+    limitation: 'Phản hồi hoàn tất không có xác nhận hợp lệ phải dừng trước lệnh đóng servo; đây không phải trường hợp staff chưa bấm nút.',
   };
   return null;
 }

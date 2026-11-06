@@ -123,6 +123,7 @@ function ResourcePanel({ resource, role }) {
   const itemOps = ops.filter(op => paths(op).some(p => !parentNames.has(p.name)) && op.key !== detailOp?.key && !op.path.endsWith('/stream'));
   const eligible = op => {
     if (op.path.includes('/confirm-pickup') || op.path.includes('/confirm-delivery')) return false; // Retired for schema 3; use Job step confirmation.
+    if (resource.id === 'alerts' && row?.notificationType === 'WORKFLOW_FAILURE' && /\/(acknowledge|resolve|close)$/.test(op.path)) return false;
     if (resource.id === 'workflows' && row?.status !== 'DRAFT' && (['PUT', 'DELETE'].includes(op.method) || /\/(steps|tasks|transitions|publish|validate)$/.test(op.path))) return false;
     if (op.path.endsWith('/submit') && row?.status !== 'DRAFT') return false;
     const step = selectedData?.steps?.find(s => s.jobStepId === selectedData.job?.selectedJobStepId);
@@ -150,6 +151,7 @@ function ResourcePanel({ resource, role }) {
       {listOp.parameters.some(p => p.name === 'page') && <div className="be-pagination"><button disabled={!page || loading} onClick={() => setPage(p => p - 1)}>Trang trước</button><button disabled={loading || (data.totalPages != null ? page + 1 >= data.totalPages : rows.length < 20)} onClick={() => setPage(p => p + 1)}>Trang sau</button></div>}
     </section><section className="be-card be-record-detail"><h3>{selectedData ? recordTitle(row, resource) : 'Thông tin chi tiết'}</h3>{detailLoading ? <p role="status">Đang tải chi tiết…</p> : detailError ? <p role="alert" className="be-error">{detailError}</p> : selectedData ? <>
       <div className="be-actions">{itemOps.filter(eligible).map(op => <button key={op.key} type="button" className={sensitiveAction(op) ? 'danger' : ''} onClick={() => open(op)}>{actionLabel(op)}</button>)}</div>
+      {resource.id === 'alerts' && row?.notificationType === 'WORKFLOW_FAILURE' && row.dataJson?.job_id && <div className="be-instruction"><p>Tiếp nhận cảnh báo không cho robot chạy lại. Xử lý lỗi và chuyển Admin tại công việc; cảnh báo được đóng sau khi đối soát kết thúc job.</p><a className="be-link-button" href={'/admin/live-operations?jobId=' + encodeURIComponent(row.dataJson.job_id)}>Mở công việc để tiếp nhận hoặc chuyển Admin →</a></div>}
       {resource.id === 'jobs' && <div className="be-live"><label className="be-check"><input type="checkbox" checked={live} onChange={e => setLive(e.target.checked)} />Theo dõi trực tiếp</label><small role="status">{liveStatus}</small><JobInstruction detail={selectedData} open={open} /></div>}
       {enhanced ? <><RecordSummary row={row} resource={resource} />{resource.id === 'jobs' && <JobSteps detail={selectedData} />}<details className="be-full-record"><summary>Toàn bộ thông tin bản ghi</summary><RecordDetails value={selectedData} /></details></> : <RecordDetails value={selectedData} />}
     </> : <div className="be-empty"><h3>Chọn một mục trong danh sách</h3><p>Thông tin và các thao tác phù hợp sẽ xuất hiện tại đây.</p></div>}</section></div>}

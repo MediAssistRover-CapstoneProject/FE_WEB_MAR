@@ -1,4 +1,4 @@
-import { addStep, authorizationFromStep, connect, copy, makeId, newDocument, renameVariable } from './designerModel.js';
+import { addStep, authorizationFromStep, connect, copy, newDocument, renameVariable } from './designerModel.js';
 
 export const QR_DELIVERY_DRAFT_NOTICE = 'Bản thiết kế QR và một nút yêu cầu đóng cửa chưa sẵn sàng chạy. Cần tích hợp nút trên màn robot, luồng bàn giao BE và quyền mở ngăn trên Pi. Bấm nút chỉ yêu cầu đóng cửa, không xác nhận cửa hoặc khóa đã đóng chắc chắn.';
 
@@ -20,7 +20,7 @@ export function rebuildQrDeliveryDraft(document) {
       serviceType: 'DELIVERY',
       description: 'Đến A → staff quét QR → mở servo → bấm “Đã bỏ hàng — Đóng cửa” → đóng servo → đến B → staff quét QR → mở servo → bấm “Đã lấy hàng — Đóng cửa” → đóng servo. Bản thiết kế chờ tích hợp màn robot và runtime bàn giao.',
       inputSchemaJson: { type: 'object', properties: {} },
-      inputUiJson: { ...inputUi, deliveryDraft: { mode: 'QR_SINGLE_BUTTON', version: 2, runtimeReady: false, notice: QR_DELIVERY_DRAFT_NOTICE } },
+      inputUiJson: { ...base.workflow.inputUiJson, ...inputUi, deliveryDraft: { mode: 'QR_SINGLE_BUTTON', version: 3, runtimeReady: false, notice: QR_DELIVERY_DRAFT_NOTICE } },
       defaultInputsJson: {},
       outputMappingJson: {},
       maxDurationSec: 3600,
@@ -36,17 +36,6 @@ export function rebuildQrDeliveryDraft(document) {
   for (const key of ['definitionHash', 'compiledGraphJson', 'validatedAt', 'publishedAt', 'startStepId']) delete next.workflow[key];
   next.nodes[0].position = { x: 40, y: 120 };
   next.nodes[1].position = { x: 2020, y: 510 };
-  const end = (name, x, y) => {
-    const id = makeId('END');
-    next.nodes.push({ id, type: 'workflow', position: { x, y }, data: { kind: 'terminal', name, terminalStatus: 'RECOVERY_REQUIRED' } });
-    return id;
-  };
-  const executionError = end('Lỗi thực thi · cần hỗ trợ', 320, 920);
-  const operationTimeout = end('Hết giờ di chuyển / servo', 650, 920);
-  const qrTimeout = end('Hết thời gian xác thực QR', 980, 920);
-  const buttonTimeout = end('Hết giờ chờ nút đóng cửa', 1310, 920);
-  const invalidResponse = end('Phản hồi nút không hợp lệ', 1640, 920);
-
   const sequence = [];
   const stages = [];
   for (const [row, stage] of ['SENDER', 'RECEIVER'].entries()) {
@@ -92,10 +81,8 @@ export function rebuildQrDeliveryDraft(document) {
     const node = next.nodes.find(n => n.id === id);
     const button = node.data.stepType === 'INTERACT';
     next = connect(next, { source: id, target: sequence[index + 1] ?? 'end', sourceHandle: button ? 'true' : 'SUCCESS' });
-    if (button) next = connect(next, { source: id, target: invalidResponse, sourceHandle: 'false' });
-    next = connect(next, { source: id, target: executionError, sourceHandle: 'FAILURE' });
-    const timeoutTarget = node.data.stepType === 'AUTHENTICATE' ? qrTimeout : button ? buttonTimeout : operationTimeout;
-    next = connect(next, { source: id, target: timeoutTarget, sourceHandle: 'TIMEOUT' });
+    // Failures, timeouts and an invalid completed button response stop inside the step.
+    // The payload compiler supplies their runtime fallbacks without extra canvas wires.
   });
   for (const [, auth, unlock] of stages) next.nodes.find(n => n.id === unlock).data.params.authorization = authorizationFromStep(next, unlock, auth);
 

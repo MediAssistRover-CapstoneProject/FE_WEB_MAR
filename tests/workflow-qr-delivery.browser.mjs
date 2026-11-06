@@ -36,11 +36,23 @@ await page.route('**/*', route => {
 try {
   await page.goto(`${base}/workflow?workflowId=${workflowId}`);
   await expect(page.locator('.wfd-node-top small', { hasText: 'CHECK_CONDITION' })).toHaveCount(8);
+  assert.equal(writes.length, 0);
   await page.getByRole('button', { name: 'Mẫu giao hàng QR', exact: true }).click();
+  const confirmation = page.getByRole('dialog', { name: 'Áp dụng mẫu giao hàng QR?', exact: true });
+  await expect(confirmation.getByRole('button', { name: 'Hủy', exact: true })).toBeFocused();
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Escape');
+  await expect(confirmation).toHaveCount(0);
+  await expect(page.locator('.wfd-node-top small', { hasText: 'CHECK_CONDITION' })).toHaveCount(8);
+  await page.getByRole('button', { name: 'Mẫu giao hàng QR', exact: true }).click();
+  await confirmation.getByRole('button', { name: 'Áp dụng mẫu', exact: true }).click();
   await expect(page.locator('.wfd-node-top small').filter({ hasText: /^(MOVE|AUTHENTICATE|CONTROL_HARDWARE|INTERACT)$/ })).toHaveCount(10);
   await expect(page.locator('.wfd-node-top small', { hasText: 'CHECK_CONDITION' })).toHaveCount(0);
   await expect(page.locator('.wfd-node-top small', { hasText: 'HANDLE_PAYLOAD' })).toHaveCount(0);
   await expect(page.locator('.wfd-banner.warning')).toContainText('chưa sẵn sàng chạy');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(11);
+  await expect(page.locator('.wfd-node.terminal')).toHaveCount(1);
+  await expect(page.locator('.react-flow__handle.source[data-handleid="FAILURE"], .react-flow__handle.source[data-handleid="TIMEOUT"], .react-flow__handle.source[data-handleid="false"]')).toHaveCount(0);
   await page.getByRole('button', { name: 'Lưu lên máy chủ', exact: true }).click();
   await expect(page.getByRole('status').first()).toContainText('Đã lưu đầy đủ');
   assert.equal(saved.steps.length, 10);
@@ -59,13 +71,22 @@ try {
   }
   await expect(page.locator('.wfd-node-hint', { hasText: 'QR sai: quét lại trong thời hạn' })).toHaveCount(2);
   await expect(page.locator('.wfd-node-hint', { hasText: 'Chưa bấm: tiếp tục chờ' })).toHaveCount(2);
-  await expect(page.locator('.wfd-node-ports', { hasText: 'Phản hồi sai' })).toHaveCount(2);
+  await expect(page.locator('.wfd-node-ports', { hasText: 'Phản hồi sai' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Kiểm tra', exact: true }).click();
   await expect(page.getByRole('status').first()).toContainText('BE đã kiểm tra cấu trúc');
   await expect(page.getByRole('button', { name: 'Publish', exact: true })).toBeDisabled();
   await page.reload();
   await expect(page.locator('.wfd-node-top small').filter({ hasText: /^(MOVE|AUTHENTICATE|CONTROL_HARDWARE|INTERACT)$/ })).toHaveCount(10);
   await expect(page.locator('.wfd-banner.warning')).toContainText('chưa sẵn sàng chạy');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(11);
+  await expect(page.locator('.wfd-node.terminal')).toHaveCount(1);
+  // Also reopen the BE definition after removing the local editor copy.
+  await page.getByRole('button', { name: '← Thư viện', exact: true }).click();
+  await page.evaluate(() => { for (const key of Object.keys(localStorage)) if (key.startsWith('mediassist.workflow-designer.v1:')) localStorage.removeItem(key); });
+  await page.goto(`${base}/workflow?workflowId=${workflowId}`);
+  await expect(page.locator('.react-flow__edge')).toHaveCount(11);
+  await expect(page.locator('.wfd-node.terminal')).toHaveCount(1);
+  await expect(page.locator('.react-flow__handle.source[data-handleid="FAILURE"], .react-flow__handle.source[data-handleid="TIMEOUT"], .react-flow__handle.source[data-handleid="false"]')).toHaveCount(0);
   assert.ok(!writes.some(w => /publish|job-steps|\/jobs(?:\/|$)|qr-verifications/.test(w.path)));
   assert.deepEqual(errors, []);
   console.log('PASS: existing demo rebuilt, saved and restored as a guarded 10-step QR draft; no runtime calls.');

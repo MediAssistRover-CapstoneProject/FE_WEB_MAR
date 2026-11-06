@@ -1,7 +1,8 @@
+import { defaultFailurePolicy, failurePolicyIssues } from '../workflowFailurePolicy.js';
 import { stepCatalog, operators, terminalStatuses, valueError, variableFitsField, fieldsForStep, speechFields, variableValueError } from './stepCatalog.js';
 import { defaultOutput, lookupOutput, inferKind } from './stepOutputs.js';
 import { stepContractIssues } from './stepContractChecks.js';
-import { branchResultField, branchesOnResult } from './designerPresentation.js';
+import { branchResultField, branchesOnResult, isCloseRequest } from './designerPresentation.js';
 
 export const copy = value => structuredClone(value);
 export const makeId = prefix => `${prefix}_${crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`;
@@ -17,7 +18,7 @@ export function visit(value, fn, path = '') {
 }
 export function newDocument() {
   return {
-    localId: makeId('DESIGN'), workflow: { workflowCode: makeId('WF_USER'), versionNo: 1, workflowName: 'Quy trình mới', serviceType: 'CUSTOM', description: '', inputSchemaJson: { type: 'object', properties: {} }, inputUiJson: {}, defaultInputsJson: {}, outputMappingJson: {}, requiredCapabilitiesJson: [], maxDurationSec: 1200, maxTotalVisits: 100, graphVersion: 3, schemaVersion: 3 },
+    localId: makeId('DESIGN'), workflow: { workflowCode: makeId('WF_USER'), versionNo: 1, workflowName: 'Quy trình mới', serviceType: 'CUSTOM', description: '', inputSchemaJson: { type: 'object', properties: {} }, inputUiJson: { failureHandling: { ...defaultFailurePolicy } }, defaultInputsJson: {}, outputMappingJson: {}, requiredCapabilitiesJson: [], maxDurationSec: 1200, maxTotalVisits: 100, graphVersion: 3, schemaVersion: 3 },
     tasks: [{ taskCode: 'MAIN', taskName: 'Tác vụ chính', sequenceNo: 1, description: '', configJson: {} }], variables: [],
     nodes: [{ id: 'start', type: 'workflow', position: { x: 80, y: 170 }, data: { kind: 'start', name: 'Bắt đầu' } }, { id: 'end', type: 'workflow', position: { x: 680, y: 170 }, data: { kind: 'terminal', name: 'Hoàn thành', terminalStatus: 'SUCCEEDED' } }],
     edges: [], viewport: { x: 0, y: 0, zoom: 1 }, readOnlyReasons: [],
@@ -61,6 +62,31 @@ export function graphHasCycle(nodes, edges) {
   };
   return nodes.some(n => walk(n.id));
 }
+// A palette click extends an open main path, or inserts before its success terminal.
+// Existing branches and paths to other steps always require an explicit connection.
+export function quickAppendSource(document, selectedId) {
+  const source = document.nodes.find(n => n.id === (selectedId ?? 'start'));
+  if (!source || source.data.kind === 'terminal' || branchesOnResult(source.data)) return null;
+  const routes = document.edges.filter(e => e.source === source.id && e.data?.outcome === 'SUCCESS');
+  if (!routes.length) return source;
+  if (source.data.kind === 'start' || routes.length !== 1 || !routes[0].data.defaultTransition) return null;
+  const terminal = document.nodes.find(n => n.id === routes[0].target);
+  return terminal?.data.kind === 'terminal' && terminal.data.terminalStatus === 'SUCCEEDED' ? source : null;
+}
+export function appendStep(document, type, selectedId, position) {
+  const source = quickAppendSource(document, selectedId);
+  let next = addStep(document, type, position);
+  if (!source) return next;
+  const targetId = next.nodes.at(-1).id;
+  const previous = next.edges.find(e => e.source === source.id && e.data?.outcome === 'SUCCESS');
+  if (previous) next.edges = next.edges.filter(e => e.id !== previous.id);
+  next = connect(next, { source: source.id, target: targetId, sourceHandle: 'SUCCESS' });
+  if (!branchesOnResult(next.nodes.find(n => n.id === targetId).data)) {
+    const end = previous ? next.nodes.find(n => n.id === previous.target) : next.nodes.find(n => n.data.kind === 'terminal' && n.data.terminalStatus === 'SUCCEEDED');
+    if (end) next = connect(next, { source: targetId, target: end.id, sourceHandle: 'SUCCESS' });
+  }
+  return next;
+}
 export function canConnect(document, connection) {
   const source = document.nodes.find(n => n.id === connection.source), target = document.nodes.find(n => n.id === connection.target);
   if (!source || !target || source.id === target.id || source.data.kind === 'terminal' || target.data.kind === 'start') return false;
@@ -88,6 +114,14 @@ export function connect(document, connection) {
   return next;
 }
 export function effectiveParams(node) { return { ...node.data.params, ...node.data.mapping }; }
+export function hasAutomaticCloseStop(document, nodeId) {
+  const node = document.nodes.find(n => n.id === nodeId);
+  if (!isCloseRequest(node?.data)) return false;
+  const routes = document.edges.filter(e => e.source === nodeId && e.data?.outcome === 'SUCCESS');
+  const condition = routes[0]?.data.conditionJson;
+  return routes.length === 1 && !routes[0].data.defaultTransition && routes[0].data.priority === 1
+    && condition?.path === `/outputs/${escape(nodeId)}/confirmed` && condition.operator === 'EQ' && condition.value === true;
+}
 const conditionPointer = path => typeof path === 'string' && !path.startsWith('/') ? '/' + path.split('.').join('/') : path;
 const below = (path, prefix) => path === prefix || path?.startsWith(prefix + '/');
 function transitionInputPath(node, path, direction) {
@@ -188,9 +222,26 @@ export function fromDetail(detail) {
   if (workflow.startStepId && codes.has(workflow.startStepId)) document.edges.push({ id: 'start-edge', source: 'start', target: codes.get(workflow.startStepId), sourceHandle: 'SUCCESS', data: { outcome: 'SUCCESS', defaultTransition: true, priority: 1, conditionJson: null } });
   (detail.transitions ?? []).forEach(t => {
     const source = codes.get(t.fromStepId);
+    // Automatic stop routes belong to the step, not to the editable canvas.
+    // v1 designers did not mark them explicitly, but did record every drawn terminal route.
+    const routeKey = `${source}:${t.outcome}:${t.priority}`;
+    const automatic = Array.isArray(designer?.automaticErrorRoutes) && designer.automaticErrorRoutes.some(route => route?.fromStepCode === source && route.outcome === t.outcome && route.terminalStatus === t.terminalStatus)
+      || designer?.version === 1 && !Object.hasOwn(designer, 'automaticErrorRoutes') && Object.hasOwn(designer.positions ?? {}, source) && designer.terminalRoutes && !Object.hasOwn(designer.terminalRoutes, routeKey);
+    if (automatic && ['FAILURE', 'TIMEOUT'].includes(t.outcome) && t.terminalStatus === 'RECOVERY_REQUIRED'
+      && t.toStepId == null && t.defaultTransition === true && t.priority === 1 && t.conditionJson == null
+      && !Object.hasOwn(designer?.terminalRoutes ?? {}, routeKey)
+      && detail.transitions.filter(route => route.fromStepId === t.fromStepId && route.outcome === t.outcome).length === 1) return;
+    if (automatic && t.outcome === 'SUCCESS' && t.terminalStatus === 'RECOVERY_REQUIRED'
+      && t.toStepId == null && t.defaultTransition === true && t.priority === 2 && t.conditionJson == null
+      && !Object.hasOwn(designer?.terminalRoutes ?? {}, routeKey)
+      && isCloseRequest(document.nodes.find(n => n.id === source)?.data)) {
+      const routes = detail.transitions.filter(route => route.fromStepId === t.fromStepId && route.outcome === 'SUCCESS');
+      const main = routes.find(route => !route.defaultTransition && route.priority === 1 && (route.toStepId != null || terminalStatuses.includes(route.terminalStatus))
+        && route.conditionJson?.path === '/result/confirmed' && route.conditionJson.operator === 'EQ' && route.conditionJson.value === true);
+      if (routes.length === 2 && main) return;
+    }
     let target = codes.get(t.toStepId);
     if (t.terminalStatus) {
-      const routeKey = `${source}:${t.outcome}:${t.priority}`;
       const stored = designer?.terminals?.find(n => n.id === designer.terminalRoutes?.[routeKey] && n.terminalStatus === t.terminalStatus);
       target = stored?.id ?? `terminal-${t.terminalStatus}`;
       if (!document.nodes.some(n => n.id === target)) document.nodes.push({ id: target, type: 'workflow', position: designer?.positions?.[target] ?? { x: 1450, y: 80 + terminalStatuses.indexOf(t.terminalStatus) * 150 }, data: { kind: 'terminal', name: stored?.name ?? (t.terminalStatus === 'SUCCEEDED' ? 'Hoàn thành' : t.terminalStatus), terminalStatus: t.terminalStatus } });
@@ -275,6 +326,7 @@ export function validateDocument(document, catalog = null) {
   const errors = [], add = (message, nodeId, edgeId) => errors.push({ message, nodeId, edgeId });
   for (const key of Object.keys(document.invalidJson ?? {})) add(`JSON chưa hợp lệ: ${key}`, key.split(':')[0]);
   if (!document.workflow.workflowName?.trim()) add('Nhập tên quy trình.');
+  for (const issue of failurePolicyIssues(document.workflow)) add(issue);
   if (document.workflow.workflowName?.length > 160) add('Tên quy trình tối đa 160 ký tự.');
   if (!(document.workflow.maxDurationSec > 0) || !(document.workflow.maxTotalVisits > 0)) add('Giới hạn thời gian và lượt chạy phải lớn hơn 0.');
   const taskCodes = document.tasks.map(t => t.taskCode), taskOrders = document.tasks.map(t => t.sequenceNo);
@@ -373,10 +425,10 @@ export function validateDocument(document, catalog = null) {
       if (catalog && typeof params.endpoint_id === 'string' && !catalog.endpoints.some(e => e.endpointId === params.endpoint_id && e.active && e.accessible && (typeof params.map_id !== 'string' || e.mapId === params.map_id))) add('Điểm MOVE không còn khả dụng hoặc sai bản đồ.', node.id);
     }
     const outgoing = document.edges.filter(e => e.source === node.id && e.data?.outcome === 'SUCCESS');
-    if (!outgoing.length || !outgoing.some(e => e.data.defaultTransition)) add(`${d.name}: nối đường thành công mặc định tới bước tiếp theo hoặc kết thúc.`, node.id);
+    if (!outgoing.length || !outgoing.some(e => e.data.defaultTransition) && !hasAutomaticCloseStop(document, node.id)) add(`${d.name}: nối đường thành công mặc định tới bước tiếp theo hoặc kết thúc.`, node.id);
     for (const outcome of outcomes) {
       const routes = document.edges.filter(e => e.source === node.id && e.data?.outcome === outcome);
-      if (routes.length && routes.filter(e => e.data.defaultTransition).length !== 1) add(`${d.name}: ${outcome} cần đúng một nhánh mặc định.`, node.id);
+      if (routes.length && routes.filter(e => e.data.defaultTransition).length !== 1 && !(outcome === 'SUCCESS' && hasAutomaticCloseStop(document, node.id))) add(`${d.name}: ${outcome} cần đúng một nhánh mặc định.`, node.id);
       const priorities = routes.map(e => e.data.priority);
       if (new Set(priorities).size !== priorities.length || priorities.some(p => !Number.isInteger(p) || p < 1)) add(`${d.name}: thứ tự nhánh phải là số nguyên dương và không trùng.`, node.id);
       if (routes.some(e => e.data.defaultTransition && e.data.priority !== Math.max(...priorities))) add(`${d.name}: nhánh mặc định phải có thứ tự cuối.`, node.id);
@@ -430,11 +482,20 @@ export function toPayload(document) {
   const allowed = ['workflowCode', 'versionNo', 'workflowName', 'serviceType', 'description', 'inputSchemaJson', 'inputUiJson', 'defaultInputsJson', 'outputMappingJson', 'requiredCapabilitiesJson', 'maxDurationSec', 'maxTotalVisits', 'graphVersion', 'schemaVersion'];
   const steps = document.nodes.filter(n => n.data.kind === 'step').map((n, i) => ({ taskCode: n.data.taskCode, stepType: n.data.stepType, stepCode: n.id, stepName: n.data.name, sequenceNo: i + 1, description: n.data.description, paramsJson: n.data.params, inputMappingJson: n.data.mapping, timeoutSec: n.data.timeoutSec, maxAttempts: n.data.maxAttempts, retryDelaySec: n.data.retryDelaySec, retryCodesJson: n.data.retryCodesJson, maxVisits: n.data.maxVisits, auditLevel: n.data.auditLevel }));
   const transitions = [];
+  const automaticErrorRoutes = [];
   for (const step of steps) for (const outcome of outcomes) {
     const routes = document.edges.filter(e => e.source === step.stepCode && e.data.outcome === outcome);
-    if (!routes.length && outcome !== 'SUCCESS') transitions.push({ fromStepCode: step.stepCode, toStepCode: null, outcome, conditionJson: null, priority: 1, defaultTransition: true, terminalStatus: 'RECOVERY_REQUIRED' });
+    if (!routes.length && outcome !== 'SUCCESS') {
+      transitions.push({ fromStepCode: step.stepCode, toStepCode: null, outcome, conditionJson: null, priority: 1, defaultTransition: true, terminalStatus: 'RECOVERY_REQUIRED' });
+      automaticErrorRoutes.push({ fromStepCode: step.stepCode, outcome, terminalStatus: 'RECOVERY_REQUIRED' });
+    }
     routes.forEach(edge => { const target = document.nodes.find(n => n.id === edge.target), source = document.nodes.find(n => n.id === step.stepCode); transitions.push({ fromStepCode: step.stepCode, toStepCode: target?.data.kind === 'step' ? edge.target : null, ...edge.data, conditionJson: transitionCondition(edge.data.conditionJson, source, 'api'), terminalStatus: target?.data.kind === 'terminal' ? target.data.terminalStatus : null }); });
+    if (outcome === 'SUCCESS' && hasAutomaticCloseStop(document, step.stepCode)) {
+      transitions.push({ fromStepCode: step.stepCode, toStepCode: null, outcome, conditionJson: null, priority: 2, defaultTransition: true, terminalStatus: 'RECOVERY_REQUIRED' });
+      automaticErrorRoutes.push({ fromStepCode: step.stepCode, outcome, terminalStatus: 'RECOVERY_REQUIRED' });
+    }
   }
+  workflow.inputUiJson.designer.automaticErrorRoutes = automaticErrorRoutes;
   return { workflow: Object.fromEntries(allowed.map(k => [k, workflow[k]])), graph: { startStepCode: document.edges.find(e => e.source === 'start')?.target, tasks: document.tasks.map((t, i) => ({ taskCode: t.taskCode, taskName: t.taskName, description: t.description ?? '', configJson: t.configJson ?? {}, sequenceNo: t.sequenceNo ?? i + 1 })), steps, transitions } };
 }
 export const fingerprint = document => JSON.stringify(toPayload(document));
