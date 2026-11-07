@@ -10,6 +10,7 @@ function catalog(resource, params) { return apiRequest(query(`/api/v1/${resource
 export const facilityApi = {
   listFloors: (params) => catalog('floors', params),
   listMaps: (params) => catalog('maps', params),
+  deleteMap: (id, reason) => apiRequest(`/api/v1/maps/${encodeURIComponent(id)}`, { method: 'DELETE', body: { reason } }),
   listZones: (params) => catalog('zones', params),
   listRooms: (params) => catalog('rooms', params),
   listEndpoints: (params) => catalog('endpoints', params),

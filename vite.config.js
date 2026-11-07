@@ -5,10 +5,14 @@ export default defineConfig(({ mode }) => {
   const target = env.VITE_DEV_PROXY_TARGET;
 
   return {
-    server: target ? {
-      proxy: {
-        '/api': { target, changeOrigin: true },
+    server: {
+      watch: {
+        // Generated test files and downloaded tools can be locked on Windows.
+        ignored: [/(^|[\\/])\.workstation-build([\\/]|$)/],
       },
-    } : undefined,
+      proxy: target ? {
+        '/api': { target, changeOrigin: true },
+      } : undefined,
+    },
   };
 });

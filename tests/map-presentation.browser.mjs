@@ -85,6 +85,7 @@ try {
   assert.equal(entry.published.features[0].label, 'Phòng Nội');
   await page.reload();
   await expect(svg.locator('text').filter({ hasText: 'Bản nháp mới' })).toHaveCount(1);
+  await svg.focus();
   await page.keyboard.press('r');
   await expect(page.getByRole('button', { name: 'Vẽ phòng (R)', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('v');

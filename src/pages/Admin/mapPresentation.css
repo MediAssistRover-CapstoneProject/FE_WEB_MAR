@@ -35,6 +35,18 @@
 .mp-history button:hover:not(:disabled), .mp-zoom button:hover { background: #f1f5f9; }
 .mp-zoom button { border-color: var(--mp-line); }
 .mp-zoom-value { min-width: 43px; text-align: center; font-size: 10px; color: #64748b; font-variant-numeric: tabular-nums; }
+.mp-rotation-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex-shrink:0; padding:9px 12px; border-bottom:1px solid var(--mp-line); background:#fff; }
+.mp-rotation-title { font-size:11px; font-weight:600; color:#64748b; margin-right:2px; }
+.mp-rotation-angle,.mp-rotation-actions { display:flex; align-items:center; gap:3px; }
+.mp-rotation-controls button { min-height:29px; padding:4px 7px; border:1px solid #dce5f0; border-radius:6px; background:#fff; font-size:11px; white-space:nowrap; }
+.mp-rotation-controls button:hover:not(:disabled) { background:#eff6ff; border-color:#bfdbfe; }
+.mp-rotation-angle>label { display:flex; align-items:center; gap:3px; color:#64748b; font-size:11px; margin:0; }
+.mp-rotation-angle input { width:67px; min-width:0; height:29px; padding:4px 5px; border:1px solid #dce5f0; border-radius:6px; background:#fff; color:#334155; font:inherit; font-size:11px; text-align:right; }
+.mp-rotation-slider { width:105px; min-width:65px; height:16px; accent-color:#3b82f6; }
+.mp-rotation-controls .mp-align-button { color:#2563eb; background:#f8fbff; }
+.mp-rotation-controls .mp-align-button.is-active { background:#ecf3ff; border-color:#93c5fd; }
+.mp-grid-toggle { display:flex; align-items:center; gap:5px; margin:0; color:#64748b; font-size:11px; white-space:nowrap; }
+.mp-grid-toggle input { accent-color:#3b82f6; }
 .mp-tool-hint { display: flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 11px; color: #8491a4; flex-shrink: 0; }
 .mp-tool-hint strong { font-size: 11px; font-weight: 600; color: #52627a; white-space: nowrap; }
 .mp-tool-dot { width: 5px; height: 5px; border-radius: 50%; background: #3b82f6; flex-shrink: 0; }
@@ -81,6 +93,9 @@
 .mp-object-actions button, .mp-layer-order button { flex: 1; padding: 8px 4px; background: white; border: 1px solid #e4eaf2; border-radius: 6px; font-size: 10px; color: #718097; }
 .mp-object-actions .mp-delete { color: #d85d72; border-color: #f5e5e8; background: #fffafb; }
 .mp-object-actions kbd { color: inherit; border: 0; background: transparent; font-size: 9px; margin-left: 4px; }
+.mp-door-properties { display:grid; gap:10px; margin-bottom:16px; padding:12px; border:1px solid #dce7f5; border-radius:9px; background:#f8fbff; }
+.mp-door-properties>div:first-child { display:grid; gap:5px; }.mp-door-properties strong { color:#475569; font-size:11px; font-weight:600; }.mp-door-properties span,.mp-door-properties p { color:#7c8ca4; font-size:10px; }.ls-studio .mp-door-properties p { margin:0; line-height:1.6; }
+.mp-door-actions { display:flex; gap:6px; flex-wrap:wrap; }.mp-door-actions button { flex:1; padding:7px 5px; border:1px solid #dce5f0; border-radius:6px; background:#fff; font-size:10px; }.mp-door-actions button:hover:not(:disabled) { background:#eff6ff; border-color:#bfdbfe; }
 .mp-empty-selection { padding: 18px 6px 12px; display: flex; flex-direction: column; align-items: center; text-align: center; }
 .mp-empty-selection > svg { width: 27px; height: 27px; color: #b2bfd0; margin-bottom: 13px; }
 .mp-empty-selection strong { color: #718097; font-size: 12px; font-weight: 500; }
@@ -138,4 +153,16 @@
   .mp-editor.is-expanded { inset: 4px; padding: 10px; border-radius: 10px; overflow-y: auto; }
   .mp-editor.is-expanded .mp-workspace { flex: none; height: auto; overflow: visible; }
   .mp-editor.is-expanded .mp-stage { height: max(400px, calc(100dvh - 230px)); }
+}
+@media (max-width: 600px) {
+  .mp-stage { height:570px; }
+  .mp-rotation-controls { gap:7px; padding:9px 10px; }
+  .mp-rotation-title { width:100%; }
+  .mp-rotation-slider { flex:1; max-width:160px; }
+  .mp-rotation-actions { margin-left:0; }
+  .mp-stage-bar { gap:5px; padding:8px; }
+  .mp-history,.mp-zoom { gap:2px; }
+  .mp-zoom-value { min-width:33px; }
+  .mp-history button,.mp-zoom button { padding:5px; font-size:10px; }
+  .mp-shortcut-hint { flex-wrap:wrap; }
 }

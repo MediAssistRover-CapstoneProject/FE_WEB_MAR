@@ -33,6 +33,14 @@ export default function MapStudioFigma({initialStage='scan'}) {
     setShowLibrary(false);
     navigate('/admin/map?'+new URLSearchParams({mapId:id,stage:target}),{replace:true});
   };
+  const mapDeleted=ids=>{
+    if(!ids.includes(mapId))return;
+    setMapId('');
+    setStage('scan');
+    setPresentationDirty(false);
+    setCopyNotice('');
+    navigate('/admin/map',{replace:true});
+  };
 
   if(showLibrary)return <section className="ls-studio">
     <header className="ls-heading">
@@ -42,7 +50,7 @@ export default function MapStudioFigma({initialStage='scan'}) {
         <Button tone="primary" onClick={()=>{setStage('scan');setShowLibrary(false);navigate('/admin/map?stage=scan');}}>Quét map mới</Button>
       </div>
     </header>
-    <SavedMapLibrary onOpen={openMap} initialMapId={mapId}/>
+    <SavedMapLibrary onOpen={openMap} onDeleted={mapDeleted} initialMapId={mapId}/>
   </section>;
 
   return <section className="ls-studio">

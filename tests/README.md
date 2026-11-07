@@ -95,11 +95,27 @@ hướng dẫn bên dưới:
 
 ```powershell
 node tests/map-database-flow.browser.mjs
+node tests/map-delete.browser.mjs
 ```
 
 Kiểm tra bản nháp cũ, trình duyệt chưa quét, đổi map/tab, URL `mapId`, database
 trống/lỗi và màn hình 390px. Toàn bộ API được giả lập; không ghi vào BE thật.
 Ảnh kết quả tại `.workstation-build/map-database-flow/`.
+
+Thư viện có nút “Xóa bản đồ” cho ADMIN (không áp dụng tài khoản demo).
+Ngay trong khung danh sách map, “Chọn để xóa” mở checkbox từng bản đồ,
+“Chọn tất cả”, số lượng đã chọn và nút “Xóa đã chọn”. Chọn để xóa không đổi
+bản đồ đang xem và không thu gọn danh sách; “Hủy chọn” xóa các dấu chọn.
+Hộp xác nhận yêu cầu lý do 5–500 ký tự, gọi `DELETE /api/v1/maps/{id}` với
+`{ reason }`. Theo contract BE, thao tác chuyển map sang `ARCHIVED` và ẩn khỏi
+danh sách sử dụng; dữ liệu quét vẫn được giữ lại. FE chỉ bỏ map khỏi danh sách
+sau khi API thành công, chọn map còn lại và bỏ liên kết quay về map vừa xóa.
+Xóa nhiều map gửi lần lượt từng API với cùng lý do. Nếu chỉ một phần thành công,
+FE bỏ các map đã xóa, giữ các map bị lỗi trong hộp xác nhận để thử lại riêng.
+Test xóa bao phủ hủy/Escape, lý do không hợp lệ, lỗi máy chủ, khóa thao tác khi
+đang gửi, tải lại, xóa map cuối, chọn nhiều/chọn tất cả, lỗi một phần/thử lại,
+dọn lựa chọn đã mất trên máy chủ và giao diện 390/1024/1440px. API được giả lập hoàn toàn;
+ảnh tại `.workstation-build/map-delete/`.
 
 ## Tuần tra dùng bản đồ cục bộ (22/10/2026)
 

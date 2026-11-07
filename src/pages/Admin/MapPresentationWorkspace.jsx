@@ -1,5 +1,7 @@
 import { featureNames } from '../../features/facility/mapPresentation.js';
 import MapPresentationCanvas from './MapPresentationCanvas.jsx';
+import MapRotationControls from './MapRotationControls.jsx';
+import { doorGeometry, setDoorOpening } from '../../features/facility/doorGeometry.js';
 
 const tools = [
   ['select', 'Chọn', 'V', 'Chọn và kéo đối tượng'],
@@ -8,7 +10,7 @@ const tools = [
   ['CORRIDOR', 'Hành lang', 'G', 'Kéo chuột để vẽ hành lang'],
   ['polygon', 'Đa giác', 'P', 'Bấm từng đỉnh, Enter để hoàn tất'],
   ['WALL', 'Tường', 'W', 'Bấm hai điểm để vẽ tường'],
-  ['DOOR', 'Cửa', 'D', 'Bấm hai điểm để vẽ cửa'],
+  ['DOOR', 'Cửa', 'D', 'Bấm bản lề trước, sau đó bấm mép còn lại của cửa'],
   ['LABEL', 'Nhãn', 'T', 'Bấm vào map để đặt tên'],
   ['LANDMARK', 'Ký hiệu', 'L', 'Bấm vào map để đặt ký hiệu'],
 ];
@@ -26,12 +28,16 @@ export default function MapPresentationWorkspace(props) {
     error, notice, history, future, undo, redo, action, discardReload, update, change,
     finish, zoom, view, setView, svgRef, pointerDown, pointerMove, pointerUp, featureDown,
     pointerCancel, expanded, setExpanded, spacePanning, showEndpoints, setShowEndpoints, duplicateSelected,
+    rotation, rotate, beginRotation, endRotation, fitBounds, contentRef, showGrid, setShowGrid,
   } = props;
   const area = selected && ['ROOM', 'CORRIDOR'].includes(selected.type);
-  const activeTool = tools.find(t => t[0] === tool);
+  const door = selected?.type === 'DOOR' ? doorGeometry(selected, entry.source) : null;
+  const flippedDoor = door && setDoorOpening(selected, entry.source, { flipSwing: true });
+  const swappedDoor = door && setDoorOpening(selected, entry.source, { swapHinge: true });
+  const activeTool = tool === 'align' ? ['align', 'Căn theo tường', '', points.length ? 'Chọn điểm thứ hai trên cùng đoạn tường để căn ngang/dọc.' : 'Bấm hai điểm cách xa nhau trên một đoạn tường thẳng.'] : tool === 'DOOR' ? ['DOOR', 'Cửa', 'D', points.length ? 'Bấm mép cửa còn lại để đặt chiều rộng. Cánh cửa sẽ mở 90°.' : 'Bấm vị trí bản lề để bắt đầu đặt cửa.'] : tools.find(t => t[0] === tool);
   const baseFont = Math.max(.05, Math.min(5, Math.min(entry.source.widthM, entry.source.heightM) / 35));
   const chooseTool = id => { setTool(id); setPoints([]); };
-  const zoomPercent = Math.round(entry.source.widthM / (view?.width || entry.source.widthM) * 100);
+  const zoomPercent = Math.round(fitBounds.width / (view?.width || fitBounds.width) * 100);
   return <div className={`mp-editor${expanded ? ' is-expanded' : ''}`}>
     <header className="mp-heading">
       <div><span className="mp-eyebrow">CHỈNH GIAO DIỆN BẢN ĐỒ</span><h3>Biến map đã quét thành sơ đồ dễ đọc</h3><p>Vẽ theo map gốc, chọn đối tượng để chỉnh sửa.</p></div>
@@ -39,7 +45,7 @@ export default function MapPresentationWorkspace(props) {
         <span className={'mp-badge ' + (entry.published ? 'is-published' : '')}><i />{dirty ? 'Có thay đổi chưa lưu' : entry.published ? 'Đã áp dụng' : 'Bản nháp'}</span>
         <button className="mp-button" disabled={busy} onClick={discardReload} title="Tải lại từ máy chủ">Tải lại</button>
         <button className="mp-button" disabled={locked || !dirty && !!entry.revision} onClick={() => action('save')} title="Ctrl + S">Lưu nháp</button>
-        <button className="mp-button is-primary" disabled={locked || !document.features.length} onClick={() => action('publish')}>{busy ? 'Đang lưu…' : 'Áp dụng bản đồ'}</button>
+        <button className="mp-button is-primary" disabled={locked || !document.features.length && rotation === 0 && !entry.published} onClick={() => action('publish')}>{busy ? 'Đang lưu…' : 'Áp dụng bản đồ'}</button>
       </div>
     </header>
     {error && <p className="mp-error" role="alert">{error}</p>}{notice && <p className="mp-notice" role="status">{notice}</p>}
@@ -52,19 +58,21 @@ export default function MapPresentationWorkspace(props) {
       <section className={'mp-stage' + (tool === 'pan' || spacePanning ? ' is-panning' : '')}>
         <div className="mp-stage-bar">
           <div className="mp-history"><button aria-label="↶ Hoàn tác" title="Hoàn tác · Ctrl + Z" disabled={!history.length || locked || preview} onClick={undo}>↶ <span>Hoàn tác</span></button><button aria-label="↷ Làm lại" title="Làm lại · Ctrl + Shift + Z" disabled={!future.length || locked || preview} onClick={redo}>↷ <span>Làm lại</span></button></div>
-          <div className="mp-zoom"><button aria-label="Thu nhỏ bản đồ" title="Thu nhỏ" onClick={() => zoom(1.3)}>−</button><span className="mp-zoom-value">{zoomPercent}%</span><button aria-label="Phóng to bản đồ" title="Phóng to" onClick={() => zoom(1 / 1.3)}>+</button><button onClick={() => setView({ x: 0, y: 0, width: entry.source.widthM, height: entry.source.heightM })}>Vừa khung</button><button aria-label={expanded ? 'Thu gọn vùng vẽ' : 'Mở rộng vùng vẽ'} title={expanded ? 'Thu gọn' : 'Mở rộng vùng vẽ'} onClick={() => setExpanded(!expanded)}>{expanded ? '↙' : '⛶'}</button></div>
+          <div className="mp-zoom"><button aria-label="Thu nhỏ bản đồ" title="Thu nhỏ" onClick={() => zoom(1.3)}>−</button><span className="mp-zoom-value">{zoomPercent}%</span><button aria-label="Phóng to bản đồ" title="Phóng to" onClick={() => zoom(1 / 1.3)}>+</button><button onClick={() => setView(fitBounds)}>Vừa khung</button><button aria-label={expanded ? 'Thu gọn vùng vẽ' : 'Mở rộng vùng vẽ'} title={expanded ? 'Thu gọn' : 'Mở rộng vùng vẽ'} onClick={() => setExpanded(!expanded)}>{expanded ? '↙' : '⛶'}</button></div>
         </div>
+        <MapRotationControls rotation={rotation} rotate={rotate} beginRotation={beginRotation} endRotation={endRotation} disabled={locked || preview} aligning={tool === 'align'} onAlign={() => chooseTool(tool === 'align' ? 'select' : 'align')} showGrid={showGrid} setShowGrid={setShowGrid}/>
         <div className="mp-tool-hint"><span className="mp-tool-dot" /><strong>{spacePanning ? 'Kéo bản đồ' : preview ? 'Xem trước bản đồ' : activeTool?.[1]}</strong><span>{spacePanning ? 'Thả Space để trở lại công cụ trước.' : preview ? 'Bỏ chọn Xem trước để tiếp tục chỉnh sửa.' : activeTool?.[3]}</span></div>
         {imageError && <p className="mp-error">Không tải được ảnh nền: {imageError}</p>}
-        <div className="mp-scroll"><MapPresentationCanvas source={entry.source} document={document} imageUrl={imageUrl} opacity={preview ? 0 : opacity} endpoints={showEndpoints ? endpoints : []} selectedId={selectedId} preview={preview} points={points} svgRef={svgRef} viewBox={view ? `${view.x} ${view.y} ${view.width} ${view.height}` : undefined} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerCancel} onFeatureDown={featureDown} onVertexDown={(event, feature, index) => featureDown(event, feature, index)} /></div>
-        {points.length > 0 && <div className="mp-drawing"><span>{tool === 'polygon' ? `${points.length} đỉnh đã chọn` : 'Chọn điểm tiếp theo'}</span>{tool === 'polygon' && <button className="mp-button is-primary" disabled={points.length < 3} onClick={finish}>Hoàn tất vùng ↵</button>}<button className="mp-button" onClick={() => setPoints([])}>Hủy <kbd>Esc</kbd></button></div>}
+        <div className="mp-scroll"><MapPresentationCanvas source={entry.source} document={document} imageUrl={imageUrl} opacity={preview && document.features.length ? 0 : opacity} endpoints={showEndpoints ? endpoints : []} selectedId={selectedId} preview={preview} points={points} svgRef={svgRef} contentRef={contentRef} showGrid={showGrid} viewBox={view ? `${view.x} ${view.y} ${view.width} ${view.height}` : undefined} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerCancel} onFeatureDown={featureDown} onVertexDown={(event, feature, index) => featureDown(event, feature, index)} /></div>
+        {points.length > 0 && <div className="mp-drawing"><span>{tool === 'polygon' ? `${points.length} đỉnh đã chọn` : tool === 'align' ? 'Chọn điểm thứ hai trên tường' : 'Chọn điểm tiếp theo'}</span>{tool === 'polygon' && <button className="mp-button is-primary" disabled={points.length < 3} onClick={finish}>Hoàn tất vùng ↵</button>}<button className="mp-button" onClick={() => setPoints([])}>Hủy <kbd>Esc</kbd></button></div>}
         <footer className="mp-map-controls"><label>Map gốc<input aria-label="Độ mờ map gốc" type="range" min="0" max="1" step=".05" disabled={preview} value={opacity} onChange={e => setOpacity(Number(e.target.value))} /><span>{Math.round(opacity * 100)}%</span></label><label className="mp-toggle"><input type="checkbox" checked={showEndpoints} onChange={e => setShowEndpoints(e.target.checked)} />Điểm đích</label><span className="mp-map-size">{entry.source.widthM.toFixed(2)} × {entry.source.heightM.toFixed(2)} m</span></footer>
         <div className="mp-shortcut-hint"><span>Cuộn chuột để zoom</span><span><kbd>Space</kbd> + kéo để di chuyển map</span><span><kbd>Esc</kbd> hủy nét vẽ</span></div>
       </section>
       <aside className="mp-inspector">
         <header className="mp-panel-heading"><strong>{selected ? 'Chỉnh đối tượng' : 'Thuộc tính'}</strong><span>{selected ? featureNames[selected.type] : 'Chưa chọn'}</span></header>
         <div className="mp-properties">{selected ? <fieldset disabled={locked || preview}>
-          <label className="mp-field">Tên hiển thị<input placeholder="Ví dụ: Phòng khám 01" maxLength={120} value={selected.label} onChange={e => update({ label: e.target.value })} /></label>
+          <label className="mp-field">Tên hiển thị<input placeholder={door?'Ví dụ: Cửa phòng khám':'Ví dụ: Phòng khám 01'} maxLength={120} value={selected.label} onChange={e => update({ label: e.target.value })} /></label>
+          {door && <div className="mp-door-properties"><div><strong>Cửa mở kiểu mặt bằng</strong><span>Rộng {door.radius.toLocaleString('vi-VN',{maximumFractionDigits:2})} m · Mở {Math.abs(door.angleDegrees).toLocaleString('vi-VN',{maximumFractionDigits:1})}°</span></div><div className="mp-door-actions"><button type="button" disabled={!flippedDoor} title={flippedDoor?'Đổi cánh cửa sang phía đối diện':'Cánh cửa sẽ vượt ra ngoài map'} onClick={()=>update({points:flippedDoor})}>Đổi phía mở</button><button type="button" disabled={!swappedDoor} title={swappedDoor?'Chuyển bản lề sang mép cửa còn lại':'Cánh cửa sẽ vượt ra ngoài map'} onClick={()=>update({points:swappedDoor})}>Đổi bên bản lề</button></div><p>Kéo điểm ở đầu cánh cửa để chỉnh góc mở.</p></div>}
           {area ? <div className="mp-room-note"><span className="mp-room-sample" /><div><strong>Viền mảnh, nền trong suốt</strong><p>Giữ rõ tường và chi tiết của map bên dưới.</p></div></div> : <label className="mp-field mp-color-field">Màu hiển thị<input type="color" value={selected.color} onChange={e => update({ color: e.target.value })} /></label>}
           <div className="mp-field"><span>Cỡ nhãn</span><div className="mp-segmented">{[['Nhỏ', .7], ['Vừa', 1], ['Lớn', 1.5]].map(([name, factor]) => { const size = Math.min(5, Math.max(.05, Math.round(baseFont * factor * 100) / 100)); return <button key={name} aria-pressed={Math.abs(selected.fontSizeM - size) < .005} onClick={() => update({ fontSizeM: size })}>{name}</button>; })}</div></div>
           <label className="mp-field">Gắn điểm đích thật<select value={selected.endpointId || ''} onChange={e => update({ endpointId: e.target.value || null })}><option value="">Không gắn điểm</option>{endpoints.filter(e => e.active && e.accessible).map(e => <option key={e.endpointId} value={e.endpointId}>{e.endpointName}</option>)}</select></label>

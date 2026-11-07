@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiRequest } from '../../features/api/client.js';
 import { allFacilityPages, facilityApi } from '../../features/facility/facilityApi.js';
-import { insideMap, mapPresentationApi, newFeature, presentationIssues, rectangle } from '../../features/facility/mapPresentation.js';
+import { insideMap, mapPresentationApi, newFeature, presentationIssues } from '../../features/facility/mapPresentation.js';
+import { fromView, normalizeRotation, rotationBounds, straightenRotation, viewRectangle } from '../../features/facility/mapPresentationView.js';
+import { doorFitsMap, doorGeometry } from '../../features/facility/doorGeometry.js';
 import MapPresentationWorkspace from './MapPresentationWorkspace.jsx';
 import './mapPresentation.css';
 
@@ -13,10 +15,13 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
   const [history, setHistory] = useState([]), [future, setFuture] = useState([]), [reload, setReload] = useState(0);
   const [view, setView] = useState(null);
   const [expanded, setExpanded] = useState(false), [spacePanning, setSpacePanning] = useState(false), [showEndpoints, setShowEndpoints] = useState(true);
-  const svgRef = useRef(null), drag = useRef(null), current = useRef(document);
+  const [showGrid, setShowGrid] = useState(false);
+  const svgRef = useRef(null), contentRef = useRef(null), drag = useRef(null), current = useRef(document), rotationGesture = useRef(null);
   current.current = document;
   const dirty = document && JSON.stringify(document) !== saved;
   const selected = document?.features.find(f => f.id === selectedId);
+  const rotation = document?.rotationDegrees ?? 0;
+  const fitBounds = entry ? rotationBounds(entry.source, rotation) : null;
   useEffect(() => { onDirtyChange?.(!!dirty); }, [dirty, onDirtyChange]);
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
   useEffect(() => {
@@ -26,7 +31,7 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     Promise.all([mapPresentationApi.get(mapId, controller.signal), allFacilityPages(facilityApi.listEndpoints)]).then(([value, rows]) => {
       if (controller.signal.aborted) return;
       setEntry(value); setDocument(value.draft); setSaved(JSON.stringify(value.draft)); setEndpoints(rows.filter(e => e.mapId === mapId));
-      setView({ x: 0, y: 0, width: value.source.widthM, height: value.source.heightM });
+      setView(rotationBounds(value.source, value.draft.rotationDegrees ?? 0));
     }).catch(e => { if (!controller.signal.aborted) setError(e.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     apiRequest(`/api/v1/maps/${encodeURIComponent(mapId)}/image.png`, { signal: controller.signal, responseType: 'blob' }).then(blob => {
       if (!controller.signal.aborted) { url = URL.createObjectURL(blob); setImageUrl(url); }
@@ -34,30 +39,62 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     return () => { controller.abort(); if (url) URL.revokeObjectURL(url); };
   }, [mapId, reload]);
   useEffect(() => {
+    if (entry) setView(rotationBounds(entry.source, rotation));
+  }, [entry?.source.widthM, entry?.source.heightM, rotation]);
+  useEffect(() => {
     if (!dirty) return;
     const warn = e => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
   const change = next => { const previous = current.current; setHistory(h => [...h.slice(-49), previous]); setFuture([]); current.current = next; setDocument(next); setNotice(''); };
-  const update = patch => change({ ...document, features: document.features.map(f => f.id === selectedId ? { ...f, ...patch } : f) });
+  const beginRotation = () => { if (!rotationGesture.current) rotationGesture.current = current.current; };
+  const endRotation = () => {
+    const before = rotationGesture.current;
+    rotationGesture.current = null;
+    if (before && JSON.stringify(before) !== JSON.stringify(current.current)) { setHistory(h => [...h.slice(-49), before]); setFuture([]); }
+  };
+  const rotate = value => {
+    if (busy || preview || entry.sourceChanged || !Number.isFinite(value)) return;
+    const angle = normalizeRotation(value);
+    if (angle === (current.current.rotationDegrees ?? 0)) return;
+    const next = { ...current.current, rotationDegrees: angle };
+    drag.current = null; setPoints([]);
+    if (rotationGesture.current) { current.current = next; setDocument(next); setNotice(''); }
+    else change(next);
+  };
+  const update = patch => {
+    let next = { ...selected, ...patch };
+    if (next.type === 'DOOR' && patch.points) {
+      const door = doorGeometry(next, entry.source);
+      if (!doorFitsMap(door, entry.source)) { setNotice('Cánh cửa phải nằm trong map. Chọn vị trí hoặc hướng mở khác.'); return; }
+      next = { ...next, points: [door.hinge, door.closed, door.open] };
+    }
+    change({ ...document, features: document.features.map(f => f.id === selectedId ? next : f) });
+  };
   const add = (type, values) => {
     const feature = newFeature(type, values, entry.source);
+    if (type === 'DOOR') {
+      const door = doorGeometry(feature, entry.source);
+      if (!doorFitsMap(door, entry.source)) { setNotice('Chọn hai mép cửa cách nhau và đủ chỗ cho cánh cửa mở trong map.'); return; }
+      feature.points = [door.hinge, door.closed, door.open];
+    }
     change({ ...current.current, features: [...current.current.features, feature] }); setSelectedId(feature.id); setPoints([]); setTool('select');
   };
   const finish = () => { if (points.length >= 3) add('ROOM', points); };
   const undo = () => { if (!history.length) return; setFuture(f => [document, ...f]); setDocument(history.at(-1)); setHistory(h => h.slice(0, -1)); setPoints([]); };
   const redo = () => { if (!future.length) return; setHistory(h => [...h, document]); setDocument(future[0]); setFuture(f => f.slice(1)); };
   const localPoint = event => {
-    const svg = svgRef.current, matrix = svg?.getScreenCTM(); if (!matrix) return null;
+    const matrix = contentRef.current?.getScreenCTM(); if (!matrix) return null;
     const p = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-    const local = { x: p.x, y: entry.source.heightM - p.y };
+    const local = fromView(p, entry.source, 0);
     return insideMap(local, entry.source) ? local : null;
   };
   const zoom = (factor, anchor = null) => setView(previous => {
-    const width = Math.min(entry.source.widthM, Math.max(entry.source.widthM / 12, previous.width * factor));
-    const height = width * entry.source.heightM / entry.source.widthM;
+    const bounds = rotationBounds(entry.source, current.current.rotationDegrees ?? 0);
+    const width = Math.min(bounds.width, Math.max(bounds.width / 12, previous.width * factor));
+    const height = width * bounds.height / bounds.width;
     const xRatio = anchor ? (anchor.x - previous.x) / previous.width : .5, yRatio = anchor ? (anchor.y - previous.y) / previous.height : .5;
-    return { width, height, x: Math.max(0, Math.min(entry.source.widthM - width, previous.x + (previous.width - width) * xRatio)), y: Math.max(0, Math.min(entry.source.heightM - height, previous.y + (previous.height - height) * yRatio)) };
+    return { width, height, x: Math.max(bounds.x, Math.min(bounds.x + bounds.width - width, previous.x + (previous.width - width) * xRatio)), y: Math.max(bounds.y, Math.min(bounds.y + bounds.height - height, previous.y + (previous.height - height) * yRatio)) };
   });
   const featureDown = (event, feature, vertex = null) => {
     if (tool !== 'select' || spacePanning || preview || busy || entry.sourceChanged || event.button !== 0) return;
@@ -77,8 +114,16 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     }
     if (preview || busy || entry.sourceChanged || event.button !== 0) return;
     const p = localPoint(event); if (!p) return;
+    if (tool === 'align') {
+      if (!points.length) { setPoints([p]); return; }
+      const angle = straightenRotation(points[0], p, entry.source, rotation);
+      if (angle === null) { setNotice('Chọn hai điểm cách xa nhau trên cùng một đoạn tường thẳng.'); return; }
+      rotate(angle); setPoints([]); setTool('select');
+      setNotice('Đã căn tường theo chiều ngang/dọc. Lưu nháp để giữ góc xoay.');
+      return;
+    }
     if (tool === 'select') { setSelectedId(''); return; }
-    if (['ROOM', 'CORRIDOR'].includes(tool)) { svgRef.current.setPointerCapture(event.pointerId); drag.current = { rectangle: tool, start: p }; setPoints(rectangle(p, p)); }
+    if (['ROOM', 'CORRIDOR'].includes(tool)) { svgRef.current.setPointerCapture(event.pointerId); drag.current = { rectangle: tool, start: p }; setPoints(viewRectangle(p, p, entry.source, rotation)); }
     else if (['LABEL', 'LANDMARK'].includes(tool)) add(tool, [p]);
     else if (['WALL', 'DOOR'].includes(tool)) { if (points.length) add(tool, [points[0], p]); else setPoints([p]); }
     else setPoints(values => [...values, p]);
@@ -86,13 +131,19 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
   const pointerMove = event => {
     const active = drag.current; if (!active) return;
     if (active.pan) {
-      setView({ ...active.view, x: Math.max(0, Math.min(entry.source.widthM - active.view.width, active.view.x - (event.clientX - active.start.x) / active.scale)), y: Math.max(0, Math.min(entry.source.heightM - active.view.height, active.view.y - (event.clientY - active.start.y) / active.scale)) });
+      const bounds = rotationBounds(entry.source, rotation);
+      setView({ ...active.view, x: Math.max(bounds.x, Math.min(bounds.x + bounds.width - active.view.width, active.view.x - (event.clientX - active.start.x) / active.scale)), y: Math.max(bounds.y, Math.min(bounds.y + bounds.height - active.view.height, active.view.y - (event.clientY - active.start.y) / active.scale)) });
       return;
     }
     const p = localPoint(event); if (!p) return;
-    if (active.rectangle) { setPoints(rectangle(active.start, p)); return; }
+    if (active.rectangle) { setPoints(viewRectangle(active.start, p, entry.source, rotation)); return; }
     const original = active.before.features.find(f => f.id === active.id);
-    const values = original.points.map((point, i) => active.vertex === null ? { x: point.x + p.x - active.start.x, y: point.y + p.y - active.start.y } : i === active.vertex ? p : point);
+    let values = original.points.map((point, i) => active.vertex === null ? { x: point.x + p.x - active.start.x, y: point.y + p.y - active.start.y } : i === active.vertex ? p : point);
+    if (original.type === 'DOOR') {
+      const door = doorGeometry({ ...original, points: values }, entry.source);
+      if (!doorFitsMap(door, entry.source)) return;
+      values = [door.hinge, door.closed, door.open];
+    }
     if (values.some(point => !insideMap(point, entry.source))) return;
     const next = { ...active.before, features: active.before.features.map(f => f.id === active.id ? { ...f, points: values } : f) };
     current.current = next; setDocument(next);
@@ -102,19 +153,23 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     drag.current = null;
     if (active.pan) return;
     if (active.rectangle) {
-      const p = localPoint(event), values = p && rectangle(active.start, p);
-      if (values && Math.abs((p.x - active.start.x) * (p.y - active.start.y)) > .000001) add(active.rectangle, values);
-      else setPoints([]);
+      const p = localPoint(event), values = p && viewRectangle(active.start, p, entry.source, rotation);
+      const area = values && Math.abs(values.reduce((sum, a, i) => { const b = values[(i + 1) % values.length]; return sum + a.x * b.y - b.x * a.y; }, 0));
+      if (values && area > .000001 && values.every(point => insideMap(point, entry.source))) add(active.rectangle, values);
+      else { setPoints([]); if (values && area > .000001) setNotice('Vùng vẽ vượt ra ngoài ảnh quét. Kéo vùng nhỏ hơn hoặc dùng Đa giác sát mép map.'); }
     } else if (JSON.stringify(active.before) !== JSON.stringify(current.current)) { setHistory(h => [...h.slice(-49), active.before]); setFuture([]); }
   };
   const action = async name => {
     setBusy(true); setError(''); setNotice('');
     try {
-      const issues = presentationIssues(document, entry.source); if (issues.length) throw Error(issues[0]);
+      const snapshot = current.current, changed = JSON.stringify(snapshot) !== saved;
+      const issues = presentationIssues(snapshot, entry.source); if (issues.length) throw Error(issues[0]);
       let value = entry;
-      if (name !== 'unpublish' && (dirty || !entry.revision)) value = await mapPresentationApi.save(mapId, { expectedRevision: entry.revision, sourceAssetHash: entry.source.assetHash, document });
+      if (name !== 'unpublish' && (changed || !entry.revision)) value = await mapPresentationApi.save(mapId, { expectedRevision: entry.revision, sourceAssetHash: entry.source.assetHash, document: snapshot });
       // Commit save acknowledgement before publishing so a failed publish can be retried.
-      setEntry(value); if (name !== 'unpublish') setSaved(JSON.stringify(document));
+      setEntry(value);
+      if (name !== 'unpublish' && Math.abs((value.draft.rotationDegrees ?? 0) - (snapshot.rotationDegrees ?? 0)) > .000001) throw Error('Máy chủ chưa lưu được góc xoay. Cập nhật backend hỗ trợ căn hướng bản đồ rồi lưu lại.');
+      if (name !== 'unpublish') setSaved(JSON.stringify(snapshot));
       if (name === 'publish') value = await mapPresentationApi.publish(mapId, value.revision);
       if (name === 'unpublish') value = await mapPresentationApi.unpublish(mapId, value.revision);
       setEntry(value); setNotice(name === 'publish' ? 'Đã áp dụng bản đồ đã chỉnh.' : name === 'unpublish' ? 'Đã bỏ áp dụng bản vẽ, giữ lại bản nháp.' : 'Đã lưu bản nháp trên máy chủ.');
@@ -130,7 +185,7 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     if (document.features.length >= 500) { setError('Tối đa 500 đối tượng.'); return; }
     const dx = Math.min(.15, entry.source.widthM - Math.max(...selected.points.map(p => p.x)));
     const dy = Math.min(.15, entry.source.heightM - Math.max(...selected.points.map(p => p.y)));
-    const clone = { ...selected, id: crypto.randomUUID(), label: (selected.label + ' (bản sao)').slice(0, 120), points: selected.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+    const clone = { ...selected, id: crypto.randomUUID(), label: selected.label ? (selected.label + ' (bản sao)').slice(0, 120) : '', points: selected.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
     change({ ...document, features: [...document.features, clone] }); setSelectedId(clone.id);
   };
   useEffect(() => {
@@ -178,5 +233,6 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     error, notice, history, future, undo, redo, action, discardReload, update, change,
     finish, zoom, view, setView, svgRef, pointerDown, pointerMove, pointerUp, featureDown,
     pointerCancel, expanded, setExpanded, spacePanning, showEndpoints, setShowEndpoints, duplicateSelected,
+    rotation, rotate, beginRotation, endRotation, fitBounds, contentRef, showGrid, setShowGrid,
   }} />;
 }

@@ -1,4 +1,5 @@
 import { apiRequest } from '../api/client.js';
+import { doorFitsMap, doorGeometry } from './doorGeometry.js';
 
 const path = id => `/api/v1/maps/${encodeURIComponent(id)}/presentation`;
 export const mapPresentationApi = {
@@ -26,14 +27,21 @@ export function rectangle(a, b) {
 }
 export function newFeature(type, points, source) {
   const scale = Math.max(.05, Math.min(source.widthM, source.heightM) / 35);
-  return { id: crypto.randomUUID(), type, label: featureNames[type], color: ({ ROOM: '#dbeafe', CORRIDOR: '#e2e8f0', WALL: '#334155', DOOR: '#0d9488', LABEL: '#334155', LANDMARK: '#7c3aed' })[type], points, lineWidthM: Math.min(2, Math.max(.01, Math.round(scale / 3 * 100) / 100)), fontSizeM: Math.min(5, Math.max(.05, Math.round(scale * 100) / 100)), endpointId: null };
+  return { id: crypto.randomUUID(), type, label: type === 'DOOR' ? '' : featureNames[type], color: ({ ROOM: '#dbeafe', CORRIDOR: '#e2e8f0', WALL: '#334155', DOOR: '#334155', LABEL: '#334155', LANDMARK: '#7c3aed' })[type], points, lineWidthM: type === 'DOOR' ? .02 : Math.min(2, Math.max(.01, Math.round(scale / 3 * 100) / 100)), fontSizeM: Math.min(5, Math.max(.05, Math.round(scale * 100) / 100)), endpointId: null };
 }
 export function presentationIssues(document, source) {
   const errors = [];
   if (!document || document.schemaVersion !== 1 || !Array.isArray(document.features)) return ['Bản vẽ không đúng định dạng.'];
+  const rotation = document.rotationDegrees ?? 0;
+  if (!Number.isFinite(rotation) || rotation < -180 || rotation > 180) errors.push('Góc xoay bản đồ phải từ -180° đến 180°.');
   if (document.features.length > 500) errors.push('Tối đa 500 đối tượng.');
   for (const feature of document.features) {
     if (feature.points.some(p => !insideMap(p, source))) errors.push(`${feature.label || 'Đối tượng'} nằm ngoài map.`);
+    if (feature.type === 'DOOR') {
+      const door = doorGeometry(feature, source);
+      if (!door) errors.push('Cửa cần hai mép cách nhau để xác định chiều rộng.');
+      else if (!doorFitsMap(door, source)) errors.push('Cánh cửa mở nằm ngoài map. Đổi phía mở hoặc giảm chiều rộng cửa.');
+    }
     if (['ROOM', 'CORRIDOR'].includes(feature.type)) {
       let area = 0;
       feature.points.forEach((a, i) => { const b = feature.points[(i + 1) % feature.points.length]; area += a.x * b.y - b.x * a.y; });
