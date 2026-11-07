@@ -17,7 +17,7 @@ await page.route('**/*', route => {
   const request = route.request(), url = new URL(request.url()), path = url.pathname;
   if (!path.startsWith('/api/v1/')) return url.origin === base ? route.continue() : route.abort();
   const respond = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
-  if (path.endsWith('/image.png')) return route.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQ0AAAAASUVORK5CYII=', 'base64') });
+  if (path.endsWith('/image.png')) return route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600"><rect width="1000" height="600" fill="#e5e7eb"/><path d="M100 500V100H900V500ZM350 100V500M600 100V500" fill="white" stroke="#334155" stroke-width="7"/><path d="M120 150H320M370 150H570M620 150H850" fill="none" stroke="#9ca3af" stroke-width="3"/></svg>' });
   if (path === '/api/v1/maps') return respond({ content: [{ ...source, mapName: 'Map tầng 1 đã quét', mapCode: 'F1', versionNo: 1, status: 'ACTIVE' }], totalPages: 1 });
   if (path === '/api/v1/endpoints') return respond({ content: [{ endpointId, mapId, endpointName: 'Cửa phòng Nội', endpointCode: 'NOI', xM: -1, yM: 4, active: true, accessible: true }], totalPages: 1 });
   if (path === `/api/v1/maps/${mapId}/presentation` && request.method() === 'GET') return respond(entry);
@@ -34,6 +34,13 @@ await page.route('**/*', route => {
 });
 const svg = page.locator('.mp-canvas');
 async function point(x, y) { return svg.evaluate((element, p) => { const v = new DOMPoint(p.x, 6 - p.y).matrixTransform(element.getScreenCTM()); return { x: v.x, y: v.y }; }, { x, y }); }
+async function changeRoomColor(value) {
+  await page.getByLabel('Màu phòng', { exact: true }).evaluate((element, color) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(element, color);
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+}
 try {
   await page.goto(`${base}/admin/map?mapId=${mapId}&stage=presentation`);
   await expect(page.getByText('Biến map đã quét thành sơ đồ dễ đọc')).toBeVisible();
@@ -42,10 +49,11 @@ try {
   const a = await point(1, 1), b = await point(4, 4);
   await page.mouse.move(a.x, a.y); await page.mouse.down(); await page.mouse.move(b.x, b.y, { steps: 5 }); await page.mouse.up();
   await expect(svg.locator('polygon')).toHaveCount(1);
-  await expect(svg.locator('polygon')).toHaveAttribute('fill', 'transparent');
-  await expect(svg.locator('polygon')).toHaveAttribute('stroke-width', '1.25');
+  await expect(svg.locator('polygon')).toHaveAttribute('fill', /^#[0-9a-f]{6}$/i);
+  await expect(svg.locator('polygon')).toHaveAttribute('fill-opacity', '0.18');
+  await expect(svg.locator('polygon')).toHaveAttribute('stroke-width', '1.5');
   await expect(svg.locator('polygon')).toHaveAttribute('vector-effect', 'non-scaling-stroke');
-  await expect(svg.locator('polygon')).toHaveAttribute('stroke-opacity', '0.65');
+  await expect(svg.locator('polygon')).toHaveAttribute('stroke-opacity', '0.9');
   await page.getByLabel('Tên hiển thị', { exact: true }).fill('Phòng Nội');
   await page.getByLabel('Tên hiển thị', { exact: true }).press('End');
   await page.keyboard.type('r');
@@ -110,6 +118,7 @@ try {
   await page.locator('.mp-layers button').filter({ hasText: 'Bản nháp mới' }).click();
   await page.getByRole('button', { name: /Nhân bản/ }).click();
   await expect(svg.locator('polygon')).toHaveCount(2);
+  assert.equal(new Set(await svg.locator('polygon').evaluateAll(elements => elements.map(element => element.getAttribute('fill')))).size, 2, 'Room duplicates receive a distinguishable color');
   await page.keyboard.press('Delete');
   await expect(svg.locator('polygon')).toHaveCount(1);
   await page.locator('.mp-layers button').filter({ hasText: 'Bản nháp mới' }).click();
@@ -133,7 +142,97 @@ try {
   await page.getByRole('button', { name: '← Thư viện bản đồ', exact: true }).click();
   await page.getByRole('button', { name: 'Chỉnh giao diện map', exact: true }).click();
   await expect(page.getByText('Biến map đã quét thành sơ đồ dễ đọc')).toBeVisible();
+
+  // Adjacent rooms keep distinct, translucent colors across selection, manual
+  // color editing, save/reload and publication. Source pixels stay available.
+  entry = { source: structuredClone(source), revision: entry.revision + 1, draft: { schemaVersion: 1, backgroundColor: '#ffffff', rotationDegrees: 0, features: [] }, published: null, publishedRevision: null, publishedAt: null, sourceChanged: false };
+  await page.reload();
+  await expect(svg.locator('image')).toHaveCount(1);
+  async function drawRoom(left, right, name) {
+    await page.getByRole('button', { name: 'Vẽ phòng (R)', exact: true }).click();
+    const start = await point(left, 1), end = await point(right, 5);
+    await page.mouse.move(start.x, start.y); await page.mouse.down();
+    await page.mouse.move(end.x, end.y, { steps: 5 });
+    await expect(svg.locator('.mp-pending-area')).toHaveAttribute('fill-opacity', '0.1');
+    await expect(svg.locator('.mp-pending-area')).toHaveAttribute('fill', /^#[0-9a-f]{6}$/i);
+    await page.mouse.up();
+    await page.getByLabel('Tên hiển thị', { exact: true }).fill(name);
+  }
+  await drawRoom(1, 3.5, 'Phòng 01');
+  await drawRoom(3.5, 6, 'Phòng 02');
+  await drawRoom(6, 9, 'Phòng 03');
+  const rooms = svg.locator('polygon');
+  await expect(rooms).toHaveCount(3);
+  const automaticColors = await rooms.evaluateAll(elements => elements.map(element => element.getAttribute('fill')));
+  assert.equal(new Set(automaticColors).size, 3, 'Adjacent new rooms receive different colors');
+  await expect(rooms.nth(0)).toHaveAttribute('fill-opacity', '0.09');
+  await expect(rooms.nth(0)).toHaveAttribute('stroke-width', '1');
+  await expect(rooms.nth(0)).toHaveAttribute('stroke-opacity', '0.65');
+  await expect(rooms.nth(2)).toHaveAttribute('fill-opacity', '0.18');
+  await expect(rooms.nth(2)).toHaveAttribute('stroke-width', '1.5');
+  await expect(svg.locator('image')).toHaveAttribute('opacity', '1');
+  await page.locator('.mp-layers button').filter({ hasText: 'Phòng 02' }).click();
+  await expect(rooms.nth(1)).toHaveAttribute('fill-opacity', '0.18');
+  await expect(rooms.nth(2)).toHaveAttribute('fill-opacity', '0.09');
+  const customColor = '#0f766e';
+  await changeRoomColor(customColor);
+  await expect(rooms.nth(1)).toHaveAttribute('fill', new RegExp(`^${customColor}$`, 'i'));
+  const roomLayer = page.locator('.mp-layers button').filter({ hasText: 'Phòng 02' });
+  await expect(roomLayer.locator('.mp-layer-swatch')).toHaveCSS('background-color', 'rgb(15, 118, 110)');
+  await page.getByRole('button', { name: 'Lưu nháp', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Đã lưu');
+  const savedRooms = structuredClone(entry.draft.features);
+  assert.equal(savedRooms[1].color.toLowerCase(), customColor);
+  assert.equal(new Set(savedRooms.map(room => room.color)).size, 3);
+  await page.reload();
+  await expect(svg.locator('polygon')).toHaveCount(3);
+  assert.deepEqual(await svg.locator('polygon').evaluateAll(elements => elements.map(element => element.getAttribute('fill'))), savedRooms.map(room => room.color));
+  await expect(svg.locator('image')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Áp dụng bản đồ', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Đã áp dụng');
+  assert.deepEqual(entry.published.features, savedRooms);
+  assert.deepEqual(entry.source, source);
+  await page.screenshot({ path: '.workstation-build/map-presentation/adjacent-rooms.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 1000 });
+  await expect(svg).toBeVisible();
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Room styling fits mobile');
+  await page.screenshot({ path: '.workstation-build/map-presentation/adjacent-rooms-mobile.png', fullPage: true });
+
+  // Older rooms may all store the original default hue. Editing/deleting one
+  // room must not silently change its neighbor's already visible identity.
+  const legacyRoom = (id, label, left, right) => ({ id, type: 'ROOM', label, color: '#dbeafe', points: [{ x: left, y: 1 }, { x: right, y: 1 }, { x: right, y: 5 }, { x: left, y: 5 }], lineWidthM: .05, fontSizeM: .18, endpointId: null });
+  entry = { source: structuredClone(source), revision: entry.revision + 1, draft: { schemaVersion: 1, backgroundColor: '#ffffff', rotationDegrees: 0, features: [legacyRoom('a', 'Phòng cũ A', 1, 4), legacyRoom('b', 'Phòng cũ B', 4, 7)] }, published: null, publishedRevision: null, publishedAt: null, sourceChanged: false };
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.reload();
+  const oldA = svg.locator('[data-feature-id="a"] > polygon'), oldB = svg.locator('[data-feature-id="b"] > polygon');
+  await expect(oldA).toBeVisible(); await expect(oldB).toBeVisible();
+  const originalLegacyColors = [await oldA.getAttribute('fill'), await oldB.getAttribute('fill')];
+  assert.notEqual(originalLegacyColors[0], originalLegacyColors[1], 'Legacy neighboring rooms are visually distinguishable');
+  await page.locator('.mp-layers button').filter({ hasText: 'Phòng cũ A' }).click();
+  await changeRoomColor('#7c3aed');
+  await expect(oldA).toHaveAttribute('fill', /^#7c3aed$/i);
+  await expect(oldB).toHaveAttribute('fill', originalLegacyColors[1]);
+  await page.getByRole('button', { name: /^Xóa/ }).click();
+  await expect(oldA).toHaveCount(0);
+  await expect(oldB).toHaveAttribute('fill', originalLegacyColors[1]);
+  await page.getByRole('button', { name: '↶ Hoàn tác', exact: true }).click();
+  await expect(oldA).toHaveAttribute('fill', /^#7c3aed$/i);
+  await expect(oldB).toHaveAttribute('fill', originalLegacyColors[1]);
+  await page.locator('.mp-layers button').filter({ hasText: 'Phòng cũ A' }).click();
+  await changeRoomColor('#dbeafe');
+  await expect(oldA).toHaveAttribute('fill', /^#dbeafe$/i);
+  await expect(page.getByLabel('Màu phòng', { exact: true })).toHaveValue('#dbeafe');
+  await page.getByRole('button', { name: 'Lưu nháp', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Đã lưu');
+  assert.equal(entry.draft.features.find(room => room.id === 'a').color.toLowerCase(), '#dbeafe');
+  assert.equal(entry.draft.features.find(room => room.id === 'b').color, originalLegacyColors[1]);
+  await page.reload();
+  await expect(oldA).toHaveAttribute('fill', /^#dbeafe$/i);
+  await expect(oldB).toHaveAttribute('fill', originalLegacyColors[1]);
+  await page.locator('.mp-layers button').filter({ hasText: 'Phòng cũ A' }).click();
+  await expect(page.getByLabel('Màu phòng', { exact: true })).toHaveValue('#dbeafe');
+  assert.deepEqual(entry.source, source);
   assert.deepEqual(errors, []);
   assert.ok(writes.every(w => w.path.includes('/presentation')));
-  console.log('PASS: edit raw map, draw, undo/redo, endpoint binding, preview, save/reload, publish isolation, zoom and conflict handling.');
+  console.log('PASS: edit raw map, draw, undo/redo, endpoint binding, preview, save/reload, publish isolation, zoom/conflicts, distinct translucent adjacent rooms, and stable legacy/manual colors.');
 } finally { await browser.close(); }

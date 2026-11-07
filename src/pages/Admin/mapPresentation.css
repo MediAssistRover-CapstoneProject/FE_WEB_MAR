@@ -54,13 +54,17 @@
 .mp-canvas { display: block; width: 100%; height: 100%; min-height: 0; background: white; border-radius: 8px; touch-action: none; user-select: none; box-shadow: 0 4px 20px #3341550a; outline: 0; }
 .mp-stage.is-panning .mp-canvas, .mp-stage.is-panning .mp-canvas * { cursor: grab !important; }
 .mp-stage.is-panning .mp-canvas:active, .mp-stage.is-panning .mp-canvas:active * { cursor: grabbing !important; }
-.mp-map-controls { display: flex; align-items: center; gap: 18px; padding: 10px 16px; background: #fff; border-top: 1px solid var(--mp-line); flex-shrink: 0; font-size: 11px; color: #64748b; }
+.mp-map-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 18px; padding: 10px 16px; background: #fff; border-top: 1px solid var(--mp-line); flex-shrink: 0; font-size: 11px; color: #64748b; }
 .mp-map-controls > label { display: flex; align-items: center; gap: 8px; white-space: nowrap; margin: 0; }
 .mp-map-controls input[type=range] { width: 105px; accent-color: #3b82f6; height: 15px; }
 .mp-map-controls label > span { min-width: 28px; font-size: 10px; color: #8b98aa; }
 .mp-toggle input { accent-color: #3b82f6; }
+.mp-snap-toggle { color: #0f766e; }
+.mp-snap-toggle input { accent-color: #0d9488; }
+.mp-snap-toggle:has(input:disabled) { opacity: .5; }
 .mp-map-size { margin-left: auto; font-size: 10px; color: #8b98aa; white-space: nowrap; }
-.mp-shortcut-hint { display: flex; gap: 16px; justify-content: center; padding: 8px 10px; font-size: 10px; color: #8e9baf; background: #f9fbfd; flex-shrink: 0; }
+.mp-shortcut-hint { display: flex; gap: 6px 14px; flex-wrap: wrap; justify-content: center; padding: 8px 10px; font-size: 10px; color: #8e9baf; background: #f9fbfd; flex-shrink: 0; }
+.mp-shortcut-hint > span { white-space: nowrap; }
 .mp-shortcut-hint kbd { border-color: #e2e8f0; font-size: 9px; padding: 0 4px; }
 .mp-inspector { display: flex; flex-direction: column; border-left: 1px solid var(--mp-line); min-width: 0; overflow-y: auto; background: white; }
 .mp-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 18px; flex-shrink: 0; }
@@ -106,6 +110,7 @@
 .mp-layers button { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 9px 8px; border: 1px solid transparent; border-radius: 6px; background: white; text-align: left; }
 .mp-layers button > svg { width: 15px; height: 15px; color: #9aa9bd; flex-shrink: 0; }
 .mp-layers button > span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.mp-layers button > .mp-layer-swatch { flex: 0 0 9px; width: 9px; height: 9px; border-radius: 3px; border: 1px solid #00000012; }
 .mp-layers button > small { font-size: 9px; color: #a4afbf; }
 .mp-layers button[aria-pressed=true] { background: #f0f6ff; color: #3478da; border-color: #d8e8ff; }
 .mp-layers button:hover { background: #f8fafc; }
@@ -118,6 +123,7 @@
 .mp-stage > .mp-error { margin: 0 14px 8px; }
 .mp-drawing { position: absolute; bottom: 88px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; gap: 10px; padding: 8px 12px; max-width: calc(100% - 24px); white-space: nowrap; font-size: 11px; color: #3b82f6; background: #f8fbff; border: 1px solid #dbeafe; border-radius: 10px; box-shadow: 0 4px 16px #33415510; }
 .mp-drawing .mp-button { min-height: 29px; padding: 5px 9px; font-size: 11px; }
+.mp-drawing-overlays, .mp-drawing-overlays * { pointer-events: none; }
 .mp-empty { border: 1px dashed #cbd5e1; background: white; border-radius: 14px; padding: 40px; text-align: center; color: #64748b; }
 .mp-editor.is-expanded { position: fixed; z-index: 1400; inset: 12px; padding: 18px; border: 1px solid #d8e2ef; border-radius: 16px; background: #f8fafc; box-shadow: 0 0 0 20px #0f172a66; display: flex; flex-direction: column; }
 .mp-editor.is-expanded .mp-heading { margin: 0 0 14px; flex-shrink: 0; }
@@ -165,4 +171,6 @@
   .mp-zoom-value { min-width:33px; }
   .mp-history button,.mp-zoom button { padding:5px; font-size:10px; }
   .mp-shortcut-hint { flex-wrap:wrap; }
+  .mp-drawing { gap:6px; padding:7px 8px; font-size:10px; flex-wrap:wrap; width:max-content; }
+  .mp-drawing .mp-button { padding:5px 7px; font-size:10px; }
 }
