@@ -9,6 +9,7 @@ export const catalog = {
   "Map & Navigation": "Bản đồ & điều hướng",
   "Map Studio": "Bản đồ",
   "Robot Status": "Trạng thái robot",
+  "Robot Setup": "Thiết lập vận hành",
   "Manual Control": "Điều khiển thủ công",
   "Monitoring": "Giám sát",
   "Alerts": "Cảnh báo",

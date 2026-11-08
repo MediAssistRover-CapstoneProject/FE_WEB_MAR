@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { getSession, clearSession } from '../../../features/auth/session.js';
 import { callBackend, watchJob } from '../../../features/api/backendApi.js';
 import { operations, canUse, requestSchema, initialValue, prepareBody, prepareValue } from '../../../features/api/contract.js';
@@ -20,6 +20,7 @@ import { CatalogNavigation, DataSource, EmptyRecords, JobSteps, RecordSummary, W
 import './backend.css';
 import './presentation.css';
 import './workspaceOverview.css';
+import '../robotOperations/robotSetup.css';
 
 export const backendScreens = new Set(resources.map(r => r.section).filter(section => !['Patrol', 'Live Operations', 'Emergency Center'].includes(section)));
 const unwrap = value => ({ ...value?.account, ...value?.request, ...value?.workflow, ...value?.job, ...value });
@@ -138,6 +139,7 @@ function ResourcePanel({ resource, role }) {
   const hasFilters = Object.values(applied).some(value => value != null && value !== '');
   return <>
     <header className="be-heading"><div><h2>{resource.title}</h2><p>{resourceHints[resource.id] || resource.description || (resource.id === 'retention' ? 'Mỗi mục là một chính sách lưu trữ cho một nhóm dữ liệu, không phải số bản ghi đang lưu.' : `Quản lý dữ liệu và thao tác của ${resource.title.toLowerCase()}.`)}</p></div><div className="be-actions"><button type="button" disabled={loading || !parentReady} onClick={() => setRevision(v => v + 1)}>Tải lại</button>{globalOps.map(op => <button type="button" key={op.key} disabled={!parentReady} className={write(op) ? 'primary' : ''} onClick={() => open(op)}>{actionLabel(op)}</button>)}</div></header>
+    {resource.id === 'robots' && role === 'ADMIN' && <div className="rsu-entry"><p>Chọn bản đồ và xác nhận vị trí robot trước khi đưa vào vận hành.</p><Link className="rsu-entry-link" to={`/admin/robot-setup${selectedId ? `?robotId=${encodeURIComponent(selectedId)}` : ''}`}>Thiết lập vận hành ↗</Link></div>}
     {enhanced && <DataSource loading={loading} error={error} loadedAt={loadedAt} total={data?.totalElements ?? rows?.length} parentReady={parentReady} />}
     {(resource.parentCatalogKey || parentPaths.length > 0) && <div className="be-card be-parent-selector">{resource.parentCatalogKey && <ParentCatalogSelector resource={resource} value={parent.hospitalId || ''} onChange={hospitalId => { setParent(current => ({ ...current, hospitalId })); setPage(0); }} />}{parentPaths.length > 0 && <SchemaFields schema={paramsSchema(parentPaths)} value={parent} onChange={next => { setParent(next); setPage(0); }} context={{ role }} />}</div>}
     {filters(listOp).length > 0 && <ListFilters resource={resource} schema={paramsSchema(filters(listOp))} value={query} applied={applied} onChange={setQuery} role={role} onApply={() => { try { setApplied(prepareValue(query, paramsSchema(filters(listOp)))); setPage(0); setError(''); } catch (e) { setError(e.message); } }} onReset={() => { setQuery({}); setApplied({}); setPage(0); setError(''); }} />}

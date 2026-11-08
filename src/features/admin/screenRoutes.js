@@ -8,6 +8,7 @@ const screenRoutes = {
   Patrol: '/admin/patrol',
   'Staff Shifts': '/admin/staff-shifts',
   'Robot Status': '/admin/robots',
+  'Robot Setup': '/admin/robot-setup',
   Alerts: '/admin/alerts',
   'History & Replay': '/admin/history-replay',
   Analytics: '/admin/analytics',
