@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdir } from 'node:fs/promises';
 import { navigationGroups } from '../src/features/admin/navigation.js';
+import { pathForScreen, screenForSlug } from '../src/features/admin/screenRoutes.js';
 import { vi } from '../src/i18n/vi.js';
 
 const require = createRequire(import.meta.url);
@@ -20,6 +21,12 @@ try {
   const screens = navigationGroups.flatMap(([, items]) => items);
   assert.equal(new Set(screens).size, screens.length, 'Mỗi màn hình chỉ xuất hiện một lần trong cấu trúc menu');
   assert.equal(screens.includes('Crowd Heatmap'),false);
+  for (const screen of screens) {
+    const path = pathForScreen(screen);
+    if (path.startsWith('/admin/')) assert.equal(screenForSlug(path.slice('/admin/'.length)), screen, `Route must retain the sidebar screen: ${screen}`);
+  }
+  assert.equal(pathForScreen('Public Catalog'), '/admin/facility');
+  assert.equal(screenForSlug('public-catalog'), 'Facility Management');
 
   await page.goto(base+'/admin');
   const sidebar = page.locator('aside.sidebar');
@@ -31,6 +38,21 @@ try {
   assert.equal(await sidebar.getByRole('button', { name: vi('Log out') }).count(), 1);
   await mkdir('.workstation-build', { recursive: true });
   await page.screenshot({ path: '.workstation-build/sidebar-desktop.png' });
+
+  const mapGroup = menu.getByRole('button', { name: vi('Map & Navigation'), exact: true });
+  const hospitalItem = menu.getByRole('button', { name: 'Thông tin bệnh viện', exact: true });
+  await mapGroup.click();
+  await hospitalItem.click();
+  await page.waitForURL('**/admin/facility');
+  await page.getByRole('heading', { name: 'Thông tin bệnh viện', exact: true, level: 2 }).waitFor();
+  assert.equal(await mapGroup.getAttribute('aria-expanded'), 'true');
+  assert.equal(await hospitalItem.getAttribute('aria-current'), 'page');
+  assert.equal(await menu.getByRole('button', { name: vi('Overview') }).getAttribute('aria-expanded'), 'false');
+  await page.reload();
+  await hospitalItem.waitFor();
+  assert.equal(await mapGroup.getAttribute('aria-expanded'), 'true');
+  assert.equal(await hospitalItem.getAttribute('aria-current'), 'page');
+  await page.screenshot({ path: '.workstation-build/sidebar-facility.png' });
 
   await menu.getByRole('button', { name: vi('Automation') }).click();
   await menu.getByRole('button', { name: 'Thiết kế quy trình' }).waitFor();

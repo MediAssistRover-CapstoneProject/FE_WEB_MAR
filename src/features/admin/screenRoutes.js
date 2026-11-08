@@ -2,7 +2,6 @@ const screenRoutes = {
   Dashboard: '/admin',
   'Map Studio': '/admin/map',
   'Facility Management': '/admin/facility',
-  'Public Catalog': '/admin/facility',
   'Live Operations': '/admin/live-operations',
   'Emergency Center': '/admin/emergency-center',
   Missions: '/admin/missions',
@@ -27,7 +26,8 @@ const slugToScreen = Object.fromEntries(Object.entries(screenRoutes)
   .map(([screen, path]) => [path.slice('/admin/'.length), screen]));
 
 export function pathForScreen(screen) {
-  return screen === 'Workflows' ? '/workflow' : screenRoutes[screen] || '/admin';
+  const canonicalScreen = screen === 'Public Catalog' ? 'Facility Management' : screen;
+  return canonicalScreen === 'Workflows' ? '/workflow' : screenRoutes[canonicalScreen] || '/admin';
 }
 
 export function screenForSlug(slug) {
