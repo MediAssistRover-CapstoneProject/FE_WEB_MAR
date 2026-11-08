@@ -43,7 +43,7 @@ export default function MapPresentationCanvas({ source, document, imageUrl, opac
         {selected && feature.points.map((p, index) => { const v = screen(p); return <circle key={index} cx={v.x} cy={v.y} r={markerSize * .8} fill="white" stroke="#60a5fa" strokeWidth={1} vectorEffect="non-scaling-stroke" onPointerDown={event => onVertexDown?.(event, feature, index)} style={{ cursor: 'crosshair' }}><title>{door ? ['Bản lề', 'Mép cửa · Kéo để đổi chiều rộng', 'Đầu cánh · Kéo để chỉnh góc minh họa'][index] : `Đỉnh ${index + 1}`}</title></circle>; })}
       </g>;
     })}
-    {endpoints.filter(e => e.active && e.accessible).map(endpoint => {
+    {!preview && endpoints.filter(e => e.active && e.accessible).map(endpoint => {
       const local = worldToLocal(endpoint, source); if (!insideMap(local, source)) return null;
       const p = screen(local);
       return <g key={endpoint.endpointId} pointerEvents="none"><circle cx={p.x} cy={p.y} r={markerSize} fill="#2563eb" stroke="white" strokeWidth={markerSize / 3} /><title>{endpoint.endpointName}</title></g>;

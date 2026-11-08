@@ -24,6 +24,8 @@ Với bản đã áp dụng góc xoay, **Về 0° → Áp dụng bản đồ** �
 
 Cuộn chuột để zoom tại con trỏ; giữ **Space + kéo** để di chuyển map. Phím tắt: **V** chọn, **H** kéo map, **R** phòng, **G** hành lang, **P** đa giác, **W** tường, **D** cửa, **T** nhãn, **L** ký hiệu. **Ctrl+S** lưu nháp, **Ctrl+Z / Ctrl+Shift+Z** hoàn tác/làm lại, **Delete** xóa đối tượng đang chọn. Phím vẽ không kích hoạt khi đang nhập tên hoặc tọa độ. Có nút nhân bản, ẩn/hiện điểm đích và mở rộng vùng vẽ.
 
+**Điểm đích:** chỉ hiện để đối chiếu vị trí khi chỉnh sửa. **Xem trước** luôn ẩn các chấm endpoint, kể cả điểm đã gắn với phòng/ký hiệu; tùy chọn **Điểm đích** được bỏ chọn và khóa trong chế độ này. Khi thoát xem trước, tùy chọn trở về trạng thái trước đó. Việc ẩn/hiện không thay đổi tọa độ hoặc liên kết endpoint.
+
 Đây là công cụ vẽ/chỉnh lớp trình bày trên map đã quét, chưa tự nhận diện phòng/tường từ ảnh LiDAR. Không xóa vật cản hoặc thay đổi ảnh PGM/YAML điều hướng. Nếu ẩn map thô, những phần chưa vẽ lại sẽ chưa xuất hiện trong bản đẹp.
 
 **Lưu nháp** lưu dữ liệu vào BE. **Áp dụng bản đồ** tạo snapshot đã xuất bản. Chỉnh/lưu nháp tiếp không thay đổi snapshot đó; **Ngừng xuất bản** chỉ gỡ snapshot, giữ bản nháp. Chưa thay đổi app staff trong phạm vi này.
