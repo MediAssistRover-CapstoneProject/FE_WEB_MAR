@@ -17,10 +17,20 @@ export default function FacilityGeometryPreview({map,zones,endpoints,zoneEdit,en
     const observer=new ResizeObserver(([entry])=>{const {width,height}=entry.contentRect;if(width&&height)setViewport({width,height});});
     observer.observe(svg);return()=>observer.disconnect();
   },[map.mapId,asset?.loaded]);
-  const pointDrag=useRef(null);
-  useEffect(()=>{pointDrag.current=null;},[map.mapId,drawing]);
+  const pointDrag=useRef(null),suppressClick=useRef(false);
+  useEffect(()=>{pointDrag.current=null;suppressClick.current=false;},[map.mapId,drawing]);
+  useEffect(()=>{if(pointDrag.current&&pointDrag.current.endpointId!==endpointEdit?.endpointId)pointDrag.current=null;},[endpointEdit?.endpointId]);
   const worldPoint=e=>{const matrix=e.currentTarget.getScreenCTM();if(!matrix)return null;const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(matrix.inverse());return {xM:p.x,yM:-p.y};};
   const endPlacement=()=>{if(pointDrag.current){pointDrag.current=null;onPlacementEnd?.();}};
+  const startEndpointMove=(event,point,select=false)=>{
+    if(!allowDraftMove||drawing||!currentAsset?.loaded||event.button!==0)return;
+    const svg=event.currentTarget.ownerSVGElement,matrix=svg?.getScreenCTM();if(!matrix)return;
+    const p=new DOMPoint(event.clientX,event.clientY).matrixTransform(matrix.inverse());
+    event.preventDefault();event.stopPropagation();suppressClick.current=false;
+    if(select)onEndpoint?.(point);
+    pointDrag.current={mode:'move',endpointId:point.endpointId,point:{xM:Number(point.xM),yM:Number(point.yM)},start:{xM:p.x,yM:-p.y},clientX:event.clientX,clientY:event.clientY,moved:false,yawRad:Number(point.yawRad)||0};
+    svg.setPointerCapture(event.pointerId);
+  };
   useEffect(()=>{
     const controller=new AbortController();let url;
     setAsset(null);setError('');
@@ -48,7 +58,7 @@ export default function FacilityGeometryPreview({map,zones,endpoints,zoneEdit,en
       if(drawing&&endpointEdit&&currentAsset?.loaded){const p=worldPoint(e),point=p&&snapMapPoint(map,p.xM,p.yM);if(!point)return;e.preventDefault();pointDrag.current={point,x:e.clientX,y:e.clientY};e.currentTarget.setPointerCapture(e.pointerId);onPoint?.({...point,yawRad:Number(endpointEdit.yawRad)||0});return;}
 
     }} onPointerMove={e=>{
-      const dpoint=pointDrag.current;if(dpoint){const end=worldPoint(e);if(!end)return;if(dpoint.mode==='move'){const point=snapMapPoint(map,dpoint.point.xM+end.xM-dpoint.start.xM,dpoint.point.yM+end.yM-dpoint.start.yM);if(point)onPoint?.({...point,yawRad:dpoint.yawRad});}else if(Math.hypot(e.clientX-dpoint.x,e.clientY-dpoint.y)>=6){onPoint?.({...dpoint.point,yawRad:endpointHeading(dpoint.point,end)});}return;}
+      const dpoint=pointDrag.current;if(dpoint){const end=worldPoint(e);if(!end)return;if(dpoint.mode==='move'){if(!dpoint.moved&&Math.hypot(e.clientX-dpoint.clientX,e.clientY-dpoint.clientY)<4)return;dpoint.moved=true;const point=snapMapPoint(map,dpoint.point.xM+end.xM-dpoint.start.xM,dpoint.point.yM+end.yM-dpoint.start.yM);if(point){suppressClick.current=true;onPoint?.({...point,yawRad:dpoint.yawRad});}}else if(Math.hypot(e.clientX-dpoint.x,e.clientY-dpoint.y)>=6){onPoint?.({...dpoint.point,yawRad:endpointHeading(dpoint.point,end)});}return;}
     }} onPointerUp={endPlacement} onPointerCancel={endPlacement} onLostPointerCapture={endPlacement} onDragStart={e=>e.preventDefault()} onClick={e=>{
       if(!drawing||endpointEdit||!currentAsset?.loaded)return;const p=worldPoint(e),point=p&&snapMapPoint(map,p.xM,p.yM);if(point)onPoint?.(point);
     }}>
@@ -58,12 +68,8 @@ export default function FacilityGeometryPreview({map,zones,endpoints,zoneEdit,en
       {zones.filter(z=>z.zoneId!==zoneEdit?.zoneId).map(z=><polygon key={z.zoneId} points={polygonPoints(z.polygonJson).map(p=>`${p[0]},${-p[1]}`).join(' ')} fill={z.zoneType==='KEEP_OUT'?'#fda4af55':z.zoneType==='NO_STOP'?'#fbbf2444':'#60a5fa44'} stroke={z.zoneType==='KEEP_OUT'?'#e11d48':z.zoneType==='NO_STOP'?'#d97706':'#2563eb'} strokeWidth={scale} opacity={z.active?1:.35} onClick={e=>{if(!drawing){e.stopPropagation();onZone?.(z.zoneId);}}}><title>{z.zoneName}</title></polygon>)}
       {points.length>0&&<polygon points={points.map(p=>`${p[0]},${-p[1]}`).join(' ')} fill="#fbbf2444" stroke="#d97706" strokeWidth={scale*1.5}/>}
       {zoneEdit&&points.map((p,index)=><circle key={index} cx={p[0]} cy={-p[1]} r={markerUnit*3.5} fill="#d97706" stroke="#fff" strokeWidth={markerUnit*1.3} pointerEvents="none"/>)}
-      {endpoints.filter(p=>p.endpointId!==endpointEdit?.endpointId).map(p=><g key={p.endpointId} transform={`translate(${p.xM},${-p.yM})`} opacity={p.active?1:.35} onClick={e=>{if(!drawing){e.stopPropagation();onEndpoint?.(p);}}}><EndpointMarker point={p} unit={markerUnit}/><title>{p.endpointName} · ({p.xM}, {p.yM}) m</title></g>)}
-      {endpointEdit&&endpointEdit.xM!==''&&endpointEdit.yM!==''&&<g data-draft-endpoint="true" aria-label="Điểm endpoint đang chỉnh" transform={`translate(${endpointEdit.xM},${-endpointEdit.yM})`} style={{cursor:allowDraftMove&&!endpointEdit.endpointId?'move':'default',touchAction:'none'}} onPointerDown={e=>{
-        if(!allowDraftMove||endpointEdit.endpointId||!currentAsset?.loaded||e.button!==0)return;
-        const svg=e.currentTarget.ownerSVGElement,matrix=svg?.getScreenCTM();if(!matrix)return;const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(matrix.inverse());
-        e.preventDefault();e.stopPropagation();pointDrag.current={mode:'move',point:{xM:Number(endpointEdit.xM),yM:Number(endpointEdit.yM)},start:{xM:p.x,yM:-p.y},yawRad:Number(endpointEdit.yawRad)||0};svg.setPointerCapture(e.pointerId);
-      }}><EndpointMarker point={endpointEdit} unit={markerUnit} draft/><title>{allowDraftMove&&!endpointEdit.endpointId?'Kéo điểm cam để đổi vị trí, giữ nguyên hướng':'Điểm đang chỉnh'}</title></g>}
+      {endpoints.filter(p=>p.endpointId!==endpointEdit?.endpointId).map(p=><g key={p.endpointId} transform={`translate(${p.xM},${-p.yM})`} opacity={p.active?1:.35} style={{cursor:allowDraftMove&&!drawing?'move':'default',touchAction:allowDraftMove?'none':undefined}} onPointerDown={e=>startEndpointMove(e,p,true)} onClick={e=>{if(!drawing&&!suppressClick.current){e.stopPropagation();onEndpoint?.(p);}}}><EndpointMarker point={p} unit={markerUnit}/><title>{p.endpointName} · ({p.xM}, {p.yM}) m</title></g>)}
+      {endpointEdit&&endpointEdit.xM!==''&&endpointEdit.yM!==''&&<g data-draft-endpoint="true" aria-label="Điểm endpoint đang chỉnh" transform={`translate(${endpointEdit.xM},${-endpointEdit.yM})`} style={{cursor:allowDraftMove&&!drawing?'move':'default',touchAction:'none'}} onPointerDown={e=>startEndpointMove(e,endpointEdit)}><EndpointMarker point={endpointEdit} unit={markerUnit} draft/><title>{allowDraftMove?'Kéo điểm cam để đổi vị trí, giữ nguyên hướng':'Điểm đang chỉnh'}</title></g>}
     </svg>
     {error?<p className="ls-error" role="alert">{error}</p>:!currentAsset?.loaded?<p style={{padding:10}} role="status">Đang tải ảnh map đã lưu từ BE…</p>:<p style={{padding:10,fontSize:12}}>{drawing?endpointEdit?'Bấm trên sàn đã quét, kéo theo hướng robot cần quay rồi thả. Điểm cam là bản nháp, cần lưu để tạo endpoint.':'Bấm trên ảnh map để thêm đỉnh vùng.':'Bản đồ quét đã lưu · Bấm vùng hoặc điểm để chỉnh sửa.'} Tọa độ tính bằng mét trong hệ tọa độ của map.</p>}
     <button type="button" className="ls-btn" onClick={()=>setRevision(v=>v+1)}>Tải lại ảnh map</button>

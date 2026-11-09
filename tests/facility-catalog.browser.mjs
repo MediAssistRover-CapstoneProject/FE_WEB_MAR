@@ -142,13 +142,44 @@ try{
  assert.equal(writes.at(-1).body.xM,movedX);assert.equal(writes.at(-1).body.yM,movedY);
  assert.deepEqual(writes.at(-2).body,{xM:movedX,yM:movedY},'Occupancy validation uses the new position');
  // Edit a different saved point immediately after saving the first one.
- await page.getByLabel('Điểm đã lưu',{exact:true}).selectOption('end-a');
+ await canvas.scrollIntoViewIfNeeded();
+ const secondMarker=await canvas.evaluate(svg=>{const p=new DOMPoint(2,-3).matrixTransform(svg.getScreenCTM());return {x:p.x,y:p.y};});
+ const beforeSecondDrag=writes.length;
+ await page.mouse.move(secondMarker.x,secondMarker.y);await page.mouse.down();
+ await page.mouse.move(secondMarker.x+65,secondMarker.y+35,{steps:6});await page.mouse.up();
+ assert.equal(await page.getByLabel('Điểm đã lưu',{exact:true}).inputValue(),'end-a','Clicking the second marker selects its own ID');
+ assert.equal(await page.getByLabel('Mã điểm',{exact:true}).inputValue(),'end-a','The form must match the selected second point');
+ assert.ok(Number(await page.getByLabel('X (m)',{exact:true}).inputValue())>2,'Dragging a saved second endpoint must change its X');
+ assert.ok(Number(await page.getByLabel('Y (m)',{exact:true}).inputValue())<3,'Dragging a saved second endpoint must change its Y');
+ assert.equal(Number(await page.getByLabel('Hướng đến (độ)',{exact:true}).inputValue()),0,'Moving the second point preserves its heading');
+ assert.equal(writes.length,beforeSecondDrag,'Dragging a saved endpoint only edits its draft');
+ const draggedX=Number(await page.getByLabel('X (m)',{exact:true}).inputValue()),draggedY=Number(await page.getByLabel('Y (m)',{exact:true}).inputValue());
+ await Promise.all([
+  page.waitForResponse(response=>response.request().method()==='PUT'&&new URL(response.url()).pathname==='/api/v1/endpoints/end-a'),
+  page.getByRole('button',{name:'Lưu thay đổi',exact:true}).click(),
+ ]);
+ assert.equal(writes.at(-1).body.xM,draggedX,'Saving B sends the dragged X to B, not A');
+ assert.equal(writes.at(-1).body.yM,draggedY,'Saving B sends the dragged Y to B, not A');
+ assert.equal(writes.at(-1).body.yawRad,0);
+ assert.equal(state.endpoints.find(p=>p.endpointId==='end-new').xM,movedX,'Dragging and saving B leaves A unchanged');
+ await page.getByRole('button',{name:'Đặt lại vị trí / hướng',exact:true}).click();
+ await canvas.scrollIntoViewIfNeeded();
+ const secondPlacement=await canvas.evaluate(svg=>{
+  const matrix=svg.getScreenCTM();
+  const start=new DOMPoint(-1.025,-1.225).matrixTransform(matrix),end=new DOMPoint(-.025,-2.225).matrixTransform(matrix);
+  return {start:{x:start.x,y:start.y},end:{x:end.x,y:end.y}};
+ });
+ await page.mouse.move(secondPlacement.start.x,secondPlacement.start.y);await page.mouse.down();
+ await page.mouse.move(secondPlacement.end.x,secondPlacement.end.y,{steps:6});await page.mouse.up();
+ assert.equal(await page.getByLabel('Điểm đã lưu',{exact:true}).inputValue(),'end-a','Map placement must retain the second endpoint ID');
+ assert.equal(Number(await page.getByLabel('X (m)',{exact:true}).inputValue()),-1.025);
+ assert.equal(Number(await page.getByLabel('Y (m)',{exact:true}).inputValue()),1.225);
  await page.getByLabel('X (m)',{exact:true}).fill('-1');await page.getByLabel('Y (m)',{exact:true}).fill('1.25');
  const beforeNetworkFailure=writes.length;failPointNetwork=true;
  await page.getByRole('button',{name:'Lưu thay đổi',exact:true}).click();
  await page.getByRole('status').filter({hasText:'Cannot reach the MediAssistRover API'}).waitFor();
  assert.equal(writes.length,beforeNetworkFailure+1,'DNS failure during validation never sends an endpoint update');
- assert.equal(state.endpoints.find(p=>p.endpointId==='end-a').xM,2,'Failed save keeps the persisted coordinates');
+ assert.equal(state.endpoints.find(p=>p.endpointId==='end-a').xM,draggedX,'Failed save keeps the persisted coordinates');
  assert.equal(Number(await page.getByLabel('X (m)',{exact:true}).inputValue()),-1,'Failed save retains the draft X');
  assert.equal(Number(await page.getByLabel('Y (m)',{exact:true}).inputValue()),1.25,'Failed save retains the draft Y');
  failPointNetwork=false;
@@ -225,6 +256,7 @@ try{
  assert.equal(state.maps.find(m=>m.mapId==='map-a').status,'ACTIVE','Original map is preserved');
  assert.equal(state.maps.find(m=>m.mapId==='map-nav').status,'DRAFT');
  assert.equal(state.zones.some(z=>z.mapId==='map-nav'),false,'Zones must be reviewed on new map');
+ await page.waitForFunction(()=>[...document.querySelectorAll('button')].some(button=>button.textContent==='Kích hoạt bản đồ'&&!button.disabled));
  assert.equal(await page.getByRole('button',{name:'Kích hoạt bản đồ',exact:true}).isEnabled(),true);
  // A lost copy response must not invite another create, including automatic retry.
  reloadSafe=false;uncertainCopy=true;
