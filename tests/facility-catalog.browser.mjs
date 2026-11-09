@@ -10,7 +10,7 @@ const map={mapId:'map-a',floorId:'f1',mapName:'Bản đồ BE thử nghiệm',ma
 const endpoint=(id,mapId)=>({endpointId:id,mapId,endpointCode:id,endpointName:id==='end-a'?'Điểm quầy A':'Điểm bản đồ khác',endpointType:'WAYPOINT',xM:2,yM:3,yawRad:0,active:true,accessible:true,publicVisible:false});
 const existingZone={zoneId:'zone-existing',mapId:'map-a',zoneCode:'zone_001',zoneName:'Vùng đã cấu hình',zoneType:'SPEED',polygonJson:{points:[[-3,-1],[-2,-1],[-2,0],[-3,0]]},speedLimitMps:.3,capacityLimit:20,calibratedAreaM2:6,cameraSourceRef:'cam-existing',cameraRoiJson:{roi:[0,0,1,1]},active:false,publicVisible:true,description:'Ghi chú cũ'};
 const state={maps:[map],zones:[existingZone],rooms:[],endpoints:[endpoint('end-a','map-a'),endpoint('end-other','map-other')],'endpoint-groups':[],'endpoint-group-members':[]};
-let rejectNext=false,rejectPoint=false,reloadSafe=true,uncertainCopy=false,rejectEndpointState=false,zoneSequence=0;
+let rejectNext=false,rejectPoint=false,failPointNetwork=false,reloadSafe=true,uncertainCopy=false,rejectEndpointState=false,zoneSequence=0;
 await page.route(url=>url.pathname.startsWith('/api/'),async route=>{
  const req=route.request(),url=new URL(req.url()),parts=url.pathname.split('/').filter(Boolean),resource=parts[2],method=req.method();
  const reply=(data,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
@@ -23,7 +23,7 @@ await page.route(url=>url.pathname.startsWith('/api/'),async route=>{
   return reply({content:state[resource]||[],last:true,totalPages:resource==='endpoints'?2:1});
  }
  const body=req.postDataJSON();writes.push({path:url.pathname,method,body});
- if(resource==='maps'&&parts[4]==='validate-navigation-point')return rejectPoint?reply({message:'Point is occupied or unknown'},400):reply({mapId:parts[3],knownFree:true});
+ if(resource==='maps'&&parts[4]==='validate-navigation-point')return failPointNetwork?route.abort('namenotresolved'):rejectPoint?reply({message:'Point is occupied or unknown'},400):reply({mapId:parts[3],knownFree:true});
  if(resource==='maps'&&parts[4]==='navigation-copy'){
   if(uncertainCopy)return reply({message:'Connection lost while creating map'},503);
   const source=state.maps.find(m=>m.mapId===parts[3]),copy={...source,mapId:'map-nav',mapName:'Bản đồ tương thích mới',status:'DRAFT'};
@@ -135,9 +135,37 @@ try{
  const countBefore=writes.length;
  await page.getByLabel('X (m)',{exact:true}).fill('1000');await page.getByRole('button',{name:/Lưu điểm đích|Lưu thay đổi/ }).click();
  await page.getByRole('status').filter({hasText:'Điểm đích phải nằm trong ảnh bản đồ'}).waitFor();assert.equal(writes.length,countBefore);
- await page.getByLabel('X (m)',{exact:true}).fill(String(selectedX));await page.getByLabel('Tên điểm',{exact:true}).fill('Điểm đã sửa');
+ const movedX=selectedX+.5,movedY=selectedY+.75;
+ await page.getByLabel('X (m)',{exact:true}).fill(String(movedX));await page.getByLabel('Y (m)',{exact:true}).fill(String(movedY));await page.getByLabel('Tên điểm',{exact:true}).fill('Điểm đã sửa');
  await page.getByRole('button',{name:/Lưu điểm đích|Lưu thay đổi/ }).click();await page.getByRole('status').filter({hasText:'Đã lưu thay đổi.'}).waitFor();
  assert.equal(writes.at(-1).method,'PUT');assert.equal(writes.at(-1).path,'/api/v1/endpoints/end-new');assert.equal(writes.at(-1).body.endpointType,'WAYPOINT');
+ assert.equal(writes.at(-1).body.xM,movedX);assert.equal(writes.at(-1).body.yM,movedY);
+ assert.deepEqual(writes.at(-2).body,{xM:movedX,yM:movedY},'Occupancy validation uses the new position');
+ // Edit a different saved point immediately after saving the first one.
+ await page.getByLabel('Điểm đã lưu',{exact:true}).selectOption('end-a');
+ await page.getByLabel('X (m)',{exact:true}).fill('-1');await page.getByLabel('Y (m)',{exact:true}).fill('1.25');
+ const beforeNetworkFailure=writes.length;failPointNetwork=true;
+ await page.getByRole('button',{name:'Lưu thay đổi',exact:true}).click();
+ await page.getByRole('status').filter({hasText:'Cannot reach the MediAssistRover API'}).waitFor();
+ assert.equal(writes.length,beforeNetworkFailure+1,'DNS failure during validation never sends an endpoint update');
+ assert.equal(state.endpoints.find(p=>p.endpointId==='end-a').xM,2,'Failed save keeps the persisted coordinates');
+ assert.equal(Number(await page.getByLabel('X (m)',{exact:true}).inputValue()),-1,'Failed save retains the draft X');
+ assert.equal(Number(await page.getByLabel('Y (m)',{exact:true}).inputValue()),1.25,'Failed save retains the draft Y');
+ failPointNetwork=false;
+ await Promise.all([
+  page.waitForResponse(response=>response.request().method()==='PUT'&&new URL(response.url()).pathname==='/api/v1/endpoints/end-a'),
+  page.getByRole('button',{name:'Lưu thay đổi',exact:true}).click(),
+ ]);
+ assert.equal(writes.at(-1).path,'/api/v1/endpoints/end-a');assert.equal(writes.at(-1).body.xM,-1);assert.equal(writes.at(-1).body.yM,1.25);
+ assert.equal(state.endpoints.find(p=>p.endpointId==='end-new').xM,movedX,'Saving the second point preserves the first');
+ await page.reload();await page.locator('[data-map-id="map-a"]').waitFor();
+ await page.getByRole('button',{name:'3. Điểm đích',exact:true}).click();
+ await page.getByLabel('Điểm đã lưu',{exact:true}).selectOption('end-a');
+ assert.equal(Number(await page.getByLabel('X (m)',{exact:true}).inputValue()),-1,'Second endpoint X survives reload');
+ assert.equal(Number(await page.getByLabel('Y (m)',{exact:true}).inputValue()),1.25,'Second endpoint Y survives reload');
+ await page.getByLabel('Điểm đã lưu',{exact:true}).selectOption('end-new');
+ assert.equal(Number(await page.getByLabel('X (m)',{exact:true}).inputValue()),movedX,'Saved X survives reload');
+ assert.equal(Number(await page.getByLabel('Y (m)',{exact:true}).inputValue()),movedY,'Saved Y survives reload');
  const writesBeforeRejectedPoint=writes.length;rejectPoint=true;
  await page.getByLabel('Tên điểm',{exact:true}).fill('Điểm không được lưu');
  await page.getByRole('button',{name:/Lưu điểm đích|Lưu thay đổi/}).click();await page.getByRole('status').filter({hasText:'Point is occupied or unknown'}).waitFor();
