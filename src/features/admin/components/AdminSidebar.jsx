@@ -7,8 +7,9 @@ import { screenTitles } from '../../api/workspaceCatalog.js';
 import { pathForScreen } from '../screenRoutes.js';
 import './AdminSidebar.css';
 
-const adminOnly = new Set(['Robot Setup', 'Workflow Dispatch', 'AI Test', 'Users & Roles', 'System Settings', 'Audit Logs', 'Analytics', 'History & Replay']);
+const adminOnly = new Set(['Fall Camera', 'Robot Setup', 'Workflow Dispatch', 'AI Test', 'Users & Roles', 'System Settings', 'Audit Logs', 'Analytics', 'History & Replay']);
 const menuLabels = {
+  'Fall Camera': 'Camera & AI té ngã',
   'Facility Management': 'Thông tin bệnh viện',
   'AI Test': 'Kiểm thử AI',
   Workflows: 'Thiết kế quy trình',

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiRequest, API_BASE_URL } from '../../features/api/client.js';
 import { getSession } from '../../features/auth/session.js';
+import FaqPanel from '../../features/voice/FaqPanel.jsx';
 import './aiWorkspace.css';
 
 const VOICE = '/api/v1/admin/assistant/voice';
@@ -26,7 +27,8 @@ function useActions() {
 }
 export function AiAdminPanel({section}) {
   if(!isAdmin()) return <p className="be-error">Chức năng này yêu cầu tài khoản ADMIN đang đăng nhập.</p>;
-  return <div className="ai-workspace"><header className="ai-heading"><div><h2>{section==='ai-voice'?'Cấu hình giọng AI':'Nguồn trả lời của AI'}</h2><p>Quản lý trực tiếp trên hệ thống bệnh viện.</p></div><Link to="/admin/ai-test" className="ai-link">Kiểm thử AI →</Link></header>{section==='ai-voice'?<VoiceEditor/>:<KnowledgeEditor/>}</div>;
+  const title = section==='ai-voice'?'Cấu hình giọng AI':section==='ai-faq'?'FAQ trả lời nhanh':'Nguồn trả lời của AI';
+  return <div className="ai-workspace"><header className="ai-heading"><div><h2>{title}</h2><p>Quản lý trực tiếp trên hệ thống bệnh viện.</p></div><Link to="/admin/ai-test" className="ai-link">Kiểm thử AI →</Link></header>{section==='ai-voice'?<VoiceEditor/>:section==='ai-faq'?<FaqPanel/>:<><KnowledgeEditor/><FaqPanel/></>}</div>;
 }
 function VoiceEditor() {
   const [voice,setVoice]=useState(null), [voices,setVoices]=useState([]), a=useActions();

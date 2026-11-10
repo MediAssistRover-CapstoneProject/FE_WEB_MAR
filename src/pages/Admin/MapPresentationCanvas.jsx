@@ -34,19 +34,22 @@ export default function MapPresentationCanvas({ source, document, imageUrl, opac
       const epsilon = Math.max(1, source.widthM, source.heightM) * 1e-9;
       const cutWall = wallSegments && (wallSegments.length !== feature.points.length - 1 || wallSegments.some(({ a, b }, i) => Math.hypot(a.x - feature.points[i].x, a.y - feature.points[i].y) > epsilon || Math.hypot(b.x - feature.points[i + 1].x, b.y - feature.points[i + 1].y) > epsilon));
       return <g key={feature.id} data-feature-id={feature.id} onPointerDown={event => onFeatureDown?.(event, feature)} style={{ cursor: onFeatureDown ? 'move' : 'default' }}>
-        {door ? <MapDoorSymbol geometry={door} source={source} color={feature.color} lineWidth={feature.lineWidthM} selected={selected}/> : !single && (polygon ? <polygon points={pointString(feature.points)} fill={color} fillOpacity={selected ? .18 : .09} stroke={color} strokeOpacity={selected ? .9 : .65} strokeWidth={selected ? 1.5 : 1} vectorEffect="non-scaling-stroke" strokeLinejoin="round" /> : cutWall ? <g>
+        {door ? <MapDoorSymbol geometry={door} source={source} color={feature.color} lineWidth={feature.lineWidthM} selected={selected}/> : !single && (polygon ? <polygon points={pointString(feature.points)} fill={color} fillOpacity={selected ? .26 : .16} stroke={color} strokeOpacity={selected ? 1 : .88} strokeWidth={selected ? 2 : 1.4} vectorEffect="non-scaling-stroke" strokeLinejoin="round" /> : cutWall ? <g>
           <path d={feature.points.map((point, i) => { const p = screen(point); return `${i ? 'L' : 'M'} ${p.x} ${p.y}`; }).join(' ')} fill="none" stroke="transparent" strokeWidth={Math.max(feature.lineWidthM, 6 * pixel)} pointerEvents="stroke" />
           {wallSegments.map(({ a, b }, i) => { const start = screen(a), end = screen(b); return <line key={i} className="mp-wall-segment" x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke={feature.color} strokeWidth={feature.lineWidthM} strokeLinecap="round" />; })}
         </g> : <polyline points={pointString(feature.points)} fill="none" stroke={feature.color} strokeWidth={feature.lineWidthM} strokeLinecap="round" strokeLinejoin="round" />)}
         {feature.type === 'LANDMARK' && <circle cx={center.x} cy={center.y} r={feature.fontSizeM * .85} fill={feature.color} opacity={.15} />}
-        {feature.label && <text x={center.x} y={center.y} transform={`rotate(${-rotation} ${center.x} ${center.y})`} textAnchor="middle" dominantBaseline="central" fill={single ? feature.color : '#1e293b'} fontSize={feature.fontSizeM} fontWeight="600" pointerEvents="none">{feature.label}</text>}
+        {feature.label && <g transform={`rotate(${-rotation} ${center.x} ${center.y})`} pointerEvents="none">
+          <text x={center.x} y={center.y} textAnchor="middle" dominantBaseline="central" fill="#ffffff" stroke="#ffffff" strokeWidth={Math.max(0.03, feature.fontSizeM * 0.26)} strokeLinejoin="round" fontSize={feature.fontSizeM} fontWeight="700">{feature.label}</text>
+          <text x={center.x} y={center.y} textAnchor="middle" dominantBaseline="central" fill={single ? feature.color : '#0f172a'} fontSize={feature.fontSizeM} fontWeight="700">{feature.label}</text>
+        </g>}
         {selected && feature.points.map((p, index) => { const v = screen(p); return <circle key={index} cx={v.x} cy={v.y} r={markerSize * .8} fill="white" stroke="#60a5fa" strokeWidth={1} vectorEffect="non-scaling-stroke" onPointerDown={event => onVertexDown?.(event, feature, index)} style={{ cursor: 'crosshair' }}><title>{door ? ['Bản lề', 'Mép cửa · Kéo để đổi chiều rộng', 'Đầu cánh · Kéo để chỉnh góc minh họa'][index] : `Đỉnh ${index + 1}`}</title></circle>; })}
       </g>;
     })}
-    {!preview && endpoints.filter(e => e.active && e.accessible).map(endpoint => {
+    {endpoints.filter(e => e.active && e.accessible).map(endpoint => {
       const local = worldToLocal(endpoint, source); if (!insideMap(local, source)) return null;
       const p = screen(local);
-      return <g key={endpoint.endpointId} pointerEvents="none"><circle cx={p.x} cy={p.y} r={markerSize} fill="#2563eb" stroke="white" strokeWidth={markerSize / 3} /><title>{endpoint.endpointName}</title></g>;
+      return <g key={endpoint.endpointId} pointerEvents="none"><circle cx={p.x} cy={p.y} r={markerSize * 1.5} fill="rgba(37, 99, 235, 0.2)" /><circle cx={p.x} cy={p.y} r={markerSize} fill="#2563eb" stroke="white" strokeWidth={markerSize / 3} /><title>{endpoint.endpointName}</title></g>;
     })}
     {!preview && <g className="mp-drawing-overlays" pointerEvents="none" aria-hidden="true">
       {drawingAssist?.edge && (() => { const a = screen(drawingAssist.edge.a), b = screen(drawingAssist.edge.b); return <line className="mp-snap-edge" x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#0d9488" strokeWidth={4} strokeOpacity={.3} vectorEffect="non-scaling-stroke" />; })()}

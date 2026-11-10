@@ -35,6 +35,7 @@ import { monitoringApi } from '../../features/monitoring/monitoringApi.js';
 import { reportsApi } from '../../features/reports/reportsApi.js';
 import { operationsApi } from '../../features/operations/operationsApi.js';
 import { voiceApi } from '../../features/voice/voiceApi.js';
+import FaqPanel from '../../features/voice/FaqPanel.jsx';
 
 const scriptCategories = ['Navigation', 'Delivery', 'Escort', 'Emergency', 'General', 'Error'];
 const deliveryScripts = [
@@ -171,6 +172,7 @@ export function VoiceScripts() {
   };
 
   return <section className="monitor-screen voice-scripts" aria-label={vi("Voice and scripts workspace")}>
+    <FaqPanel />
     <div className="voice-scripts__layout">
       <aside className="monitor-panel voice-scripts__library">
         <div className="monitor-panel__head monitor-panel__head--split">

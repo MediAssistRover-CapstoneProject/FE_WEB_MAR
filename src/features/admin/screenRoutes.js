@@ -17,6 +17,7 @@ const screenRoutes = {
   'Workflow Dispatch': '/admin/workflow-dispatch',
   'Voice & Scripts': '/admin/voice-scripts',
   'AI Test': '/admin/ai-test',
+  'Fall Camera': '/admin/fall-camera',
   'Users & Roles': '/admin/users-roles',
   'System Settings': '/admin/system-settings',
   'My Account': '/admin/my-account',

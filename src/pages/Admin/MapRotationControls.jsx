@@ -20,7 +20,12 @@ export default function MapRotationControls({ rotation, rotate, beginRotation, e
       <button type="button" aria-label="Xoay phải 1 độ" title="Xoay phải 1°" disabled={disabled} onClick={() => rotate(rotation + 1)}>↷</button>
     </div>
     <input className="mp-rotation-slider" aria-label="Thanh trượt xoay bản đồ" type="range" min="-180" max="180" step=".1" value={rotation} disabled={disabled} onPointerDown={beginRotation} onPointerUp={endRotation} onPointerCancel={endRotation} onKeyDown={event => { if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(event.key)) beginRotation(); }} onKeyUp={endRotation} onBlur={endRotation} onChange={event => rotate(Number(event.target.value))}/>
-    <div className="mp-rotation-actions"><button type="button" aria-label="Xoay trái 90 độ" title="Xoay trái 90°" disabled={disabled} onClick={() => rotate(rotation - 90)}>−90°</button><button type="button" aria-label="Xoay phải 90 độ" title="Xoay phải 90°" disabled={disabled} onClick={() => rotate(rotation + 90)}>+90°</button><button type="button" disabled={disabled || rotation === 0} onClick={() => rotate(0)}>Về 0°</button></div>
+    <div className="mp-rotation-actions">
+      <button type="button" aria-label="Xoay trái 90 độ" title="Xoay trái 90°" disabled={disabled} onClick={() => rotate(rotation - 90)}>−90°</button>
+      <button type="button" aria-label="Xoay phải 90 độ" title="Xoay phải 90°" disabled={disabled} onClick={() => rotate(rotation + 90)}>+90°</button>
+      <button type="button" disabled={disabled || rotation === 0} onClick={() => rotate(0)}>Về 0°</button>
+      <button type="button" style={{fontWeight: 600, color: '#2563eb', background: '#eff6ff'}} disabled={disabled || Math.abs(rotation - (-19.9)) < 0.05} onClick={() => rotate(-19.9)} title="Căn thẳng chuẩn theo phòng (-19.9°)">Căn thẳng (-19.9°)</button>
+    </div>
     <button type="button" className={'mp-align-button' + (aligning ? ' is-active' : '')} aria-label="Căn theo tường" aria-pressed={aligning} disabled={disabled} onClick={onAlign}>⌖ Căn theo tường</button>
     <label className="mp-grid-toggle"><input type="checkbox" checked={showGrid} onChange={event => setShowGrid(event.target.checked)}/>Lưới căn</label>
   </div>;

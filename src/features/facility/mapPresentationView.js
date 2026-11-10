@@ -49,6 +49,53 @@ export function rotationBounds(source, degrees = 0) {
   return { x: minX === 0 ? 0 : minX, y: minY === 0 ? 0 : minY, width: maxX - minX, height: maxY - minY };
 }
 
+export function contentBounds(source, features = [], endpoints = [], degrees = 0) {
+  const rotBounds = rotationBounds(source, degrees);
+  if (!features || !features.length) return rotBounds;
+
+  const allPoints = [];
+  features.forEach(f => {
+    if (Array.isArray(f.points)) {
+      f.points.forEach(p => {
+        if (Number.isFinite(p?.x) && Number.isFinite(p?.y)) {
+          allPoints.push(toView(p, source, degrees));
+        }
+      });
+    }
+  });
+
+  if (Array.isArray(endpoints)) {
+    endpoints.forEach(e => {
+      if (Number.isFinite(Number(e.xM)) && Number.isFinite(Number(e.yM))) {
+        const dx = Number(e.xM) - (source.originXM || 0), dy = Number(e.yM) - (source.originYM || 0);
+        const c = Math.cos(source.originYawRad || 0), s = Math.sin(source.originYawRad || 0);
+        const lx = c * dx + s * dy, ly = -s * dx + c * dy;
+        if (lx >= 0 && ly >= 0 && lx <= source.widthM && ly <= source.heightM) {
+          allPoints.push(toView({ x: lx, y: ly }, source, degrees));
+        }
+      }
+    });
+  }
+
+  if (allPoints.length < 3) return rotBounds;
+
+  const xs = allPoints.map(p => p.x), ys = allPoints.map(p => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const width = Math.max(0.1, maxX - minX), height = Math.max(0.1, maxY - minY);
+
+  // 7% lề thoáng xung quanh giúp các phòng không bao giờ bị cấn mép khung hình
+  const padX = Math.max(0.25, width * 0.07);
+  const padY = Math.max(0.25, height * 0.07);
+
+  return {
+    x: Math.round((minX - padX) * 1000) / 1000,
+    y: Math.round((minY - padY) * 1000) / 1000,
+    width: Math.round((width + padX * 2) * 1000) / 1000,
+    height: Math.round((height + padY * 2) * 1000) / 1000,
+  };
+}
+
 export function viewRectangle(a, b, source, degrees = 0) {
   const start = toView(a, source, degrees), end = toView(b, source, degrees);
   const left = Math.min(start.x, end.x), right = Math.max(start.x, end.x), top = Math.min(start.y, end.y), bottom = Math.max(start.y, end.y);

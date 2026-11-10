@@ -6,7 +6,7 @@ injectStyles('mediassist-style-pages-Auth-AuthFlows-jsx', inlineStyles);
 
 import { useRef, useState } from 'react';
 import { AuthButton, AuthField, AuthShell } from './components/AuthUi.jsx';
-import { API_BASE_URL } from '../../features/api/client.js';
+import { API_BASE_URL, getApiTarget, setApiTarget } from '../../features/api/client.js';
 
 export default function AuthFlows({ onHome, onAuthenticated, notice }) {
   const [username, setUsername] = useState('');
@@ -15,6 +15,9 @@ export default function AuthFlows({ onHome, onAuthenticated, notice }) {
   const [loginError, setLoginError] = useState('');
   const [loginFailure, setLoginFailure] = useState(null);
   const submitting = useRef(false);
+  const target = getApiTarget();
+  const isLocal = target === 'local';
+
   const onSubmit = async (event) => {
     event.preventDefault();
     if (submitting.current) return;
@@ -38,9 +41,56 @@ export default function AuthFlows({ onHome, onAuthenticated, notice }) {
     }
   };
   return <AuthShell><form className="auth-form" onSubmit={onSubmit}>
-    <button type="button" className="auth-home" onClick={onHome}>{vi('← Home')}</button>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+      <button type="button" className="auth-home" onClick={onHome}>{vi('← Home')}</button>
+      <div
+        role="group"
+        aria-label="Chuyển đổi môi trường API"
+        style={{
+          display: 'inline-flex',
+          background: '#eef4fb',
+          padding: 3,
+          borderRadius: 999,
+          border: '1px solid #d0dfef',
+          gap: 2,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setApiTarget('local')}
+          style={{
+            border: 0,
+            borderRadius: 999,
+            padding: '5px 12px',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            background: isLocal ? '#1687ed' : 'transparent',
+            color: isLocal ? '#fff' : '#4a6583',
+          }}
+        >
+          🟢 API Local
+        </button>
+        <button
+          type="button"
+          onClick={() => setApiTarget('server')}
+          style={{
+            border: 0,
+            borderRadius: 999,
+            padding: '5px 12px',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            background: !isLocal ? '#1687ed' : 'transparent',
+            color: !isLocal ? '#fff' : '#4a6583',
+          }}
+        >
+          ☁️ API Server
+        </button>
+      </div>
+    </div>
     <h2>{vi('Welcome back')}</h2>
-    <p className="auth-description">Đăng nhập bằng tên tài khoản được cấp trên hệ thống này.</p>
+    <p className="auth-description">Đăng nhập bằng tên tài khoản được cấp trên hệ thống ({isLocal ? 'Máy chủ Local · cổng 8080' : 'Máy chủ Server · Railway'}).</p>
     {notice && <p className="auth-success" role="status">{notice}</p>}
     <AuthField label="Tên đăng nhập" type="text" placeholder="Ví dụ: admin" value={username} onChange={value => { setUsername(value); setLoginError(''); }} />
     <AuthField label="Mật khẩu" type="password" placeholder="Nhập mật khẩu" value={password} onChange={value => { setPassword(value); setLoginError(''); }} />

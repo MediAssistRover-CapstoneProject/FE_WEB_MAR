@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { apiRequest } from '../../features/api/client.js';
 import { allFacilityPages, facilityApi } from '../../features/facility/facilityApi.js';
 import { insideMap, mapPresentationApi, newFeature, presentationIssues } from '../../features/facility/mapPresentation.js';
-import { fromView, normalizeRotation, rotationBounds, straightenRotation, viewRectangle } from '../../features/facility/mapPresentationView.js';
+import { fromView, normalizeRotation, rotationBounds, straightenRotation, viewRectangle, contentBounds } from '../../features/facility/mapPresentationView.js';
 import { doorFitsMap, doorGeometry } from '../../features/facility/doorGeometry.js';
 import { doorOnWall, getDoorWall, getWallEdge, snapDrawingPoint } from '../../features/facility/mapDrawingAssist.js';
 import { nextRoomColor, nextRoomName, persistRoomColors, preserveRoomColors } from '../../features/facility/roomAppearance.js';
@@ -40,7 +40,7 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
   const dirty = document && JSON.stringify(document) !== saved;
   const selected = document?.features.find(f => f.id === selectedId);
   const rotation = document?.rotationDegrees ?? 0;
-  const fitBounds = entry ? rotationBounds(entry.source, rotation) : null;
+  const fitBounds = entry ? contentBounds(entry.source, document?.features, endpoints, rotation) : null;
   const clearDrawingHints = () => { setDrawingAssist(null); setDrawingPreview(values => values.length ? [] : values); setDoorPreview(null); };
   useEffect(() => {
     doorEdge.current = null; lastPointer.current = null; clearDrawingHints();
@@ -60,7 +60,7 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
       roomCatalog.current = roomRows;
       const hydratedDraft = hydrateRoomFeatures(value.draft, mapEndpoints, mapRooms);
       setEntry(value); setDocument(hydratedDraft); setSaved(JSON.stringify(value.draft)); setEndpoints(mapEndpoints); setRooms(mapRooms);
-      setView(rotationBounds(value.source, value.draft.rotationDegrees ?? 0));
+      setView(contentBounds(value.source, hydratedDraft?.features || value.draft?.features, mapEndpoints, value.draft.rotationDegrees ?? 0));
     }).catch(e => { if (!controller.signal.aborted) setError(e.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     apiRequest(`/api/v1/maps/${encodeURIComponent(mapId)}/image.png`, { signal: controller.signal, responseType: 'blob' }).then(blob => {
       if (!controller.signal.aborted) { url = URL.createObjectURL(blob); setImageUrl(url); }
@@ -68,7 +68,7 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     return () => { controller.abort(); if (url) URL.revokeObjectURL(url); };
   }, [mapId, reload]);
   useEffect(() => {
-    if (entry) setView(rotationBounds(entry.source, rotation));
+    if (entry) setView(contentBounds(entry.source, document?.features, endpoints, rotation));
   }, [entry?.source.widthM, entry?.source.heightM, rotation]);
   useEffect(() => {
     if (!dirty) return;
