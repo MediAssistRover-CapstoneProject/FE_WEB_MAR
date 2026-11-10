@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { openSetupSession, sameHash, setupContext, setupPendingResolved, setupPiCommand, setupReadiness, setupSeed, setupWriteBlock } from '../src/features/robotOperations/robotSetup.js';
+import { openSetupSession, sameHash, setupConnection, setupContext, setupNextExpiry, setupPendingResolved, setupPiCommand, setupReadiness, setupSeed, setupWriteBlock } from '../src/features/robotOperations/robotSetup.js';
 import { consumeSetupEvents, newerSetupPose } from '../src/features/robotOperations/robotSetupStream.js';
 
 const robotId = '11111111-1111-4111-8111-111111111111', mapId = '22222222-2222-4222-8222-222222222222', sessionId = '33333333-3333-4333-8333-333333333333', hash = 'a'.repeat(64);
@@ -30,8 +30,39 @@ test('readiness requires a verified fresh pose, matching live session and acknow
     v => { v.snapshot.activeJobId = 'running'; }, v => { v.snapshot.robot.status = 'BUSY'; }, v => { v.error = 'Disconnected'; },
     v => { v.now += 5001; }, v => { v.snapshot.observedAt = time(-5001); }, v => { v.asset.loaded = false; },
     v => { v.pending = { kind: 'seed' }; },
+    v => { v.syncing = true; },
   ];
   for (const change of cases) { const input = fixture(); change(input); assert.equal(!!setupReadiness(input).ready, false, change.toString()); }
+});
+
+test('web synchronization and confirmed robot disconnection remain distinct', () => {
+  const value = fixture();
+  const connection = () => setupConnection(setupReadiness(value), value.snapshot);
+  assert.equal(connection().robot, 'Robot đang kết nối');
+  value.error = 'Request timed out';
+  assert.equal(connection().web, 'Đang đồng bộ lại với máy chủ');
+  assert.equal(connection().robot, 'Đang chờ xác nhận kết nối robot');
+  assert.equal(setupReadiness(value).ready, false);
+  value.error = ''; value.snapshot.mqttConnected = false;
+  value.snapshot.sessionFailureReason = 'MQTT session offline';
+  assert.equal(connection().web, 'Đã đồng bộ với máy chủ');
+  assert.equal(connection().robot, 'Robot mất kết nối MQTT');
+  assert.equal(connection().detail, 'MQTT session offline');
+  value.snapshot.mqttConnected = true; value.snapshot.heartbeatFresh = false;
+  assert.equal(connection().robot, 'Đang chờ heartbeat mới từ robot');
+});
+
+test('expiry scheduling invalidates telemetry and sessions at their actual boundaries', () => {
+  const value = fixture();
+  value.profileReceivedAt = now;
+  assert.equal(setupNextExpiry(value, now), now + 5001);
+  value.snapshot.latestPose.capturedAt = time(-3500);
+  assert.equal(setupNextExpiry(value, now), now + 1501, 'an older pose expires before the current snapshot');
+  value.snapshot.navigationSession.expiresAt = time(1000);
+  assert.equal(setupNextExpiry(value, now), now + 1000);
+  assert.equal(setupReadiness({ ...value, now: now + 1000 }).ready, false);
+  assert.equal(setupNextExpiry(value, now + 5001), now + 15001);
+  assert.equal(setupNextExpiry(value, now + 15001), null);
 });
 
 test('estimated seeds cannot stand in for the actual robot pose', () => {

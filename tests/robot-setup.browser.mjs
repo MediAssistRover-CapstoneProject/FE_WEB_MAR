@@ -33,7 +33,8 @@ const endpoint = { endpointId, mapId, endpointName: 'Điểm đỗ A', endpointT
 const maps = [mapId, otherMap].map((value, index) => ({ mapId: value, mapName: index ? 'Bản đồ tầng 2' : 'Khu khám bệnh · Tầng 1', versionNo: 2, status: 'ACTIVE', assetHash: hash }));
 let session = { state: 'NONE' }, connected = false, acknowledged = false, activeJob = null, wrongRobot = false, metadataHash = hash, endpointMoved = false, loseInitialization = false, heldSession = null;
 let snapshotFailure = false, openCount = 0, failClose = false, failOpen = false, loseOpen = false, heldOpen = null;
-let snapshotDelay = 0, profileDelay = 0, snapshotReads = 0, profileReads = 0, poseAge = 0;
+let snapshotDelay = 0, profileDelay = 0, snapshotReads = 0, profileReads = 0, poseAge = 0, delayAfterInitialization = 0, nextSnapshotDelay = 0;
+let emulateSnapshotCache = false, cachedSnapshot = null, cachedUntil = 0, cachedReads = 0;
 const png = Buffer.from(await page.evaluate(() => {
   const canvas = document.createElement('canvas'); canvas.width = 1000; canvas.height = 600;
   const c = canvas.getContext('2d'); c.fillStyle = '#e5e7eb'; c.fillRect(0, 0, 1000, 600); c.fillStyle = '#fff'; c.fillRect(60, 60, 880, 480);
@@ -47,6 +48,7 @@ await page.route('**/*', async route => {
   const request = route.request(), url = new URL(request.url()), path = url.pathname, method = request.method();
   if (!path.startsWith('/api/v1/')) return url.origin === base ? route.continue() : route.abort();
   const json = (body, status = 200) => route.fulfill({ status, json: body });
+  const sessionJson = () => json({ ...session, observedAt: new Date().toISOString() });
   const rows = content => json({ content, totalPages: 1, last: true });
   if (method === 'GET') {
     if (path === '/api/v1/robots') return rows([{ robotId, robotName: 'MAR-01', robotCode: 'MAR-01', status: 'IDLE', batteryPercent: 86 }, { robotId: id(9), robotName: 'MAR-02', status: 'IDLE' }]);
@@ -57,8 +59,11 @@ await page.route('**/*', async route => {
     if (path.endsWith('/snapshot')) {
       snapshotReads++;
       if (path.includes(id(9))) return json({ ...snapshot(), robot: { robotId: id(9), status: 'IDLE' }, navigationSession: { state: 'NONE' }, mqttConnected: false, heartbeatFresh: false, latestPose: null });
-      const value = snapshot();
-      if (snapshotDelay) await new Promise(resolve => setTimeout(resolve, snapshotDelay));
+      const cached = cachedSnapshot && Date.now() < cachedUntil;
+      if (cached) cachedReads++;
+      const value = cached ? cachedSnapshot : snapshot();
+      const delay = nextSnapshotDelay || snapshotDelay; nextSnapshotDelay = 0;
+      if (delay) await new Promise(resolve => setTimeout(resolve, delay));
       return snapshotFailure ? route.abort() : json(value);
     }
     if (path.endsWith('/navigation-zones')) {
@@ -73,24 +78,25 @@ await page.route('**/*', async route => {
   assert.equal(method, 'POST');
   assert.ok(path.startsWith(`/api/v1/robots/${robotId}/navigation-session`), 'Setup must never dispatch MOVE, jobs or map mutations');
   const body = request.postDataJSON(); writes.push({ path, body });
+  if (emulateSnapshotCache) { cachedSnapshot = { ...snapshot(), observedAt: new Date(Date.now() - 500).toISOString() }; cachedUntil = Date.now() + 1000; }
   if (path.endsWith('/initialization')) {
     assert.equal(body.sessionId, session.sessionId);
     const next = { ...session, state: 'LOCALIZING', initialization: { mode: body.mode, revision: session.initialization.revision + 1, pose: body.mode === 'SEED' ? { x_m: body.xM, y_m: body.yM, yaw_rad: body.yawRad } : null } };
     acknowledged = false;
     if (loseInitialization) { heldSession = next; loseInitialization = false; return route.abort(); }
-    session = next; return json(session);
+    session = next; nextSnapshotDelay = delayAfterInitialization; return sessionJson();
   }
   if (path.endsWith('/close')) {
     assert.equal(body.sessionId, session.sessionId);
     if (failClose) return json({ message: 'Robot vẫn còn nhiệm vụ đang chờ' }, 409);
-    session = { ...session, state: 'CLOSED' }; return json(session);
+    session = { ...session, state: 'CLOSED' }; return sessionJson();
   }
   if (failOpen) return json({ message: 'Chưa tạo được phiên mới thử nghiệm' }, 409);
   const next = { robotId, sessionId: openCount++ ? id(5 + openCount) : sessionId, mapId: body.mapId, mapAssetHash: hash, state: 'WAITING_FOR_PI', expiresAt: new Date(Date.now() + body.durationSec * 1000).toISOString(), initialization: { mode: 'MANUAL', revision: 0 } };
   acknowledged = false;
   if (loseOpen) { loseOpen = false; heldOpen = next; return route.abort(); }
   session = next;
-  return json(session);
+  return sessionJson();
 });
 const button = name => page.getByRole('button', { name, exact: true });
 const readyBanner = page.getByText('Robot đã sẵn sàng nhận nhiệm vụ', { exact: true });
@@ -217,9 +223,27 @@ try {
   await expect(page.getByRole('status').filter({ hasText: 'Đang đối chiếu yêu cầu trước.' })).toHaveCount(0);
   await waitConnected();
   await page.getByText('Định vị nâng cao', { exact: true }).click();
+  delayAfterInitialization = 1200;
+  await page.evaluate(() => {
+    window.retainedSetupMap = document.querySelector('.rsu-map-view svg');
+    window.retainedSetupImage = document.querySelector('.rsu-map-view image');
+    window.initializationTrace = [];
+    window.initializationObserver = new MutationObserver(() => window.initializationTrace.push({
+      title: document.querySelector('.rsu-state strong')?.textContent,
+      sameMap: document.querySelector('.rsu-map-view svg') === window.retainedSetupMap,
+      sameImage: document.querySelector('.rsu-map-view image') === window.retainedSetupImage,
+    }));
+    window.initializationObserver.observe(document.querySelector('.rsu-page'), { subtree: true, childList: true, characterData: true });
+  });
   await button('Tự tìm vị trí').click();
   await expect.poll(() => writes.length).toBe(4);
   assert.deepEqual(writes[3].body, { sessionId, mode: 'GLOBAL' });
+  await expect(page.locator('[data-setup-transport]')).toContainText('Đang đồng bộ lại');
+  await expect(seedButton()).toBeDisabled();
+  await expect(page.locator('[data-setup-transport]')).toContainText('Đã đồng bộ');
+  const initializationTrace = await page.evaluate(() => { window.initializationObserver.disconnect(); return window.initializationTrace; });
+  assert.ok(initializationTrace.length && initializationTrace.every(row => row.sameMap && row.sameImage && !['Chưa mở phiên vận hành', 'Chọn robot và bản đồ'].includes(row.title)), 'initialization retains its map and acknowledged session while awaiting a full snapshot');
+  delayAfterInitialization = 0;
   // Rejecting the close must never create another session.
   failClose = true;
   await button('Dừng phiên và mở phiên mới').click();
@@ -230,6 +254,7 @@ try {
   const oldExpiry = session.expiresAt;
   assert.ok(Date.parse(oldExpiry) - Date.now() > 60 * 60 * 1000);
   await page.getByLabel('Thời hạn phiên mới', { exact: true }).selectOption('14400');
+  emulateSnapshotCache = true;
   await button('Dừng phiên và mở phiên mới').dblclick();
   await expect.poll(() => writes.length).toBe(7);
   assert.ok(writes[5].path.endsWith('/close'));
@@ -238,6 +263,10 @@ try {
   assert.notEqual(session.sessionId, sessionId);
   await expect(page.locator('pre')).toContainText('--session-id ' + session.sessionId);
   await expect(page.locator('pre')).not.toContainText('--session-id ' + sessionId);
+  await expect(page.locator('[data-setup-transport]')).toContainText('Đã đồng bộ');
+  assert.ok(cachedReads >= 2, 'close and create both survive a cached pre-mutation snapshot');
+  assert.equal(await page.getByRole('alert').count(), 0);
+  emulateSnapshotCache = false; cachedSnapshot = null;
   await expect(readyBanner).toHaveCount(0);
   assert.ok(Date.parse(oldExpiry) > Date.now(), 'restart completes while the old lease still had hours left');
   // When creation fails after a confirmed close, the UI allows opening again.
@@ -295,10 +324,51 @@ try {
     send(); window.setupStreamTimer = setInterval(send, 300);
   }, { value: snapshot(), pose: streamPose });
   await expect(page.locator('[data-pose="verified"]')).toHaveAttribute('transform', `translate(${streamPose.xM} ${-streamPose.yM})`);
-  await expect(page.locator('[data-setup-transport]')).toContainText('trực tiếp');
+  await expect(page.locator('[data-setup-transport]')).toContainText('Đã đồng bộ');
   const streamReads = snapshotReads;
   await page.waitForTimeout(2500);
   assert.ok(snapshotReads <= streamReads + 1, 'healthy state events suppress repeated REST snapshot requests');
+  await expect(readyBanner).toBeVisible();
+  // Pose-only traffic updates the marker/footer without mutating the form or
+  // rebuilding its map. Expiry must revoke readiness even with no next packet.
+  await page.evaluate(() => {
+    clearInterval(window.setupStreamTimer);
+    window.poseFormMutations = 0;
+    window.poseFormObserver = new MutationObserver(records => { window.poseFormMutations += records.length; });
+    for (const selector of ['.rsu-selection', '.rsu-steps', '.rsu-controls']) window.poseFormObserver.observe(document.querySelector(selector), { subtree: true, childList: true, characterData: true });
+    window.poseMap = document.querySelector('.rsu-map-view svg');
+    window.poseImage = document.querySelector('.rsu-map-view image');
+  });
+  const movedPose = { ...streamPose, xM: streamPose.xM + .2 };
+  await page.evaluate(({ value, pose }) => {
+    const time = new Date().toISOString();
+    for (let i = 0; i < 60; i++) window.setupStream.send('robot-pose', { messageType: 'NAVIGATION_POSE', robotId: value.robot.robotId,
+      mapId: value.navigationSession.mapId, mapAssetHash: value.navigationSession.mapAssetHash,
+      navigationSessionId: value.navigationSession.sessionId, initializationRevision: 1,
+      transportSessionId: 'pi-stream', sequenceNo: window.streamSequence++, receivedAt: time, capturedAt: time, pose });
+  }, { value: snapshot(), pose: movedPose });
+  await expect(page.locator('[data-pose="verified"]')).toHaveAttribute('transform', `translate(${movedPose.xM} ${-movedPose.yM})`);
+  assert.deepEqual(await page.evaluate(() => { window.poseFormObserver.disconnect(); return { mutations: window.poseFormMutations, sameMap: document.querySelector('.rsu-map-view svg') === window.poseMap, sameImage: document.querySelector('.rsu-map-view image') === window.poseImage }; }), { mutations: 0, sameMap: true, sameImage: true });
+  await expect(page.locator('[data-pose="verified"]')).toHaveCount(0, { timeout: 2500 });
+  await expect(page.locator('[data-pose="last"]')).toHaveCount(1);
+  await expect(page.locator('[data-setup-position]')).toContainText('Vị trí cuối');
+  await expect(readyBanner).toHaveCount(0);
+  assert.equal(writes.length, 13);
+  await page.evaluate(value => window.setupStream.send('robot-state', value), snapshot());
+  await expect(readyBanner).toBeVisible();
+  // Confirmed MQTT loss changes only connection/readiness indicators. Layout,
+  // zoom and the image stay put, and retained coordinates are explicitly stale.
+  await button('Phóng to bản đồ thiết lập').click();
+  const stableMap = await page.locator('.rsu-workspace').evaluate(element => ({ top: element.getBoundingClientRect().top + scrollY, viewBox: element.querySelector('svg').getAttribute('viewBox') }));
+  await page.evaluate(value => window.setupStream.send('robot-state', value), { ...snapshot(), mqttConnected: false, heartbeatFresh: false, dispatchReady: false, sessionFailureReason: 'MQTT session offline', navigationSession: { ...session, state: 'WAITING_FOR_PI' } });
+  await expect(page.locator('[data-setup-robot]')).toContainText('Robot mất kết nối MQTT');
+  await expect(page.locator('[data-setup-transport]')).toContainText('Đã đồng bộ');
+  await expect(page.locator('[data-pose="last"]')).toHaveCount(1);
+  await expect(readyBanner).toHaveCount(0);
+  const disconnectedMap = await page.locator('.rsu-workspace').evaluate(element => ({ top: element.getBoundingClientRect().top + scrollY, viewBox: element.querySelector('svg').getAttribute('viewBox') }));
+  assert.equal(disconnectedMap.viewBox, stableMap.viewBox, 'MQTT reconnect does not reset zoom');
+  assert.ok(Math.abs(disconnectedMap.top - stableMap.top) <= 1, 'connection labels do not shift the workspace');
+  await page.evaluate(value => window.setupStream.send('robot-state', value), snapshot());
   await expect(readyBanner).toBeVisible();
   await page.evaluate(value => window.setupStream.send('robot-state', value), { ...snapshot(), observedAt: new Date(Date.now() - 10000).toISOString(), navigationSession: { ...session, state: 'CLOSED' } });
   await expect(readyBanner).toBeVisible();
@@ -319,10 +389,19 @@ try {
     latest.controller.error(Error('fixture stream disconnected'));
   });
   await expect(readyBanner).toBeVisible();
+  snapshotFailure = true;
+  await expect(page.locator('[data-setup-transport]')).toContainText('Đang đồng bộ lại');
+  await expect(page.locator('[data-setup-robot]')).toContainText('Đang chờ xác nhận');
+  await expect(page.locator('[data-pose="verified"]')).toHaveCount(0);
+  await expect(page.locator('[data-pose="last"]')).toHaveCount(1);
+  await expect(readyBanner).toHaveCount(0);
+  await expect(button('Dừng phiên và mở phiên mới')).toBeDisabled();
+  snapshotFailure = false;
+  await expect(readyBanner).toBeVisible();
   connected = false;
   await expect(readyBanner).toHaveCount(0);
   await expect(page.locator('.rsu-checks')).toContainText('Pi chưa kết nối MQTT');
-  await expect(page.locator('[data-setup-transport]')).toContainText('REST dự phòng');
+  await expect(page.locator('[data-setup-transport]')).toContainText('Đã đồng bộ');
   assert.equal(writes.length, 13, 'streaming, switching robots and fallback never write robot state');
   // Staff cannot access setup through its URL or legacy screen query.
   await page.evaluate(() => localStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { role: 'STAFF', username: 'staff' }, tokens: { accessToken: 'fixture' } })));

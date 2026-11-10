@@ -13,6 +13,8 @@ Trước thao tác ghi, trang đối chiếu snapshot mới, phiên và hash tà
 
 Profile ACK chỉ xác nhận đã nhận cấu hình. Kiểm thử phần cứng vẫn cần xác minh việc áp dụng vùng cấm, tốc độ, AMCL và Nav2. Staff dùng luồng giao việc hiện có; trang này không thay đổi quyền hoặc API điều phối của staff.
 
+Giao diện giữ nguyên bản đồ và khung thông báo khi đồng bộ lại; kết nối web được hiển thị riêng với kết nối MQTT/heartbeat của robot. Sau phản hồi mở/đóng phiên hoặc khởi tạo, trang giữ thông tin phiên đã được BE xác nhận nhưng khóa thao tác cho đến snapshot mới. Vị trí cuối chỉ được giữ trong cùng robot/map/hash/phiên/revision, hiển thị màu xám và ghi rõ chưa xác minh khi dữ liệu hết hạn. Vị trí này không được dùng để xác nhận sẵn sàng. Pose realtime cập nhật riêng trên bản đồ theo nhịp vẽ của trình duyệt; biểu mẫu chỉ được đánh thức khi trạng thái thay đổi hoặc dữ liệu đến hạn, không render theo vòng 500 ms.
+
 Kiểm tra:
 
 ```powershell

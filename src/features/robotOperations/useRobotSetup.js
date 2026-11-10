@@ -5,8 +5,17 @@ import { allRows, request } from './api.js';
 import { isOperator } from './model.js';
 import { loadSavedMap } from './savedMap.js';
 import { mapGeometry, insideMap } from '../facility/mapCoordinates.js';
-import { consumeSetupEvents, newerSetupPose } from './robotSetupStream.js';
+import { consumeSetupEvents, createSetupPoseFeed } from './robotSetupStream.js';
 import { openSetupSession, sameHash, setupContext, setupPendingResolved, setupSeed, setupWriteBlock } from './robotSetup.js';
+
+function waitForSnapshot(signal) {
+  return new Promise((resolve, reject) => {
+    const abort = () => { clearTimeout(timer); reject(signal.reason); };
+    const timer = setTimeout(() => { signal.removeEventListener('abort', abort); resolve(); }, 300);
+    signal.addEventListener('abort', abort, { once: true });
+    if (signal.aborted) abort();
+  });
+}
 
 export function useRobotSetup(initialRobot = '', initialMap = '') {
   const [catalog, setCatalog] = useState({ robots: [], maps: [], endpoints: [] });
@@ -18,6 +27,9 @@ export function useRobotSetup(initialRobot = '', initialMap = '') {
   const scope = useRef({ robotId, mapId }); scope.current = { robotId, mapId };
   const sequence = useRef(0), writeLock = useRef(false), mutation = useRef(null), mounted = useRef(true);
   const liveRef = useRef(live);
+  const poseFeed = useRef(null);
+  if (!poseFeed.current) poseFeed.current = createSetupPoseFeed();
+  const minimumObservation = useRef(0);
   const account = getSession()?.account;
   const pendingKey = useCallback(id => `mar-robot-setup:${encodeURIComponent(API_BASE_URL)}:${encodeURIComponent(account?.accountId || account?.username || '')}:${id}`, [account?.accountId, account?.username]);
   const storePending = useCallback((value, id) => {
@@ -49,13 +61,16 @@ export function useRobotSetup(initialRobot = '', initialMap = '') {
     const value = typeof update === 'function' ? update(liveRef.current) : update;
     liveRef.current = value; setLive(value);
   }, []);
-  const acceptSnapshot = useCallback((snapshot, receivedAt, id) => {
+  const acceptSnapshot = useCallback((snapshot, receivedAt, id, streamed = false) => {
     if (!mounted.current || scope.current.robotId !== id) return null;
     if (snapshot?.robot?.robotId !== id || !Number.isFinite(Date.parse(snapshot.observedAt))) throw Error('Trạng thái trả về không đúng robot đã chọn hoặc thiếu thời điểm ghi nhận.');
     const previous = liveRef.current;
+    if (Date.parse(snapshot.observedAt) < minimumObservation.current) return null;
     if (previous.snapshot?.robot?.robotId === id && Date.parse(snapshot.observedAt) < Date.parse(previous.snapshot.observedAt)) return { snapshot: previous.snapshot, receivedAt: previous.receivedAt };
     const sameContext = setupContext(previous.snapshot) === setupContext(snapshot);
-    updateLive({ ...previous, snapshot, receivedAt, error: '', ...(sameContext ? {} : { profile: null, profileContext: '', profileReceivedAt: 0, profileError: '', livePose: null }) });
+    if (!sameContext) poseFeed.current.clear();
+    updateLive({ ...previous, snapshot, receivedAt, error: '', syncing: false, ...(streamed ? { streamAt: receivedAt } : {}), ...(sameContext ? {} : { profile: null, profileContext: '', profileReceivedAt: 0, profileError: '' }) });
+    if (previous.syncing) setError('');
     const stored = (() => { try { return JSON.parse(sessionStorage.getItem(pendingKey(id)) || 'null'); } catch { return null; } })();
     if (setupPendingResolved(stored, snapshot)) { storePending(null, id); setError(''); setNotice('Đã đối chiếu yêu cầu trước với trạng thái mới của robot.'); }
     return { snapshot, receivedAt };
@@ -80,7 +95,8 @@ export function useRobotSetup(initialRobot = '', initialMap = '') {
   useEffect(() => {
     const controller = new AbortController(); let pollTimer, retryTimer, streamController;
     let lastStateAt = 0, streamStartedAt = 0;
-    updateLive({ snapshot: null, receivedAt: 0, profile: null, profileContext: '', error: '', livePose: null, streamAt: 0 }); setNotice(''); setError('');
+    minimumObservation.current = 0; poseFeed.current.clear();
+    updateLive({ snapshot: null, receivedAt: 0, profile: null, profileContext: '', error: '', streamAt: 0 }); setNotice(''); setError('');
     try { setPending(JSON.parse(sessionStorage.getItem(pendingKey(robotId)) || 'null')); } catch { setPending(null); }
     if (!robotId || !isOperator(getSession())) return () => controller.abort();
     const stream = async () => {
@@ -92,11 +108,11 @@ export function useRobotSetup(initialRobot = '', initialMap = '') {
         await consumeSetupEvents(response, (value, event) => {
           if (signal.aborted || !mounted.current || scope.current.robotId !== robotId || writeLock.current) return;
           if (event === 'robot-pose') {
-            if (newerSetupPose(liveRef.current.livePose?.value, value, robotId)) updateLive(previous => ({ ...previous, livePose: { value, receivedAt: Date.now() } }));
+            poseFeed.current.push(value, robotId);
           } else {
-            const accepted = acceptSnapshot(value, Date.now(), robotId);
+            const accepted = acceptSnapshot(value, Date.now(), robotId, true);
             if (accepted && accepted.snapshot === value && Date.now() - Date.parse(value.observedAt) <= 5000) {
-              lastStateAt = Date.now(); updateLive(previous => ({ ...previous, streamAt: lastStateAt }));
+              lastStateAt = Date.now();
             }
           }
         });
@@ -113,7 +129,7 @@ export function useRobotSetup(initialRobot = '', initialMap = '') {
       if (!controller.signal.aborted) pollTimer = setTimeout(poll, Math.max(250, 1500 - (Date.now() - started)));
     };
     stream(); poll();
-    return () => { controller.abort(); streamController?.abort(); clearTimeout(pollTimer); clearTimeout(retryTimer); sequence.current++; };
+    return () => { controller.abort(); streamController?.abort(); clearTimeout(pollTimer); clearTimeout(retryTimer); poseFeed.current.clear(); sequence.current++; };
   }, [robotId, refresh, pendingKey, acceptSnapshot, updateLive]);
   const profileScope = setupContext(live.snapshot);
   const profileEligible = live.snapshot?.robot?.robotId === robotId && openSetupSession(live.snapshot?.navigationSession) && live.snapshot.navigationSession.state !== 'WAITING_FOR_PI';
@@ -206,9 +222,21 @@ export function useRobotSetup(initialRobot = '', initialMap = '') {
         acknowledged = true; storePending(null, id);
         if (kind === 'restart' && operation === 'close') restartClosed = true;
         if (!mounted.current) return;
-        updateLive(value => ({ ...value, snapshot: null, profile: null, profileContext: '', profileReceivedAt: 0, livePose: null, receivedAt: 0 }));
+        minimumObservation.current = Math.max(minimumObservation.current, Date.parse(result.observedAt) || 0);
+        poseFeed.current.clear();
+        // Retain the robot/map and show the acknowledged session immediately.
+        // Only a subsequent full snapshot can restore freshness/readiness.
+        updateLive(value => ({ ...value, snapshot: { ...value.snapshot, navigationSession: result, latestPose: null }, syncing: true, profile: null, profileContext: '', profileReceivedAt: 0, receivedAt: 0 }));
         setNotice(operation === 'open' ? kind === 'restart' ? 'Đã đóng phiên cũ và mở phiên mới. Sao chép lệnh chạy Pi với mã phiên mới trong phần Kết nối, sau đó xác nhận lại vị trí.' : 'Đã mở phiên. Khởi động navigation trên Pi bằng lệnh trong phần Kết nối.' : operation === 'close' ? kind === 'restart' ? 'Đã đóng phiên cũ. Đang tạo phiên mới…' : 'Đã đóng phiên vận hành. Dừng tiến trình navigation trên Pi khi kết thúc sử dụng.' : 'Đã gửi yêu cầu định vị. Đang chờ robot xác minh vị trí và cấu hình.');
-        await refresh(controller.signal);
+        // The shared BE display cache may still hold a pre-mutation snapshot
+        // for up to one second. Retry reads only; never replay the POST.
+        let confirmedSnapshot = null;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          confirmedSnapshot = await refresh(controller.signal);
+          if (confirmedSnapshot) break;
+          if (attempt < 4) await waitForSnapshot(controller.signal);
+        }
+        if (!confirmedSnapshot) throw Error('Chưa nhận được trạng thái mới sau thao tác. Trang đang tiếp tục đồng bộ.');
       }
     } catch (e) {
       const rejected = e.status >= 400 && e.status < 500 && e.status !== 408;
@@ -222,7 +250,7 @@ export function useRobotSetup(initialRobot = '', initialMap = '') {
   };
   const chooseRobot = id => { if (writeLock.current) return; sequence.current++; setRobotId(id); setMapId(''); setError(''); };
   const chooseMap = id => { if (!writeLock.current) { setMapId(id); setError(''); } };
-  const reloadAsset = () => { if (!writeLock.current) setAssetRevision(value => value + 1); };
-  const markImageLoaded = () => setAsset(value => value ? { ...value, loaded: true } : value);
-  return { catalog, loading, catalogError, robotId, mapId, chooseRobot, chooseMap, asset, assetError, markImageLoaded, reloadAsset, live, busy, notice, error, pending, perform, refresh };
+  const reloadAsset = useCallback(() => { if (!writeLock.current) setAssetRevision(value => value + 1); }, []);
+  const markImageLoaded = useCallback(() => setAsset(value => value && !value.loaded ? { ...value, loaded: true } : value), []);
+  return { catalog, loading, catalogError, robotId, mapId, chooseRobot, chooseMap, asset, assetError, markImageLoaded, reloadAsset, live, poseFeed: poseFeed.current, busy, notice, error, pending, perform, refresh };
 }

@@ -27,3 +27,33 @@ export function newerSetupPose(previous, sample, robotId) {
     && Number.isFinite(sample.sequenceNo)
     && (!previous || sample.transportSessionId !== previous.transportSessionId || sample.sequenceNo > previous.sequenceNo);
 }
+
+// Pose packets repaint the map, without putting every coordinate in the form's
+// React state. Expiry also notifies subscribers, so retained data never grants
+// readiness after the live sample has gone stale.
+export function createSetupPoseFeed() {
+  const listeners = new Set();
+  let sample = null, queued = null, previous = null, frame = null, expiry;
+  const notify = () => listeners.forEach(listener => listener());
+  const clear = () => {
+    if (frame !== null) cancelAnimationFrame(frame);
+    clearTimeout(expiry); frame = null; sample = queued = previous = null;
+    notify();
+  };
+  return {
+    getSnapshot: () => sample,
+    subscribe: listener => { listeners.add(listener); return () => listeners.delete(listener); },
+    push(value, robotId) {
+      if (!newerSetupPose(previous, value, robotId)) return;
+      previous = value; queued = { value, receivedAt: Date.now() };
+      if (frame !== null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null; sample = queued; queued = null; clearTimeout(expiry);
+        const age = Date.parse(sample.value.receivedAt) - Date.parse(sample.value.capturedAt) + Date.now() - sample.receivedAt;
+        expiry = setTimeout(() => { sample = null; notify(); }, Number.isFinite(age) ? Math.max(0, 1501 - age) : 0);
+        notify();
+      });
+    },
+    clear,
+  };
+}

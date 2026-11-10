@@ -21,10 +21,10 @@ export function setupLivePose(livePose, snapshot, asset, now = Date.now()) {
   return { ...pose, robotId: sample.robotId, mapId: sample.mapId, frameId: metadata.frame_id, capturedAt: sample.capturedAt };
 }
 
-export function setupReadiness({ snapshot, receivedAt, profile, profileContext, profileReceivedAt = receivedAt, profileError = '', livePose, map, asset, now = Date.now(), error = '', pending = null }) {
+export function setupReadiness({ snapshot, receivedAt, profile, profileContext, profileReceivedAt = receivedAt, profileError = '', livePose, map, asset, now = Date.now(), error = '', syncing = false, pending = null }) {
   const session = snapshot?.navigationSession;
   const age = now - receivedAt, observedAge = now - Date.parse(snapshot?.observedAt);
-  const fresh = !!snapshot && !error && age >= 0 && age <= 5000 && observedAge >= -1000 && observedAge <= 5000;
+  const fresh = !!snapshot && !error && !syncing && age >= 0 && age <= 5000 && observedAge >= -1000 && observedAge <= 5000;
   const connected = fresh && snapshot.mqttConnected === true && snapshot.heartbeatFresh === true;
   const open = openSetupSession(session, now);
   const loaded = !!map && asset?.mapId === map.mapId && asset.loaded && sameHash(asset.metadata?.asset_hash, asset.metadata?.asset_hash);
@@ -46,6 +46,21 @@ export function setupReadiness({ snapshot, receivedAt, profile, profileContext, 
   const step = !loaded ? 0 : !matches || session.state === 'WAITING_FOR_PI' ? 1 : !localized ? 2 : 3;
   const title = pending ? 'Đang đối chiếu yêu cầu' : error ? 'Chưa nhận được trạng thái mới' : ready ? 'Sẵn sàng vận hành' : snapshot?.activeJobId ? 'Robot đang thực hiện nhiệm vụ' : !loaded ? 'Chọn robot và bản đồ' : !open ? 'Chưa mở phiên vận hành' : !matches ? 'Kiểm tra bản đồ của phiên' : session.state === 'WAITING_FOR_PI' ? 'Đang chờ Pi kết nối' : !localized ? 'Đang chờ xác minh vị trí' : 'Đang kiểm tra sẵn sàng';
   return { fresh, connected, open, loaded, matches, localized: !!localized, acknowledged: !!acknowledged, idle, checks, ready, step, title, pose: localized ? pose : null };
+}
+
+// Wake the form at a validity boundary, rather than rerendering it twice a second.
+export function setupNextExpiry(live, now = Date.now()) {
+  const times = [live.receivedAt + 5001, Date.parse(live.snapshot?.observedAt) + 5001, Date.parse(live.snapshot?.latestPose?.capturedAt) + 5001,
+    Date.parse(live.snapshot?.observedAt) - 1000, live.profileReceivedAt + 15001,
+    Date.parse(live.snapshot?.navigationSession?.expiresAt)].filter(time => Number.isFinite(time) && time > now);
+  return times.length ? Math.min(...times) : null;
+}
+
+export function setupConnection(state, snapshot) {
+  if (!state.fresh) return { web: 'Đang đồng bộ lại với máy chủ', robot: 'Đang chờ xác nhận kết nối robot', detail: 'Giữ thông tin cuối để tham khảo; chưa thể xác nhận trạng thái hiện tại.' };
+  if (!snapshot.mqttConnected) return { web: 'Đã đồng bộ với máy chủ', robot: 'Robot mất kết nối MQTT', detail: snapshot.sessionFailureReason || 'Chờ Pi kết nối lại với máy chủ.' };
+  if (!snapshot.heartbeatFresh) return { web: 'Đã đồng bộ với máy chủ', robot: 'Đang chờ heartbeat mới từ robot', detail: 'MQTT đã kết nối; robot chưa gửi heartbeat còn hiệu lực.' };
+  return { web: 'Đã đồng bộ với máy chủ', robot: 'Robot đang kết nối', detail: 'Đã nhận heartbeat mới từ Pi.' };
 }
 
 export function setupWriteBlock(snapshot, receivedAt, now = Date.now()) {

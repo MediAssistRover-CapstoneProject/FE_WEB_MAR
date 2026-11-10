@@ -1,9 +1,19 @@
-import { useRef, useState } from 'react';
+import { memo, useRef, useState, useSyncExternalStore } from 'react';
 import { endpointHeading, snapMapPoint } from '../../../features/facility/mapCoordinates.js';
+import { setupContext, setupLivePose } from '../../../features/robotOperations/robotSetup.js';
 
-export default function RobotSetupMap({ asset, endpoints, seed, pose, choosing, disabled, onPoint, onEndpoint, onLoaded, onImageError }) {
+const number = value => Number(value).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
+
+export default memo(function RobotSetupMap({ asset, endpoints, seed, pose, snapshot, poseFeed, allowLivePose, choosing, disabled, onPoint, onEndpoint, onLoaded, onImageError, onReload, reloading }) {
   const svgRef = useRef(null), drag = useRef(null);
   const [zoom, setZoom] = useState(1);
+  const livePose = useSyncExternalStore(poseFeed.subscribe, poseFeed.getSnapshot, poseFeed.getSnapshot);
+  const current = (allowLivePose && setupLivePose(livePose, snapshot, asset)) || pose;
+  const scope = JSON.stringify([asset?.mapId, asset?.metadata.asset_hash, setupContext(snapshot)]);
+  const remembered = useRef(null);
+  if (remembered.current?.scope !== scope) remembered.current = null;
+  if (current) remembered.current = { scope, pose: current };
+  const displayPose = current || remembered.current?.pose;
   if (!asset) return <div className="rsu-map-empty"><span aria-hidden="true">⌖</span><strong>Chọn bản đồ để bắt đầu</strong><p>Bản đồ quét và vị trí robot sẽ xuất hiện tại đây.</p></div>;
   const map = asset.geometry, yaw = map.originYawRad, w = map.widthM, h = map.heightM;
   const corners = [[0, 0], [w, 0], [w, h], [0, h]].map(([x, y]) => ({ x: map.originXM + Math.cos(yaw) * x - Math.sin(yaw) * y, y: map.originYM + Math.sin(yaw) * x + Math.cos(yaw) * y }));
@@ -37,9 +47,10 @@ export default function RobotSetupMap({ asset, endpoints, seed, pose, choosing, 
         <circle r={unit * 1.7} fill="transparent" /><circle r={unit * .55} fill={point.endpointType === 'PARK' ? '#0f766e' : '#64748b'} stroke="white" strokeWidth={unit * .18} /><title>{point.endpointName}</title>
       </g>)}
       {marker(seed, '#d97706', 'Vị trí khởi tạo dự kiến', 'seed')}
-      {marker(pose, '#2563eb', 'Vị trí robot đã xác minh', 'verified')}
+      {marker(displayPose, current ? '#2563eb' : '#8793a3', current ? 'Vị trí robot đã xác minh' : 'Vị trí cuối — đang chờ xác minh', current ? 'verified' : 'last')}
     </svg>
     {!asset.loaded && <p role="status">Đang tải ảnh bản đồ…</p>}
-    <div className="rsu-map-legend"><span><i className="rsu-dot rsu-dot-blue" />Vị trí đã xác minh</span><span><i className="rsu-dot rsu-dot-orange" />Vị trí khởi tạo dự kiến</span><span><i className="rsu-dot rsu-dot-teal" />Điểm đỗ / điểm đã lưu</span></div>
+    <div className="rsu-map-legend"><span><i className="rsu-dot rsu-dot-blue" />Vị trí đã xác minh</span><span><i className="rsu-dot rsu-dot-last" />Vị trí cuối, chưa xác minh</span><span><i className="rsu-dot rsu-dot-orange" />Vị trí khởi tạo dự kiến</span><span><i className="rsu-dot rsu-dot-teal" />Điểm đỗ / điểm đã lưu</span></div>
+    <footer className="rsu-map-footer"><span data-setup-position>{displayPose ? `${current ? 'Robot' : 'Vị trí cuối'}: X ${number(displayPose.xM)} m · Y ${number(displayPose.yM)} m · ${number(displayPose.yawRad * 180 / Math.PI)}°${current ? '' : ' · Đang chờ xác minh'}` : 'Chưa có vị trí robot được xác minh trên bản đồ này.'}</span><button type="button" className="rsu-text-button" disabled={reloading} onClick={onReload}>Tải lại bản đồ</button></footer>
   </div>;
-}
+});
