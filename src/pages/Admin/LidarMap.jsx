@@ -136,6 +136,7 @@ export default function LidarMap({draft,stage,tool,onPoint,zoneEdit,endpointEdit
     };
   },[]);
   const renderZone=z=>{
+    if(stage!=='zone'&&(z.enabled===false||z.active===false))return null;
     const c=ZONE_TYPES.find(t=>t.id===z.type)?.color||color,p=z.points[0],editing=z===activeZone;
     const editable=!tool&&stage==='zone'&&onSelectZone;
     return <Selectable key={z.id||'new-zone'} label={'Edit zone '+(z.name||'mới')} onSelect={editable?()=>onSelectZone(z.id):undefined}

@@ -77,7 +77,7 @@ function ThreeScene({ map, plan, position }) {
     blocks.instanceMatrix.needsUpdate=true;scene.add(blocks);
     const colors = { KEEP_OUT: '#ef5d76', SPEED: '#efb84b', NO_STOP: '#f97316' };
     (map.zones||[]).forEach(zone => {
-      if (zone.enabled === false || !zone.points?.length) return;
+      if (zone.enabled === false || zone.active === false || !zone.points?.length) return;
       const shape = new THREE.Shape();
       zone.points.forEach((p, i) => { const v = at(p); i ? shape.lineTo(v.x, v.z) : shape.moveTo(v.x, v.z); });
       shape.closePath();

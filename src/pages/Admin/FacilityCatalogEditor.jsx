@@ -8,14 +8,17 @@ import ZoneMapEditor from './ZoneMapEditor.jsx';
 import { useNavigate } from 'react-router-dom';
 import { dispatchEndpoints, endpointDraftDirty } from '../../features/facility/mapPublishing.js';
 import { saveValidatedEndpoint } from '../../features/facility/navigationPoint.js';
+import { getSession } from '../../features/auth/session.js';
 
 const zoneDefault={zoneCode:'',zoneName:'',zoneType:'KEEP_OUT',polygonJson:'{"points":[]}',speedLimitMps:'',capacityLimit:'',calibratedAreaM2:'',cameraSourceRef:'',cameraRoiJson:'',active:true,publicVisible:false,description:''};
 const endpointDefault={endpointCode:'',endpointName:'',endpointType:'WAYPOINT',xM:'',yM:'',yawRad:0,zoneId:'',roomId:'',active:true,accessible:true,publicVisible:false,description:''};
 const emptyCatalog={maps:[],zones:[],endpoints:[],groups:[],members:[],rooms:[]};
 const jsonString=value=>value==null?'':JSON.stringify(value,null,2);
+const zoneForm=value=>({...value,polygonJson:jsonString(value.polygonJson),cameraRoiJson:jsonString(value.cameraRoiJson)});
 
 export default function FacilityCatalogEditor({stage, initialMapId = '', onMapChange, onMapCopied, onOpenLibrary}) {
   const navigate=useNavigate();
+  const canManageZones=getSession()?.account?.role==='ADMIN';
   const [catalog,setCatalog]=useState(emptyCatalog),[mapId,setMapId]=useState(''),[status,setStatus]=useState(''),[busy,setBusy]=useState(false),[ready,setReady]=useState(false);
   const [zone,setZone]=useState(zoneDefault),[endpoint,setEndpoint]=useState(endpointDefault),[endpointTab,setEndpointTab]=useState('point');
   const [drawing,setDrawing]=useState(false);
@@ -43,7 +46,7 @@ export default function FacilityCatalogEditor({stage, initialMapId = '', onMapCh
   const groups=catalog.groups.filter(g=>g.mapId===mapId).map(g=>groupFromApi(g,catalog.members));
   const localEndpoints=endpoints.map(e=>({id:e.endpointId,name:e.endpointName,enabled:e.active,accessible:e.accessible}));
   const fetchCatalog=async()=>{
-    const [maps,zones,endpoints,groups,members,rooms]=await Promise.all([api.listMaps,api.listZones,api.listEndpoints,api.listEndpointGroups,api.listEndpointGroupMembers,api.listRooms].map(allFacilityPages));
+    const [maps,zones,endpoints,groups,members,rooms]=await Promise.all([api.listMaps,params=>api.listZones({...params,...(canManageZones?{includeDeleted:true}:{})}),api.listEndpoints,api.listEndpointGroups,api.listEndpointGroupMembers,api.listRooms].map(allFacilityPages));
     return {maps,zones,endpoints,groups,members,rooms};
   };
   useEffect(()=>{let mounted=true;fetchCatalog().then(data=>{if(mounted){setCatalog(data);setMapId(data.maps.find(m=>m.mapId===mapSelection.current.initialMapId)?.mapId||data.maps.find(m=>m.status==='ACTIVE')?.mapId||data.maps[0]?.mapId||'');setReady(true);setStatus('');}}).catch(e=>{if(mounted)setStatus('Không tải được dữ liệu bản đồ: '+e.message);});return()=>{mounted=false;};},[]);
@@ -55,7 +58,23 @@ export default function FacilityCatalogEditor({stage, initialMapId = '', onMapCh
     finally{writeLock.current=false;setBusy(false);}
   };
   const upsert=(key,id,value)=>setCatalog(c=>({...c,[key]:[...c[key].filter(item=>item[id]!==value[id]),value]}));
-  const editZone=id=>{const z=zones.find(z=>z.zoneId===id);setZone(z?{...z,polygonJson:jsonString(z.polygonJson),cameraRoiJson:jsonString(z.cameraRoiJson)}:{...zoneDefault});};
+  const editZone=id=>{const z=zones.find(z=>z.zoneId===id);setZone(z?zoneForm(z):{...zoneDefault});};
+  const savedZone=zones.find(z=>z.zoneId===zone.zoneId);
+  const savedZoneForm=savedZone&&zoneForm(savedZone);
+  const zoneStateDirty=!!savedZone&&Object.keys(zoneDefault).some(key=>String(zone[key]??'')!==String(savedZoneForm[key]??''));
+  const toggleZoneActive=async reason=>{
+    if(!canManageZones||!savedZone||busy||writeLock.current||zoneStateDirty||map?.status==='ARCHIVED')return;
+    const target=savedZone,active=!target.active,trimmed=reason.trim();
+    if(trimmed.length<5||trimmed.length>500){setStatus('Lý do cần từ 5 đến 500 ký tự.');return;}
+    await write(async()=>{
+      const result=await(active?api.activateZone(target.zoneId,trimmed):api.deactivateZone(target.zoneId,trimmed));
+      if(result?.zoneId!==target.zoneId||result.mapId!==target.mapId||result.active!==active)throw Error('Máy chủ chưa xác nhận trạng thái của đúng vùng.');
+      if(!mounted.current)return;
+      upsert('zones','zoneId',result);
+      setZone(current=>current.zoneId===target.zoneId?zoneForm(result):current);
+      setDrawing(false);
+    },active?'Đã kích hoạt lại vùng '+target.zoneCode+'.':'Đã ngừng hoạt động vùng '+target.zoneCode+'.').catch(()=>{});
+  };
   const dirty=map&&endpointDraftDirty(endpoint,map,endpoints,zones,rooms);
   const savedEndpoint=endpoints.find(p=>p.endpointId===endpoint.endpointId);
   const endpointStateDirty=!!dirty&&JSON.stringify(endpoint)!==JSON.stringify(savedEndpoint);
@@ -131,10 +150,10 @@ export default function FacilityCatalogEditor({stage, initialMapId = '', onMapCh
         {mapVerified&&<p>Kiểm tra này chỉ xác nhận map có thể nạp lại. Robot vẫn cần phiên dẫn đường, vị trí đã xác minh và cấu hình đã đồng bộ trước khi chạy.</p>}
       </section>
       {stage==='scan'&&<section className="ls-panel"><h3>Bản đồ đã có trên BE</h3><p>Quét thật cần robot, phiên mapping và artifact được BE xác minh. Trang này quản lý danh mục vùng/điểm trên bản đồ đã tồn tại.</p><p>Chuyển sang Vùng hoặc Điểm đích để cấu hình trên đúng mapId.</p><p><strong>Không có nhãn phòng trong dữ liệu quét gốc.</strong> Vùng, phòng và điểm đích là các lớp cấu hình thêm sau khi có hình học.</p></section>}
-      {stage==='zone'&&<ZoneMapEditor map={map} zones={zones} endpoints={endpoints} zone={zone} setZone={setZone} drawing={drawing} setDrawing={setDrawing} busy={busy} onSelect={editZone} onSave={draft=>{
+      {stage==='zone'&&<ZoneMapEditor map={map} zones={zones} endpoints={endpoints} zone={zone} setZone={setZone} drawing={drawing} setDrawing={setDrawing} busy={busy} canManage={canManageZones} hasUnsavedChanges={zoneStateDirty} onToggleActive={toggleZoneActive} onSelect={editZone} onSave={draft=>{
         let payload;
         try{payload=zonePayload(draft,mapId);}catch(error){setStatus(error.message);return;}
-        write(async()=>{const result=await(draft.zoneId?api.updateZone(draft.zoneId,payload):api.createZone(payload));upsert('zones','zoneId',result);setZone({...result,polygonJson:jsonString(result.polygonJson),cameraRoiJson:jsonString(result.cameraRoiJson)});setDrawing(false);}).catch(()=>{});
+        write(async()=>{const result=await(draft.zoneId?api.updateZone(draft.zoneId,payload):api.createZone(payload));upsert('zones','zoneId',result);setZone(zoneForm(result));setDrawing(false);}).catch(()=>{});
       }}/>}
       {stage==='endpoint'&&<><WorkspaceTabs label="Quản lý điểm đích" active={endpointTab} onSelect={setEndpointTab} items={[{id:'point',label:'Điểm đích'},{id:'group',label:'Nhóm điểm đích'}]}/>
         {endpointTab==='group'?<EndpointGroupEditor key={mapId} remote busy={busy||map.status==='ARCHIVED'} groups={groups} endpoints={localEndpoints}

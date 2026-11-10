@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { ZONE_CATEGORIES } from '../../features/facility/facilityContract.js';
 import FacilityGeometryPreview, { polygonPoints } from './FacilityGeometryPreview.jsx';
 import './zoneMapEditor.css';
@@ -17,8 +18,14 @@ function nextCode(zones){
   return 'ZONE_'+String(number).padStart(3,'0');
 }
 
-export default function ZoneMapEditor({map,zones,endpoints,zone,setZone,drawing,setDrawing,busy,onSelect,onSave}){
+export default function ZoneMapEditor({map,zones,endpoints,zone,setZone,drawing,setDrawing,busy,onSelect,onSave,canManage=false,hasUnsavedChanges=false,onToggleActive}){
   const locked=busy||map.status==='ARCHIVED';
+  const selected=zones.find(z=>z.zoneId===zone.zoneId);
+  const [reason,setReason]=useState('');
+  const [filter,setFilter]=useState('all');
+  const activeCount=zones.filter(z=>z.active===true).length;
+  const visibleZones=zones.filter(z=>filter==='all'||(filter==='active'?z.active===true:z.active===false));
+  useEffect(()=>setReason(''),[selected?.zoneId,selected?.active]);
   const points=polygonPoints(zone.polygonJson);
   const area=Math.abs(points.reduce((sum,p,i)=>{const q=points[(i+1)%points.length];return sum+p[0]*q[1]-q[0]*p[1];},0)/2);
   const set=(key,value)=>setZone(z=>({...z,[key]:value}));
@@ -29,13 +36,27 @@ export default function ZoneMapEditor({map,zones,endpoints,zone,setZone,drawing,
     <section className="ls-panel zm-map-panel">
       <header className="zm-heading"><div><h3>{map.mapName}</h3><p>{drawing?'Bấm lần lượt các góc để vẽ ranh giới vùng.':'Chọn vùng trên bản đồ để chỉnh sửa, hoặc vẽ một vùng mới.'}</p></div><span className={'zm-mode '+(drawing?'is-drawing':'')}>{drawing?'Đang vẽ vùng':'Bản đồ đã lưu'}</span></header>
       <div className="zm-tools"><button type="button" className={'ls-btn '+(drawing?'primary':'')} disabled={locked} aria-pressed={drawing} onClick={()=>setDrawing(value=>!value)}>{drawing?'Dừng vẽ':'Vẽ vùng'}</button><button type="button" className="ls-btn small" disabled={locked||!points.length} onClick={()=>setPoints(points.slice(0,-1))}>Bỏ đỉnh cuối</button><button type="button" className="ls-btn small" disabled={locked||!points.length} onClick={()=>{setPoints([]);setDrawing(true);}}>Vẽ lại</button><span>{points.length?`${points.length} đỉnh · ${area.toLocaleString('vi-VN',{maximumFractionDigits:2})} m²`:'Chọn ít nhất 3 đỉnh trên bản đồ'}</span></div>
-      <FacilityGeometryPreview map={map} zones={zones} endpoints={endpoints} zoneEdit={zone} drawing={drawing&&!locked} onZone={choose} onPoint={point=>setZone(current=>({...current,polygonJson:JSON.stringify({points:[...polygonPoints(current.polygonJson),[point.xM,point.yM]]},null,2)}))}/>
+      <FacilityGeometryPreview map={map} zones={zones} endpoints={endpoints} zoneEdit={zone} showInactiveZones drawing={drawing&&!locked} onZone={choose} onPoint={point=>setZone(current=>({...current,polygonJson:JSON.stringify({points:[...polygonPoints(current.polygonJson),[point.xM,point.yM]]},null,2)}))}/>
+      <div className="zm-legend"><span><i/>Vùng đang hoạt động</span><span><i className="inactive"/>Vùng đã ngừng · chỉ hiển thị tại bước Vùng</span></div>
       <section className="zm-saved" aria-label="Vùng đã lưu"><header><h4>Vùng đã lưu <span>{zones.length}</span></h4><button type="button" className="ls-btn small" disabled={locked} onClick={()=>choose('')}>+ Vùng mới</button></header>
-        {zones.length?<div className="ls-item-list">{zones.map(z=><button type="button" className={'ls-item '+(z.zoneId===zone.zoneId?'selected':'')} key={z.zoneId} disabled={busy} onClick={()=>choose(z.zoneId)}><i style={{background:colors[z.zoneType]}}/><span><strong>{z.zoneName}</strong><small>{ZONE_CATEGORIES[z.zoneType]}{z.active?'':' · Đã tắt'}</small></span></button>)}</div>:<p className="zm-empty">Chưa có vùng nào. Đặt tên và vẽ vùng đầu tiên trên bản đồ.</p>}
+        <nav className="zm-filters" aria-label="Lọc danh sách vùng">{[['all','Tất cả',zones.length],['active','Đang hoạt động',activeCount],['inactive','Đã ngừng',zones.length-activeCount]].map(([value,label,count])=><button type="button" key={value} aria-pressed={filter===value} onClick={()=>setFilter(value)}>{label}<span>{count}</span></button>)}</nav>
+        {visibleZones.length?<div className="ls-item-list">{visibleZones.map(z=><button type="button" className={'ls-item '+(z.active?'':'is-inactive ')+(z.zoneId===zone.zoneId?'selected':'')} key={z.zoneId} disabled={busy} onClick={()=>choose(z.zoneId)}><i style={{background:z.active?colors[z.zoneType]:'#94a3b8'}}/><span><strong>{z.zoneName}</strong><small>{ZONE_CATEGORIES[z.zoneType]}</small><span className={'zm-list-state '+(z.active?'active':'inactive')}>{!z.active&&<span aria-hidden="true">⏸ </span>}{z.active?'Đang hoạt động':'Ngừng hoạt động'}</span></span></button>)}</div>:<p className="zm-empty">{zones.length?'Không có vùng trong nhóm này.':'Chưa có vùng nào. Đặt tên và vẽ vùng đầu tiên trên bản đồ.'}</p>}
       </section>
     </section>
     <aside className="ls-panel zm-properties">
       <header className="zm-heading"><div><h3>{zone.zoneId?'Chỉnh sửa vùng':'Tạo vùng mới'}</h3><p>Đặt tên, chọn chức năng và vẽ ranh giới.</p></div></header>
+      {selected&&<section className="zm-lifecycle" aria-label="Trạng thái vùng">
+        <div className="zm-lifecycle-heading"><strong>Trạng thái hoạt động</strong><span className={'zm-state '+(selected.active?'active':'inactive')} role="status">{selected.active?'Đang hoạt động':'Đã ngừng hoạt động'}</span></div>
+        <p>{selected.active?'Ngừng áp dụng vùng và giữ lại cấu hình để có thể kích hoạt lại.':'Vùng vẫn được lưu trên bản đồ. Kích hoạt lại khi cần áp dụng quy tắc vùng.'}</p>
+        {canManage&&<form onSubmit={event=>{event.preventDefault();onToggleActive?.(reason);}}>
+          <fieldset disabled={locked||hasUnsavedChanges}>
+            <Field label="Lý do đổi trạng thái vùng"><textarea aria-label="Lý do đổi trạng thái vùng" required minLength={5} maxLength={500} rows={2} placeholder="Nhập lý do (5–500 ký tự)" value={reason} onChange={event=>setReason(event.target.value)}/></Field>
+            <button type="submit" className={'ls-btn '+(selected.active?'danger':'primary')} disabled={!onToggleActive||reason.trim().length<5}>{busy?'Đang cập nhật…':selected.active?'Ngừng hoạt động vùng':'Kích hoạt lại vùng'}</button>
+          </fieldset>
+        </form>}
+        {hasUnsavedChanges&&<small role="status">Lưu hoặc bỏ thay đổi trước khi đổi trạng thái vùng.</small>}
+        <small>Robot áp dụng thay đổi sau khi nhận cấu hình vùng mới.</small>
+      </section>}
       <form onSubmit={event=>{event.preventDefault();onSave({...zone,zoneCode:code});}} onInvalidCapture={event=>{let details=event.target.closest('details');while(details){details.open=true;details=details.parentElement.closest('details');}}}>
         <fieldset disabled={locked}>
           <Field label="Tên vùng" required maxLength={160} placeholder="VD: Khu vực trước cửa thang máy" value={zone.zoneName} onChange={event=>set('zoneName',event.target.value)}/>
@@ -47,7 +68,7 @@ export default function ZoneMapEditor({map,zones,endpoints,zone,setZone,drawing,
           <details className="zm-options"><summary>Cài đặt nâng cao</summary><p>Mã vùng được tạo tự động. Các thông tin bên dưới không bắt buộc.</p>
             <Field label="Mã vùng" maxLength={64} placeholder={code} value={zone.zoneCode||''} onChange={event=>set('zoneCode',event.target.value)}/>
             <Field label="Mô tả" value={zone.description||''} onChange={event=>set('description',event.target.value)}/>
-            <label className="zm-check"><input type="checkbox" checked={!!zone.active} onChange={event=>set('active',event.target.checked)}/> Vùng hoạt động</label>
+            {!selected&&<label className="zm-check"><input type="checkbox" checked={!!zone.active} onChange={event=>set('active',event.target.checked)}/> Vùng hoạt động</label>}
             <label className="zm-check"><input type="checkbox" checked={!!zone.publicVisible} onChange={event=>set('publicVisible',event.target.checked)}/> Hiển thị công khai</label>
             <details className="zm-options"><summary>Camera và thông số bổ sung</summary>
               {zone.zoneType!=='SPEED'&&zone.speedLimitMps!==''&&zone.speedLimitMps!=null&&<Field label="Giới hạn tốc độ đã lưu (m/s)" type="number" min="0.000001" step="any" value={zone.speedLimitMps} onChange={event=>set('speedLimitMps',event.target.value)}/>}

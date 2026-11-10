@@ -7,6 +7,7 @@ function Field({ label, children, ...props }) {
 }
 
 export default function EndpointMapEditor({ map, zones, rooms, endpoints, endpoint, setEndpoint, drawing, setDrawing, busy, onSave, hasUnsavedChanges=false, onToggleActive }) {
+  zones=zones.filter(zone=>zone.active===true);
   const locked = busy || map.status === 'ARCHIVED';
   const selected = endpoints.find(p => p.endpointId === endpoint.endpointId);
   const placed = endpoint.xM !== '' && endpoint.yM !== '';

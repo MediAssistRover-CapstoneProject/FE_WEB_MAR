@@ -5,7 +5,8 @@ import { endpointHeading, mapGeometry, snapMapPoint } from '../../features/facil
 import EndpointMarker from './EndpointMarker.jsx';
 
 export function polygonPoints(value){try{const object=typeof value==='string'?JSON.parse(value):value;return Array.isArray(object?.points)?object.points.filter(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)):[];}catch{return [];}}
-export default function FacilityGeometryPreview({map,zones,endpoints,zoneEdit,endpointEdit,onPoint,onZone,onEndpoint,drawing,onPlacementEnd,allowDraftMove=false,showInactiveEndpoints=false}){
+export default function FacilityGeometryPreview({map,zones,endpoints,zoneEdit,endpointEdit,onPoint,onZone,onEndpoint,drawing,onPlacementEnd,allowDraftMove=false,showInactiveEndpoints=false,showInactiveZones=false}){
+  zones=zones.filter(zone=>zone.mapId===map.mapId&&(showInactiveZones||zone.active===true));
   endpoints=endpoints.filter(point=>point.mapId===map.mapId&&(showInactiveEndpoints||point.active===true));
   const id=useId().replaceAll(':','');
   const [asset,setAsset]=useState(null),[error,setError]=useState(''),[revision,setRevision]=useState(0);
@@ -50,7 +51,20 @@ export default function FacilityGeometryPreview({map,zones,endpoints,zoneEdit,en
   const minX=Math.min(...corners.map(p=>p[0])),maxX=Math.max(...corners.map(p=>p[0])),minY=Math.min(...corners.map(p=>p[1])),maxY=Math.max(...corners.map(p=>p[1]));
   const size=Math.max(maxX-minX,maxY-minY),pad=size*.05,scale=size/500;
   const markerUnit=Math.max((maxX-minX+pad*2)/viewport.width,(maxY-minY+pad*2)/viewport.height)/zoom;
-  const points=polygonPoints(zoneEdit?.polygonJson);
+  const visibleZoneEdit=zoneEdit&&(showInactiveZones||zoneEdit.active===true)?zoneEdit:null;
+  const renderZone=(zone,editing=false)=>{
+    const vertices=polygonPoints(zone.polygonJson);
+    if(!vertices.length)return null;
+    const inactive=zone.active===false;
+    const color=inactive?'#64748b':editing?'#d97706':zone.zoneType==='KEEP_OUT'?'#e11d48':zone.zoneType==='NO_STOP'?'#d97706':'#2563eb';
+    const fill=inactive?'#94a3b826':editing?'#fbbf2444':zone.zoneType==='KEEP_OUT'?'#fda4af55':zone.zoneType==='NO_STOP'?'#fbbf2444':'#60a5fa44';
+    return <g key={zone.zoneId||'draft-zone'} data-zone-id={zone.zoneId} data-zone-state={inactive?'inactive':'active'} onClick={e=>{if(!drawing){e.stopPropagation();if(!editing)onZone?.(zone.zoneId);}}} style={{cursor:onZone&&!drawing&&!editing?'pointer':undefined}}>
+      <polygon points={vertices.map(p=>`${p[0]},${-p[1]}`).join(' ')} fill={fill} stroke={color} strokeWidth={scale*(editing?1.5:1)} strokeDasharray={inactive?`${scale*5} ${scale*3}`:undefined}/>
+      <title>{zone.zoneName}{inactive?' · Đã ngừng hoạt động':''}</title>
+      {inactive&&vertices.length>=3&&<text x={Math.min(...vertices.map(p=>p[0]))+markerUnit*5} y={-Math.max(...vertices.map(p=>p[1]))+markerUnit*16} fill="#475569" stroke="#fff" strokeWidth={markerUnit*3} paintOrder="stroke" fontFamily="Inter,Arial,sans-serif" fontSize={markerUnit*11} fontWeight="600" pointerEvents="none">⏸ {zone.zoneName} · Đã ngừng</text>}
+      {editing&&vertices.map((p,index)=><circle key={index} cx={p[0]} cy={-p[1]} r={markerUnit*3.5} fill={color} stroke="#fff" strokeWidth={markerUnit*1.3} pointerEvents="none"/>)}
+    </g>;
+  };
   return <div style={{margin:'16px 0',border:'1px solid #dce5f0',borderRadius:8,overflow:'hidden'}}>
     <div className="ls-actions" style={{padding:'8px 10px'}}><button type="button" className="ls-btn" aria-label="Thu nhỏ map" onClick={()=>setZoom(z=>Math.max(1,z/1.4))}>−</button><button type="button" className="ls-btn" onClick={()=>{setZoom(1);}}>Vừa khung</button><button type="button" className="ls-btn" aria-label="Phóng to map" onClick={()=>setZoom(z=>Math.min(8,z*1.4))}>+</button><span>{Math.round(zoom*100)}% · Bản đồ cố định</span></div>
     <svg ref={svgRef} role="img" aria-label="Lớp vùng và điểm đích BE theo mét" viewBox={`${(minX+maxX)/2-(maxX-minX+pad*2)/zoom/2} ${-(minY+maxY)/2-(maxY-minY+pad*2)/zoom/2} ${(maxX-minX+pad*2)/zoom} ${(maxY-minY+pad*2)/zoom}`} style={{width:'100%',display:'block',aspectRatio:'16 / 10',background:'#f1f5f9',cursor:drawing?'crosshair':'default',touchAction:drawing?'none':'pan-y',userSelect:'none'}} onPointerDown={e=>{
@@ -65,9 +79,8 @@ export default function FacilityGeometryPreview({map,zones,endpoints,zoneEdit,en
       <defs><pattern id={id} width={size/20} height={size/20} patternUnits="userSpaceOnUse"><path d={`M ${size/20} 0 H 0 V ${size/20}`} fill="none" stroke="#dce5f0" strokeWidth={scale*.5}/></pattern></defs>
       <polygon points={corners.map(p=>`${p[0]},${-p[1]}`).join(' ')} fill={`url(#${id})`} stroke="#94a3b8" strokeWidth={scale}/>
       {currentAsset&&<image href={currentAsset.url} x="0" y={-h} width={w} height={h} preserveAspectRatio="none" transform={`translate(${x} ${-y}) rotate(${-yaw*180/Math.PI})`} style={{imageRendering:'pixelated'}} onLoad={()=>setAsset(a=>a?.url===currentAsset.url?{...a,loaded:true}:a)} onError={()=>{setError('Không đọc được ảnh bản đồ. Hãy tải lại ảnh.');setAsset(null);}}/>}
-      {zones.filter(z=>z.zoneId!==zoneEdit?.zoneId).map(z=><polygon key={z.zoneId} points={polygonPoints(z.polygonJson).map(p=>`${p[0]},${-p[1]}`).join(' ')} fill={z.zoneType==='KEEP_OUT'?'#fda4af55':z.zoneType==='NO_STOP'?'#fbbf2444':'#60a5fa44'} stroke={z.zoneType==='KEEP_OUT'?'#e11d48':z.zoneType==='NO_STOP'?'#d97706':'#2563eb'} strokeWidth={scale} opacity={z.active?1:.35} onClick={e=>{if(!drawing){e.stopPropagation();onZone?.(z.zoneId);}}}><title>{z.zoneName}</title></polygon>)}
-      {points.length>0&&<polygon points={points.map(p=>`${p[0]},${-p[1]}`).join(' ')} fill="#fbbf2444" stroke="#d97706" strokeWidth={scale*1.5}/>}
-      {zoneEdit&&points.map((p,index)=><circle key={index} cx={p[0]} cy={-p[1]} r={markerUnit*3.5} fill="#d97706" stroke="#fff" strokeWidth={markerUnit*1.3} pointerEvents="none"/>)}
+      {zones.filter(z=>z.zoneId!==visibleZoneEdit?.zoneId).map(z=>renderZone(z))}
+      {visibleZoneEdit&&renderZone(visibleZoneEdit,true)}
       {endpoints.filter(p=>p.endpointId!==endpointEdit?.endpointId).map(p=><g key={p.endpointId} transform={`translate(${p.xM},${-p.yM})`} opacity={p.active?1:.35} style={{cursor:allowDraftMove&&!drawing?'move':'default',touchAction:allowDraftMove?'none':undefined}} onPointerDown={e=>startEndpointMove(e,p,true)} onClick={e=>{if(!drawing&&!suppressClick.current){e.stopPropagation();onEndpoint?.(p);}}}><EndpointMarker point={p} unit={markerUnit}/><title>{p.endpointName} · ({p.xM}, {p.yM}) m</title></g>)}
       {endpointEdit&&endpointEdit.xM!==''&&endpointEdit.yM!==''&&<g data-draft-endpoint="true" aria-label="Điểm endpoint đang chỉnh" transform={`translate(${endpointEdit.xM},${-endpointEdit.yM})`} style={{cursor:allowDraftMove&&!drawing?'move':'default',touchAction:'none'}} onPointerDown={e=>startEndpointMove(e,endpointEdit)}><EndpointMarker point={endpointEdit} unit={markerUnit} draft/><title>{allowDraftMove?'Kéo điểm cam để đổi vị trí, giữ nguyên hướng':'Điểm đang chỉnh'}</title></g>}
     </svg>

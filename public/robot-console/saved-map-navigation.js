@@ -431,7 +431,7 @@
         const p=mapToPixel(state.meta,points[0][0],points[0][1]);ctx.font='4px system-ui';ctx.fillStyle=ctx.strokeStyle;ctx.fillText(label,p.u,p.v-2);
       }
       for(const z of state.zones)if(z.active&&z.zoneId!==state.zoneEditing?.zoneId)polygon(z.polygonJson?.points||z.polygonJson,z.zoneType,z.zoneCode+(z.zoneType==='SPEED'?' '+z.speedLimitMps+' m/s':''));
-      polygon(state.zonePoints,$('navZoneType').value,'Zone đang sửa',true);
+      if($('navZoneActive').checked&&(!state.zoneEditing||state.zoneEditing.active===true))polygon(state.zonePoints,$('navZoneType').value,'Zone đang sửa',true);
       const plan=plannedPath(state.snapshot,state.meta);
       if(plan){
         ctx.beginPath();
@@ -517,7 +517,7 @@
       state.zones=(await pages('/api/v1/zones')).filter(z=>z.mapId===mapId()&&['SPEED','KEEP_OUT'].includes(z.zoneType));
       $('navZones').replaceChildren(new Option('Chọn zone',''));const bound=$('navPointZone').value;
       $('navPointZone').replaceChildren(new Option('Không gắn zone',''));
-      for(const z of state.zones){$('navZones').add(new Option(z.zoneCode+' — '+z.zoneName+(z.active?'':' (đã tắt)'),z.zoneId));$('navPointZone').add(new Option(z.zoneCode,z.zoneId));}
+      for(const z of state.zones){$('navZones').add(new Option(z.zoneCode+' — '+z.zoneName+(z.active?'':' (đã tắt)'),z.zoneId));if(z.active)$('navPointZone').add(new Option(z.zoneCode,z.zoneId));}
       $('navPointZone').value=bound;$('navZones').value=id;state.zoneSyncAt=-Infinity;state.zoneAck=null;zoneRequestSerial++;
       $('navZoneStatus').textContent=state.zones.length+' zone đã lưu; '+state.zones.filter(z=>z.active).length+' đang bật trên BE. Các ô hình học/tốc độ cần bấm Lưu; bật/tắt zone đã lưu gửi ngay. Theo dõi ACK cấu hình và kiểm chứng thực thi trên Pi.';draw();
     }
