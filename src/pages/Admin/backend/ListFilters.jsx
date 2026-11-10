@@ -4,7 +4,7 @@ import SchemaFields from './SchemaFields.jsx';
 
 export default function ListFilters({ resource, schema, value, applied, onChange, onApply, onReset, role }) {
   const selected = Object.entries(applied).filter(([, item]) => item !== '' && item != null);
-  const simplify = ['Missions', 'Live Operations', 'Facility Management', 'Public Catalog'].includes(resource?.section);
+  const simplify = ['Live Operations', 'Facility Management', 'Public Catalog'].includes(resource?.section);
   const basicNames = ['keyword', 'status', 'requestType', 'floorId', 'mapId', 'active'];
   const entries = Object.entries(schema.properties || {});
   const primary = entries.filter(([key]) => basicNames.includes(key));

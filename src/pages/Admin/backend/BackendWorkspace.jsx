@@ -34,7 +34,7 @@ const write = op => op.method !== 'GET';
 const keyFor = (r, row) => unwrap(row)?.[r.idField];
 const sensitiveAction = op => op.method === 'DELETE' || /\/(cancel|archive|retire|deactivate|lock|reset-password|rotate-secret|runs)$/.test(op.path);
 
-export default function BackendWorkspace({ section = 'Missions' }) {
+export default function BackendWorkspace({ section }) {
   if (section === 'Staff Shifts') return <ShiftWorkspace />;
   if (section === 'Users & Roles') return <UsersRoles />;
   if (section === 'Facility Management' || section === 'Public Catalog') return <HospitalInfoWorkspace />;

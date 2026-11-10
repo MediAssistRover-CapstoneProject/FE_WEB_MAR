@@ -4,7 +4,6 @@ const screenRoutes = {
   'Facility Management': '/admin/facility',
   'Live Operations': '/admin/live-operations',
   'Emergency Center': '/admin/emergency-center',
-  Missions: '/admin/missions',
   Patrol: '/admin/patrol',
   'Staff Shifts': '/admin/staff-shifts',
   'Robot Status': '/admin/robots',

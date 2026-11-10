@@ -21,12 +21,14 @@ try {
   const screens = navigationGroups.flatMap(([, items]) => items);
   assert.equal(new Set(screens).size, screens.length, 'Mỗi màn hình chỉ xuất hiện một lần trong cấu trúc menu');
   assert.equal(screens.includes('Crowd Heatmap'),false);
+  assert.equal(screens.includes('Missions'), false);
   for (const screen of screens) {
     const path = pathForScreen(screen);
     if (path.startsWith('/admin/')) assert.equal(screenForSlug(path.slice('/admin/'.length)), screen, `Route must retain the sidebar screen: ${screen}`);
   }
   assert.equal(pathForScreen('Public Catalog'), '/admin/facility');
   assert.equal(screenForSlug('public-catalog'), 'Facility Management');
+  assert.equal(screenForSlug('missions'), null);
 
   await page.goto(base+'/admin');
   const sidebar = page.locator('aside.sidebar');
@@ -61,7 +63,9 @@ try {
   assert.equal(await menu.getByRole('button', { name: vi('Automation') }).getAttribute('aria-expanded'), 'true');
   await menu.getByRole('button', { name: 'Thiết kế quy trình' }).click();
   await page.waitForURL(/\/workflow(s)?$/);
+  await page.locator('.wfd-page').waitFor();
   const workflowSidebar = page.locator('aside.mediassist-sidebar');
+  await workflowSidebar.waitFor({ state: 'visible' });
   await workflowSidebar.getByRole('button', { name: vi('Automation') }).waitFor();
   assert.equal(Math.round((await workflowSidebar.boundingBox()).width), 248);
   assert.equal(await workflowSidebar.getByRole('button', { name: vi('Automation') }).getAttribute('aria-expanded'), 'true');
@@ -72,6 +76,15 @@ try {
   await page.goto(base+'/admin?screen=Crowd%20Heatmap');
   await page.getByRole('heading',{name:'Bảng điều khiển',exact:true,level:1}).waitFor();
   assert.ok(!apiCalls.some(path=>/monitoring\/(crowd-density|heatmaps)/.test(path)));
+
+  for (const oldPath of ['/admin/missions', '/admin?screen=Missions', '/admin/missions?tab=deliveries']) {
+    await page.goto(base + oldPath);
+    await page.waitForURL('**/admin/live-operations');
+    await page.locator('.lo-page').waitFor();
+    assert.equal(await menu.getByRole('button', { name: 'Nhiệm vụ', exact: true }).count(), 0);
+    assert.equal(await page.locator('a[href*="/admin/missions"]').count(), 0);
+    assert.equal(await page.getByRole('heading', { name: 'Nhiệm vụ & yêu cầu', exact: true }).count(), 0);
+  }
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(base+'/admin');
@@ -91,6 +104,10 @@ try {
   await page.getByRole('button', { name: 'Mở menu' }).click();
   assert.equal(await menu.getByRole('button', { name: vi('Administration') }).count(), 0);
   assert.equal(await sidebar.getByRole('button', { name: 'Tài khoản của tôi' }).count(), 1);
+  await page.goto(base + '/admin/missions');
+  await page.waitForURL('**/admin/live-operations');
+  await page.getByRole('button', { name: 'Mở menu' }).click();
+  assert.equal(await menu.getByRole('button', { name: 'Nhiệm vụ', exact: true }).count(), 0);
   console.log('PASS: sidebar gọn, đủ màn hình, hai loại quy trình rõ ràng và mở được trên mobile.');
 } finally {
   await browser.close();

@@ -2,16 +2,13 @@ import { API_BASE_URL } from '../../../features/api/client.js';
 import { recordStatus, statusTone } from '../../../features/api/workspaceCatalog.js';
 import { displayValue } from './RecordDetails.jsx';
 
-export const enhancedSection = section => ['Missions', 'Live Operations', 'Facility Management', 'Public Catalog'].includes(section);
+export const enhancedSection = section => ['Live Operations', 'Facility Management', 'Public Catalog'].includes(section);
 export const workspaceCopy = {
-  Missions: ['Nhiệm vụ & yêu cầu', 'Tạo yêu cầu, xem trạng thái xử lý và mở từng mục để theo dõi. Các lần chạy thử ở Điều phối không xuất hiện trong danh sách này.'],
   'Live Operations': ['Theo dõi thực thi', 'Xem các công việc do máy chủ quản lý. Chọn một công việc để xem bước hiện tại và bật cập nhật trực tiếp.'],
   'Facility Management': ['Danh mục bệnh viện', 'Quản lý nội dung và địa điểm trên máy chủ. Các điểm đang lưu riêng trong trình duyệt ở Bản đồ không tự xuất hiện tại đây.'],
   'Public Catalog': ['Thông tin công khai', 'Xem nội dung mà người dùng có thể tra cứu. Dữ liệu lấy từ danh mục công khai của máy chủ; việc chỉnh sửa thực hiện tại Danh mục bệnh viện.'],
 };
 export const resourceHints = {
-  requests: 'Yêu cầu dẫn đường, hỗ trợ và vận hành. Chọn loại yêu cầu để bắt đầu, sau đó theo dõi trạng thái trong danh sách.',
-  deliveries: 'Theo dõi các yêu cầu giao nhận và thông tin bàn giao.',
   jobs: 'Một công việc là một lần thực thi quy trình. Mở chi tiết để xem các bước và kết quả.',
   hospitals: 'Hồ sơ giới thiệu bệnh viện. Tạo hoặc chỉnh sửa nội dung, kiểm tra trạng thái phát hành trước khi xem ở Thông tin công khai.',
   floors: 'Các tầng của bệnh viện, dùng để tổ chức bản đồ và phòng.',
@@ -39,11 +36,6 @@ export function WorkspaceIntro({ section, role }) {
         <path d="M6 6h10M6 10h10" />
       </svg>
     ),
-    Missions: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-      </svg>
-    ),
   };
   return (
     <header className="be-workspace-intro">
@@ -57,7 +49,6 @@ export function WorkspaceIntro({ section, role }) {
       <div className="be-intro-actions">
         {section === 'Public Catalog' && role === 'ADMIN' && <a className="be-link-button" href="/admin/facility">Quản lý nội dung →</a>}
         {section === 'Facility Management' && <a className="be-link-button" href="/admin/public-catalog">Xem danh mục công khai →</a>}
-        {section === 'Missions' && <a className="be-link-button" href="/admin/live-operations">Theo dõi công việc robot →</a>}
       </div>
     </header>
   );

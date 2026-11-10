@@ -5,7 +5,7 @@ import { operations, buildRequest, prepareBody, prepareValue, requestSchema, ini
 import { resources, resourceFor, managedOperations } from '../src/features/api/workspaceCatalog.js';
 const id = '11111111-1111-4111-8111-111111111111';
 
-test('supported human APIs have a UI resource or auth flow; removed density screens and device APIs stay separate', () => {
+test('supported human APIs have a workspace or dedicated flow; removed screens and device APIs stay separate', () => {
   assert.equal(Object.keys(operations).length, 199);
   assert.equal(snapshot.excluded.length, 37);
   for (const op of Object.values(operations)) {
@@ -14,6 +14,9 @@ test('supported human APIs have a UI resource or auth flow; removed density scre
       continue;
     }
     assert.ok(resourceFor(op) || managedOperations.has(op.key), op.key);
+    if (/^\/api\/v1\/(information|navigation|escort|operational|service|delivery)-requests(?:\/|$)/.test(op.path)) {
+      assert.equal(resourceFor(op), undefined, 'Shared request APIs must not restore the removed administration page');
+    }
     assert.ok(!op.path.startsWith('/api/v1/pi/'));
     if (!op.public && !managedOperations.has(op.key)) assert.ok(op.roles.length, op.key);
   }

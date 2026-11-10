@@ -40,6 +40,11 @@ bước, robot đang rảnh, hủy đang chờ xử lý, công việc đã kết
 lỗi/phân trang, đổi lựa chọn khi phản hồi chậm, đồng bộ SSE, dữ liệu REST cũ,
 quyền STAFF và bố cục 390/1024/1440px. Ảnh nằm trong `.workstation-build/live-operations/`.
 
+Trang Nhiệm vụ đã được gỡ khỏi menu và giao diện quản trị. Các URL cũ
+`/admin/missions` và `/admin?screen=Missions` chuyển sang Vận hành trực tiếp.
+API yêu cầu dịch vụ/giao nhận vẫn được giữ cho các luồng robot và Workstations;
+việc gỡ trang không xóa dữ liệu yêu cầu hoặc công việc trên máy chủ.
+
 Reliability test kiểm tra phản hồi REST chậm sau SSE, phiên bản từng bước,
 giữ chi tiết khi công việc kết thúc, chỉ báo dữ liệu cũ khi lỗi đọc,
 kiểm tra lại bước trước khi gửi xác nhận và robot thay đổi khả dụng trong lúc mở biểu mẫu.

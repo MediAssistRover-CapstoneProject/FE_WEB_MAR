@@ -16,9 +16,8 @@ await context.addInitScript(({ draft, key }) => {
 }, { draft, key: STORAGE_KEY });
 const page = await context.newPage(), errors = [], writes = [], reads = [];
 page.on('pageerror', error => errors.push(error.message));
-let fail = false, empty = false;
+let empty = false;
 const hospital = { hospitalInformationId: '11111111-1111-4111-8111-111111111111', title: 'Hướng dẫn khám bệnh', content: 'Đến quầy tiếp đón để đăng ký.\nMang theo giấy tờ và hồ sơ khám trước đó.', infoCategory: 'GENERAL', languageCode: 'vi', status: 'PUBLISHED', publicVisible: true, updatedAt: '2026-10-24T03:00:00Z' };
-const request = { serviceRequestId: '22222222-1111-4111-8111-111111111111', requestCode: 'REQ-2026-101', requestType: 'DELIVERY', status: 'IN_PROGRESS', priority: 3, requestNote: 'Giao thuốc đến phòng trực', requestedAt: '2026-10-24T03:01:00Z' };
 const job = { jobId: '33333333-1111-4111-8111-111111111111', jobCode: 'JOB-101', status: 'RUNNING', serviceType: 'DELIVERY' };
 await page.route('**/api/v1/**', async route => {
   const req = route.request(), url = new URL(req.url()), path = url.pathname;
@@ -27,11 +26,8 @@ await page.route('**/api/v1/**', async route => {
   if (req.method() !== 'GET') { writes.push({ path, body: req.postDataJSON() }); return reply({ ...hospital, ...req.postDataJSON() }); }
   reads.push(url);
   if (path === '/api/v1/auth/me') return reply({ fullName: 'Quản trị kiểm thử', role: 'ADMIN' });
-  if (fail && path === '/api/v1/service-requests') return reply({ message: 'Máy chủ kiểm thử tạm ngừng' }, 503);
   if (path.endsWith('/hospital-information')) return list(empty ? [] : [hospital]);
   if (path.endsWith('/hospital-information/' + hospital.hospitalInformationId)) return reply(hospital);
-  if (path === '/api/v1/service-requests') return list(empty ? [] : [request]);
-  if (path.endsWith('/service-requests/' + request.serviceRequestId)) return reply(request);
   if (path === '/api/v1/jobs') return list([job]);
   if (path.endsWith('/jobs/' + job.jobId)) return reply({ job, steps: [{ jobStepId: 's1', executionSequenceNo: 1, stepCodeSnapshot: 'Đến quầy thuốc', stepTypeSnapshot: 'MOVE', status: 'SUCCEEDED', attemptNo: 1 }, { jobStepId: 's2', executionSequenceNo: 2, stepCodeSnapshot: 'Đến phòng trực', stepTypeSnapshot: 'MOVE', status: 'RUNNING', attemptNo: 1 }] });
   return list([]);
@@ -58,28 +54,12 @@ try {
   empty = true; await page.getByRole('button', { name: 'Tải lại', exact: true }).click();
   await page.getByRole('heading', { name: 'Danh mục chưa có dữ liệu' }).waitFor();
   empty = false;
-  await go('Missions');
-  await page.locator('.be-records button').first().click();
-  await page.getByRole('region', { name: 'Tóm tắt bản ghi' }).getByText(request.requestNote, { exact: true }).waitFor();
-  await page.locator('.be-filter>summary').click();
-  await page.locator('.be-filter').getByLabel('Trạng thái', { exact: true }).selectOption('IN_PROGRESS');
-  empty = true; await page.getByRole('button', { name: 'Áp dụng bộ lọc', exact: true }).click();
-  await page.getByText('Không có kết quả khớp bộ lọc', { exact: true }).waitFor();
-  assert.ok(reads.some(url => url.searchParams.get('status') === 'IN_PROGRESS'));
-  empty = false; await page.getByRole('button', { name: 'Xóa điều kiện lọc', exact: true }).click();
-  await page.locator('.be-records button').first().waitFor();
-  fail = true; await page.getByRole('button', { name: 'Tải lại', exact: true }).click();
-  await page.getByRole('alert').filter({ hasText: 'Máy chủ kiểm thử' }).waitFor();
-  assert.equal(await page.getByText('Danh mục chưa có dữ liệu', { exact: true }).count(), 0);
-  fail = false; await page.getByRole('button', { name: 'Tải lại', exact: true }).click();
-  await page.locator('.be-records button').first().waitFor();
-  await page.screenshot({ path: '.workstation-build/workspace-ux/missions.png', fullPage: true });
   await go('Live Operations');
   await page.locator('.lo-job-item').first().click();
   await page.getByText('Các bước đã ghi nhận', { exact: true }).waitFor();
   assert.equal(await page.locator('.lo-steps li').count(), 2);
   await page.screenshot({ path: '.workstation-build/workspace-ux/jobs.png', fullPage: true });
-  for (const section of ['Missions', 'Facility Management', 'Public Catalog']) {
+  for (const section of ['Facility Management', 'Public Catalog']) {
     await page.setViewportSize({ width: 390, height: 844 }); await go(section);
     await page.locator('.be-records button').first().click();
     await page.locator('.be-record-summary').waitFor(); await noOverflow();
@@ -103,5 +83,5 @@ try {
   await page.setViewportSize({ width: 390, height: 844 }); await noOverflow();
   await page.screenshot({ path: '.workstation-build/workspace-ux/mobile-dispatch.png', fullPage: true });
   assert.deepEqual(errors, []); assert.deepEqual(writes, []);
-  console.log('PASS: API source and timestamps, grouped catalogs, readable content, forms, filters, empty/error distinction, job steps, mobile, Dispatch 2D/3D retains progress. All API responses mocked; no server changes.');
+  console.log('PASS: API source and timestamps, grouped catalogs, readable content, forms, empty states, job steps, mobile, Dispatch 2D/3D retains progress. All API responses mocked; no server changes.');
 } finally { await browser.close(); }

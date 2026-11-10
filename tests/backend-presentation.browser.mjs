@@ -74,18 +74,18 @@ try {
   await page.locator('.be-record-detail h3').getByText('Nhật ký kiểm toán', { exact: true }).waitFor();
   await screenshot('retention');
 
-  await go('Missions');
+  await go('Robot Status');
   await page.locator('.be-filter > summary').click();
   const status = page.locator('.be-filter').getByLabel('Trạng thái', { exact: true });
-  await status.selectOption('RECOVERY_REQUIRED');
-  assert.equal(await status.locator('option:checked').innerText(), 'Cần phục hồi');
-  const filtered = page.waitForRequest(req => new URL(req.url()).pathname === '/api/v1/service-requests' && new URL(req.url()).searchParams.get('status') === 'RECOVERY_REQUIRED');
+  await status.selectOption('ERROR');
+  assert.notEqual(await status.locator('option:checked').innerText(), 'ERROR');
+  const filtered = page.waitForRequest(req => new URL(req.url()).pathname === '/api/v1/robots' && new URL(req.url()).searchParams.get('status') === 'ERROR');
   await page.getByRole('button', { name: 'Áp dụng bộ lọc', exact: true }).click();
   await filtered;
   await page.getByText('1 đang áp dụng', { exact: true }).waitFor();
   await page.locator('.be-records button').first().waitFor();
   await screenshot('filters');
-  const unfiltered = page.waitForRequest(req => new URL(req.url()).pathname === '/api/v1/service-requests' && !new URL(req.url()).searchParams.has('status'));
+  const unfiltered = page.waitForRequest(req => new URL(req.url()).pathname === '/api/v1/robots' && !new URL(req.url()).searchParams.has('status'));
   await page.getByRole('button', { name: 'Đặt lại', exact: true }).click();
   await unfiltered;
   assert.equal(await status.inputValue(), '');
@@ -101,10 +101,10 @@ try {
   assert.ok(!await page.locator('.be-dashboard').innerText().then(text => text.includes('JOB-')));
   await screenshot('dashboard');
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const section of ['Dashboard', 'Analytics', 'System Settings', 'Missions']) {
+  for (const section of ['Dashboard', 'Analytics', 'System Settings', 'Robot Status']) {
     await go(section);
     await page.locator('.be-workspace').first().waitFor();
-    if (section === 'Missions') await page.locator('.be-filter > summary').click();
+    if (section === 'Robot Status') await page.locator('.be-filter > summary').click();
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${section} should fit mobile`);
   }
   await screenshot('mobile');

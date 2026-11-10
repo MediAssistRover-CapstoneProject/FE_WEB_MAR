@@ -4,8 +4,6 @@ import { backendFieldLabels, settingLabels } from '../../i18n/backendLabels.js';
 
 const resource = (id, title, section, root, idField, extra = {}) => ({ id, title, section, root: `/api/v1/${root}`, idField, ...extra });
 export const resources = [
-  resource('requests', 'Yêu cầu dịch vụ', 'Missions', 'service-requests', 'serviceRequestId'),
-  resource('deliveries', 'Giao nhận', 'Missions', 'delivery-requests', 'serviceRequestId'),
   resource('jobs', 'Công việc', 'Live Operations', 'jobs', 'jobId'),
   resource('schedules', 'Lịch tự động', 'Patrol', 'schedules', 'scheduleId'),
   resource('robots', 'Robot', 'Robot Status', 'robots', 'robotId'),
@@ -44,10 +42,13 @@ export const resources = [
   resource('public-endpoints', 'Điểm đích', 'Public Catalog', 'public/endpoints', 'endpointId', { description: 'Chỉ hiển thị điểm đích đang hoạt động, công khai.', filterHint: 'Có thể lọc theo bản đồ, phòng, loại điểm, khả năng tiếp cận hoặc từ khóa.' }),
   resource('public-endpoint-groups', 'Nhóm điểm đích', 'Public Catalog', 'public/endpoint-groups', 'endpointGroupId', { description: 'Chỉ hiển thị nhóm điểm đích đang hoạt động và công khai.', filterHint: 'Có thể lọc theo bản đồ hoặc từ khóa.' }),
 ];
-export const managedOperations = new Set(['POST /api/v1/auth/login', 'POST /api/v1/auth/logout', 'POST /api/v1/auth/refresh']);
+// Keep shared request contracts for Workstations and live operations without
+// exposing a generic request/delivery administration screen.
+export const managedOperations = new Set(['POST /api/v1/auth/login', 'POST /api/v1/auth/logout', 'POST /api/v1/auth/refresh',
+  ...Object.values(operations).filter(op => /^\/api\/v1\/(information|navigation|escort|operational|service|delivery)-requests(?:\/|$)/.test(op.path)).map(op => op.key),
+]);
 export function resourceFor(operation) {
   const path = operation.path;
-  if (/^\/api\/v1\/(information|navigation|escort|operational)-requests$/.test(path)) return resources.find(r => r.id === 'requests');
   if (path === '/api/v1/mapping-jobs') return resources.find(r => r.id === 'maps');
   if (path.startsWith('/api/v1/job-steps/') || path.startsWith('/api/v1/auth-verifications/')) return resources.find(r => r.id === 'jobs');
   if (path.startsWith('/api/v1/admin/accounts/')) return resources.find(r => r.id === 'staff');
