@@ -9,9 +9,22 @@ import { nextRoomColor, nextRoomName, persistRoomColors, preserveRoomColors } fr
 import MapPresentationWorkspace from './MapPresentationWorkspace.jsx';
 import './mapPresentation.css';
 
+function hydrateRoomFeatures(document, endpoints, rooms) {
+  return { ...document, features: document.features.map(feature => {
+    if (feature.type !== 'ROOM') return feature;
+    const endpoint = endpoints.find(value => value.endpointId === feature.endpointId);
+    const room = rooms.find(value => value.roomId === feature.roomId || value.roomId === endpoint?.roomId);
+    if (!room) return feature;
+    return { ...feature, roomId: room.roomId, roomCode: feature.roomCode || room.roomCode,
+      roomName: feature.roomName || room.roomName, label: feature.label || room.roomName,
+      roomType: feature.roomType || room.roomType, departmentCode: feature.departmentCode ?? room.departmentCode ?? '',
+      roomDescription: feature.roomDescription ?? room.description ?? '', roomPublicVisible: feature.roomPublicVisible ?? room.publicVisible };
+  }) };
+}
+
 export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyChange }) {
   const [entry, setEntry] = useState(null), [document, setDocument] = useState(null), [saved, setSaved] = useState('');
-  const [endpoints, setEndpoints] = useState([]), [imageUrl, setImageUrl] = useState(''), [imageError, setImageError] = useState('');
+  const [endpoints, setEndpoints] = useState([]), [rooms, setRooms] = useState([]), [imageUrl, setImageUrl] = useState(''), [imageError, setImageError] = useState('');
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
   const [tool, setTool] = useState('select'), [selectedId, setSelectedId] = useState(''), [opacity, setOpacity] = useState(1), [preview, setPreview] = useState(false), [points, setPoints] = useState([]);
   const [history, setHistory] = useState([]), [future, setFuture] = useState([]), [reload, setReload] = useState(0);
@@ -38,9 +51,13 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     if (!mapId) { setLoading(false); return; }
     const controller = new AbortController(); let url;
     setLoading(true); setError(''); setImageError(''); setEntry(null); setDocument(null); setImageUrl(''); setPoints([]); setSelectedId(''); setHistory([]); setFuture([]);
-    Promise.all([mapPresentationApi.get(mapId, controller.signal), allFacilityPages(facilityApi.listEndpoints)]).then(([value, rows]) => {
+    Promise.all([mapPresentationApi.get(mapId, controller.signal), allFacilityPages(facilityApi.listEndpoints), allFacilityPages(facilityApi.listRooms), allFacilityPages(facilityApi.listMaps)]).then(([value, rows, roomRows, maps]) => {
       if (controller.signal.aborted) return;
-      setEntry(value); setDocument(value.draft); setSaved(JSON.stringify(value.draft)); setEndpoints(rows.filter(e => e.mapId === mapId));
+      const mapEndpoints = rows.filter(e => e.mapId === mapId);
+      const floorId = maps.find(map => map.mapId === mapId)?.floorId;
+      const mapRooms = roomRows.filter(room => !floorId || room.floorId === floorId);
+      const hydratedDraft = hydrateRoomFeatures(value.draft, mapEndpoints, mapRooms);
+      setEntry(value); setDocument(hydratedDraft); setSaved(JSON.stringify(value.draft)); setEndpoints(mapEndpoints); setRooms(mapRooms);
       setView(rotationBounds(value.source, value.draft.rotationDegrees ?? 0));
     }).catch(e => { if (!controller.signal.aborted) setError(e.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     apiRequest(`/api/v1/maps/${encodeURIComponent(mapId)}/image.png`, { signal: controller.signal, responseType: 'blob' }).then(blob => {
@@ -87,7 +104,12 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     if (values.some(point => !insideMap(point, entry.source))) return false;
     if (type === 'WALL' && Math.hypot(values[1].x - values[0].x, values[1].y - values[0].y) < 1e-8) return false;
     const feature = newFeature(type, values, entry.source);
-    if (type === 'ROOM') { feature.color = nextRoomColor(values, current.current.features); feature.label = nextRoomName(current.current.features); }
+    if (type === 'ROOM') {
+      const number = current.current.features.filter(item => item.type === 'ROOM').length + 1;
+      feature.color = nextRoomColor(values, current.current.features); feature.label = nextRoomName(current.current.features);
+      feature.roomCode = `ROOM_${String(number).padStart(2, '0')}`; feature.roomName = feature.label;
+      feature.roomType = 'GENERAL'; feature.departmentCode = ''; feature.roomDescription = ''; feature.roomPublicVisible = true;
+    }
     if (type === 'WALL') feature.label = '';
     if (type === 'DOOR') {
       const door = doorGeometry(feature, entry.source);
@@ -273,6 +295,10 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     try {
       const snapshot = name === 'unpublish' ? current.current : persistRoomColors(current.current), changed = JSON.stringify(snapshot) !== saved;
       const issues = presentationIssues(snapshot, entry.source); if (issues.length) throw Error(issues[0]);
+      if (name === 'publish') {
+        const incomplete = snapshot.features.find(feature => feature.type === 'ROOM' && (!feature.endpointId || !feature.roomCode?.trim() || !(feature.roomName || feature.label)?.trim() || !feature.roomType?.trim()));
+        if (incomplete) throw Error(`Phòng "${incomplete.roomName || incomplete.label || 'chưa đặt tên'}" cần đủ mã phòng, tên, loại phòng và điểm đích trước khi áp dụng.`);
+      }
       let value = entry;
       if (name !== 'unpublish' && (changed || !entry.revision)) value = await mapPresentationApi.save(mapId, { expectedRevision: entry.revision, sourceAssetHash: entry.source.assetHash, document: snapshot });
       // Commit save acknowledgement before publishing so a failed publish can be retried.
@@ -281,7 +307,21 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
       if (name !== 'unpublish') { current.current = snapshot; setDocument(snapshot); setSaved(JSON.stringify(snapshot)); }
       if (name === 'publish') value = await mapPresentationApi.publish(mapId, value.revision);
       if (name === 'unpublish') value = await mapPresentationApi.unpublish(mapId, value.revision);
-      setEntry(value); setNotice(name === 'publish' ? 'Đã áp dụng bản đồ đã chỉnh.' : name === 'unpublish' ? 'Đã bỏ áp dụng bản vẽ, giữ lại bản nháp.' : 'Đã lưu bản nháp trên máy chủ.');
+      setEntry(value);
+      if (name === 'publish') {
+        current.current = value.draft; setDocument(value.draft); setSaved(JSON.stringify(value.draft));
+        const synchronized = value.draft.features.filter(feature => feature.type === 'ROOM' && feature.roomId).map(feature => ({
+          roomId: feature.roomId, roomCode: feature.roomCode, roomName: feature.roomName || feature.label,
+          roomType: feature.roomType, departmentCode: feature.departmentCode, description: feature.roomDescription,
+          publicVisible: feature.roomPublicVisible !== false, active: true,
+        }));
+        setRooms(previous => [...previous.filter(room => !synchronized.some(value => value.roomId === room.roomId)), ...synchronized]);
+        setEndpoints(previous => previous.map(endpoint => {
+          const feature = value.draft.features.find(item => item.type === 'ROOM' && item.endpointId === endpoint.endpointId);
+          return feature ? { ...endpoint, roomId: feature.roomId, publicVisible: feature.roomPublicVisible !== false || endpoint.publicVisible } : endpoint;
+        }));
+      }
+      setNotice(name === 'publish' ? 'Đã áp dụng bản đồ và đồng bộ phòng, điểm đích vào database.' : name === 'unpublish' ? 'Đã bỏ áp dụng bản vẽ, giữ lại bản nháp.' : 'Đã lưu bản nháp trên máy chủ.');
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
   const discardReload = () => { if (!dirty || window.confirm('Bỏ các chỉnh sửa chưa lưu và tải lại?')) setReload(v => v + 1); };
@@ -296,8 +336,17 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     const dx = Math.min(.15, entry.source.widthM - Math.max(...selected.points.map(p => p.x)));
     const dy = Math.min(.15, entry.source.heightM - Math.max(...selected.points.map(p => p.y)));
     const clone = { ...selected, id: crypto.randomUUID(), label: selected.label ? (selected.label + ' (bản sao)').slice(0, 120) : '', points: selected.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
-    if (clone.type === 'ROOM') clone.color = nextRoomColor(clone.points, document.features);
+    if (clone.type === 'ROOM') {
+      const number = document.features.filter(item => item.type === 'ROOM').length + 1;
+      clone.color = nextRoomColor(clone.points, document.features); clone.roomId = null; clone.endpointId = null;
+      clone.roomCode = `ROOM_${String(number).padStart(2, '0')}`; clone.roomName = clone.label; clone.roomPublicVisible = true;
+    }
     change({ ...document, features: [...document.features, clone] }); setSelectedId(clone.id);
+  };
+  const removeSelected = () => {
+    if (!selected || busy || preview) return;
+    if (selected.type === 'ROOM' && selected.roomId && !window.confirm('Chỉ xóa hình phòng khỏi giao diện. Phòng và lịch sử đang dùng phòng này vẫn được giữ trong database. Tiếp tục?')) return;
+    change({ ...document, features: document.features.filter(feature => feature.id !== selected.id) }); setSelectedId('');
   };
   useEffect(() => {
     const svg = svgRef.current; if (!svg || !entry) return;
@@ -333,7 +382,7 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
       if (key === 'enter' && ['polygon', 'WALL'].includes(tool) && !preview) { event.preventDefault(); finish(); return; }
       if (modifier && key === 'z' && !preview) { event.preventDefault(); event.shiftKey ? redo() : undo(); return; }
       if (modifier && key === 'y' && !preview) { event.preventDefault(); redo(); return; }
-      if ((key === 'delete' || key === 'backspace') && selectedId && !preview) { event.preventDefault(); change({ ...document, features: document.features.filter(f => f.id !== selectedId) }); setSelectedId(''); return; }
+      if ((key === 'delete' || key === 'backspace') && selectedId && !preview) { event.preventDefault(); removeSelected(); return; }
       const shortcuts = { v: 'select', h: 'pan', r: 'ROOM', g: 'CORRIDOR', p: 'polygon', w: 'WALL', d: 'DOOR', t: 'LABEL', l: 'LANDMARK' };
       if (!modifier && !event.altKey && !preview && shortcuts[key]) { event.preventDefault(); setTool(shortcuts[key]); setPoints([]); }
     };
@@ -351,11 +400,11 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
   const locked = busy || entry.sourceChanged;
   return <MapPresentationWorkspace {...{
     entry, document, selected, selectedId, setSelectedId, tool, setTool, points, setPoints,
-    busy, dirty, locked, preview, setPreview, opacity, setOpacity, endpoints, imageUrl, imageError,
+    busy, dirty, locked, preview, setPreview, opacity, setOpacity, endpoints, rooms, imageUrl, imageError,
     error, notice, history, future, undo, redo, action, discardReload, update, change,
     finish, zoom, view, setView, svgRef, pointerDown, pointerMove, pointerUp, featureDown,
     pointerCancel, pointerLeave, expanded, setExpanded, spacePanning, showEndpoints, setShowEndpoints, duplicateSelected,
     rotation, rotate, beginRotation, endRotation, fitBounds, contentRef, showGrid, setShowGrid,
-    snapEnabled, setSnapEnabled, drawingAssist, drawingPreview, doorPreview,
+    snapEnabled, setSnapEnabled, drawingAssist, drawingPreview, doorPreview, removeSelected,
   }} />;
 }
