@@ -1,5 +1,6 @@
 import { apiRequest } from '../api/client.js';
 import { doorFitsMap, doorGeometry } from './doorGeometry.js';
+import { DEFAULT_ROOM_DEPARTMENT_CODE } from './roomDefaults.js';
 
 const path = id => `/api/v1/maps/${encodeURIComponent(id)}/presentation`;
 export const mapPresentationApi = {
@@ -28,7 +29,7 @@ export function rectangle(a, b) {
 export function newFeature(type, points, source) {
   const scale = Math.max(.05, Math.min(source.widthM, source.heightM) / 35);
   return { id: crypto.randomUUID(), type, label: type === 'DOOR' ? '' : featureNames[type], color: ({ ROOM: '#dbeafe', CORRIDOR: '#e2e8f0', WALL: '#334155', DOOR: '#334155', LABEL: '#334155', LANDMARK: '#7c3aed' })[type], points, lineWidthM: type === 'DOOR' ? .02 : Math.min(2, Math.max(.01, Math.round(scale / 3 * 100) / 100)), fontSizeM: Math.min(5, Math.max(.05, Math.round(scale * 100) / 100)), endpointId: null,
-    roomId: null, roomCode: null, roomName: null, roomType: null, departmentCode: null, roomDescription: null, roomPublicVisible: null };
+    roomId: null, roomCode: null, roomName: null, roomType: null, departmentCode: type === 'ROOM' ? DEFAULT_ROOM_DEPARTMENT_CODE : null, roomDescription: null, roomPublicVisible: null };
 }
 export function presentationIssues(document, source) {
   const errors = [];

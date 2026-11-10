@@ -1,8 +1,12 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { schemaOf, initialValue, operations, canUse } from '../../../features/api/contract.js';
 import { callBackend, readCatalog } from '../../../features/api/backendApi.js';
 import { fieldLabel, references, resources, valueAt, recordTitle } from '../../../features/api/workspaceCatalog.js';
 import { vi } from '../../../i18n/vi.js';
+import { DEFAULT_ROOM_DEPARTMENT_CODE } from '../../../features/facility/roomDefaults.js';
+import RoomDepartmentSelect from '../facility/RoomDepartmentSelect.jsx';
+import RoomTypeSelect from '../facility/RoomTypeSelect.jsx';
+import { useRoomCodeSuggestion } from '../../../features/facility/useRoomCodeSuggestion.js';
 
 function ReferenceField({ name, value, onChange, required, context, inputId, disabled }) {
   const reference = references[name];
@@ -34,7 +38,14 @@ function ReferenceField({ name, value, onChange, required, context, inputId, dis
 
 function QuickRoomCreate({ onCreated, disabled }) {
   const [open, setOpen] = useState(false), [floors, setFloors] = useState([]), [loading, setLoading] = useState(false), [saving, setSaving] = useState(false), [error, setError] = useState('');
-  const [form, setForm] = useState({ floorId: '', roomCode: '', roomName: '', roomType: 'PHARMACY', departmentCode: '', description: '' });
+  const [form, setForm] = useState({ floorId: '', roomCode: '', roomName: '', roomType: 'PHARMACY', departmentCode: DEFAULT_ROOM_DEPARTMENT_CODE, description: '' });
+  const roomCode = useRoomCodeSuggestion(open);
+  const lastSuggestedCode = useRef('');
+  useEffect(() => {
+    if (!open || !roomCode.code) return;
+    const previous = lastSuggestedCode.current; lastSuggestedCode.current = roomCode.code;
+    setForm(current => !current.roomCode || current.roomCode === previous ? { ...current, roomCode: roomCode.code } : current);
+  }, [open, roomCode.code]);
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController(); setLoading(true); setError('');
@@ -45,7 +56,7 @@ function QuickRoomCreate({ onCreated, disabled }) {
   }, [open]);
   const set = (name, value) => setForm(current => ({ ...current, [name]: value }));
   const submit = async event => {
-    event.preventDefault(); setSaving(true); setError('');
+    event.preventDefault(); if (saving || roomCode.loading) return; setSaving(true); setError('');
     try {
       if (!form.floorId || !form.roomCode.trim() || !form.roomName.trim() || !form.roomType.trim()) throw Error('Vui lòng chọn tầng và nhập đủ mã, tên, loại phòng.');
       const room = await callBackend('POST /api/v1/rooms', { body: {
@@ -58,7 +69,7 @@ function QuickRoomCreate({ onCreated, disabled }) {
         active: true,
         publicVisible: false,
       } });
-      onCreated(room); setOpen(false); setForm({ floorId: '', roomCode: '', roomName: '', roomType: 'PHARMACY', departmentCode: '', description: '' });
+      onCreated(room); setOpen(false); setForm({ floorId: '', roomCode: '', roomName: '', roomType: 'PHARMACY', departmentCode: DEFAULT_ROOM_DEPARTMENT_CODE, description: '' });
     } catch (cause) { setError(cause.message || 'Không thể tạo phòng.'); }
     finally { setSaving(false); }
   };
@@ -68,25 +79,26 @@ function QuickRoomCreate({ onCreated, disabled }) {
       <form onSubmit={submit}><fieldset className="be-form-body" disabled={saving}>
         <div className="be-fields">
           <div className="be-field"><label>Tầng *</label><select required value={form.floorId} disabled={loading} onChange={event => set('floorId', event.target.value)}><option value="">{loading ? 'Đang tải tầng…' : 'Chọn tầng'}</option>{floors.filter(floor => floor.active !== false).map(floor => <option key={floor.floorId} value={floor.floorId}>{floor.floorCode} · {floor.floorName}</option>)}</select></div>
-          <div className="be-field"><label>Mã phòng *</label><input required maxLength="64" value={form.roomCode} placeholder="VD: KHO_DUOC_F1" onChange={event => set('roomCode', event.target.value.toUpperCase())} /></div>
+          <div className="be-field"><label htmlFor="quick-room-code">Mã phòng *</label><input id="quick-room-code" required maxLength="64" value={form.roomCode} placeholder={roomCode.loading ? 'Đang tạo mã phòng…' : 'ROOM_01'} onChange={event => set('roomCode', event.target.value.toUpperCase())} /><small>Mã được điền tự động; bạn có thể chỉnh sửa.</small></div>
           <div className="be-field"><label>Tên phòng *</label><input required maxLength="160" value={form.roomName} placeholder="VD: Kho dược tầng 1" onChange={event => set('roomName', event.target.value)} /></div>
-          <div className="be-field"><label>Loại phòng *</label><select value={form.roomType} onChange={event => set('roomType', event.target.value)}><option value="PHARMACY">Kho dược</option><option value="EXAMINATION">Phòng khám</option><option value="WARD">Phòng bệnh</option><option value="LABORATORY">Phòng xét nghiệm</option><option value="WAITING_AREA">Khu chờ</option><option value="OTHER">Khác</option></select></div>
-          <div className="be-field"><label>Mã khoa/phòng ban</label><input maxLength="64" value={form.departmentCode} placeholder="VD: KHO_DUOC" onChange={event => set('departmentCode', event.target.value)} /></div>
+          <div className="be-field"><label htmlFor="quick-room-type">Loại phòng *</label><RoomTypeSelect id="quick-room-type" required value={form.roomType} onChange={value => set('roomType', value)} /></div>
+          <div className="be-field"><label htmlFor="quick-room-department">Mã khoa/phòng ban</label><RoomDepartmentSelect id="quick-room-department" value={form.departmentCode} onChange={value => set('departmentCode', value)} /></div>
           <div className="be-field be-wide"><label>Mô tả</label><textarea rows="3" value={form.description} onChange={event => set('description', event.target.value)} /></div>
         </div>
-      </fieldset>{error && <p className="be-error" role="alert">{error}</p>}<footer className="be-actions"><button type="button" disabled={saving} onClick={() => setOpen(false)}>Hủy</button><button className="primary" type="submit" disabled={saving || loading}>{saving ? 'Đang lưu…' : 'Lưu phòng và chọn'}</button></footer></form>
+      </fieldset>{roomCode.error && <p className="be-error" role="alert">{roomCode.error}</p>}{error && <p className="be-error" role="alert">{error}</p>}<footer className="be-actions"><button type="button" disabled={saving} onClick={() => setOpen(false)}>Hủy</button><button className="primary" type="submit" disabled={saving || loading || roomCode.loading}>{saving ? 'Đang lưu…' : 'Lưu phòng và chọn'}</button></footer></form>
     </dialog>}</>;
 }
 
 export default function SchemaFields({ schema, value = {}, onChange, context = {}, prefix = '', disabled = false, lockedFields = [], visibleFields }) {
   const s = schemaOf(schema);
   if (!s.properties) return <Field name="data" label="Cấu hình" definition={s} value={value} onChange={onChange} required context={context} disabled={disabled} />;
+  const roomDepartment = context.roomDepartment || Object.hasOwn(s.properties, 'roomCode') && Object.hasOwn(s.properties, 'roomType');
   return <div className="be-fields">{Object.entries(s.properties).filter(([name]) => {
     if (visibleFields && !visibleFields.includes(name)) return false;
     if (value.targetMode === 'ENDPOINT_GROUP' && ['destinationEndpointId', 'deliveryEndpointId'].includes(name)) return false;
     if (value.targetMode === 'ENDPOINT' && ['destinationGroupId', 'deliveryGroupId'].includes(name)) return false;
     return true;
-  }).map(([name, def]) => <Field key={name} name={name} definition={def} label={prefix + fieldLabel(name)} value={value[name]} required={s.required?.includes(name)} disabled={disabled || lockedFields.includes(name)} context={{ ...context, mapId: value.mapId || context.mapId }} onChange={next => {
+  }).map(([name, def]) => <Field key={name} name={name} definition={def} label={prefix + fieldLabel(name)} value={value[name]} required={s.required?.includes(name)} disabled={disabled || lockedFields.includes(name)} context={{ ...context, roomDepartment, mapId: value.mapId || context.mapId }} onChange={next => {
     const updated = { ...value, [name]: next };
     if (name === 'mapId' && next !== value.mapId) for (const field of ['zoneId', 'destinationEndpointId', 'destinationGroupId', 'pickupEndpointId', 'deliveryEndpointId', 'deliveryGroupId', 'originEndpointId', 'endpointId', 'endpointGroupId']) delete updated[field];
     onChange(updated);
@@ -114,6 +126,8 @@ function Field({ name, definition, label = fieldLabel(name), value, onChange, re
   const localDate = value && s.format === 'date-time' && Number.isFinite(Date.parse(value)) ? new Date(Date.parse(value) - new Date(value).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : value;
   return <div className={'be-field' + (long ? ' be-wide' : '')}><label htmlFor={id}>{label}{required ? ' *' : ''}</label>
     {isReference ? <ReferenceField name={name} value={value} onChange={onChange} required={required} context={context} inputId={id} disabled={disabled} />
+      : name === 'departmentCode' && context.roomDepartment ? <RoomDepartmentSelect id={id} value={value} onChange={onChange} required={required} disabled={disabled} />
+      : name === 'roomType' && context.roomDepartment ? <RoomTypeSelect id={id} value={value} onChange={onChange} required={required} disabled={disabled} />
       : s.enum ? <select id={id} value={value ?? ''} required={required} disabled={disabled} onChange={e => onChange(e.target.value)}><option value="">{context.filter ? 'Tất cả' : `Chọn ${label.toLowerCase()}`}</option>{s.enum.map(v => <option key={v} value={v}>{vi(v)}</option>)}</select>
       : freeJson ? <><textarea id={id} rows={4} required={required} disabled={disabled} value={jsonDraft} placeholder="{}" spellCheck={false} onChange={e => { setJsonDraft(e.target.value); onChange(e.target.value); }} /><small>Cấu hình nâng cao dạng JSON; để trống nếu không sử dụng.</small></>
       : long ? <textarea id={id} rows={3} value={value ?? ''} maxLength={s.maxLength} required={required} disabled={disabled} onChange={e => onChange(e.target.value)} />

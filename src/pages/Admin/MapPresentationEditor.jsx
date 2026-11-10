@@ -6,6 +6,7 @@ import { fromView, normalizeRotation, rotationBounds, straightenRotation, viewRe
 import { doorFitsMap, doorGeometry } from '../../features/facility/doorGeometry.js';
 import { doorOnWall, getDoorWall, getWallEdge, snapDrawingPoint } from '../../features/facility/mapDrawingAssist.js';
 import { nextRoomColor, nextRoomName, persistRoomColors, preserveRoomColors } from '../../features/facility/roomAppearance.js';
+import { nextRoomCode } from '../../features/facility/roomDefaults.js';
 import MapPresentationWorkspace from './MapPresentationWorkspace.jsx';
 import './mapPresentation.css';
 
@@ -34,7 +35,7 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
   const [snapEnabled, setSnapEnabled] = useState(true), [drawingAssist, setDrawingAssist] = useState(null);
   const [drawingPreview, setDrawingPreview] = useState([]), [doorPreview, setDoorPreview] = useState(null);
   const svgRef = useRef(null), contentRef = useRef(null), drag = useRef(null), current = useRef(document), rotationGesture = useRef(null);
-  const doorEdge = useRef(null), lastPointer = useRef(null);
+  const doorEdge = useRef(null), lastPointer = useRef(null), roomCatalog = useRef([]);
   current.current = document;
   const dirty = document && JSON.stringify(document) !== saved;
   const selected = document?.features.find(f => f.id === selectedId);
@@ -56,6 +57,7 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
       const mapEndpoints = rows.filter(e => e.mapId === mapId);
       const floorId = maps.find(map => map.mapId === mapId)?.floorId;
       const mapRooms = roomRows.filter(room => !floorId || room.floorId === floorId);
+      roomCatalog.current = roomRows;
       const hydratedDraft = hydrateRoomFeatures(value.draft, mapEndpoints, mapRooms);
       setEntry(value); setDocument(hydratedDraft); setSaved(JSON.stringify(value.draft)); setEndpoints(mapEndpoints); setRooms(mapRooms);
       setView(rotationBounds(value.source, value.draft.rotationDegrees ?? 0));
@@ -105,10 +107,9 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     if (type === 'WALL' && Math.hypot(values[1].x - values[0].x, values[1].y - values[0].y) < 1e-8) return false;
     const feature = newFeature(type, values, entry.source);
     if (type === 'ROOM') {
-      const number = current.current.features.filter(item => item.type === 'ROOM').length + 1;
       feature.color = nextRoomColor(values, current.current.features); feature.label = nextRoomName(current.current.features);
-      feature.roomCode = `ROOM_${String(number).padStart(2, '0')}`; feature.roomName = feature.label;
-      feature.roomType = 'GENERAL'; feature.departmentCode = ''; feature.roomDescription = ''; feature.roomPublicVisible = true;
+      feature.roomCode = nextRoomCode([...roomCatalog.current, ...current.current.features]); feature.roomName = feature.label;
+      feature.roomType = 'GENERAL'; feature.roomDescription = ''; feature.roomPublicVisible = true;
     }
     if (type === 'WALL') feature.label = '';
     if (type === 'DOOR') {
@@ -315,6 +316,7 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
           roomType: feature.roomType, departmentCode: feature.departmentCode, description: feature.roomDescription,
           publicVisible: feature.roomPublicVisible !== false, active: true,
         }));
+        roomCatalog.current = [...roomCatalog.current.filter(room => !synchronized.some(value => value.roomId === room.roomId)), ...synchronized];
         setRooms(previous => [...previous.filter(room => !synchronized.some(value => value.roomId === room.roomId)), ...synchronized]);
         setEndpoints(previous => previous.map(endpoint => {
           const feature = value.draft.features.find(item => item.type === 'ROOM' && item.endpointId === endpoint.endpointId);
@@ -337,9 +339,8 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     const dy = Math.min(.15, entry.source.heightM - Math.max(...selected.points.map(p => p.y)));
     const clone = { ...selected, id: crypto.randomUUID(), label: selected.label ? (selected.label + ' (bản sao)').slice(0, 120) : '', points: selected.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
     if (clone.type === 'ROOM') {
-      const number = document.features.filter(item => item.type === 'ROOM').length + 1;
       clone.color = nextRoomColor(clone.points, document.features); clone.roomId = null; clone.endpointId = null;
-      clone.roomCode = `ROOM_${String(number).padStart(2, '0')}`; clone.roomName = clone.label; clone.roomPublicVisible = true;
+      clone.roomCode = nextRoomCode([...roomCatalog.current, ...document.features]); clone.roomName = clone.label; clone.roomPublicVisible = true;
     }
     change({ ...document, features: [...document.features, clone] }); setSelectedId(clone.id);
   };

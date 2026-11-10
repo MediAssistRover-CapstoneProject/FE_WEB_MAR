@@ -5,6 +5,8 @@ import { callBackend, watchJob } from '../../../features/api/backendApi.js';
 import { operations, canUse, requestSchema, initialValue, prepareBody, prepareValue } from '../../../features/api/contract.js';
 import { resources, resourceOperations, actionLabel, recordTitle, recordTimestamp, recordStatus, settingDisplayValue, statusTone, fieldLabel, screenTitles } from '../../../features/api/workspaceCatalog.js';
 import { vi } from '../../../i18n/vi.js';
+import { DEFAULT_ROOM_DEPARTMENT_CODE } from '../../../features/facility/roomDefaults.js';
+import { useRoomCodeSuggestion } from '../../../features/facility/useRoomCodeSuggestion.js';
 import SchemaFields from './SchemaFields.jsx';
 import RecordDetails, { displayValue } from './RecordDetails.jsx';
 import ListFilters from './ListFilters.jsx';
@@ -206,16 +208,21 @@ function JobInstruction({ detail, open }) {
 
 export function OperationDialog({ op, resource, row: raw, bindings, role, preset, onClose, onSaved, title: customTitle, description, choiceOverrides, beforeSubmit, lockShiftTimes = false }) {
   const ref = useRef(null), lock = useRef(false), requestIdentity = useRef(null);
+  const roomCode = useRoomCodeSuggestion(op.key === 'POST /api/v1/rooms');
   const row = unwrap(raw), choices = useMemo(() => localChoices(raw), [raw]);
   const currentStep = raw?.steps?.find(s => s.jobStepId === raw.job?.selectedJobStepId);
   const responseAction = op.path === '/api/v1/job-steps/{id}/responses';
   const initialPath = Object.fromEntries(paths(op).map(p => [p.name, op.path.startsWith('/api/v1/auth-verifications/') ? '' : responseAction && p.name === 'id' ? currentStep?.jobStepId || '' : bindings[p.name] ?? '']));
   const [path, setPath] = useState(initialPath), [query, setQuery] = useState(() => initialValue(paramsSchema(queryParams(op))) || {}), [body, setBody] = useState(() => {
     const data = initialValue(requestSchema(op.key), op.method === 'PUT' ? { ...row, ...row?.rollout, expectedRevision: row?.rollout?.revision } : undefined) || {};
+    if (op.key === 'POST /api/v1/rooms') data.departmentCode = DEFAULT_ROOM_DEPARTMENT_CODE;
     if (op.path.endsWith('/auth-verifications') || op.path.endsWith('/qr-challenges')) { data.authJobStepId = currentStep?.jobStepId; data.purpose = currentStep?.resolvedInputsJson?.purpose; data.validForSeconds = 120; if (op.path.endsWith('/auth-verifications')) data.method = 'STAFF_CONFIRMATION'; }
     return { ...data, ...preset };
   });
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [result, setResult] = useState(undefined), [completed, setCompleted] = useState(false), [confirm, setConfirm] = useState(false);
+  useEffect(() => {
+    if (roomCode.code) setBody(current => current.roomCode ? current : { ...current, roomCode: roomCode.code });
+  }, [roomCode.code]);
   useEffect(() => { ref.current?.showModal(); }, []);
   const schema = requestSchema(op.key);
   const missingPaths = paths(op).filter(p => !initialPath[p.name]);
@@ -226,7 +233,7 @@ export function OperationDialog({ op, resource, row: raw, bindings, role, preset
     if (op.method === 'PUT' && child) setBody(initialValue(schema, child));
   };
   const submit = async event => {
-    event.preventDefault(); if (lock.current) return;
+    event.preventDefault(); if (lock.current || roomCode.loading) return;
     setError('');
     try {
       if (sensitiveAction(op) && !confirm) throw Error('Vui lòng xác nhận thao tác.');
@@ -259,8 +266,8 @@ export function OperationDialog({ op, resource, row: raw, bindings, role, preset
         {op.path.endsWith('/retention/runs') && <p className={query.dryRun ? 'be-muted' : 'be-error'}>{query.dryRun ? 'Chỉ xem trước; không xóa dữ liệu.' : 'Thao tác thật có thể lưu trữ hoặc xóa dữ liệu theo chính sách máy chủ. Hãy kiểm tra kết quả xem trước trước khi tiếp tục.'}</p>}
         {sensitiveAction(op) && <label className="be-check be-confirm"><input type="checkbox" checked={confirm} onChange={e => setConfirm(e.target.checked)} />Tôi xác nhận thực hiện thao tác này.</label>}
       </fieldset>
-      {error && <p className="be-error" role="alert">{error}</p>}
-      <footer className="be-actions"><button type="button" disabled={busy} onClick={onClose}>Hủy</button><button className="primary" disabled={busy || responseAction && !currentStep} type="submit">{busy ? 'Đang xử lý…' : write(op) ? 'Xác nhận' : 'Xem kết quả'}</button></footer>
+      {roomCode.error && <p className="be-error" role="alert">{roomCode.error}</p>}{error && <p className="be-error" role="alert">{error}</p>}
+      <footer className="be-actions"><button type="button" disabled={busy} onClick={onClose}>Hủy</button><button className="primary" disabled={busy || roomCode.loading || responseAction && !currentStep} type="submit">{busy ? 'Đang xử lý…' : write(op) ? 'Xác nhận' : 'Xem kết quả'}</button></footer>
     </form>}
   </dialog>;
 }
