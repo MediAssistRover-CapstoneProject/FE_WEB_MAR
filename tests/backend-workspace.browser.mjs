@@ -90,14 +90,6 @@ try {
   assert.deepEqual(writes.at(-1).body.data, { confirmed: true, items: cargo });
   assert.ok(writes.at(-1).key);
 
-  // A child collection can be created even before its first record exists.
-  await go('Facility Management');
-  await page.getByRole('navigation', { name: 'Danh mục chức năng' }).getByRole('button', { name: 'Bài hướng dẫn', exact: true }).click();
-  await page.getByLabel('Bệnh viện *', { exact: true }).selectOption(id(7));
-  await page.getByRole('button', { name: 'Tạo mới', exact: true }).click();
-  assert.equal(await dialog.getByLabel('Bệnh viện *', { exact: true }).count(), 0);
-  await dialog.getByRole('button', { name: 'Đóng biểu mẫu' }).click();
-
   // Smoke each role-appropriate resource, including empty collections.
   for (const section of new Set(resources.filter(r => !r.staffOnly).map(r => r.section))) {
     await go(section);
@@ -129,5 +121,5 @@ try {
   await page.goto('http://127.0.0.1:5173/workflows');
   await page.waitForURL('**/admin?screen=Workflow%20Management');
   assert.deepEqual(errors, []);
-  console.log('PASS: service request create/retry, staff update, parent-bound actions, all resource screens, role restrictions.');
+  console.log('PASS: service request create/retry, staff update, all resource screens, role restrictions.');
 } finally { await browser.close(); }

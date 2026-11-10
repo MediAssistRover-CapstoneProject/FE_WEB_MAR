@@ -31,6 +31,8 @@ if (!response.ok) throw Error(`OpenAPI returned ${response.status}`);
 const spec = await response.json();
 const operations = {};
 const excluded = [];
+// Keep removed frontend features out of regenerated contracts.
+const removedFeature = path => /^\/api\/v1\/(?:public\/)?hospital-information\/\{hospitalId\}\/articles(?:\/|$)/.test(path);
 for (const [path, methods] of Object.entries(spec.paths)) {
   for (const [method, item] of Object.entries(methods)) {
     if (!item.operationId) continue;
@@ -38,6 +40,7 @@ for (const [path, methods] of Object.entries(spec.paths)) {
     const origin = source.get(key);
     if (!origin) throw Error(`Running OpenAPI does not match BE source: ${key}`);
     if (path.startsWith('/api/v1/pi/')) { excluded.push({ key, reason: 'DEVICE_ONLY' }); continue; }
+    if (removedFeature(path)) continue;
     const success = Object.entries(item.responses || {}).find(([code]) => /^2/.test(code))?.[1];
     operations[key] = {
       method: method.toUpperCase(), path, roles: origin.roles,
@@ -48,7 +51,7 @@ for (const [path, methods] of Object.entries(spec.paths)) {
     };
   }
 }
-const missing = [...source.keys()].filter(key => !key.includes('/pi/') && !operations[key]);
+const missing = [...source.keys()].filter(key => !key.includes('/pi/') && !removedFeature(key.slice(key.indexOf(' ') + 1)) && !operations[key]);
 if (missing.length) throw Error(`Running BE is missing source operations: ${missing.join(', ')}`);
 const referenced = new Set();
 function refs(value) {

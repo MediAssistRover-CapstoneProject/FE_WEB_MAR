@@ -14,7 +14,6 @@ export const resourceHints = {
   deliveries: 'Theo dõi các yêu cầu giao nhận và thông tin bàn giao.',
   jobs: 'Một công việc là một lần thực thi quy trình. Mở chi tiết để xem các bước và kết quả.',
   hospitals: 'Hồ sơ giới thiệu bệnh viện. Tạo hoặc chỉnh sửa nội dung, kiểm tra trạng thái phát hành trước khi xem ở Thông tin công khai.',
-  articles: 'Chọn bệnh viện để quản lý các bài hướng dẫn trực thuộc.',
   floors: 'Các tầng của bệnh viện, dùng để tổ chức bản đồ và phòng.',
   maps: 'Những phiên bản bản đồ đã lưu trên máy chủ, gắn với một tầng cụ thể.',
   zones: 'Các khu vực nằm trên bản đồ máy chủ và quy tắc sử dụng tương ứng.',
@@ -66,7 +65,7 @@ export function WorkspaceIntro({ section, role }) {
 
 export function CatalogNavigation({ available, resource, onSelect, section }) {
   const groups = section === 'Facility Management' ? [
-    ['Nội dung', ['hospitals', 'articles']],
+    ['Nội dung', ['hospitals']],
     ['Không gian', ['floors', 'maps', 'zones', 'rooms']],
     ['Điểm phục vụ', ['endpoints', 'groups', 'members']],
   ] : [['Danh mục tra cứu', available.map(item => item.id)]];

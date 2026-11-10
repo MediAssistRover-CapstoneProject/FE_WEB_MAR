@@ -94,7 +94,6 @@ function ResourcePanel({ resource, role }) {
   const [action, setAction] = useState(null), [live, setLive] = useState(false), [liveStatus, setLiveStatus] = useState('');
   const parentSignature = JSON.stringify(parent), querySignature = JSON.stringify(applied);
   const listPaths = paths(listOp);
-  const parentPaths = resource.parentCatalogKey ? listPaths.filter(path => path.name !== 'hospitalId') : listPaths;
   const parentReady = listPaths.every(p => parent[p.name]);
   useEffect(() => {
     setData(null); setError(''); setSelected(null); setDetail(null); setLive(false); setLoadedAt(null); setLoading(false); setDetailLoading(false);
@@ -143,7 +142,7 @@ function ResourcePanel({ resource, role }) {
     <header className="be-heading"><div><h2>{resource.title}</h2><p>{resourceHints[resource.id] || resource.description || (resource.id === 'retention' ? 'Mỗi mục là một chính sách lưu trữ cho một nhóm dữ liệu, không phải số bản ghi đang lưu.' : `Quản lý dữ liệu và thao tác của ${resource.title.toLowerCase()}.`)}</p></div><div className="be-actions"><button type="button" disabled={loading || !parentReady} onClick={() => setRevision(v => v + 1)}>Tải lại</button>{globalOps.map(op => <button type="button" key={op.key} disabled={!parentReady} className={write(op) ? 'primary' : ''} onClick={() => open(op)}>{actionLabel(op)}</button>)}</div></header>
     {resource.id === 'robots' && role === 'ADMIN' && <div className="rsu-entry"><p>Chọn bản đồ và xác nhận vị trí robot trước khi đưa vào vận hành.</p><Link className="rsu-entry-link" to={`/admin/robot-setup${selectedId ? `?robotId=${encodeURIComponent(selectedId)}` : ''}`}>Thiết lập vận hành ↗</Link></div>}
     {enhanced && <DataSource loading={loading} error={error} loadedAt={loadedAt} total={data?.totalElements ?? rows?.length} parentReady={parentReady} />}
-    {(resource.parentCatalogKey || parentPaths.length > 0) && <div className="be-card be-parent-selector">{resource.parentCatalogKey && <ParentCatalogSelector resource={resource} value={parent.hospitalId || ''} onChange={hospitalId => { setParent(current => ({ ...current, hospitalId })); setPage(0); }} />}{parentPaths.length > 0 && <SchemaFields schema={paramsSchema(parentPaths)} value={parent} onChange={next => { setParent(next); setPage(0); }} context={{ role }} />}</div>}
+    {listPaths.length > 0 && <div className="be-card"><SchemaFields schema={paramsSchema(listPaths)} value={parent} onChange={next => { setParent(next); setPage(0); }} context={{ role }} /></div>}
     {filters(listOp).length > 0 && <ListFilters resource={resource} schema={paramsSchema(filters(listOp))} value={query} applied={applied} onChange={setQuery} role={role} onApply={() => { try { setApplied(prepareValue(query, paramsSchema(filters(listOp)))); setPage(0); setError(''); } catch (e) { setError(e.message); } }} onReset={() => { setQuery({}); setApplied({}); setPage(0); setError(''); }} />}
     {error && <p className="be-error" role="alert">{error}</p>}
     {loading && <p role="status">Đang tải dữ liệu…</p>}
@@ -164,20 +163,6 @@ function ResourcePanel({ resource, role }) {
     {singleton && <section className={resource.id === 'reports' ? '' : 'be-card'}><div className="be-actions">{itemOps.filter(eligible).map(op => <button key={op.key} onClick={() => open(op)}>{actionLabel(op)}</button>)}</div>{resource.id === 'reports' ? <OperationsReport value={data} /> : <RecordDetails value={data} />}</section>}
     {action && <OperationDialog key={action.op.key} {...action} resource={resource} role={role} onClose={() => setAction(null)} onSaved={() => setRevision(v => v + 1)} />}
   </>;
-}
-
-function ParentCatalogSelector({ resource, value, onChange }) {
-  const [rows, setRows] = useState([]), [loading, setLoading] = useState(true), [error, setError] = useState('');
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true); setError('');
-    callBackend(resource.parentCatalogKey, { query: { page: 0, size: 100 } }, { signal: controller.signal })
-      .then(response => setRows(Array.isArray(response) ? response : response?.content ?? []))
-      .catch(cause => { if (cause.name !== 'AbortError') setError(cause.message || 'Không tải được danh sách bệnh viện.'); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
-  }, [resource.parentCatalogKey]);
-  return <label className="be-parent-field">{resource.parentLabel}<select value={value} disabled={loading} onChange={event => onChange(event.target.value)}><option value="">{loading ? 'Đang tải…' : `Chọn ${resource.parentLabel.toLowerCase()}`}</option>{rows.map(item => <option key={item.hospitalInformationId} value={item.hospitalInformationId}>{item.title || item.hospitalName || item.hospitalInformationId}</option>)}</select>{error && <small role="alert">{error}</small>}</label>;
 }
 
 function rowPaths(resource, raw, parent = {}) {

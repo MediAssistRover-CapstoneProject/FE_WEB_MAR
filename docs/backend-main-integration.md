@@ -5,7 +5,7 @@
 ## Kết nối và phạm vi
 
 - FE dùng mặc định `https://mediassistrover.duckdns.org`; cấu hình thực tế trên máy nằm trong `.env.local`. Có thể đổi bằng `VITE_API_BASE_URL` rồi khởi động lại Vite/build lại.
-- Đã đọc OpenAPI Railway và so với BE main: 207 thao tác dành cho người dùng/công khai có cùng đường dẫn, tham số và schema trong snapshot. 37 API Pi/thiết bị được tách riêng, không đưa khóa thiết bị vào trình duyệt.
+- Đã đọc OpenAPI Railway và so với BE main: snapshot hiện giữ 199 thao tác dành cho người dùng/công khai sau khi gỡ tính năng nội dung con khỏi FE. 37 API Pi/thiết bị được tách riêng, không đưa khóa thiết bị vào trình duyệt.
 - Snapshot: `src/features/api/backendContract.json`; bộ gọi API: `backendApi.js`; kiểm tra/chuẩn hóa dữ liệu: `contract.js`.
 - Swagger hiện trùng tên các record `Create`, `Update`, `Confirm`. `contractOverrides.js` dùng đúng DTO Java của từng thao tác, gồm nhân viên, ca trực, cài đặt, giao nhận, xác thực giao nhận và tạo phiên quét.
 - Không chạy các lệnh điều khiển robot, tạo/xóa dữ liệu hoặc đặt lại mật khẩu trên Railway trong quá trình kiểm tra.
@@ -15,7 +15,7 @@
 - Nhiệm vụ: yêu cầu thông tin, dẫn đường, hộ tống, vận hành, giao nhận; gửi xử lý/hủy theo trạng thái.
 - Vận hành trực tiếp: danh sách/chi tiết công việc, phân công, hủy, sự kiện, phục hồi, phiên quét, SSE, xác nhận bước và xác thực giao nhận.
 - Robot/Sạc pin: dữ liệu robot thực, bảo trì/cấp khóa/đối soát/cấu hình giám sát theo quyền; yêu cầu sạc đi qua API vận hành, không giả lập thành công.
-- Danh mục bệnh viện: thông tin, bài hướng dẫn, tầng, phòng, bản đồ, vùng, điểm đích, nhóm và thành viên. Có lối vào bộ vẽ vùng/đặt điểm trên danh mục BE.
+- Danh mục bệnh viện: hồ sơ bệnh viện, tầng và phòng theo bản đồ hoạt động. Bộ vẽ vùng/đặt điểm được quản lý tại Map Studio.
 - Quản lý quy trình: CRUD, tác vụ, bước, liên kết, đồ thị, chọn bước bắt đầu, kiểm tra/phát hành/nhân bản/lưu trữ; danh sách đã phát hành và thư viện bước. Trình biên tập `/workflows` vẫn được giữ.
 - Ca trực: nhân viên, ca, khung giờ và chuyển trạng thái; Staff xem ca của mình.
 - Giám sát: cảnh báo, sự cố, phát hiện, báo cáo và CSV; hội thoại/lệnh giọng nói chỉ hiển thị thao tác BE hỗ trợ.
@@ -43,7 +43,7 @@ FE đã bổ sung: refresh single-flight, giữ phương thức/body/idempotency
 
 - `npm run build`.
 - `node --test tests/*.test.mjs`: 54 bài đạt tại thời điểm bổ sung tích hợp.
-- `tests/backend-workspace.browser.mjs`: tạo yêu cầu, retry giữ idempotency, sửa nhân viên, tạo dữ liệu con, mở các danh mục và phân quyền bằng API giả lập.
+- `tests/backend-workspace.browser.mjs`: tạo yêu cầu, retry giữ idempotency, sửa nhân viên, mở các danh mục và phân quyền bằng API giả lập.
 - `tests/auth.browser.mjs`: đăng nhập 401/thành công, lỗi tải tài khoản, tài khoản dự phòng không gọi BE.
 - `tests/workflow-crud.browser.mjs`: tạo/sửa/xóa quy trình, tác vụ, bước bằng API giả lập.
 - `tests/dispatch.browser.mjs`: mô phỏng điều phối và nhiều kích thước màn hình; không ghi BE.

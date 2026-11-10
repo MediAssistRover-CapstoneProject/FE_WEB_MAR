@@ -2,15 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { callBackend } from '../../../features/api/backendApi.js';
 import { facilityApi } from '../../../features/facility/facilityApi.js';
-import { getSession } from '../../../features/auth/session.js';
-import { vi } from '../../../i18n/vi.js';
 import '../liveOperations/liveOperations.css';
 
 function Icon({ name = 'building', ...props }) {
   const paths = {
     building: <><path d="M3 21h18M5 21V7l8-4v18M13 7h6v14" /><path d="M9 9h1M9 13h1M9 17h1M16 11h1M16 15h1" /></>,
     layers: <><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></>,
-    book: <><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" /><path d="M6 6h10M6 10h10" /></>,
     refresh: <><path d="M20 7v5h-5M4 17v-5h5" /><path d="M6 8a7 7 0 0 1 12-2l2 3M4 15l2 3a7 7 0 0 0 12-2" /></>,
     search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></>,
     arrow: <path d="m9 5 7 7-7 7" />,
@@ -19,7 +16,6 @@ function Icon({ name = 'building', ...props }) {
     phone: <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />,
     mail: <><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></>,
     robot: <><rect x="4" y="7" width="16" height="13" rx="4" /><path d="M12 3v4M8 12v2m8-2v2m-7 3h6M1 11v5m22-5v5" /></>,
-    alert: <><path d="m12 3 10 18H2Z" /><path d="M12 9v4m0 3v1" /></>,
     room: <><path d="M5 21V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v17" /><path d="M3 21h18M14 12h.01" /></>,
   };
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>{paths[name] || paths.building}</svg>;
@@ -51,93 +47,10 @@ const DEFAULT_FLOORS = [
   { floorId: 'FL-04', floorCode: 'T4', floorName: 'Tầng 4 - Điều Hành & Hành Chính', levelNo: 4, description: 'Văn phòng ban giám đốc, hội trường nghiên cứu y khoa và trung tâm kiểm soát điều hành robot MAR-01.', active: true, departments: 'Ban Giám đốc, Phòng CNTT & Điều phối Robot, Phòng Quản lý chất lượng' },
 ];
 
-const HARDCODED_ARTICLES = [
-  {
-    id: 'ART-01',
-    code: 'HD-001',
-    category: 'Tiếp đón & Hướng dẫn',
-    title: 'Quy trình tiếp đón người bệnh và đăng ký khám tại sảnh chính',
-    updatedAt: 'Hôm nay · 08:30',
-    status: 'PUBLISHED',
-    readCount: 1420,
-    summary: 'Hướng dẫn các bước lấy số tự động, quét mã bảo hiểm và cách nhờ robot MAR-01 dẫn đường đến phòng khám.',
-    content: [
-      { heading: '1. Tiếp cận sảnh chính và lấy số thứ tự', text: 'Khi bước vào sảnh tầng 1, người bệnh quét thẻ Căn cước công dân gắn chip hoặc ứng dụng VssID tại cây lấy số tự động để nhận phiếu khám bệnh.' },
-      { heading: '2. Nhờ robot hỗ trợ dẫn đường', text: 'Robot MAR-01 túc trực tại sảnh chính sẵn sàng hướng dẫn di chuyển. Người bệnh chạm vào màn hình cảm ứng của robot hoặc nói “Dẫn tôi đến phòng khám Ngoại” để robot dẫn đường.' },
-      { heading: '3. Chờ gọi tên tại phòng khám', text: 'Màn hình điện tử trước mỗi cửa phòng khám hiển thị số thứ tự đang khám và thứ tự kế tiếp. Người bệnh vui lòng ngồi tại khu vực ghế chờ đã được bố trí.' }
-    ],
-    tips: 'Nên chuẩn bị trước thẻ BHYT và kết quả khám gần nhất để thủ tục tiếp nhận diễn ra nhanh chóng.'
-  },
-  {
-    id: 'ART-02',
-    code: 'HD-002',
-    category: 'Vận hành Robot',
-    title: 'Hướng dẫn nhận và kiểm tra túi thuốc tự động từ Robot MAR-01',
-    updatedAt: 'Hôm qua · 15:40',
-    status: 'PUBLISHED',
-    readCount: 890,
-    summary: 'Quy trình xác thực mã PIN / thẻ điều dưỡng để mở ngăn chứa an toàn khi robot giao thuốc đến trạm trực.',
-    content: [
-      { heading: '1. Robot thông báo đến nơi', text: 'Khi robot đến trạm điều dưỡng tại tầng chỉ định, robot sẽ phát âm thanh chào và hiển thị mã công việc giao nhận trên màn hình.' },
-      { heading: '2. Xác thực quyền mở ngăn', text: 'Điều dưỡng trực dùng thẻ nhân viên quét qua đầu đọc NFC hoặc nhập mã PIN gồm 4 số được gửi qua ca trực để mở ngăn chứa.' },
-      { heading: '3. Kiểm đếm và đóng ngăn an toàn', text: 'Đối chiếu danh mục thuốc trên màn hình robot với thuốc thực nhận, sau đó đóng cửa ngăn chứa và nhấn “Hoàn tất nhận thuốc”.' }
-    ],
-    tips: 'Trường hợp có nghi vấn sai lệch thuốc, vui lòng bấm “Báo cáo sai lệch” trên màn hình trước khi đóng ngăn.'
-  },
-  {
-    id: 'ART-03',
-    code: 'HD-003',
-    category: 'Không gian & Chỉ dẫn',
-    title: 'Sơ đồ luồng di chuyển và cụm thang máy dành cho người bệnh',
-    updatedAt: '04/11/2026',
-    status: 'PUBLISHED',
-    readCount: 2150,
-    summary: 'Phân luồng thang máy công cộng dành cho người nhà và thang máy hậu cần chuyên dụng cho xe cấp cứu, robot.',
-    content: [
-      { heading: '1. Cụm thang máy trung tâm (Thang A1, A2)', text: 'Dành riêng cho người bệnh và thân nhân di chuyển giữa các tầng từ Tầng 1 đến Tầng 4.' },
-      { heading: '2. Thang máy hậu cần & Vận chuyển (Thang B1)', text: 'Ưu tiên vận chuyển giường bệnh cấp cứu, dụng cụ phẫu thuật và hành trình tự động của robot MAR-01.' },
-      { heading: '3. Lối thoát hiểm khẩn cấp', text: 'Hệ thống cầu thang bộ thoát hiểm được bố trí ở hai đầu hành lang mỗi tầng, có đèn tín hiệu EXIT sáng 24/7.' }
-    ],
-    tips: 'Vui lòng không đứng chắn lối vào thang máy hậu cần khi robot MAR đang phát tín hiệu chuyển tầng.'
-  },
-  {
-    id: 'ART-04',
-    code: 'HD-004',
-    category: 'Nội quy viện',
-    title: 'Quy định giờ thăm bệnh nhân và phòng ngừa nhiễm khuẩn',
-    updatedAt: '01/11/2026',
-    status: 'PUBLISHED',
-    readCount: 1670,
-    summary: 'Khung giờ thăm nuôi tại các phòng nội trú và hướng dẫn khử khuẩn tay trước khi vào khu chăm sóc đặc biệt.',
-    content: [
-      { heading: '1. Khung giờ thăm bệnh quy định', text: 'Buổi trưa: 11h30 - 13h00 · Buổi chiều tối: 16h30 - 20h30 hàng ngày. Ngoài khung giờ trên, người nhà cần có thẻ nuôi bệnh.' },
-      { heading: '2. Số lượng người thăm', text: 'Mỗi buồng bệnh tối đa 2 người thăm cùng một thời điểm để giữ không gian yên tĩnh và thông thoáng cho người bệnh phục hồi.' },
-      { heading: '3. Vệ sinh và bảo vệ', text: 'Sát khuẩn tay nhanh bằng dung dịch cồn y tế đặt tại cửa buồng bệnh và đeo khẩu trang y tế suốt thời gian có mặt trong viện.' }
-    ],
-    tips: 'Trẻ em dưới 12 tuổi không nên vào khu vực buồng bệnh hồi sức tích cực để tránh nguy cơ nhiễm khuẩn chéo.'
-  },
-  {
-    id: 'ART-05',
-    code: 'HD-005',
-    category: 'Khẩn cấp & An toàn',
-    title: 'Hướng dẫn kích hoạt báo động khẩn cấp SOS và sơ cấp cứu té ngã',
-    updatedAt: '28/10/2026',
-    status: 'PUBLISHED',
-    readCount: 3120,
-    summary: 'Cách nhấn nút SOS trên thân robot hoặc tại các chốt hành lang khi phát hiện tình huống người bệnh gặp nguy hiểm.',
-    content: [
-      { heading: '1. Kích hoạt báo động khẩn cấp', text: 'Nhấn nút SOS đỏ trên ngực robot MAR-01 hoặc nút bấm khẩn cấp màu đỏ bố trí dọc hành lang và trong nhà vệ sinh.' },
-      { heading: '2. Robot tự động phát tín hiệu', text: 'Ngay khi kích hoạt, robot sẽ dừng mọi hoạt động hiện tại, phát còi cảnh báo tại chỗ và truyền hình ảnh trực tiếp về Trung tâm điều hành.' },
-      { heading: '3. Giữ nguyên vị trí người bệnh', text: 'Trừ khi có nguy cơ cháy nổ, tuyệt đối không di dời người bệnh bị ngã hoặc co giật. Hãy chờ nhân viên y tế đến sau 30-60 giây.' }
-    ],
-    tips: 'Nút SOS chỉ dùng trong tình huống khẩn cấp y tế. Mọi trường hợp bấm thử nghiệm vui lòng liên hệ phòng CNTT.'
-  }
-];
-
 export default function HospitalInfoWorkspace() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryTab = searchParams.get('tab');
-  const [tab, setTab] = useState(['floors', 'rooms', 'articles'].includes(queryTab) ? queryTab : 'hospital');
+  const [tab, setTab] = useState(['floors', 'rooms'].includes(queryTab) ? queryTab : 'hospital');
 
   const [hospitals, setHospitals] = useState(DEFAULT_HOSPITALS);
   const [selectedHospital, setSelectedHospital] = useState(DEFAULT_HOSPITALS[0]);
@@ -149,19 +62,20 @@ export default function HospitalInfoWorkspace() {
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [roomsError, setRoomsError] = useState('');
-  const [articles] = useState(HARDCODED_ARTICLES);
-  const [selectedArticle, setSelectedArticle] = useState(HARDCODED_ARTICLES[0]);
   const [search, setSearch] = useState('');
-  const [articleCategory, setArticleCategory] = useState('Tất cả');
   const [toast, setToast] = useState('');
 
-  const role = getSession()?.account?.role;
-
   useEffect(() => {
-    if (queryTab && ['hospital', 'floors', 'rooms', 'articles'].includes(queryTab)) {
-      setTab(queryTab);
+    const nextTab = ['hospital', 'floors', 'rooms'].includes(queryTab) ? queryTab : 'hospital';
+    setTab(nextTab);
+    if (queryTab && queryTab !== nextTab) {
+      setSearchParams(prev => {
+        const params = new URLSearchParams(prev);
+        params.set('tab', nextTab);
+        return params;
+      }, { replace: true });
     }
-  }, [queryTab]);
+  }, [queryTab, setSearchParams]);
 
   const selectTab = next => {
     setTab(next);
@@ -249,15 +163,6 @@ export default function HospitalInfoWorkspace() {
     (f.floorCode && f.floorCode.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const filteredArticles = articles.filter(a => {
-    const matchCat = articleCategory === 'Tất cả' || a.category === articleCategory;
-    const matchSearch = !search ||
-      a.title.toLowerCase().includes(search.toLowerCase()) ||
-      a.code.toLowerCase().includes(search.toLowerCase()) ||
-      a.summary.toLowerCase().includes(search.toLowerCase());
-    return matchCat && matchSearch;
-  });
-
   const filteredRooms = rooms.filter(room => {
     if (!search) return true;
     const value = search.toLowerCase();
@@ -267,8 +172,6 @@ export default function HospitalInfoWorkspace() {
 
   const selectedMap = activeMaps.find(map => map.mapId === selectedMapId);
   const roomFloor = floors.find(floor => floor.floorId === selectedRoom?.floorId);
-
-  const categories = ['Tất cả', 'Tiếp đón & Hướng dẫn', 'Vận hành Robot', 'Không gian & Chỉ dẫn', 'Nội quy viện', 'Khẩn cấp & An toàn'];
 
   const metrics = [
     { label: 'Cơ sở bệnh viện', count: hospitals.length, tone: 'blue', icon: 'building' },
@@ -285,7 +188,7 @@ export default function HospitalInfoWorkspace() {
           <span className="lo-title-icon"><Icon name="building" /></span>
           <div>
             <h2>Thông tin bệnh viện</h2>
-            <p>Quản lý hồ sơ cơ sở y tế, sơ đồ tầng, phòng theo map hoạt động và các bài viết hướng dẫn người bệnh.</p>
+            <p>Quản lý hồ sơ cơ sở y tế, sơ đồ tầng, phòng theo map hoạt động.</p>
           </div>
         </div>
         <div className="lo-header-actions">
@@ -359,18 +262,9 @@ export default function HospitalInfoWorkspace() {
                 Danh sách phòng
                 <span>{rooms.length}</span>
               </button>
-              <button
-                type="button"
-                aria-pressed={tab === 'articles'}
-                className={tab === 'articles' ? 'is-active' : ''}
-                onClick={() => selectTab('articles')}
-              >
-                Bài viết hướng dẫn
-                <span>{articles.length}</span>
-              </button>
             </nav>
             <span className="lo-total">
-              {tab === 'hospital' ? `${hospitals.length} cơ sở` : tab === 'floors' ? `${floors.length} tầng` : tab === 'rooms' ? `${rooms.length} phòng` : `${articles.length} bài viết`}
+              {tab === 'hospital' ? `${hospitals.length} cơ sở` : tab === 'floors' ? `${floors.length} tầng` : `${rooms.length} phòng`}
             </span>
           </div>
 
@@ -381,20 +275,11 @@ export default function HospitalInfoWorkspace() {
                 <Icon name="search" />
                 <input
                   aria-label="Tìm kiếm"
-                  placeholder={tab === 'floors' ? 'Tìm tên tầng, mã tầng (VD: Tầng 1, T1)...' : tab === 'rooms' ? 'Tìm tên phòng, mã phòng, loại phòng hoặc khoa...' : 'Tìm bài hướng dẫn, từ khóa, mã bài viết...'}
+                  placeholder={tab === 'floors' ? 'Tìm tên tầng, mã tầng (VD: Tầng 1, T1)...' : 'Tìm tên phòng, mã phòng, loại phòng hoặc khoa...'}
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                 />
               </label>
-              {tab === 'articles' && (
-                <select
-                  aria-label="Lọc chuyên mục bài viết"
-                  value={articleCategory}
-                  onChange={e => setArticleCategory(e.target.value)}
-                >
-                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              )}
               {tab === 'rooms' && (
                 <select aria-label="Chọn map đang hoạt động" value={selectedMapId} onChange={e => setSelectedMapId(e.target.value)}>
                   {!activeMaps.length && <option value="">Chưa có map hoạt động</option>}
@@ -483,9 +368,6 @@ export default function HospitalInfoWorkspace() {
                 <div className="lo-detail-actions" style={{ marginTop: '20px' }}>
                   <button className="lo-button lo-primary" onClick={() => selectTab('floors')}>
                     <Icon name="layers" />Xem sơ đồ {floors.length} tầng
-                  </button>
-                  <button className="lo-button" onClick={() => selectTab('articles')}>
-                    <Icon name="book" />Xem các bài viết hướng dẫn
                   </button>
                   <button className="lo-button" onClick={() => {
                     navigator.clipboard?.writeText(selectedHospital.address);
@@ -669,97 +551,6 @@ export default function HospitalInfoWorkspace() {
                 </div>
               </article>
             ) : !roomsLoading && <article className="lo-detail"><div className="lo-empty"><span className="lo-empty-icon"><Icon name="room" /></span><h3>Chưa có phòng để hiển thị</h3><p>Hãy chọn map đang hoạt động có phòng và endpoint đã được công khai.</p></div></article>}
-          </div>
-        )}
-
-        {/* TAB 4: ARTICLES (BÀI VIẾT HƯỚNG DẪN - HARDCODED UI) */}
-        {tab === 'articles' && (
-          <div className="lo-layout">
-            <aside className="lo-job-list" aria-label="Danh sách bài viết">
-              <header>
-                <strong>{filteredArticles.length} bài hướng dẫn</strong>
-                <span>Chỉ dẫn người bệnh</span>
-              </header>
-              <div className="lo-job-items">
-                {filteredArticles.map(art => (
-                  <button
-                    key={art.id}
-                    type="button"
-                    className={`lo-job-item ${selectedArticle?.id === art.id ? 'is-selected' : ''}`}
-                    onClick={() => setSelectedArticle(art)}
-                  >
-                    <div className="lo-job-item-top">
-                      <span className="lo-badge lo-running"><i />{art.category}</span>
-                      <span>{art.code}</span>
-                    </div>
-                    <strong>{art.title}</strong>
-                    <span className="lo-job-target" style={{ WebkitLineClamp: 2, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {art.summary}
-                    </span>
-                    <div className="lo-job-item-bottom">
-                      <time>{art.updatedAt}</time>
-                      <Icon name="arrow" />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </aside>
-
-            {selectedArticle && (
-              <article className="lo-detail" aria-label="Nội dung bài viết">
-                <header className="lo-detail-header">
-                  <div>
-                    <div className="lo-detail-kicker">
-                      <span className="lo-badge lo-success"><i />Đã phát hành</span>
-                      <span className="lo-badge lo-running"><i />{selectedArticle.category}</span>
-                      <span>Mã bài viết: {selectedArticle.code}</span>
-                    </div>
-                    <h3>{selectedArticle.title}</h3>
-                    <p><Icon name="book" />Cập nhật lúc {selectedArticle.updatedAt} · {selectedArticle.readCount} lượt xem</p>
-                  </div>
-                </header>
-
-                <div className="lo-instruction" style={{ marginBottom: '20px' }}>
-                  <strong>Tóm tắt nội dung</strong>
-                  <p>{selectedArticle.summary}</p>
-                </div>
-
-                <div style={{ display: 'grid', gap: '18px', margin: '20px 0' }}>
-                  {selectedArticle.content.map((sec, idx) => (
-                    <section key={idx} style={{ background: '#f8fafc', border: '1px solid var(--lo-line)', borderRadius: '10px', padding: '16px' }}>
-                      <h4 style={{ fontSize: '13px', fontWeight: 650, color: 'var(--lo-ink)', margin: '0 0 6px' }}>
-                        {sec.heading}
-                      </h4>
-                      <p style={{ fontSize: '13px', color: '#4a5d78', lineHeight: 1.7, margin: 0 }}>
-                        {sec.text}
-                      </p>
-                    </section>
-                  ))}
-                </div>
-
-                {selectedArticle.tips && (
-                  <div className="lo-notice lo-notice-warning" style={{ marginTop: '16px' }}>
-                    <Icon name="alert" />
-                    <p><strong>Lưu ý cho người bệnh: </strong>{selectedArticle.tips}</p>
-                  </div>
-                )}
-
-                <div className="lo-detail-actions" style={{ marginTop: '24px' }}>
-                  <button className="lo-button lo-primary" onClick={() => {
-                    setToast(`Đã sao chép liên kết bài viết "${selectedArticle.title}".`);
-                    setTimeout(() => setToast(''), 3000);
-                  }}>
-                    Sao chép liên kết chia sẻ
-                  </button>
-                  <button className="lo-button" onClick={() => {
-                    setToast(`Đã gửi thông báo cập nhật bài viết đến kiosk sảnh.`);
-                    setTimeout(() => setToast(''), 3000);
-                  }}>
-                    Phát hành lên kiosk sảnh
-                  </button>
-                </div>
-              </article>
-            )}
           </div>
         )}
       </div>

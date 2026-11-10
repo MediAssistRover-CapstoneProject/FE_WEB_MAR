@@ -50,8 +50,6 @@ try {
   await page.getByRole('button', { name: 'Tạo mới', exact: true }).click();
   const dialog = page.getByRole('dialog'); await dialog.waitFor();
   await dialog.getByRole('button', { name: 'Đóng biểu mẫu', exact: true }).click();
-  await page.getByRole('navigation', { name: 'Danh mục chức năng' }).getByRole('button', { name: 'Bài hướng dẫn', exact: true }).click();
-  assert.equal(await page.getByRole('button', { name: 'Tạo mới', exact: true }).isDisabled(), true);
   await go('Public Catalog');
   await page.locator('.be-records button').first().click();
   await page.locator('.be-readable-content').waitFor();
