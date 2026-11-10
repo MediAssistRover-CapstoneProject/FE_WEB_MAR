@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const root = resolve(process.argv[2] || '../../Be/BE_MAR');
-const url = process.env.OPENAPI_URL || 'http://localhost:8080/v3/api-docs';
+const url = process.env.OPENAPI_URL || 'https://mediassistrover.duckdns.org/v3/api-docs';
 async function files(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
   return (await Promise.all(entries.map(e => e.isDirectory() ? files(resolve(dir, e.name)) : resolve(dir, e.name)))).flat();

@@ -2,7 +2,7 @@ import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
-  const target = env.VITE_DEV_PROXY_TARGET || 'http://localhost:8080';
+  const target = env.VITE_API_BASE_URL || 'https://mediassistrover.duckdns.org';
   const proxyEntry = {
     target,
     changeOrigin: true,

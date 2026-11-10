@@ -45,7 +45,6 @@ function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto })
   const [saved, setSaved] = useState(null), [error, setError] = useState('');
   const [presentation, setPresentation] = useState(null), [presentationNotice, setPresentationNotice] = useState('');
   const [retry, setRetry] = useState(0), [zoom, setZoom] = useState(1), [follow, setFollow] = useState(false);
-  const [trail, setTrail] = useState([]);
   const remembered = useRef(null), followCenter = useRef(null);
   useEffect(() => { setZoom(1); remembered.current = null; followCenter.current = null; }, [mapId]);
   useEffect(() => {
@@ -89,22 +88,11 @@ function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto })
     window.addEventListener('focus', onFocus);
     return () => { controller.abort(); clearTimeout(timer); window.removeEventListener('focus', onFocus); };
   }, [mapId, retry, revision, auto]);
-  useEffect(() => { setTrail([]); }, [mapId, job?.jobId]);
   const meta = saved && saved.mapId === mapId ? saved.metadata : null;
   const view = monitorPoseView(remembered.current, { snapshot, livePose, metadata: meta, job, fresh });
   remembered.current = view.memory;
   const pose = view.live ? view.pose : null;
   const displayPose = view.pose;
-  useEffect(() => {
-    if (!pose || !job || snapshot.activeJobId !== job.jobId || pose.jobId && pose.jobId !== job.jobId) return;
-    setTrail(previous => {
-      if (previous.at(-1)?.capturedAt === pose.capturedAt) return previous;
-      const last = previous.at(-1);
-      // A gap is drawn as a break, never as an inferred straight path.
-      const gap = !last || Date.parse(pose.capturedAt) - Date.parse(last.capturedAt) > 10000;
-      return [...previous, { ...pose, gap }].slice(-600);
-    });
-  }, [pose?.capturedAt, mapId, job?.jobId]);
   const position = pose && imagePoint(pose, meta);
   const displayPosition = displayPose && imagePoint(displayPose, meta);
   const plan = fresh ? matchingPlan(snapshot, meta, job) : null;
@@ -122,15 +110,9 @@ function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto })
   const center = follow && followCenter.current ? followCenter.current.position : { x: width / 2, y: height / 2 };
   const left = Math.max(0, Math.min(width - viewWidth, center.x - viewWidth / 2));
   const top = Math.max(0, Math.min(height - viewHeight, center.y - viewHeight / 2));
-  let trailPath = '';
-  trail.forEach(point => {
-    const pixel = imagePoint(point, meta);
-    if (pixel) trailPath += (point.gap || !trailPath ? 'M' : 'L') + pixel.x + ',' + pixel.y + ' ';
-  });
   const published = matchingPresentation(presentation, meta);
   const presentationView = published && presentationViewport(published, zoom, follow ? followCenter.current?.position : null);
   const overlay = <g className="rm-navigation-overlay">
-    {trailPath && <path className="rm-trail" d={trailPath} fill="none" stroke="#16a34a" strokeWidth={radius * .35} />}
     {validPlan && <polyline className="rm-plan" points={planPoints.map(point => point.x + ',' + point.y).join(' ')} fill="none" stroke="#2563eb" strokeWidth={radius * .35} strokeDasharray={radius + ' ' + radius * .6} />}
     {destination && <g className="rm-destination" transform={`translate(${destination.x} ${destination.y})`}><circle r={radius} fill="#f59e0b" stroke="white" strokeWidth={radius * .2} /><title>Điểm đến</title></g>}
     {displayPosition && <g className={view.live ? "rm-position" : "rm-position-stale"} transform={`translate(${displayPosition.x} ${displayPosition.y}) rotate(${-(displayPose.yawRad - meta.origin_yaw_rad) * 180 / Math.PI})`}>
@@ -155,8 +137,8 @@ function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto })
       </svg> : <div className="rm-placeholder"><span>⌖</span><p>{error || catalogError || (mapId ? 'Đang tải ảnh bản đồ…' : maps.length > 1 ? 'Chọn bản đồ đang hoạt động để theo dõi.' : 'Chưa có bản đồ đang hoạt động trên máy chủ.')}</p>{error && <button onClick={() => setRetry(n => n + 1)}>Tải lại bản đồ</button>}</div>}
     </div>
     {saved && <p className="rm-caption rm-presentation-status" role="status">{published ? 'Đang dùng giao diện bản đồ đã áp dụng.' : presentationNotice || 'Giao diện không khớp phiên bản map này. Đang hiển thị map gốc.'} {!published && mapId && <Link to={`/admin/map?mapId=${encodeURIComponent(mapId)}&stage=presentation`}>Mở chỉnh sửa và áp dụng bản đồ →</Link>}</p>}
-    <div className="rm-legend"><span><i className="rm-green" />Vệt vị trí đã nhận</span><span><i className="rm-blue" />Đường dự kiến</span><span>● Điểm đến</span></div>
-    <p className="rm-caption">{position ? 'Vị trí robot đang cập nhật.' : displayPosition ? `Vị trí gần nhất lúc ${new Date(displayPose.capturedAt).toLocaleTimeString('vi-VN')} · ${Math.floor(view.ageMs / 1000)} giây trước; chưa có vị trí trực tiếp.` : 'Chưa có vị trí robot còn hiệu lực trên bản đồ này.'} {validPlan ? 'Đường dự kiến của bước hiện tại.' : 'Chờ cập nhật đường đi.'} Vệt vị trí được ghi nhận từ khi mở trang.</p>
+    <div className="rm-legend"><span><i className="rm-blue" />Đường dự kiến</span><span>● Điểm đến</span></div>
+    <p className="rm-caption">{position ? 'Vị trí robot đang cập nhật.' : displayPosition ? `Vị trí gần nhất lúc ${new Date(displayPose.capturedAt).toLocaleTimeString('vi-VN')} · ${Math.floor(view.ageMs / 1000)} giây trước; chưa có vị trí trực tiếp.` : 'Chưa có vị trí robot còn hiệu lực trên bản đồ này.'} {validPlan ? 'Đường dự kiến của bước hiện tại.' : 'Chờ cập nhật đường đi.'}</p>
   </section>;
 }
 

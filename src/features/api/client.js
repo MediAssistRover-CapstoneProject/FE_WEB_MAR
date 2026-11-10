@@ -1,58 +1,7 @@
 import { clearSession, getRefreshToken, getSession, updateTokens } from '../auth/session.js';
 
-const API_TARGET_KEY = 'mediassist-rover.api-target';
-const SESSION_KEY = 'mediassist-rover.session';
-const ACCESS_TOKEN_KEY = 'mediassist-rover.access-token';
-
-export const SERVER_API_URL = (import.meta.env?.VITE_SERVER_API_BASE_URL || 'https://mediassistrover.duckdns.org').trim().replace(/\/+$/, '');
-export const LOCAL_API_URL = (import.meta.env?.DEV && import.meta.env?.VITE_DEV_PROXY_TARGET ? '' : (import.meta.env?.VITE_LOCAL_API_BASE_URL || 'http://localhost:8080')).trim().replace(/\/+$/, '');
-
-export function getApiTarget() {
-  try {
-    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(API_TARGET_KEY) : null;
-    if (saved === 'local' || saved === 'server') return saved;
-  } catch { /* ignore storage errors */ }
-  const envUrl = (import.meta.env?.VITE_API_BASE_URL ?? '').trim();
-  if (envUrl.includes('duckdns.org') || envUrl.includes('railway.app')) return 'server';
-  return 'local';
-}
-
-export function setApiTarget(nextTarget) {
-  const target = nextTarget === 'server' ? 'server' : 'local';
-  const current = getApiTarget();
-  if (target === current) return;
-  try {
-    const currentSession = localStorage.getItem(SESSION_KEY);
-    if (currentSession) {
-      localStorage.setItem(`${SESSION_KEY}.${current}`, currentSession);
-    } else {
-      localStorage.removeItem(`${SESSION_KEY}.${current}`);
-    }
-    localStorage.setItem(API_TARGET_KEY, target);
-    const restored = localStorage.getItem(`${SESSION_KEY}.${target}`);
-    if (restored) {
-      localStorage.setItem(SESSION_KEY, restored);
-      const parsed = JSON.parse(restored);
-      if (parsed?.tokens?.accessToken) localStorage.setItem(ACCESS_TOKEN_KEY, parsed.tokens.accessToken);
-      else localStorage.removeItem(ACCESS_TOKEN_KEY);
-    } else {
-      localStorage.removeItem(SESSION_KEY);
-      localStorage.removeItem(ACCESS_TOKEN_KEY);
-    }
-  } catch { /* ignore storage errors */ }
-  if (typeof window !== 'undefined') {
-    const hasRestored = Boolean(localStorage.getItem(SESSION_KEY));
-    if (!hasRestored && window.location.pathname.startsWith('/admin')) {
-      window.location.assign('/login');
-    } else {
-      window.location.reload();
-    }
-  }
-}
-
-// Local development uses the backend configured in Be/BE_MAR/.env.
-// Deployments override this through VITE_API_BASE_URL or the Admin API switcher.
-const API_BASE_URL = getApiTarget() === 'server' ? SERVER_API_URL : LOCAL_API_URL;
+// All requests use the configured server, including REST, streams and map images.
+const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || 'https://mediassistrover.duckdns.org').trim().replace(/\/+$/, '');
 let refreshing = null;
 
 export class ApiError extends Error {

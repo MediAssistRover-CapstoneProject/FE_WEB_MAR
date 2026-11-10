@@ -12,11 +12,11 @@ VITE_API_BASE_URL=https://mediassistrover.duckdns.org
 
 Chạy `npm run dev`, đăng nhập bằng tài khoản trên máy chủ rồi mở Bản đồ hoặc Workstations. Khởi động lại Vite nếu chưa nhận thay đổi `.env.local`. Cấu hình API này áp dụng cả REST, SSE và ảnh map. URL camera Pi cấu hình riêng theo kết nối thực tế; cấu hình này không thay URL upload/TTS/CA của worker Pi.
 
-Nếu cần dùng Vite proxy khi phát triển, đặt `VITE_API_BASE_URL=` và `VITE_DEV_PROXY_TARGET=https://mediassistrover.duckdns.org`. Không thêm `/swagger-ui` vào API base URL.
+FE chỉ dùng máy chủ được cấu hình qua `VITE_API_BASE_URL`, mặc định là `https://mediassistrover.duckdns.org`. Không còn bộ chọn API Local/Server. Vite cũng chuyển tiếp các request cùng origin tới máy chủ này khi phát triển. Không thêm `/swagger-ui` vào API base URL.
 
 ## Deploy
 
-VITE_DEV_PROXY_TARGET chỉ có tác dụng với Vite dev. Production phải reverse proxy /api tới BE, hoặc build với VITE_API_BASE_URL=https://domain-be và cấu hình CORS trên BE. Không dùng localhost làm địa chỉ BE cho người dùng từ máy khác.
+Build với `VITE_API_BASE_URL=https://domain-be` và cấu hình CORS trên BE. Vite proxy chỉ có tác dụng khi phát triển; production cần reverse proxy nếu có request `/api` cùng origin.
 
 Camera 8080 là MJPEG từ Pi, không đi qua BE/MQTT. FE HTTPS cần camera HTTPS qua gateway/VPN có xác thực; không tự động mở camera HTTP qua Internet. Ảnh MQTT vẫn là ảnh chụp chậm, không phải video mượt. Không đưa token BE vào URL camera.
 
