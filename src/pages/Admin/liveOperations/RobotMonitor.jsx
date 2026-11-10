@@ -6,16 +6,17 @@ import { loadSavedMap } from '../../../features/robotOperations/savedMap.js';
 import { imagePoint, matchingPlan, monitorPoseScope, monitorPoseView } from '../../../features/operations/monitorGeometry.js';
 import { matchingPresentation, presentationViewport } from '../../../features/operations/monitorPresentation.js';
 import MapPresentationCanvas from '../MapPresentationCanvas.jsx';
-import { jobPresentation, selectedStep, statusInfo } from '../../../features/operations/liveOperations.js';
+import { dataFreshness, jobPresentation, newerJob, selectedStep, statusInfo } from '../../../features/operations/liveOperations.js';
 import { vi } from '../../../i18n/vi.js';
 import RobotCamera from '../robotOperations/RobotCamera.jsx';
 import { useJobFeed } from '../../../features/operations/useJobFeed.js';
 import { useRobotRealtime } from '../../../features/operations/useRobotRealtime.js';
+import MissionProgress from './MissionProgress.jsx';
 import './robotMonitor.css';
 
 const dateTime = value => value ? new Date(value).toLocaleString('vi-VN') : 'Chưa ghi nhận';
 
-function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto }) {
+function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto, stepDetail }) {
   const [maps, setMaps] = useState([]);
   const [catalogError, setCatalogError] = useState('');
   const [chosenMapId, setChosenMapId] = useState('');
@@ -125,6 +126,7 @@ function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto })
       <button type="button" aria-label="Thu nhỏ bản đồ" disabled={!saved || zoom <= 1} onClick={() => setZoom(value => Math.max(1, value - .5))}>−</button>
       <button type="button" aria-label="Phóng to bản đồ" disabled={!saved || zoom >= 5} onClick={() => setZoom(value => Math.min(5, value + .5))}>+</button>
     </div></header>
+    {stepDetail}
     <div className="rm-map-canvas" data-map-view={published ? 'published' : 'original'}>
       {saved && published ? <MapPresentationCanvas source={published.source} document={published.document} preview
         imageUrl={saved.url} opacity={published.document.features.length ? 0 : 1}
@@ -165,9 +167,16 @@ export default function RobotMonitor({ jobs, catalogs, auto, revision, onOpen })
     return () => { controller.abort(); clearTimeout(timer); };
   }, [revision, auto]);
   const active = jobs.filter(job => ['RUNNING', 'ACCEPTED'].includes(job.status) && job.robotId === robotId);
-  const current = active.find(job => job.jobId === snapshot?.activeJobId) || active[0];
-  const { detail, error: detailError } = useJobFeed(current && snapshot?.activeJobId === current.jobId
-    ? { ...current, selectedJobStepId: snapshot.selectedJobStepId || current.selectedJobStepId } : current, auto, revision);
+  const rememberedJob = useRef(null);
+  // Keep the last result visible until another job takes over; isolate by robot.
+  const previous = rememberedJob.current?.robotId === robotId ? rememberedJob.current : null;
+  const observedJob = active.find(job => job.jobId === snapshot?.activeJobId) || active[0]
+    || jobs.find(job => job.robotId === robotId && job.status === 'RECOVERY_REQUIRED')
+    || (previous && (jobs.find(job => job.jobId === previous.jobId) || previous));
+  const { detail, error: detailError, receivedAt: detailReceivedAt } = useJobFeed(observedJob && snapshot?.activeJobId === observedJob.jobId
+    ? { ...observedJob, selectedJobStepId: snapshot.selectedJobStepId || observedJob.selectedJobStepId } : observedJob, auto, revision);
+  const current = detail?.job && detail.job.jobId === observedJob?.jobId ? newerJob(observedJob, detail.job) : observedJob;
+  rememberedJob.current = current;
   const robot = snapshot?.robot || catalogs.robots[0];
   const observedAge = Date.now() - Date.parse(snapshot?.observedAt);
   const fresh = !error && receivedAt > 0 && Date.now() - receivedAt <= 5000
@@ -182,7 +191,8 @@ export default function RobotMonitor({ jobs, catalogs, auto, revision, onOpen })
     <div className="rm-robot-bar"><strong>♧ {[robot?.robotName, robot?.robotCode].find(value => value?.trim() && value.trim().toLowerCase() !== 'string') || 'Robot'}</strong><span className={'rm-pill ' + (connected ? 'is-good' : '')}>{connected ? vi(robot?.status) : 'Chưa có kết nối mới'}</span><span>{connected ? '● Đã kết nối' : '○ Chờ tín hiệu robot'}</span><small>{receivedAt ? 'Cập nhật lúc ' + new Date(receivedAt).toLocaleTimeString('vi-VN') : 'Đang chờ dữ liệu'}</small></div>
     {error && <p className="lo-notice lo-notice-warning" role="status">{error}</p>}
     <div className="rm-layout"><div className="rm-left">
-      <RobotMap snapshot={snapshot} livePose={livePose} job={current} endpoints={catalogs.endpoints} fresh={fresh} revision={revision} auto={auto} />
+      <RobotMap snapshot={snapshot} livePose={livePose} job={current} endpoints={catalogs.endpoints} fresh={fresh} revision={revision} auto={auto}
+        stepDetail={<MissionProgress current={current} detail={detail} catalogs={catalogs} stale={dataFreshness(detailReceivedAt, now, !!detailError).stale} connected={!!connected} auto={auto} />} />
       <section className="rm-card rm-queue"><header><h3>Danh sách công việc</h3></header>
         <nav aria-label="Hàng đợi của robot">{[['running', 'Đang thực hiện', active.length], ['queue', 'Chờ thực hiện', waiting.length], ['scheduled', 'Theo lịch', upcoming.length]].map(([key, title, count]) => <button key={key} aria-pressed={tab === key} onClick={() => setTab(key)}>{title} <b>{count}</b></button>)}</nav>
         <p className="rm-caption">{tab === 'queue' ? 'Sắp theo ưu tiên và thời điểm vào hàng đợi. Máy chủ quyết định công việc đủ điều kiện chạy tiếp.' : tab === 'scheduled' ? 'Thời điểm kích hoạt kế tiếp từ lịch trên máy chủ.' : 'Công việc đang được robot tiếp nhận hoặc thực hiện.'}</p>

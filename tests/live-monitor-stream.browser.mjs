@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
 
 const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:5187';
 const id = n => `${String(n).repeat(8)}-${String(n).repeat(4)}-4${String(n).repeat(3)}-8${String(n).repeat(3)}-${String(n).repeat(12)}`;
@@ -112,7 +113,53 @@ try {
   assert.equal(await page.evaluate(() => { window.monitorObserver.disconnect(); return window.monitorBlankFrames.length; }), 0);
   assert.equal(await page.evaluate(() => performance.getEntriesByType('navigation').length), 1);
   assert.deepEqual(writes, []); assert.deepEqual(errors, []);
-  console.log('PASS: scoped state/pose stream, shared mission details, no blank panels or remounted map during slow refresh, stable zoom/image URL, stale gray position, REST fallback and one document navigation. All APIs mocked.');
+  // The compact row above the map shares the feed and follows BE selection.
+  const progress = page.getByRole('region', { name: 'Bước hiện tại trên bản đồ' });
+  const nextId = id(6);
+  steps.push({ jobStepId: nextId, rowVersion: 1, stepTypeSnapshot: 'HANDLE_PAYLOAD', status: 'PENDING', executionSequenceNo: 2 });
+  job = { ...job, rowVersion: 2 };
+  await emit('job-state', detail(), true);
+  await expect(progress).toContainText('Bước 1');
+  await expect(progress.locator('.rm-progress-title')).toHaveText('Di chuyển');
+  await expect(progress.locator('.rm-step-status')).toHaveText('✓ Thành công');
+  assert.equal(await progress.evaluate(node => node.nextElementSibling.classList.contains('rm-map-canvas')), true, 'detail is immediately above the map');
+  const stripBox = await progress.boundingBox(), mapBox = await page.locator('.rm-map-canvas').boundingBox();
+  assert.ok(stripBox.height < 90 && stripBox.y + stripBox.height <= mapBox.y + 1, 'horizontal row stays compact and never covers the map');
+  await expect(progress.locator('ol, .rm-progress-next')).toHaveCount(0);
+  job = { ...job, rowVersion: 3, selectedJobStepId: nextId };
+  steps[1] = { ...steps[1], rowVersion: 2, status: 'RUNNING', resolvedInputsJson: { message: 'Chờ nhân viên nhận hàng tại Phòng 03.' } };
+  await emit('job-state', detail(), true);
+  await expect(progress).toContainText('Bước 2');
+  await expect(progress.locator('.rm-step-status')).toHaveText('Chờ xác nhận bước');
+  await expect(progress.locator('.rm-progress-title')).toHaveText('Xử lý hàng hóa');
+  assert.equal(await page.evaluate(() => window.monitorStreams.filter(stream => stream.path.includes('/jobs/') && !stream.closed).length), 1, 'progress row shares the existing job subscription');
+  await mkdir('.workstation-build/mission-progress', { recursive: true });
+  await page.locator('.rm-map').screenshot({ path: '.workstation-build/mission-progress/running.png' });
+  job = { ...job, rowVersion: 4, status: 'RECOVERY_REQUIRED' };
+  steps[1] = { ...steps[1], rowVersion: 3, status: 'FAILED', errorCode: 'ROBOT_OFFLINE' };
+  await emit('job-state', detail(), true);
+  await expect(progress.locator('.rm-step-status')).toHaveText('Cần xử lý');
+  await expect(progress.locator('.rm-progress-title')).toHaveText('Xử lý hàng hóa');
+  await expect(progress.locator('.rm-progress-next')).toHaveCount(0);
+  // Another server fixture: success remains visible after the active list refresh.
+  job = { ...job, rowVersion: 5, status: 'SUCCEEDED', selectedJobStepId: null };
+  steps[1] = { ...steps[1], rowVersion: 4, status: 'SUCCEEDED', errorCode: null };
+  await emit('job-state', detail(), true);
+  await expect(progress).toContainText('Nhiệm vụ đã hoàn thành');
+  const beforeFinalRefresh = reads.get(detailPath);
+  await page.getByRole('button', { name: 'Làm mới', exact: true }).click();
+  await expect.poll(() => reads.get(detailPath)).toBeGreaterThan(beforeFinalRefresh);
+  await expect(progress).toContainText('Nhiệm vụ đã hoàn thành');
+  await expect(svg).toHaveAttribute('viewBox', zoom);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(progress).toBeVisible();
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'mobile layout fits the viewport');
+  await page.locator('.rm-map').screenshot({ path: '.workstation-build/mission-progress/mobile.png' });
+  // Reload with only historical jobs: the empty state must also render safely.
+  await page.reload();
+  await expect(progress).toContainText('Chưa có bước đang thực hiện');
+  assert.deepEqual(writes, []); assert.deepEqual(errors, []);
+  console.log('PASS: shared state/pose feeds, stable map, progress waits for BE selection, confirmation/failure/success states, retained terminal result after list refresh, mobile and empty state. All APIs mocked; no writes.');
 } catch (error) {
   console.error('Live monitor errors:', errors, 'page:', await page.locator('body').innerText().catch(() => 'unavailable')); throw error;
 } finally { await browser.close(); }

@@ -5,6 +5,17 @@
 .rm-pill.is-good{background:#e5f6ee;color:#147547}
 .rm-layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,1fr);gap:18px;align-items:start}
 .rm-left,.rm-right{display:grid;gap:18px;min-width:0}
+.rm-progress{padding:10px 18px;background:#f8fbff;border-bottom:1px solid #e5edf8}
+.rm-progress-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
+.rm-progress-main{display:flex;align-items:baseline;flex-wrap:wrap;gap:5px 10px;min-width:0}
+.rm-progress-main>small{font-size:11px;font-weight:600;color:#71849d;white-space:nowrap}
+.rm-progress-title{font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.rm-progress-target{font-size:11px;color:#657d9b;overflow-wrap:anywhere}
+.rm-step-status{flex-shrink:0;padding:4px 9px;border-radius:999px;background:#f1f5f9;color:#64748b;font-size:11px;line-height:1.4;white-space:nowrap}
+.rm-step-status.is-running{background:#eaf2ff;color:#1d4ed8}.rm-step-status.is-success{background:#e5f6ee;color:#147547}
+.rm-step-status.is-failed{background:#fef2f2;color:#b91c1c}.rm-step-status.is-waiting,.rm-step-status.is-attention{background:#fff3df;color:#92621c}
+.rm-progress-notice{display:block;margin-top:4px;font-size:10px;line-height:1.4;color:#92621c}
+@media(max-width:480px){.rm-progress{padding:9px 12px}.rm-progress-heading{gap:8px}.rm-progress-main{gap:3px 7px}.rm-progress-title{font-size:12px}.rm-step-status{padding:4px 7px;font-size:10px}}
 .rm-card{min-width:0;background:white;border:1px solid #dce7f7;border-radius:15px;overflow:hidden}
 .rm-card>header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:17px 19px;border-bottom:1px solid #edf2fa}
 .lo-page .rm-card h3{margin:0;font-size:16px;font-weight:650}.rm-card header small{display:block;margin-top:5px;color:#7186a2;font-size:11px}
