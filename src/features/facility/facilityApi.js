@@ -13,6 +13,7 @@ export const facilityApi = {
   deleteMap: (id, reason) => apiRequest(`/api/v1/maps/${encodeURIComponent(id)}`, { method: 'DELETE', body: { reason } }),
   listZones: (params) => catalog('zones', params),
   listRooms: (params) => catalog('rooms', params),
+  listPublicRooms: (params, options) => apiRequest(query('/api/v1/public/rooms', params), { skipAuth: true, ...options }),
   listEndpoints: (params) => catalog('endpoints', params),
   listEndpointGroups: (params) => catalog('endpoint-groups', params),
   listEndpointGroupMembers: (params) => catalog('endpoint-group-members', params),

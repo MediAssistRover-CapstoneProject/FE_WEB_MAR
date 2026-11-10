@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { callBackend } from '../../../features/api/backendApi.js';
+import { facilityApi } from '../../../features/facility/facilityApi.js';
 import { getSession } from '../../../features/auth/session.js';
 import { vi } from '../../../i18n/vi.js';
 import '../liveOperations/liveOperations.css';
@@ -19,6 +20,7 @@ function Icon({ name = 'building', ...props }) {
     mail: <><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></>,
     robot: <><rect x="4" y="7" width="16" height="13" rx="4" /><path d="M12 3v4M8 12v2m8-2v2m-7 3h6M1 11v5m22-5v5" /></>,
     alert: <><path d="m12 3 10 18H2Z" /><path d="M12 9v4m0 3v1" /></>,
+    room: <><path d="M5 21V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v17" /><path d="M3 21h18M14 12h.01" /></>,
   };
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>{paths[name] || paths.building}</svg>;
 }
@@ -135,12 +137,18 @@ const HARDCODED_ARTICLES = [
 export default function HospitalInfoWorkspace() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryTab = searchParams.get('tab');
-  const [tab, setTab] = useState(queryTab === 'floors' ? 'floors' : queryTab === 'articles' ? 'articles' : 'hospital');
+  const [tab, setTab] = useState(['floors', 'rooms', 'articles'].includes(queryTab) ? queryTab : 'hospital');
 
   const [hospitals, setHospitals] = useState(DEFAULT_HOSPITALS);
   const [selectedHospital, setSelectedHospital] = useState(DEFAULT_HOSPITALS[0]);
   const [floors, setFloors] = useState(DEFAULT_FLOORS);
   const [selectedFloor, setSelectedFloor] = useState(DEFAULT_FLOORS[1]);
+  const [activeMaps, setActiveMaps] = useState([]);
+  const [selectedMapId, setSelectedMapId] = useState('');
+  const [rooms, setRooms] = useState([]);
+  const [selectedRoom, setSelectedRoom] = useState(null);
+  const [roomsLoading, setRoomsLoading] = useState(false);
+  const [roomsError, setRoomsError] = useState('');
   const [articles] = useState(HARDCODED_ARTICLES);
   const [selectedArticle, setSelectedArticle] = useState(HARDCODED_ARTICLES[0]);
   const [search, setSearch] = useState('');
@@ -150,7 +158,7 @@ export default function HospitalInfoWorkspace() {
   const role = getSession()?.account?.role;
 
   useEffect(() => {
-    if (queryTab && ['hospital', 'floors', 'articles'].includes(queryTab)) {
+    if (queryTab && ['hospital', 'floors', 'rooms', 'articles'].includes(queryTab)) {
       setTab(queryTab);
     }
   }, [queryTab]);
@@ -192,8 +200,48 @@ export default function HospitalInfoWorkspace() {
       })
       .catch(() => {});
 
+    callBackend('GET /api/v1/maps', { query: { page: 0, size: 100 } }, { signal: controller.signal })
+      .then(res => {
+        const rows = (Array.isArray(res) ? res : res?.content) || [];
+        const active = rows.filter(map => map.status === 'ACTIVE');
+        setActiveMaps(active);
+        setSelectedMapId(current => active.some(map => map.mapId === current) ? current : active[0]?.mapId || '');
+      })
+      .catch(() => {
+        setActiveMaps([]);
+        setSelectedMapId('');
+      });
+
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    if (!selectedMapId) {
+      setRooms([]);
+      setSelectedRoom(null);
+      setRoomsError(activeMaps.length ? '' : 'Chưa có map nào đang hoạt động.');
+      return undefined;
+    }
+    const controller = new AbortController();
+    setRoomsLoading(true);
+    setRoomsError('');
+    facilityApi.listPublicRooms({ mapId: selectedMapId, page: 0, size: 100 }, { signal: controller.signal })
+      .then(res => {
+        const rows = (Array.isArray(res) ? res : res?.content) || [];
+        setRooms(rows);
+        setSelectedRoom(current => rows.find(room => room.roomId === current?.roomId) || rows[0] || null);
+      })
+      .catch(error => {
+        if (error.name === 'AbortError') return;
+        setRooms([]);
+        setSelectedRoom(null);
+        setRoomsError(error.message || 'Không tải được danh sách phòng của map đang hoạt động.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setRoomsLoading(false);
+      });
+    return () => controller.abort();
+  }, [selectedMapId, activeMaps.length]);
 
   const filteredFloors = floors.filter(f =>
     !search ||
@@ -210,12 +258,22 @@ export default function HospitalInfoWorkspace() {
     return matchCat && matchSearch;
   });
 
+  const filteredRooms = rooms.filter(room => {
+    if (!search) return true;
+    const value = search.toLowerCase();
+    return [room.roomName, room.roomCode, room.roomType, room.departmentCode]
+      .some(field => field?.toLowerCase().includes(value));
+  });
+
+  const selectedMap = activeMaps.find(map => map.mapId === selectedMapId);
+  const roomFloor = floors.find(floor => floor.floorId === selectedRoom?.floorId);
+
   const categories = ['Tất cả', 'Tiếp đón & Hướng dẫn', 'Vận hành Robot', 'Không gian & Chỉ dẫn', 'Nội quy viện', 'Khẩn cấp & An toàn'];
 
   const metrics = [
     { label: 'Cơ sở bệnh viện', count: hospitals.length, tone: 'blue', icon: 'building' },
     { label: 'Số tầng hoạt động', count: floors.filter(f => f.active).length, tone: 'amber', icon: 'layers' },
-    { label: 'Bài viết hướng dẫn', count: articles.length, tone: 'green', icon: 'book' },
+    { label: 'Phòng trên map hoạt động', count: rooms.length, tone: 'green', icon: 'room' },
     { label: 'Trạng thái phát hành', count: 'Công khai', tone: 'green', icon: 'check' },
   ];
 
@@ -227,7 +285,7 @@ export default function HospitalInfoWorkspace() {
           <span className="lo-title-icon"><Icon name="building" /></span>
           <div>
             <h2>Thông tin bệnh viện</h2>
-            <p>Quản lý hồ sơ cơ sở y tế, sơ đồ tầng và các bài viết hướng dẫn người bệnh.</p>
+            <p>Quản lý hồ sơ cơ sở y tế, sơ đồ tầng, phòng theo map hoạt động và các bài viết hướng dẫn người bệnh.</p>
           </div>
         </div>
         <div className="lo-header-actions">
@@ -294,6 +352,15 @@ export default function HospitalInfoWorkspace() {
               </button>
               <button
                 type="button"
+                aria-pressed={tab === 'rooms'}
+                className={tab === 'rooms' ? 'is-active' : ''}
+                onClick={() => selectTab('rooms')}
+              >
+                Danh sách phòng
+                <span>{rooms.length}</span>
+              </button>
+              <button
+                type="button"
                 aria-pressed={tab === 'articles'}
                 className={tab === 'articles' ? 'is-active' : ''}
                 onClick={() => selectTab('articles')}
@@ -303,7 +370,7 @@ export default function HospitalInfoWorkspace() {
               </button>
             </nav>
             <span className="lo-total">
-              {tab === 'hospital' ? `${hospitals.length} cơ sở` : tab === 'floors' ? `${floors.length} tầng` : `${articles.length} bài viết`}
+              {tab === 'hospital' ? `${hospitals.length} cơ sở` : tab === 'floors' ? `${floors.length} tầng` : tab === 'rooms' ? `${rooms.length} phòng` : `${articles.length} bài viết`}
             </span>
           </div>
 
@@ -314,7 +381,7 @@ export default function HospitalInfoWorkspace() {
                 <Icon name="search" />
                 <input
                   aria-label="Tìm kiếm"
-                  placeholder={tab === 'floors' ? 'Tìm tên tầng, mã tầng (VD: Tầng 1, T1)...' : 'Tìm bài hướng dẫn, từ khóa, mã bài viết...'}
+                  placeholder={tab === 'floors' ? 'Tìm tên tầng, mã tầng (VD: Tầng 1, T1)...' : tab === 'rooms' ? 'Tìm tên phòng, mã phòng, loại phòng hoặc khoa...' : 'Tìm bài hướng dẫn, từ khóa, mã bài viết...'}
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                 />
@@ -326,6 +393,12 @@ export default function HospitalInfoWorkspace() {
                   onChange={e => setArticleCategory(e.target.value)}
                 >
                   {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              )}
+              {tab === 'rooms' && (
+                <select aria-label="Chọn map đang hoạt động" value={selectedMapId} onChange={e => setSelectedMapId(e.target.value)}>
+                  {!activeMaps.length && <option value="">Chưa có map hoạt động</option>}
+                  {activeMaps.map(map => <option key={map.mapId} value={map.mapId}>{map.mapName} · v{map.versionNo}</option>)}
                 </select>
               )}
               {search && (
@@ -542,7 +615,64 @@ export default function HospitalInfoWorkspace() {
           </div>
         )}
 
-        {/* TAB 3: ARTICLES (BÀI VIẾT HƯỚNG DẪN - HARDCODED UI) */}
+        {/* TAB 3: ROOMS ON ACTIVE MAP */}
+        {tab === 'rooms' && (
+          <div className="lo-layout">
+            <aside className="lo-job-list" aria-label="Danh sách phòng theo map đang hoạt động">
+              <header>
+                <strong>{filteredRooms.length} phòng</strong>
+                <span>{selectedMap?.mapName || 'Chưa chọn map'}</span>
+              </header>
+              <div className="lo-job-items">
+                {roomsLoading && <div className="lo-loading"><span className="lo-spinner" />Đang tải danh sách phòng…</div>}
+                {!roomsLoading && roomsError && <p className="lo-list-empty" role="alert">{roomsError}</p>}
+                {!roomsLoading && !roomsError && !filteredRooms.length && <p className="lo-list-empty">Map này chưa có phòng công khai gắn với endpoint đang hoạt động.</p>}
+                {!roomsLoading && filteredRooms.map(room => (
+                  <button key={room.roomId} type="button" className={`lo-job-item ${selectedRoom?.roomId === room.roomId ? 'is-selected' : ''}`} onClick={() => setSelectedRoom(room)}>
+                    <div className="lo-job-item-top">
+                      <span className="lo-badge lo-success"><i />Đang hoạt động</span>
+                      <span>{room.roomCode}</span>
+                    </div>
+                    <strong>{room.roomName}</strong>
+                    <span className="lo-job-target"><Icon name="room" />{room.departmentCode || room.roomType || 'Phòng bệnh viện'}</span>
+                    <div className="lo-job-item-bottom">
+                      <time>{room.roomType || 'Chưa phân loại'}</time>
+                      <Icon name="arrow" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </aside>
+
+            {selectedRoom ? (
+              <article className="lo-detail" aria-label="Chi tiết phòng">
+                <header className="lo-detail-header"><div>
+                  <div className="lo-detail-kicker">
+                    <span className="lo-badge lo-success"><i />Có thể tra cứu</span>
+                    <span>Mã phòng: {selectedRoom.roomCode}</span>
+                  </div>
+                  <h3>{selectedRoom.roomName}</h3>
+                  <p><Icon name="pin" />{roomFloor?.floorName || 'Tầng chưa xác định'} · {selectedMap?.mapName}</p>
+                </div></header>
+                <dl className="lo-job-facts">
+                  <div><dt>Loại phòng</dt><dd>{selectedRoom.roomType || 'Chưa phân loại'}</dd></div>
+                  <div><dt>Khoa phụ trách</dt><dd>{selectedRoom.departmentCode || 'Chưa cập nhật'}</dd></div>
+                  <div><dt>Tầng</dt><dd>{roomFloor?.floorName || selectedRoom.floorId}</dd></div>
+                  <div><dt>Map đang hoạt động</dt><dd>{selectedMap?.mapName} · v{selectedMap?.versionNo}</dd></div>
+                </dl>
+                <div className="lo-instruction" style={{ marginTop: '20px' }}>
+                  <strong>Thông tin phòng</strong>
+                  <p>{selectedRoom.description || 'Chưa có mô tả chi tiết cho phòng này.'}</p>
+                </div>
+                <div className="lo-detail-actions" style={{ marginTop: '20px' }}>
+                  <Link to={`/admin/map?mapId=${encodeURIComponent(selectedMapId)}`} className="lo-button lo-primary"><Icon name="building" />Xem phòng trên Map Studio</Link>
+                </div>
+              </article>
+            ) : !roomsLoading && <article className="lo-detail"><div className="lo-empty"><span className="lo-empty-icon"><Icon name="room" /></span><h3>Chưa có phòng để hiển thị</h3><p>Hãy chọn map đang hoạt động có phòng và endpoint đã được công khai.</p></div></article>}
+          </div>
+        )}
+
+        {/* TAB 4: ARTICLES (BÀI VIẾT HƯỚNG DẪN - HARDCODED UI) */}
         {tab === 'articles' && (
           <div className="lo-layout">
             <aside className="lo-job-list" aria-label="Danh sách bài viết">

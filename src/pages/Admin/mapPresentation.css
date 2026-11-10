@@ -73,7 +73,12 @@
 .mp-properties { padding: 0 18px 16px; }
 .mp-properties fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .mp-field { display: grid; gap: 8px; font-size: 11px; color: #6c7b92; margin: 0 0 16px; }
-.mp-field input:not([type=color]), .mp-field select { border: 1px solid #e1e8f2; padding: 9px 10px; border-radius: 7px; color: #334155; background: #fff; width: 100%; min-width: 0; font: inherit; font-size: 12px; min-height: 36px; }
+.mp-field input:not([type=color]), .mp-field select, .mp-field textarea { border: 1px solid #e1e8f2; padding: 9px 10px; border-radius: 7px; color: #334155; background: #fff; width: 100%; min-width: 0; font: inherit; font-size: 12px; min-height: 36px; }
+.mp-field textarea { resize: vertical; line-height: 1.5; }
+.mp-room-catalog { margin-bottom: 16px; padding: 12px; border: 1px solid #dbe7f8; border-radius: 9px; background: #f7faff; }
+.mp-room-catalog > p { margin: 0 0 13px; color: #60748e; font-size: 11px; line-height: 1.6; }
+.mp-room-public { display: flex; align-items: flex-start; gap: 8px; color: #50647f; font-size: 11px; line-height: 1.5; }
+.mp-room-public input { margin-top: 2px; accent-color: #2563eb; }
 .mp-field input::placeholder { color: #b0bac9; }
 .mp-color-field { display: flex; align-items: center; justify-content: space-between; }
 .mp-color-field input[type=color] { width: 42px; height: 29px; border: 1px solid var(--mp-line); background: white; border-radius: 5px; padding: 3px; }
