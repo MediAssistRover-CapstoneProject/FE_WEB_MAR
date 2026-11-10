@@ -16,6 +16,8 @@ import RecoveryPanel from './RecoveryPanel.jsx';
 import './liveOperations.css';
 import RobotMonitor from './RobotMonitor.jsx';
 import { useJobFeed } from '../../../features/operations/useJobFeed.js';
+import Icon from './OperationsIcon.jsx';
+import './operationsDesign.css';
 
 const jobResource = resources.find(resource => resource.id === 'jobs');
 const PAGE_SIZE = 12;
@@ -25,22 +27,6 @@ const clock = value => value ? new Date(value).toLocaleTimeString('vi-VN') : '�
 const label = value => vi(value || 'Chưa ghi nhận');
 const stepTitle = step => label(step.stepTypeSnapshot || step.stepCodeSnapshot);
 const eventTitles = { JOB_CREATED: 'Công việc được tạo', JOB_QUEUED: 'Đưa vào hàng đợi', JOB_STARTED: 'Bắt đầu công việc', JOB_SUCCEEDED: 'Công việc hoàn tất', JOB_FAILED: 'Công việc thất bại', JOB_CANCELLED: 'Công việc đã hủy', CANCEL_REQUESTED: 'Đã yêu cầu hủy', STEP_STARTED: 'Bắt đầu bước', STEP_SUCCEEDED: 'Bước hoàn tất', STEP_FAILED: 'Bước thất bại', STEP_SELECTED: 'Chọn bước thực thi', JOB_RECONCILED: 'Đã đối soát công việc', RECOVERY_REQUIRED: 'Cần đối soát phục hồi' };
-
-function Icon({ name = 'activity', ...props }) {
-  const paths = {
-    activity: <path d="M3 12h4l3-8 4 16 3-8h4" />,
-    refresh: <><path d="M20 7v5h-5M4 17v-5h5" /><path d="M6 8a7 7 0 0 1 12-2l2 3M4 15l2 3a7 7 0 0 0 12-2" /></>,
-    robot: <><rect x="4" y="7" width="16" height="13" rx="4" /><path d="M12 3v4M8 12v2m8-2v2m-7 3h6M1 11v5m22-5v5" /></>,
-    search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></>,
-    arrow: <path d="m9 5 7 7-7 7" />,
-    check: <path d="m5 12 4 4L19 6" />,
-    alert: <><path d="m12 3 10 18H2Z" /><path d="M12 9v4m0 3v1" /></>,
-    pin: <><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 0 1 14 0Z" /><circle cx="12" cy="10" r="2" /></>,
-    time: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
-    list: <path d="M9 6h12M9 12h12M9 18h12M3 6h1M3 12h1M3 18h1" />,
-  };
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>{paths[name] || paths.activity}</svg>;
-}
 
 function Badge({ status }) {
   const info = statusInfo(status);
@@ -170,26 +156,29 @@ export default function LiveOperationsPage() {
   };
   const counts = Object.fromEntries(JOB_GROUPS.map(item => [item.id, jobs.filter(job => item.statuses.includes(job.status)).length]));
   const metrics = [
-    { label: 'Đang hoạt động', count: counts.active, icon: 'activity', tone: 'blue', group: 'active' },
-    { label: 'Chờ điều phối', count: jobs.filter(job => job.status === 'QUEUED').length, icon: 'time', tone: 'amber', group: 'active', status: 'QUEUED' },
-    { label: 'Cần xử lý', count: counts.attention, icon: 'alert', tone: 'red', group: 'attention' },
-    { label: 'Đã kết thúc', count: counts.history, icon: 'check', tone: 'green', group: 'history' },
+    { label: 'Đang hoạt động', detail: 'Các công việc chưa kết thúc', count: counts.active, icon: 'activity', tone: 'blue', group: 'active' },
+    { label: 'Chờ điều phối', detail: 'Đang trong hàng đợi thực hiện', count: jobs.filter(job => job.status === 'QUEUED').length, icon: 'time', tone: 'amber', group: 'active', status: 'QUEUED' },
+    { label: 'Cần xử lý', detail: 'Đối soát và phục hồi công việc', count: counts.attention, icon: 'alert', tone: 'red', group: 'attention' },
+    { label: 'Đã kết thúc', detail: 'Tra cứu kết quả và lịch sử', count: counts.history, icon: 'check', tone: 'green', group: 'history' },
   ];
   const resetFilters = () => { setSearch(''); setStatus(''); setRobotId(''); setWorkflowId(''); setFrom(''); setTo(''); setPage(0); };
   const hasFilters = !!(search || status || robotId || workflowId || from || to);
   const refresh = () => { setRevision(value => value + 1); setCatalogRevision(value => value + 1); };
   const recent = filterJobs(jobs, { group: 'history' }, catalogs).slice(0, 3);
+  const openExplorer = (nextGroup = group, nextStatus = '') => {
+    chooseGroup(nextGroup, nextStatus); setExplore(true);
+    requestAnimationFrame(() => document.getElementById('lo-explorer')?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
+  };
 
   return <section className="lo-page" aria-label="Theo dõi công việc robot">
-    <header className="lo-header"><div className="lo-page-title"><span className="lo-title-icon"><Icon /></span><div><h2>Theo dõi công việc</h2><p>Tiến trình robot, kết quả thực thi và các việc cần can thiệp.</p></div></div><div className="lo-header-actions"><label className="lo-auto"><input type="checkbox" checked={auto} onChange={event => setAuto(event.target.checked)} /><span>Tự cập nhật</span></label><button className="lo-button" onClick={refresh} disabled={loading}><Icon name="refresh" className={loading ? 'lo-spin' : ''} />Làm mới</button></div></header>
-    <div className="lo-sync" role="status"><span className={`lo-connection ${loadError ? 'lo-offline' : ''}`} />{loadError ? 'Chưa cập nhật được dữ liệu' : loading && !updatedAt ? 'Đang kết nối…' : auto ? 'Việc đang mở: mỗi 15 giây · Toàn bộ lịch sử: mỗi 60 giây' : 'Đã tạm dừng tự cập nhật'}{updatedAt && <span>Cập nhật lúc {clock(updatedAt)}</span>}{group === 'history' && historyUpdatedAt && <span>Lịch sử tải lúc {clock(historyUpdatedAt)}</span>}</div>
-    <Freshness receivedAt={updatedAt} failed={!!loadError} auto={auto} title="Danh sách công việc" />
-    <RobotMonitor jobs={jobs} catalogs={catalogs} auto={auto} revision={revision} onOpen={job => { showJob(job); setExplore(true); requestAnimationFrame(() => document.getElementById("lo-explorer")?.scrollIntoView({ block: "start", behavior: "smooth" })); }} />
-    <details className="lo-explorer" id="lo-explorer" open={explore} onToggle={event => setExplore(event.currentTarget.open)}><summary>Chi tiết công việc, lịch sử và xử lý</summary>
-    <div className="lo-metrics">{metrics.map(metric => <button key={metric.label} className={`lo-metric lo-metric-${metric.tone}`} onClick={() => chooseGroup(metric.group, metric.status || '')}><span><span className="lo-metric-label">{metric.label}</span><strong>{updatedAt ? metric.count : '—'}</strong></span><span className="lo-metric-icon"><Icon name={metric.icon} /></span></button>)}</div>
+    <header className="lo-header"><div className="lo-page-title"><span className="lo-kicker"><Icon name="activity" />TRUNG TÂM VẬN HÀNH</span><h2>Theo dõi công việc</h2><p>Mọi chuyển động, nhiệm vụ và kết quả trong một góc nhìn.</p></div><div className="lo-header-actions"><label className="lo-auto"><input type="checkbox" checked={auto} onChange={event => setAuto(event.target.checked)} /><span>Tự cập nhật</span></label><button className="lo-button" onClick={refresh} disabled={loading}><Icon name="refresh" className={loading ? 'lo-spin' : ''} />Làm mới</button></div></header>
+    <div className="lo-statusline"><div className="lo-sync" role="status"><span className={`lo-connection ${loadError || !auto ? 'lo-offline' : ''}`} />{loadError ? 'Chưa cập nhật được dữ liệu' : loading && !updatedAt ? 'Đang kết nối…' : auto ? 'Đồng bộ tự động đang bật' : 'Đã tạm dừng tự cập nhật'}{updatedAt && <span>Cập nhật lúc {clock(updatedAt)}</span>}{group === 'history' && historyUpdatedAt && <span>Lịch sử tải lúc {clock(historyUpdatedAt)}</span>}</div><Freshness receivedAt={updatedAt} failed={!!loadError} auto={auto} title="Danh sách công việc" /></div>
+    <div className="lo-metrics" aria-label="Tổng quan công việc">{metrics.map(metric => <button key={metric.label} className={`lo-metric lo-metric-${metric.tone}`} aria-controls="lo-explorer" onClick={() => openExplorer(metric.group, metric.status || '')}><span><span className="lo-metric-label">{metric.label}</span><strong>{updatedAt ? metric.count : '—'}</strong><small>{metric.detail}</small></span><span className="lo-metric-side"><span className="lo-metric-icon"><Icon name={metric.icon} /></span><Icon name="arrow" className="lo-metric-arrow" /></span></button>)}</div>
     {loadError && <div className="lo-notice lo-notice-error" role="alert"><Icon name="alert" /><div><strong>Không thể làm mới công việc</strong><p>{loadError}{updatedAt ? ' Dữ liệu bên dưới là lần tải thành công gần nhất.' : ''}</p></div><button className="lo-button" onClick={refresh}>Thử lại</button></div>}
     {catalogWarning && <div className="lo-notice lo-notice-warning"><Icon name="alert" /><p>{catalogWarning}</p><button className="lo-text-button" onClick={() => setCatalogRevision(value => value + 1)}>Tải lại tên</button></div>}
     {toast && <div className="lo-notice lo-notice-success" role="status"><Icon name="check" /><p>{toast}</p><button className="lo-text-button" onClick={() => setToast('')}>Đóng</button></div>}
+    <RobotMonitor jobs={jobs} catalogs={catalogs} auto={auto} revision={revision} onOpen={job => { showJob(job); setExplore(true); requestAnimationFrame(() => document.getElementById("lo-explorer")?.scrollIntoView({ block: "start", behavior: "smooth" })); }} />
+    <details className="lo-explorer" id="lo-explorer" open={explore} onToggle={event => setExplore(event.currentTarget.open)}><summary><span className="lo-explorer-icon"><Icon name="list" /></span><span className="lo-explorer-title"><strong>Chi tiết công việc, lịch sử và xử lý</strong><small>Tra cứu tiến trình và thực hiện các thao tác cần thiết</small></span>{counts.attention > 0 && <span className="lo-explorer-attention">{counts.attention} cần xử lý</span>}<span className="lo-explorer-toggle">{explore ? 'Thu gọn' : 'Mở chi tiết'}<Icon name="chevron" /></span></summary>
     <div className="lo-board">
       <div className="lo-board-controls">
       <div className="lo-board-toolbar"><nav className="lo-groups" aria-label="Nhóm công việc">{JOB_GROUPS.map(item => <button key={item.id} aria-pressed={group === item.id} className={group === item.id ? 'is-active' : ''} onClick={() => chooseGroup(item.id)}>{item.label}<span>{counts[item.id]}</span></button>)}</nav><span className="lo-total">{jobs.length} công việc</span></div>

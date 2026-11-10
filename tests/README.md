@@ -191,7 +191,16 @@ Chạy Vite tại cổng 5175, đặt `PLAYWRIGHT_MODULE` và `CHROME_EXECUTABLE
 node tests/live-operations.browser.mjs
 node tests/live-operations-reliability.browser.mjs
 node tests/live-operations-interventions.browser.mjs
+node tests/live-operations-design.browser.mjs
 ```
+
+The design check uses fully mocked APIs on an isolated Vite origin (default
+`http://127.0.0.1:5198`, override with `TEST_BASE_URL`). It checks the always-visible
+overview, opening the correct detail group from a metric, map/mission placement,
+connection loss and layouts at 390/1024/1536px without sending API mutations.
+It also checks that a 20-step mission scrolls internally, including wheel input
+at both ends, while the page, mission header and action remain still.
+Screenshots: `.workstation-build/live-operations-design/`.
 
 Các API đều được giả lập. Bộ interventions kiểm tra hủy trong lúc xác nhận,
 bằng chứng/phiên kết nối đổi trước khi đối soát, phục hồi chưa có lệnh MQTT,

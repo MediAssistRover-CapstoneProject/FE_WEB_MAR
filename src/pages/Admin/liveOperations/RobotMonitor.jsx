@@ -12,6 +12,7 @@ import RobotCamera from '../robotOperations/RobotCamera.jsx';
 import { useJobFeed } from '../../../features/operations/useJobFeed.js';
 import { useRobotRealtime } from '../../../features/operations/useRobotRealtime.js';
 import MissionProgress from './MissionProgress.jsx';
+import OperationsIcon from './OperationsIcon.jsx';
 import './robotMonitor.css';
 
 const dateTime = value => value ? new Date(value).toLocaleString('vi-VN') : 'Chưa ghi nhận';
@@ -121,7 +122,7 @@ function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto, s
     </g>}
   </g>;
   return <section className="rm-card rm-map">
-    <header><div><h3>Bản đồ trực tiếp</h3><small>{activeMap ? activeMap.mapName + ' · Đang hoạt động · v' + activeMap.versionNo : 'Chưa chọn bản đồ đang hoạt động'}</small></div><div className="rm-tools">      {maps.length > 1 && <select aria-label="Bản đồ đang hoạt động" value={mapId || ''} onChange={event => setChosenMapId(event.target.value)}><option value="">Chọn bản đồ</option>{maps.map(map => <option key={map.mapId} value={map.mapId}>{map.mapName}</option>)}</select>}
+    <header><div className="rm-card-title"><span className="rm-card-icon"><OperationsIcon name="map" /></span><div><h3>Bản đồ trực tiếp</h3><small>{activeMap ? activeMap.mapName + ' · Đang hoạt động · v' + activeMap.versionNo : 'Chưa chọn bản đồ đang hoạt động'}</small></div></div><div className="rm-tools">{maps.length > 1 && <select aria-label="Bản đồ đang hoạt động" value={mapId || ''} onChange={event => setChosenMapId(event.target.value)}><option value="">Chọn bản đồ</option>{maps.map(map => <option key={map.mapId} value={map.mapId}>{map.mapName}</option>)}</select>}
       <button type="button" aria-pressed={follow} disabled={!position} onClick={() => { setFollow(!follow); setZoom(value => Math.max(value, 2)); }}>Theo robot</button>
       <button type="button" aria-label="Thu nhỏ bản đồ" disabled={!saved || zoom <= 1} onClick={() => setZoom(value => Math.max(1, value - .5))}>−</button>
       <button type="button" aria-label="Phóng to bản đồ" disabled={!saved || zoom >= 5} onClick={() => setZoom(value => Math.min(5, value + .5))}>+</button>
@@ -187,32 +188,38 @@ export default function RobotMonitor({ jobs, catalogs, auto, revision, onOpen })
   const upcoming = schedules.filter(item => item.status === 'ACTIVE' && (!item.robotId || item.robotId === robotId) && item.nextRunAt && Date.parse(item.nextRunAt) >= now)
     .sort((a, b) => Date.parse(a.nextRunAt) - Date.parse(b.nextRunAt));
   const rows = tab === 'running' ? active : waiting;
+  const battery = Number.isFinite(robot?.batteryPercent) ? robot.batteryPercent : null;
   return <div className="rm-monitor">
-    <div className="rm-robot-bar"><strong>♧ {[robot?.robotName, robot?.robotCode].find(value => value?.trim() && value.trim().toLowerCase() !== 'string') || 'Robot'}</strong><span className={'rm-pill ' + (connected ? 'is-good' : '')}>{connected ? vi(robot?.status) : 'Chưa có kết nối mới'}</span><span>{connected ? '● Đã kết nối' : '○ Chờ tín hiệu robot'}</span><small>{receivedAt ? 'Cập nhật lúc ' + new Date(receivedAt).toLocaleTimeString('vi-VN') : 'Đang chờ dữ liệu'}</small></div>
+    <div className={`rm-robot-bar ${connected ? 'is-connected' : 'is-disconnected'}`}>
+      <div className="rm-robot-identity"><span className="rm-robot-avatar"><OperationsIcon name="robot" /></span><div><small>ROBOT ĐANG THEO DÕI</small><div className="rm-robot-name"><strong>{[robot?.robotName, robot?.robotCode].find(value => value?.trim() && value.trim().toLowerCase() !== 'string') || 'Robot'}</strong><span className={'rm-pill ' + (connected ? 'is-good' : '')}>{connected ? vi(robot?.status) : 'Chưa có kết nối mới'}</span></div></div></div>
+      <div className="rm-robot-telemetry"><div><OperationsIcon name="signal" /><span><small>Kết nối</small><strong>{connected ? 'Đã kết nối' : 'Chờ tín hiệu robot'}</strong></span></div><div><OperationsIcon name="battery" /><span><small>Pin ghi nhận</small><strong>{battery === null ? 'Chưa có dữ liệu' : `${battery}%`}</strong></span></div><div className="rm-robot-updated"><OperationsIcon name="time" /><span><small>Lần nhận gần nhất</small><strong>{receivedAt ? new Date(receivedAt).toLocaleTimeString('vi-VN') : 'Đang chờ dữ liệu'}</strong></span></div></div>
+    </div>
     {error && <p className="lo-notice lo-notice-warning" role="status">{error}</p>}
     <div className="rm-layout"><div className="rm-left">
       <RobotMap snapshot={snapshot} livePose={livePose} job={current} endpoints={catalogs.endpoints} fresh={fresh} revision={revision} auto={auto}
         stepDetail={<MissionProgress current={current} detail={detail} catalogs={catalogs} stale={dataFreshness(detailReceivedAt, now, !!detailError).stale} connected={!!connected} auto={auto} />} />
-      <section className="rm-card rm-queue"><header><h3>Danh sách công việc</h3></header>
+      <section className="rm-card rm-queue"><header><div className="rm-card-title"><span className="rm-card-icon"><OperationsIcon name="list" /></span><div><h3>Danh sách công việc</h3><small>Các lượt chạy của robot đang theo dõi</small></div></div><span className="rm-card-count">{tab === 'scheduled' ? upcoming.length : rows.length} công việc</span></header>
         <nav aria-label="Hàng đợi của robot">{[['running', 'Đang thực hiện', active.length], ['queue', 'Chờ thực hiện', waiting.length], ['scheduled', 'Theo lịch', upcoming.length]].map(([key, title, count]) => <button key={key} aria-pressed={tab === key} onClick={() => setTab(key)}>{title} <b>{count}</b></button>)}</nav>
         <p className="rm-caption">{tab === 'queue' ? 'Sắp theo ưu tiên và thời điểm vào hàng đợi. Máy chủ quyết định công việc đủ điều kiện chạy tiếp.' : tab === 'scheduled' ? 'Thời điểm kích hoạt kế tiếp từ lịch trên máy chủ.' : 'Công việc đang được robot tiếp nhận hoặc thực hiện.'}</p>
         {tab === 'scheduled' ? <>{scheduleError && <p role="alert">{scheduleError}</p>}{!upcoming.length && !scheduleError && <p className="rm-caption">Chưa có lịch chạy tiếp theo.</p>}{upcoming.map(item => <div className="rm-queue-row" key={item.scheduleId}><strong>{item.scheduleName?.trim().toLowerCase() === 'string' ? 'Lịch công việc' : item.scheduleName}</strong><span>{dateTime(item.nextRunAt)}</span><Link to="/admin/patrol">Xem lịch →</Link></div>)}</> : <>
-          {!rows.length && <p className="rm-caption">{tab === 'queue' ? 'Chưa có công việc chờ thực hiện.' : 'Robot chưa có công việc đang thực hiện.'}</p>}
+          {!rows.length && <div className="rm-queue-empty"><span><OperationsIcon name="list" /></span><div><strong>{tab === 'queue' ? 'Chưa có công việc chờ thực hiện.' : 'Robot chưa có công việc đang thực hiện.'}</strong><p>Các công việc mới sẽ xuất hiện tại đây.</p></div></div>}
           {rows.map((job, index) => { const entry = jobPresentation(job, catalogs); return <button className="rm-queue-row" key={job.jobId} onClick={() => onOpen(job)}><span className="rm-order" title="Thứ tự hiển thị">{index + 1}</span><strong>{entry.title}</strong><span>{entry.target || 'Chưa có điểm đến'}</span><span className="rm-pill">{job.status === 'QUEUED' ? 'Chờ thực hiện' : statusInfo(job.status).label}</span><span aria-hidden="true">›</span></button>; })}
         </>}
       </section>
-    </div><aside className="rm-right"><RobotCamera key={robotId} robotId={robotId} /><CurrentMission current={current} catalogs={catalogs} detail={detail} error={detailError} onOpen={onOpen} /></aside></div>
+    </div><aside className="rm-right"><RobotCamera key={robotId} robotId={robotId} placeholderIcon={<OperationsIcon name="camera" />} /><CurrentMission current={current} catalogs={catalogs} detail={detail} error={detailError} onOpen={onOpen} /></aside></div>
   </div>;
 }
 
 const CurrentMission = memo(function CurrentMission({ current, catalogs, detail, error: detailError, onOpen }) {
   const info = current && jobPresentation(current, catalogs), step = detail && selectedStep(detail);
   return <section className="rm-card rm-current">
-      <header><h3>Nhiệm vụ hiện tại</h3>{current && <span className="rm-pill is-good">{statusInfo(current.status).label}</span>}</header>
+      <header><div className="rm-card-title"><span className="rm-card-icon"><OperationsIcon name="activity" /></span><h3>Nhiệm vụ hiện tại</h3></div>{current && <span className={`rm-pill is-${statusInfo(current.status).tone}`}>{statusInfo(current.status).label}</span>}</header>
+      <div className="rm-mission-body" role="region" aria-label="Nội dung nhiệm vụ hiện tại" tabIndex={current ? 0 : undefined}>
       {current ? <><strong className="rm-mission-title">{info.title}</strong><p>{info.target || 'Chưa có điểm đến'}</p><small>{current.jobCode}</small>
         <ol>{(detail?.steps || []).slice().sort((a, b) => a.executionSequenceNo - b.executionSequenceNo).map(item => <li key={item.jobStepId} className={item.status === 'SUCCEEDED' ? 'is-done' : item.jobStepId === step?.jobStepId ? 'is-current' : ''}><strong>{vi(item.stepTypeSnapshot)}</strong><small>{statusInfo(item.status).label}</small></li>)}</ol>
         {detailError && <p className="rm-caption" role="status">Chưa cập nhật được tiến trình mới; đang giữ lần ghi nhận gần nhất.</p>}{!detail && <p className="rm-caption">Đang tải tiến trình chi tiết…</p>}
-        <button className="lo-button lo-primary" onClick={() => onOpen(current)}>Xem tiến trình và thao tác</button>
-      </> : <div className="rm-placeholder"><span>✓</span><p>Chưa có nhiệm vụ đang thực hiện.</p></div>}
+      </> : <div className="rm-placeholder rm-mission-empty"><span><OperationsIcon name="robot" /></span><strong>Chưa có nhiệm vụ đang thực hiện.</strong><p>Theo dõi công việc mới của robot tại đây.</p></div>}
+      </div>
+      {current && <button className="lo-button lo-primary" onClick={() => onOpen(current)}>Xem tiến trình và thao tác</button>}
     </section>;
 });

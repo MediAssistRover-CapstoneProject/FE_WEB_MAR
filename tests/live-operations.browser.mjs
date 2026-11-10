@@ -259,6 +259,8 @@ try {
     const session = JSON.parse(localStorage.getItem('mediassist-rover.session'));
     session.account.role = 'STAFF'; localStorage.setItem('mediassist-rover.session', JSON.stringify(session));
   });
+  // This phase follows the streamed recovery version 9; stale versions must not win.
+  running.rowVersion = 10;
   jobs = [running, queued];
   await screen.getByRole('button', { name: 'Làm mới', exact: true }).click();
   await screen.getByRole('button', { name: 'Xác nhận bước hiện tại', exact: true }).waitFor();

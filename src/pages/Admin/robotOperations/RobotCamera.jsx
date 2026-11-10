@@ -4,7 +4,7 @@ import { getSession } from '../../../features/auth/session.js';
 import { acquireRobotCamera, configuredCameraUrl } from '../../../features/media/robotCameraClient.js';
 import './robotCamera.css';
 
-export default function RobotCamera({ robotId, variant = 'monitor', fallback = null }) {
+export default function RobotCamera({ robotId, variant = 'monitor', fallback = null, placeholderIcon = null }) {
   const container = useRef(null), video = useRef(null), lease = useRef(null);
   const [paused, setPaused] = useState(false), [playing, setPlaying] = useState(false), [stale, setStale] = useState(false), [playBlocked, setPlayBlocked] = useState(false);
   const [state, setState] = useState({ robotId, phase: 'connecting', track: null, message: 'Đang kết nối camera robot…' });
@@ -61,7 +61,7 @@ export default function RobotCamera({ robotId, variant = 'monitor', fallback = n
     <div className="rc-video">
       <video ref={video} autoPlay muted playsInline aria-label="Camera trực tiếp của robot" hidden={!current.track || paused} />
       {useLegacy && <img src={legacy} alt="Nguồn video dự phòng đã cấu hình" onError={() => setLegacyFailed(true)} />}
-      {!live && !useLegacy && <div className="rc-placeholder" role="status"><span aria-hidden="true">▣</span><p>{message}</p>{playBlocked && <button onClick={() => video.current?.play().then(() => setPlayBlocked(false)).catch(() => setPlayBlocked(true))}>Phát camera</button>}</div>}
+      {!live && !useLegacy && <div className="rc-placeholder" role="status"><span aria-hidden="true">{placeholderIcon || '▣'}</span><p>{message}</p>{playBlocked && <button onClick={() => video.current?.play().then(() => setPlayBlocked(false)).catch(() => setPlayBlocked(true))}>Phát camera</button>}</div>}
     </div>
     {canFallback && !useLegacy && fallback && <div className="rc-fallback">{fallback}</div>}
     <footer><small>{live ? 'Camera từ robot đang chọn' : message}</small><div>{robotId && authorized && <><button type="button" disabled={current.phase === 'connecting' && !paused} onClick={() => { if (paused) setPaused(false); else lease.current?.retry(); }}>{paused ? 'Mở camera' : 'Kết nối lại'}</button>{!paused && <button type="button" onClick={() => setPaused(true)}>Ngừng xem</button>}</>}</div></footer>
