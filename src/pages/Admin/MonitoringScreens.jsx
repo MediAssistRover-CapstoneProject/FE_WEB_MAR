@@ -281,9 +281,8 @@ export function AnalyticsReports() {
       ['Average Job', duration(report.jobs?.averageDurationSeconds)],
       ['Fleet Utilization', percent(report.robots?.utilizationPercent), 'teal'],
       ['Open Alerts', number(report.incidents?.alerts), 'amber'],
-      ['Crowd Records', number(report.monitoring?.crowdDensityRecords)],
     ]
-    : [['Job Success', '—', 'green'], ['Total Jobs', '—'], ['Average Job', '—'], ['Fleet Utilization', '—', 'teal'], ['Open Alerts', '—', 'amber'], ['Crowd Records', '—']];
+    : [['Job Success', '—', 'green'], ['Total Jobs', '—'], ['Average Job', '—'], ['Fleet Utilization', '—', 'teal'], ['Open Alerts', '—', 'amber']];
 
   return <section className="monitor-screen analytics-reports" aria-label={vi("Analytics and reports")}>
     <div className="analytics-reports__tools">
@@ -315,8 +314,6 @@ export function AnalyticsReports() {
             ['Failed jobs', number(report?.jobs?.failed), 'Jobs'],
             ['Recovery required', number(report?.jobs?.recoveryRequired), 'Jobs'],
             ['Detection events', number(report?.monitoring?.detectionEvents), 'Monitoring'],
-            ['Average persons', number(report?.monitoring?.averagePersonCount), 'Crowd'],
-            ['Max persons', number(report?.monitoring?.maximumPersonCount), 'Crowd'],
           ].map(([label, value, change]) => <div className="analytics-reports__quality-row" key={label}><span>{vi(label)}</span><b>{vi(value)}</b><em>{vi(change)}</em></div>))}
           <button className="secondary" type="button" onClick={() => setNotice(reportError || (report ? `Generated ${relativeTime(report.generatedAt)}.` : 'Analytics data is loading.'))}>{vi("Report status")}</button>
         </article>

@@ -213,6 +213,22 @@ node --test tests/map-setup.test.mjs tests/map-studio.test.mjs tests/map-feature
 
 ## Kiểm tra giao diện
 
+Giám sát (Cảnh báo, Lịch sử giám sát, Phân tích và Nhật ký kiểm toán):
+
+```powershell
+node --test tests/monitoring-model.test.mjs
+# Vite chạy riêng ở cổng 5198; mọi API và dữ liệu ghi đều được giả lập.
+$env:TEST_BASE_URL = 'http://127.0.0.1:5198'
+node tests/monitoring-workspace.browser.mjs
+```
+
+Bao phủ thứ tự xử lý cảnh báo, quyền/người nhận/thời hạn, trạng thái thay đổi
+trước khi gửi, giữ dữ liệu khi tải lại lỗi, bộ lọc ngày mặc định theo giờ Việt Nam,
+CSV dùng bộ lọc đã áp dụng, tra cứu cả Admin/Staff trong nhật ký, sự kiện phát hiện,
+bằng chứng và bố cục 390/1024/1440px. Ảnh ở `.workstation-build/monitoring-workspace/`.
+URL `/admin/history-replay` được giữ để tương thích; tên hiển thị là Lịch sử giám sát.
+Không mô phỏng phát lại hành trình hoặc tự tạo dữ liệu giám sát.
+
 Yêu cầu Chrome, Playwright và FE đang chạy tại cổng 5173. Đặt `PLAYWRIGHT_MODULE` trỏ đến module Playwright và `CHROME_EXECUTABLE` trỏ đến Chrome đã cài, sau đó chạy:
 
 ```powershell

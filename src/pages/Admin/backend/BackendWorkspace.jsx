@@ -12,6 +12,7 @@ import RecordDetails, { displayValue } from './RecordDetails.jsx';
 import ListFilters from './ListFilters.jsx';
 import ShiftCalendar from './ShiftCalendar.jsx';
 import UsersRoles from '../UsersRoles.jsx';
+import MonitoringWorkspace, { monitoringSections } from '../monitoring/MonitoringWorkspace.jsx';
 import OperationsReport from './OperationsReport.jsx';
 import FacilityCatalogEditor from '../FacilityCatalogEditor.jsx';
 import HospitalInfoWorkspace from '../facility/HospitalInfoWorkspace.jsx';
@@ -35,6 +36,7 @@ const keyFor = (r, row) => unwrap(row)?.[r.idField];
 const sensitiveAction = op => op.method === 'DELETE' || /\/(cancel|archive|retire|deactivate|lock|reset-password|rotate-secret|runs)$/.test(op.path);
 
 export default function BackendWorkspace({ section }) {
+  if (monitoringSections.has(section)) return <MonitoringWorkspace section={section} />;
   if (section === 'Staff Shifts') return <ShiftWorkspace />;
   if (section === 'Users & Roles') return <UsersRoles />;
   if (section === 'Facility Management' || section === 'Public Catalog') return <HospitalInfoWorkspace />;
