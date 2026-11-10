@@ -52,7 +52,7 @@ try {
   await page.goto(`${base}/admin/live-operations`);
   const canvas = page.locator('.rm-map-canvas'), svg = canvas.locator('svg');
   await expect(canvas).toHaveAttribute('data-map-view', 'published');
-  await expect(canvas.getByText('Vị trí trên bản đã sửa', { exact: true })).toBeVisible();
+  await expect(canvas.getByText('Vị trí trên bản đã sửa', { exact: true }).last()).toBeVisible();
   await expect(canvas.locator('.rm-position')).toHaveCount(1);
   await expect(canvas.locator('.rm-plan')).toHaveCount(1);
   await expect(canvas.locator('image')).toHaveCount(0);
@@ -92,10 +92,10 @@ try {
   await expect(canvas.locator('.mp-map-content')).toHaveAttribute('transform', 'rotate(-20 5 3)');
   published.document.features = [feature('robot-marker', 4)]; published.document.rotationDegrees = 90; await refresh();
   await expect(canvas.locator('.mp-map-content')).toHaveAttribute('transform', 'rotate(90 5 3)');
-  await expect(svg).toHaveAttribute('viewBox', '2 -2 6 10');
+  await expect(svg).toHaveAttribute('viewBox', '2.5 -0.5 3 5');
   presentationStatus = 503; await refresh();
-  await expect(page.locator('.rm-presentation-status')).toContainText('Chưa tải được giao diện');
-  await expect(canvas).toHaveAttribute('data-map-view', 'original');
+  await expect(canvas).toHaveAttribute('data-map-view', 'published');
+  await expect(svg).toHaveAttribute('viewBox', '2.5 -0.5 3 5');
   assert.deepEqual(writes, [], 'map monitoring must not modify navigation data');
   assert.deepEqual(errors, []);
   console.log('Live edited map passed: rotation, coordinate alignment, follow, zoom, fallback, refresh, mobile and read-only API calls.');

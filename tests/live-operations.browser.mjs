@@ -52,6 +52,7 @@ await page.route('**/api/v1/**', async route => {
 
 try {
   await page.goto(`${base}/admin/live-operations`);
+  await page.locator('.lo-explorer > summary').click();
   const screen = page.getByRole('region', { name: 'Theo dõi công việc robot', exact: true });
   await screen.getByRole('heading', { name: 'Giao thuốc đến phòng 305', exact: true }).waitFor();
   assert.equal(await screen.getByLabel('Tự cập nhật', { exact: true }).isChecked(), true);
@@ -267,6 +268,7 @@ try {
   assert.equal(await screen.getByRole('button', { name: 'Phân robot', exact: true }).count(), 0);
   failList = true;
   await page.reload();
+  await page.locator('.lo-explorer > summary').click();
   await screen.getByRole('heading', { name: 'Chưa tải được danh sách công việc', exact: true }).waitFor();
   assert.equal(await screen.getByRole('heading', { name: 'Hiện không có công việc đang hoạt động', exact: true }).count(), 0);
   failList = false;

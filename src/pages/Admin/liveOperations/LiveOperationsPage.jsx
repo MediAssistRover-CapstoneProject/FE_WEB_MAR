@@ -1,13 +1,13 @@
 import WorkflowFailurePanel from './WorkflowFailurePanel.jsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { callBackend, readCatalog, watchJob } from '../../../features/api/backendApi.js';
+import { callBackend, readCatalog } from '../../../features/api/backendApi.js';
 import { canUse, operations } from '../../../features/api/contract.js';
 import { getSession } from '../../../features/auth/session.js';
 import { readOpenJobs } from '../../../features/operations/liveOperationsData.js';
 import { resources } from '../../../features/api/workspaceCatalog.js';
 import { vi } from '../../../i18n/vi.js';
-import { ACTIVE_STATUSES, JOB_GROUPS, TERMINAL_STATUSES, allowedJobActions, assertJobAction, confirmationBlock, dataFreshness, filterJobs, jobPresentation, jobProblem, mergeJobDetail, newerJob, operationSummary, selectedStep, statusInfo } from '../../../features/operations/liveOperations.js';
+import { ACTIVE_STATUSES, JOB_GROUPS, TERMINAL_STATUSES, allowedJobActions, assertJobAction, confirmationBlock, dataFreshness, filterJobs, jobPresentation, jobProblem, newerJob, operationSummary, selectedStep, statusInfo } from '../../../features/operations/liveOperations.js';
 import { OperationDialog } from '../backend/BackendWorkspace.jsx';
 import RecordDetails from '../backend/RecordDetails.jsx';
 import { EventDetails, StepDetails } from './OperationDetails.jsx';
@@ -15,6 +15,7 @@ import JobTechnicalPanel from './JobTechnicalPanel.jsx';
 import RecoveryPanel from './RecoveryPanel.jsx';
 import './liveOperations.css';
 import RobotMonitor from './RobotMonitor.jsx';
+import { useJobFeed } from '../../../features/operations/useJobFeed.js';
 
 const jobResource = resources.find(resource => resource.id === 'jobs');
 const PAGE_SIZE = 12;
@@ -205,11 +206,11 @@ export default function LiveOperationsPage() {
 }
 
 export function JobDetail({ job: listJob, catalogs, role, auto, retained, onShowGroup, manualRevision, integrate, onSaved }) {
-  const [detail, setDetail] = useState(null), [error, setError] = useState(''), [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('progress'), [liveStatus, setLiveStatus] = useState(''), [action, setAction] = useState(null), [retry, setRetry] = useState(0);
+  const { detail, error, loading, receivedAt, liveStatus, accept: acceptFeed, refresh: refreshDetail } = useJobFeed(listJob, auto, manualRevision);
+  const [tab, setTab] = useState('progress'), [action, setAction] = useState(null);
   const [revealStep, setRevealStep] = useState(null);
-  const [receivedAt, setReceivedAt] = useState(null), [opening, setOpening] = useState(false), [actionError, setActionError] = useState('');
-  const openingLock = useRef(false), actionController = useRef(null), streamGeneration = useRef(0);
+  const [opening, setOpening] = useState(false), [actionError, setActionError] = useState('');
+  const openingLock = useRef(false), actionController = useRef(null);
   useEffect(() => () => actionController.current?.abort(), []);
   useEffect(() => {
     if (!revealStep || tab !== 'progress') return;
@@ -220,52 +221,15 @@ export function JobDetail({ job: listJob, catalogs, role, auto, retained, onShow
     details?.querySelector('summary')?.focus({ preventScroll: true });
   }, [revealStep, tab, listJob.jobId]);
   const current = useRef(null);
-  const detailRequest = useRef(null);
-  const pendingDetailRefresh = useRef(false);
+  current.current = detail;
+  const accept = useCallback(next => {
+    const merged = acceptFeed(next); if (merged) current.current = merged; return merged;
+  }, [acceptFeed]);
   const job = newerJob(detail?.job, listJob);
   const isTerminal = TERMINAL_STATUSES.includes(job.status);
   const refreshTick = useRefreshTick(auto && !isTerminal, manualRevision);
   const now = useNow();
-  useEffect(() => () => detailRequest.current?.abort(), []);
-  const accept = useCallback(next => {
-    if (!next?.job || next.job.jobId !== listJob.jobId) return;
-    const merged = mergeJobDetail(current.current, next);
-    current.current = merged; setDetail(merged); integrate(merged);
-    setReceivedAt(Date.now()); setError('');
-    return merged;
-  }, [listJob.jobId, integrate]);
-  useEffect(() => {
-    if (detailRequest.current && !detailRequest.current.signal.aborted) { pendingDetailRefresh.current = true; return; }
-    const controller = new AbortController(), generation = streamGeneration.current;
-    detailRequest.current = controller;
-    callBackend('GET /api/v1/jobs/{id}', { path: { id: listJob.jobId } }, { signal: controller.signal }).then(next => {
-      // A stream snapshot received after this REST request started is newer
-      // evidence, including for task fields without individual versions.
-      if (!controller.signal.aborted && generation === streamGeneration.current) accept(next);
-    }).catch(cause => { if (!controller.signal.aborted) setError(cause.message || 'Không tải được chi tiết.'); }).finally(() => {
-      if (detailRequest.current === controller) detailRequest.current = null;
-      if (!controller.signal.aborted) { setLoading(false); if (pendingDetailRefresh.current) { pendingDetailRefresh.current = false; setRetry(value => value + 1); } }
-    });
-  }, [listJob.jobId, listJob.rowVersion, listJob.status, refreshTick, retry, accept]);
-  useEffect(() => {
-    if (!auto || isTerminal) { setLiveStatus(''); return; }
-    const controller = new AbortController(); let timer, failures = 0;
-    const connect = async () => {
-      setLiveStatus('Đang kết nối trực tiếp…');
-      try {
-        await watchJob(listJob.jobId, { signal: controller.signal, onEvent: event => {
-          if (controller.signal.aborted || event.type !== 'job-state') return;
-          streamGeneration.current += 1; accept(event.data); failures = 0; setLiveStatus('Đang theo dõi trực tiếp');
-        } });
-      } catch { /* REST refresh continues while the stream reconnects. */ }
-      if (!controller.signal.aborted) {
-        setLiveStatus('Kết nối trực tiếp gián đoạn · vẫn làm mới mỗi 15 giây');
-        timer = setTimeout(connect, Math.min(30000, 3000 * 2 ** Math.min(failures++, 4)));
-      }
-    };
-    connect();
-    return () => { controller.abort(); clearTimeout(timer); };
-  }, [auto, isTerminal, listJob.jobId, accept]);
+  useEffect(() => { if (detail) integrate(detail); }, [detail, integrate]);
   const info = jobPresentation(job, catalogs), step = selectedStep(detail), permissions = allowedJobActions(job, role, step, now), problem = jobProblem(detail && { ...detail, job });
   const summary = operationSummary(job, step, now);
   const confirmationIssue = job.status === 'RUNNING' && step?.status === 'RUNNING' && ['AUTHENTICATE', 'HANDLE_PAYLOAD', 'INTERACT'].includes(step.stepTypeSnapshot) && step.resolvedInputsJson?.action !== 'SPEAK' ? confirmationBlock(job, role, step, now) : '';
@@ -315,7 +279,7 @@ export function JobDetail({ job: listJob, catalogs, role, auto, retained, onShow
     {retained && <div className="lo-notice lo-notice-success" role="status"><p>Công việc đã đổi trạng thái sang {statusInfo(job.status).label.toLowerCase()}. Đang giữ chi tiết để bạn tiếp tục xem.</p><button className="lo-text-button" onClick={onShowGroup}>{isTerminal ? 'Xem trong lịch sử' : 'Mở nhóm hiện tại'}</button></div>}
     {opening && <p className="lo-action-check" role="status">Đang kiểm tra trạng thái mới trước khi mở thao tác…</p>}
     {actionError && <div className="lo-notice lo-notice-error" role="alert"><p>{actionError}</p><button className="lo-text-button" onClick={() => setActionError('')}>Đóng</button></div>}
-    {error && <div className="lo-notice lo-notice-error" role="alert"><p>Không cập nhật được chi tiết: {error} Các thao tác tạm khóa.</p><button className="lo-text-button" onClick={() => setRetry(value => value + 1)}>Thử lại</button></div>}
+    {error && <div className="lo-notice lo-notice-error" role="alert"><p>Không cập nhật được chi tiết: {error} Các thao tác tạm khóa.</p><button className="lo-text-button" onClick={refreshDetail}>Thử lại</button></div>}
     {loading ? <div className="lo-loading" role="status"><span className="lo-spinner" />Đang tải chi tiết…</div> : detail && <>
       {problem && <section className={`lo-problem ${problem.recovery ? 'lo-problem-attention' : 'lo-problem-compact'}`}><Icon name="alert" /><div><strong>{problem.recovery ? 'Cần xác minh trước khi tiếp tục điều phối' : 'Công việc thất bại'}</strong><p>{problem.stepNumber && <span className="lo-failure-step">Bước {problem.stepNumber} · {problem.stepName}: </span>}<span>{problem.message}</span></p>{problem.recovery && <p>Kiểm tra robot và bằng chứng dừng trước khi đối soát. Đối soát không tự chạy lại công việc.</p>}{problem.stepId && <button className="lo-text-button lo-view-failed-step" onClick={() => { setTab('progress'); setRevealStep({ id: problem.stepId }); }}>Xem bước lỗi <span aria-hidden="true">→</span></button>}</div></section>}
       {job.beOrchestrated && ['RECOVERY_REQUIRED', 'FAILED', 'CANCELLED'].includes(job.status) && <WorkflowFailurePanel key={job.jobId} job={job} refreshTick={refreshTick} disabled={!!error} onSaved={onSaved} onOpenRecovery={permissions.recover ? () => setTab('recovery') : undefined} />}

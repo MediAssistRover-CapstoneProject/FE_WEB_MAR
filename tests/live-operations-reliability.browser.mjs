@@ -43,6 +43,7 @@ const fixture = async () => {
   });
   const start = async () => {
     await page.goto(`${base}/admin/live-operations`);
+    await page.locator('.lo-explorer > summary').click();
     await page.locator('.lo-step').waitFor();
   };
   return { context, page, state, writes, reads, errors, start };

@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useMemo } from 'react';
 import { featureCenter, svgPoint, worldToLocal, insideMap } from '../../features/facility/mapPresentation.js';
 import { rotationBounds } from '../../features/facility/mapPresentationView.js';
 import { doorGeometry } from '../../features/facility/doorGeometry.js';
@@ -22,11 +22,7 @@ export default function MapPresentationCanvas({ source, document, imageUrl, opac
   const roomColors = roomColorsFor(document.features);
   const pendingArea = ['ROOM', 'CORRIDOR', 'polygon'].includes(drawingTool) && points.length >= 3;
   const pendingColor = pendingArea && (drawingTool === 'CORRIDOR' ? '#64748b' : nextRoomColor(points, document.features));
-  return <svg ref={svgRef} tabIndex={0} className="mp-canvas" viewBox={`0 0 ${source.widthM} ${source.heightM}`} aria-label="Bản đồ đang chỉnh giao diện" {...events}>
-    <g ref={contentRef} className="mp-map-content" transform={`rotate(${rotation} ${source.widthM / 2} ${source.heightM / 2})`}>
-    <rect width={source.widthM} height={source.heightM} fill={document.backgroundColor} />
-    {imageUrl && opacity > 0 && <image href={imageUrl} width={source.widthM} height={source.heightM} opacity={opacity} preserveAspectRatio="none" pointerEvents="none" />}
-    {document.features.map(feature => {
+  const featureNodes = useMemo(() => document.features.map(feature => {
       const door = feature.type === 'DOOR' ? doorGeometry(feature, source) : null;
       const center = screen(door ? door.labelPoint : featureCenter(feature)), polygon = ['ROOM', 'CORRIDOR'].includes(feature.type), single = ['LABEL', 'LANDMARK'].includes(feature.type), selected = selectedId === feature.id && !preview;
       const color = polygon && areaColor(feature, roomColors);
@@ -45,7 +41,12 @@ export default function MapPresentationCanvas({ source, document, imageUrl, opac
         </g>}
         {selected && feature.points.map((p, index) => { const v = screen(p); return <circle key={index} cx={v.x} cy={v.y} r={markerSize * .8} fill="white" stroke="#60a5fa" strokeWidth={1} vectorEffect="non-scaling-stroke" onPointerDown={event => onVertexDown?.(event, feature, index)} style={{ cursor: 'crosshair' }}><title>{door ? ['Bản lề', 'Mép cửa · Kéo để đổi chiều rộng', 'Đầu cánh · Kéo để chỉnh góc minh họa'][index] : `Đỉnh ${index + 1}`}</title></circle>; })}
       </g>;
-    })}
+    }), [document, source, selectedId, preview, onFeatureDown, onVertexDown, pixel, doorPreview]);
+  return <svg ref={svgRef} tabIndex={0} className="mp-canvas" viewBox={`0 0 ${source.widthM} ${source.heightM}`} aria-label="Bản đồ đang chỉnh giao diện" {...events}>
+    <g ref={contentRef} className="mp-map-content" transform={`rotate(${rotation} ${source.widthM / 2} ${source.heightM / 2})`}>
+    <rect width={source.widthM} height={source.heightM} fill={document.backgroundColor} />
+    {imageUrl && opacity > 0 && <image href={imageUrl} width={source.widthM} height={source.heightM} opacity={opacity} preserveAspectRatio="none" pointerEvents="none" />}
+    {featureNodes}
     {endpoints.filter(e => e.active && e.accessible).map(endpoint => {
       const local = worldToLocal(endpoint, source); if (!insideMap(local, source)) return null;
       const p = screen(local);
