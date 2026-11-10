@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { openSetupSession, sameHash, setupContext, setupPendingResolved, setupPiCommand, setupReadiness, setupSeed, setupWriteBlock } from '../src/features/robotOperations/robotSetup.js';
+import { consumeSetupEvents, newerSetupPose } from '../src/features/robotOperations/robotSetupStream.js';
 
 const robotId = '11111111-1111-4111-8111-111111111111', mapId = '22222222-2222-4222-8222-222222222222', sessionId = '33333333-3333-4333-8333-333333333333', hash = 'a'.repeat(64);
 const now = Date.now(), time = offset => new Date(now + offset).toISOString();
@@ -22,7 +23,7 @@ test('readiness requires a verified fresh pose, matching live session and acknow
     v => { v.snapshot.robot.currentMapId = 'other'; }, v => { v.snapshot.robot.mapAssetHash = 'b'.repeat(64); },
     v => { v.map.status = 'INACTIVE'; }, v => { v.asset.metadata.navigation_reload_safe = false; },
     v => { v.snapshot.navigationSession.expiresAt = time(-1); }, v => { v.snapshot.navigationSession.robotId = 'other'; },
-    v => { v.snapshot.latestPose.fresh = false; }, v => { v.snapshot.latestPose.capturedAt = time(-2501); },
+    v => { v.snapshot.latestPose.fresh = false; }, v => { v.snapshot.latestPose.capturedAt = time(-5001); },
     v => { v.snapshot.latestPose.mapId = 'other'; }, v => { v.snapshot.latestPose.robotId = 'other'; }, v => { v.snapshot.latestPose.frameId = 'odom'; },
     v => { v.snapshot.latestPose.xM = Number.NaN; }, v => { v.snapshot.latestPose.xM = 999; }, v => { v.profile.profileAcknowledged = false; }, v => { v.profile.robotId = 'other'; },
     v => { v.profile.acknowledgedProfileHash = 'b'.repeat(64); }, v => { v.profileContext = 'old initialization'; },
@@ -38,6 +39,17 @@ test('estimated seeds cannot stand in for the actual robot pose', () => {
   value.snapshot.navigationSession.initialization.pose = { x_m: 1, y_m: 4, yaw_rad: 0 };
   assert.equal(setupReadiness(value).pose, null);
   assert.equal(setupReadiness({ ...value, snapshot: null }).ready, false);
+});
+
+test('pose freshness matches the BE five-second limit across polling intervals', () => {
+  const value = fixture();
+  value.snapshot.latestPose.capturedAt = time(-3500);
+  assert.equal(setupReadiness(value).ready, true);
+  value.snapshot.latestPose.capturedAt = time(-5001);
+  assert.equal(setupReadiness(value).ready, false);
+  value.snapshot.latestPose.capturedAt = time(-1000);
+  value.snapshot.latestPose.fresh = false;
+  assert.equal(setupReadiness(value).ready, false);
 });
 
 test('map-origin rotation is honored when choosing a saved seed, including zero values', () => {
@@ -70,4 +82,74 @@ test('Pi launch commands accept only validated session identifiers', () => {
   assert.ok(openSetupSession(fixture().snapshot.navigationSession, now));
   assert.ok(setupPiCommand({ sessionId }).endsWith('--session-id ' + sessionId));
   assert.equal(setupPiCommand({ sessionId: '$(bad command)' }), '');
+});
+
+test('a restart is acknowledged only by a new session ID and its selected map asset', () => {
+  const snapshot = fixture().snapshot;
+  const pending = { kind: 'open', robotId, mapId, assetHash: hash, previousSessionId: sessionId };
+  assert.equal(setupPendingResolved(pending, snapshot), false);
+  snapshot.navigationSession.sessionId = '44444444-4444-4444-8444-444444444444';
+  assert.equal(setupPendingResolved(pending, snapshot), true);
+  assert.ok(setupPiCommand(snapshot.navigationSession).endsWith(snapshot.navigationSession.sessionId));
+  snapshot.navigationSession.state = 'CLOSED';
+  assert.equal(setupPendingResolved(pending, snapshot), false);
+});
+
+test('live pose can replace delayed SQL only in the same verified session and revision', () => {
+  function streamed() {
+    const value = fixture();
+    value.asset.geometry = map;
+    value.snapshot.latestPose.fresh = false;
+    value.livePose = { receivedAt: now, value: { messageType: 'NAVIGATION_POSE', robotId, mapId, mapAssetHash: hash,
+      navigationSessionId: sessionId, initializationRevision: 1, capturedAt: time(-100), receivedAt: time(0),
+      pose: { ...value.snapshot.latestPose, xM: value.snapshot.latestPose.xM + .1 } } };
+    return value;
+  }
+  assert.equal(setupReadiness(streamed()).ready, true);
+  const cases = [
+    v => { v.livePose.value.robotId = 'other'; }, v => { v.livePose.value.mapId = 'other'; },
+    v => { v.livePose.value.mapAssetHash = 'b'.repeat(64); }, v => { v.livePose.value.navigationSessionId = 'old'; },
+    v => { v.livePose.value.initializationRevision = 0; }, v => { v.livePose.value.pose.xM = 999; },
+    v => { v.livePose.value.pose.yM = Number.NaN; }, v => { v.livePose.value.capturedAt = time(-1501); },
+    v => { v.livePose.receivedAt -= 1501; }, v => { v.livePose.receivedAt += 1; },
+    v => { v.snapshot.navigationSession.state = 'WAITING_FOR_PI'; }, v => { v.snapshot.mqttConnected = false; },
+    v => { v.snapshot.dispatchReady = false; }, v => { v.snapshot.navigationSession.initialization.revision = 2; },
+  ];
+  for (const change of cases) { const value = streamed(); change(value); assert.equal(setupReadiness(value).ready, false, change.toString()); }
+  const value = streamed(); value.livePose.value.initializationRevision = 0;
+  value.snapshot.latestPose.fresh = true;
+  assert.equal(setupReadiness(value).pose, value.snapshot.latestPose, 'invalid stream samples fall back to verified SQL');
+});
+
+test('profile acknowledgement expires independently of fresh snapshots', () => {
+  const value = fixture();
+  value.profileReceivedAt = now - 15001;
+  assert.equal(setupReadiness(value).acknowledged, false);
+  assert.equal(setupReadiness(value).connected, true);
+  value.profileReceivedAt = now;
+  assert.equal(setupReadiness(value).ready, true);
+  value.profileError = 'network failure';
+  assert.equal(setupReadiness(value).ready, false);
+});
+
+test('stream pose ordering is scoped to robot and transport', () => {
+  const previous = { robotId, messageType: 'NAVIGATION_POSE', transportSessionId: 'a', sequenceNo: 10 };
+  assert.equal(newerSetupPose(previous, { ...previous, sequenceNo: 11 }, robotId), true);
+  assert.equal(newerSetupPose(previous, { ...previous, sequenceNo: 9 }, robotId), false);
+  assert.equal(newerSetupPose(previous, { ...previous }, robotId), false);
+  assert.equal(newerSetupPose(previous, { ...previous, transportSessionId: 'b', sequenceNo: 1 }, robotId), true);
+  assert.equal(newerSetupPose(previous, { ...previous, robotId: 'other', sequenceNo: 11 }, robotId), false);
+});
+
+test('SSE reader handles split UTF-8, CRLF, multiline events and cancellation', async () => {
+  const events = [], encoder = new TextEncoder(); let cancelled = false;
+  const bytes = encoder.encode(': keepalive\r\n\r\nevent: ignored\ndata: invalid\n\nevent: robot-state\r\ndata: {"name":\r\ndata: "Vị trí"}\r\n\r\nevent: robot-pose\ndata: {"sequenceNo":1}\n\n');
+  const stream = new ReadableStream({ start(controller) { for (const byte of bytes) controller.enqueue(new Uint8Array([byte])); }, cancel() { cancelled = true; } });
+  const response = new Response(stream, { headers: { 'Content-Type': 'text/event-stream' } });
+  // Throw from the callback after both events, as when a consumer is stopped.
+  await assert.rejects(consumeSetupEvents(response, (value, event) => { events.push([value, event]); if (events.length === 2) throw Error('stop'); }), /stop/);
+  assert.deepEqual(events, [[{ name: 'Vị trí' }, 'robot-state'], [{ sequenceNo: 1 }, 'robot-pose']]);
+  assert.equal(cancelled, true);
+  await assert.rejects(consumeSetupEvents(new Response('{}', { headers: { 'Content-Type': 'application/json' } }), () => {}));
+  await assert.rejects(consumeSetupEvents(new Response('x'.repeat(1048577), { headers: { 'Content-Type': 'text/event-stream' } }), () => {}), /vượt giới hạn/);
 });

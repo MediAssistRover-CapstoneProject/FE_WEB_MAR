@@ -5,6 +5,8 @@ import { readCatalog, callBackend } from '../../../features/api/backendApi.js';
 import { request } from '../../../features/robotOperations/api.js';
 import { loadSavedMap } from '../../../features/robotOperations/savedMap.js';
 import { freshMonitorPose, imagePoint, matchingPlan } from '../../../features/operations/monitorGeometry.js';
+import { matchingPresentation, presentationViewport } from '../../../features/operations/monitorPresentation.js';
+import MapPresentationCanvas from '../MapPresentationCanvas.jsx';
 import { jobPresentation, selectedStep, statusInfo } from '../../../features/operations/liveOperations.js';
 import { vi } from '../../../i18n/vi.js';
 import './robotMonitor.css';
@@ -63,6 +65,7 @@ function RobotMap({ snapshot, job, endpoints, fresh, revision, auto }) {
     return () => { controller.abort(); clearTimeout(timer); };
   }, [revision, auto]);
   const [saved, setSaved] = useState(null), [error, setError] = useState('');
+  const [presentation, setPresentation] = useState(null), [presentationNotice, setPresentationNotice] = useState('');
   const [retry, setRetry] = useState(0), [zoom, setZoom] = useState(1), [follow, setFollow] = useState(false);
   const [trail, setTrail] = useState([]);
   useEffect(() => {
@@ -76,7 +79,33 @@ function RobotMap({ snapshot, job, endpoints, fresh, revision, auto }) {
       setSaved({ url, metadata });
     }).catch(cause => { if (!controller.signal.aborted) setError(cause.message); });
     return () => { controller.abort(); if (url) URL.revokeObjectURL(url); };
-  }, [mapId, retry]);
+  }, [mapId, retry, revision]);
+  useEffect(() => {
+    setPresentation(null); setPresentationNotice('Đang kiểm tra giao diện bản đồ đã áp dụng…');
+    if (!mapId) return;
+    const controller = new AbortController();
+    let timer, sequence = 0;
+    const load = async () => {
+      clearTimeout(timer);
+      const current = ++sequence;
+      try {
+        const value = await request(`/api/v1/maps/${encodeURIComponent(mapId)}/presentation/published`, { signal: controller.signal });
+        if (!controller.signal.aborted && current === sequence) { setPresentation(value); setPresentationNotice(''); }
+      } catch (cause) {
+        if (!controller.signal.aborted && current === sequence) {
+          setPresentation(null);
+          setPresentationNotice(cause.status === 404 ? 'Chưa có giao diện đã áp dụng. Đang hiển thị map gốc.'
+            : cause.status === 409 ? 'Giao diện đã cũ so với map gốc. Đang hiển thị map gốc.'
+            : 'Chưa tải được giao diện đã áp dụng. Đang hiển thị map gốc.');
+        }
+      }
+      if (!controller.signal.aborted && current === sequence && auto) timer = setTimeout(load, 60000);
+    };
+    load();
+    const onFocus = () => { if (!controller.signal.aborted) load(); };
+    window.addEventListener('focus', onFocus);
+    return () => { controller.abort(); clearTimeout(timer); window.removeEventListener('focus', onFocus); };
+  }, [mapId, retry, revision, auto]);
   useEffect(() => { setTrail([]); }, [mapId, job?.jobId]);
   const currentPose = fresh ? freshMonitorPose(snapshot) : null;
   const pose = currentPose?.mapId === mapId ? currentPose : null;
@@ -109,23 +138,34 @@ function RobotMap({ snapshot, job, endpoints, fresh, revision, auto }) {
     const pixel = imagePoint(point, meta);
     if (pixel) trailPath += (point.gap || !trailPath ? 'M' : 'L') + pixel.x + ',' + pixel.y + ' ';
   });
+  const published = matchingPresentation(presentation, meta);
+  const presentationView = published && presentationViewport(published, zoom, follow ? position : null);
+  const overlay = <g className="rm-navigation-overlay">
+    {trailPath && <path className="rm-trail" d={trailPath} fill="none" stroke="#16a34a" strokeWidth={radius * .35} />}
+    {validPlan && <polyline className="rm-plan" points={planPoints.map(point => point.x + ',' + point.y).join(' ')} fill="none" stroke="#2563eb" strokeWidth={radius * .35} strokeDasharray={radius + ' ' + radius * .6} />}
+    {destination && <g className="rm-destination" transform={`translate(${destination.x} ${destination.y})`}><circle r={radius} fill="#f59e0b" stroke="white" strokeWidth={radius * .2} /><title>Điểm đến</title></g>}
+    {position && <g className="rm-position" transform={`translate(${position.x} ${position.y}) rotate(${-(pose.yawRad - meta.origin_yaw_rad) * 180 / Math.PI})`}>
+      <circle r={radius * 1.3} fill="#2563eb" stroke="white" strokeWidth={radius * .2} /><path d={`M ${radius * 2.2} 0 L 0 ${-radius * .7} L 0 ${radius * .7} Z`} fill="white" />
+    </g>}
+  </g>;
   return <section className="rm-card rm-map">
     <header><div><h3>Bản đồ trực tiếp</h3><small>{activeMap ? activeMap.mapName + ' · Đang hoạt động · v' + activeMap.versionNo : 'Chưa chọn bản đồ đang hoạt động'}</small></div><div className="rm-tools">      {maps.length > 1 && <select aria-label="Bản đồ đang hoạt động" value={mapId || ''} onChange={event => setChosenMapId(event.target.value)}><option value="">Chọn bản đồ</option>{maps.map(map => <option key={map.mapId} value={map.mapId}>{map.mapName}</option>)}</select>}
       <button type="button" aria-pressed={follow} disabled={!position} onClick={() => { setFollow(!follow); setZoom(value => Math.max(value, 2)); }}>Theo robot</button>
       <button type="button" aria-label="Thu nhỏ bản đồ" disabled={!saved || zoom <= 1} onClick={() => setZoom(value => Math.max(1, value - .5))}>−</button>
       <button type="button" aria-label="Phóng to bản đồ" disabled={!saved || zoom >= 5} onClick={() => setZoom(value => Math.min(5, value + .5))}>+</button>
     </div></header>
-    <div className="rm-map-canvas">
-      {saved ? <svg viewBox={[left, top, viewWidth, viewHeight].join(' ')} role="img" aria-label="Bản đồ, vị trí robot và lộ trình từ máy chủ">
+    <div className="rm-map-canvas" data-map-view={published ? 'published' : 'original'}>
+      {saved && published ? <MapPresentationCanvas source={published.source} document={published.document} preview
+        imageUrl={saved.url} opacity={published.document.features.length ? 0 : 1}
+        viewBox={[presentationView.x, presentationView.y, presentationView.width, presentationView.height].join(' ')}
+        role="img" aria-label="Bản đồ đã chỉnh sửa, vị trí robot và lộ trình từ máy chủ">
+        <g transform={`scale(${published.source.widthM / width} ${published.source.heightM / height})`}>{overlay}</g>
+      </MapPresentationCanvas> : saved ? <svg viewBox={[left, top, viewWidth, viewHeight].join(' ')} role="img" aria-label="Bản đồ, vị trí robot và lộ trình từ máy chủ">
         <image href={saved.url} width={width} height={height} />
-        {trailPath && <path d={trailPath} fill="none" stroke="#16a34a" strokeWidth={radius * .35} />}
-        {validPlan && <polyline points={planPoints.map(point => point.x + ',' + point.y).join(' ')} fill="none" stroke="#2563eb" strokeWidth={radius * .35} strokeDasharray={radius + ' ' + radius * .6} />}
-        {destination && <g transform={'translate(' + destination.x + ' ' + destination.y + ')'}><circle r={radius} fill="#f59e0b" stroke="white" strokeWidth={radius * .2} /><title>Điểm đến</title></g>}
-        {position && <g transform={'translate(' + position.x + ' ' + position.y + ') rotate(' + (-(pose.yawRad - meta.origin_yaw_rad) * 180 / Math.PI) + ')'}>
-          <circle r={radius * 1.3} fill="#2563eb" stroke="white" strokeWidth={radius * .2} /><path d={'M ' + radius * 2.2 + ' 0 L 0 ' + -radius * .7 + ' L 0 ' + radius * .7 + ' Z'} fill="white" />
-        </g>}
+        {overlay}
       </svg> : <div className="rm-placeholder"><span>⌖</span><p>{error || catalogError || (mapId ? 'Đang tải ảnh bản đồ…' : maps.length > 1 ? 'Chọn bản đồ đang hoạt động để theo dõi.' : 'Chưa có bản đồ đang hoạt động trên máy chủ.')}</p>{error && <button onClick={() => setRetry(n => n + 1)}>Tải lại bản đồ</button>}</div>}
     </div>
+    {saved && <p className="rm-caption rm-presentation-status" role="status">{published ? 'Đang dùng giao diện bản đồ đã áp dụng.' : presentationNotice || 'Giao diện không khớp phiên bản map này. Đang hiển thị map gốc.'} {!published && mapId && <Link to={`/admin/map?mapId=${encodeURIComponent(mapId)}&stage=presentation`}>Mở chỉnh sửa và áp dụng bản đồ →</Link>}</p>}
     <div className="rm-legend"><span><i className="rm-green" />Vệt vị trí đã nhận</span><span><i className="rm-blue" />Đường dự kiến</span><span>● Điểm đến</span></div>
     <p className="rm-caption">{position ? 'Vị trí robot đang cập nhật.' : 'Chưa có vị trí robot còn hiệu lực trên bản đồ này.'} {validPlan ? 'Đường dự kiến của bước hiện tại.' : 'Chờ cập nhật đường đi.'} Vệt vị trí được ghi nhận từ khi mở trang.</p>
   </section>;

@@ -12,7 +12,7 @@ const object = (properties, required = []) => ({ type: 'object', properties, req
 const json = { type: 'object', additionalProperties: true };
 const staff = {
   fullName: str(160), email: str(254, { format: 'email' }), phone: str(32, { pattern: '^\\+?[0-9][0-9 .-]{7,30}$' }),
-  staffCode: str(64), departmentCode: str(64), jobTitle: str(100), contactExtension: str(20),
+  staffCode: str(64), departmentCode: str(64), jobTitle: str(100), contactExtension: str(20), url: str(2048),
 };
 const slot = object({ sequenceNo: integer(1), startsAt: date, endsAt: date, status: enumeration('AVAILABLE', 'BLOCKED', 'CLOSED'), note: str(4000) }, ['sequenceNo', 'startsAt', 'endsAt', 'status']);
 const shift = { staffProfileId: uuid, roomId: uuid, shiftName: str(100), startsAt: date, endsAt: date, note: str(4000), slots: { type: 'array', items: slot } };

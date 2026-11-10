@@ -28,15 +28,15 @@ test('user-entered values are preserved; sorting is natural by staff code', () =
   assert.deepEqual(sortStaff(rows).map(r => r.staffCode), ['NV2', 'NV10']);
   assert.equal(rows[0].staffCode, 'NV10');
 });
-test('password confirmation and bcrypt byte limit are checked without altering the password', () => {
-  assert.equal(passwordError(' valid-password ', ' valid-password '), '');
-  assert.match(passwordError('short', 'short'), /8/);
-  assert.match(passwordError('abcdefgh', 'different'), /khớp/);
-  const multibyte = 'ắ'.repeat(25); assert.match(passwordError(multibyte, multibyte), /72 byte/);
+test('password length and bcrypt byte limit are checked without altering the password', () => {
+  assert.equal(passwordError(' valid-password '), '');
+  assert.match(passwordError('short'), /8/);
+  const multibyte = 'ắ'.repeat(25); assert.match(passwordError(multibyte), /72 byte/);
 });
 test('fingerprint detects changes that must invalidate an open edit or account action', () => {
   const row = member();
   assert.notEqual(staffFingerprint(row), staffFingerprint({ ...row, active: false }));
   assert.notEqual(staffFingerprint(row), staffFingerprint({ ...row, account: { ...row.account, status: 'LOCKED' } }));
   assert.notEqual(staffFingerprint(row), staffFingerprint({ ...row, departmentCode: 'NEW' }));
+  assert.notEqual(staffFingerprint(row), staffFingerprint({ ...row, url: 'https://images.example.test/images/new.jpg' }));
 });

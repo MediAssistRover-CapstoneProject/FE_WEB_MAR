@@ -6,7 +6,7 @@ import { visibleWallSegments } from '../../features/facility/mapDrawingAssist.js
 import { areaColor, nextRoomColor, roomColorsFor } from '../../features/facility/roomAppearance.js';
 import MapDoorSymbol from './MapDoorSymbol.jsx';
 
-export default function MapPresentationCanvas({ source, document, imageUrl, opacity = 0, endpoints = [], selectedId, preview, points = [], drawingTool, drawingAssist = null, drawingPreview = [], doorPreview = null, onFeatureDown, onVertexDown, svgRef, contentRef, showGrid = false, ...events }) {
+export default function MapPresentationCanvas({ source, document, imageUrl, opacity = 0, endpoints = [], selectedId, preview, points = [], drawingTool, drawingAssist = null, drawingPreview = [], doorPreview = null, onFeatureDown, onVertexDown, svgRef, contentRef, showGrid = false, children, ...events }) {
   const gridId = useId(), rotation = document.rotationDegrees ?? 0, bounds = rotationBounds(source, rotation);
   const screen = p => svgPoint(p, source);
   const pointString = values => values.map(p => { const v = screen(p); return `${v.x},${v.y}`; }).join(' ');
@@ -61,6 +61,7 @@ export default function MapPresentationCanvas({ source, document, imageUrl, opac
         <text x={9 * pixel} y={-9 * pixel} fontSize={10 * pixel} fontWeight="600" fill="#0f766e" stroke="white" strokeWidth={3 * pixel} paintOrder="stroke" strokeLinejoin="round">{snapLabels[drawingAssist.kind]}</text>
       </g>}
     </g>}
+    {children}
     </g>
     {showGrid && <g className="mp-alignment-grid" pointerEvents="none"><defs><pattern id={gridId} width={gridSpacing} height={gridSpacing} patternUnits="userSpaceOnUse"><path d={`M ${gridSpacing} 0 H 0 V ${gridSpacing}`} fill="none" stroke="#3b82f6" strokeOpacity=".3" strokeWidth="1" vectorEffect="non-scaling-stroke"/></pattern></defs><rect x={bounds.x} y={bounds.y} width={bounds.width} height={bounds.height} fill={`url(#${gridId})`}/></g>}
   </svg>;

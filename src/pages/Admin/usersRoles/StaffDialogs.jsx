@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { callBackend } from '../../../features/api/backendApi.js';
 import { prepareBody } from '../../../features/api/contract.js';
 import { passwordError, staffActions, staffDisplayName, staffError, staffFingerprint } from '../../../features/admin/staffManagement.js';
+import { STAFF_IMAGE_ACCEPT, staffImageError, uploadStaffImage } from '../../../features/admin/staffImages.js';
 
 function Dialog({ title, description, busy, onClose, children }) {
   const ref = useRef(null), titleId = useId();
@@ -12,29 +13,55 @@ function Dialog({ title, description, busy, onClose, children }) {
   </dialog>;
 }
 
-function PasswordField({ label, value, onChange, reveal = true }) {
+function PasswordField({ label, value, onChange, reveal = true, wide = false }) {
   const [visible, setVisible] = useState(false);
-  return <label className="um-field"><span>{label}</span><div className="um-password"><input aria-label={label} type={visible ? 'text' : 'password'} autoComplete="new-password" required minLength={8} maxLength={72} value={value} onChange={e => onChange(e.target.value)} />{reveal && <button type="button" aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} onClick={() => setVisible(v => !v)}>{visible ? 'Ẩn' : 'Hiện'}</button>}</div></label>;
+  return <label className={`um-field${wide ? ' um-wide' : ''}`}><span>{label}</span><div className="um-password"><input aria-label={label} type={visible ? 'text' : 'password'} autoComplete="new-password" required minLength={8} maxLength={72} value={value} onChange={e => onChange(e.target.value)} />{reveal && <button type="button" aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} onClick={() => setVisible(v => !v)}>{visible ? 'Ẩn' : 'Hiện'}</button>}</div></label>;
 }
 
 export function StaffForm({ member, actorId, onClose, onSaved, onRefresh }) {
-  const [form, setForm] = useState(() => ({ username: '', temporaryPassword: '', confirmation: '', fullName: member?.account?.fullName || '', email: member?.account?.email || '', phone: member?.account?.phone || '', staffCode: member?.staffCode || '', departmentCode: member?.departmentCode || '', jobTitle: member?.jobTitle || '', contactExtension: member?.contactExtension || '' }));
+  const [form, setForm] = useState(() => ({ username: '', temporaryPassword: '', fullName: member?.account?.fullName || '', email: member?.account?.email || '', phone: member?.account?.phone || '', staffCode: member?.staffCode || '', departmentCode: member?.departmentCode || '', jobTitle: member?.jobTitle || '', url: member?.url || '' }));
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const [imageFile, setImageFile] = useState(null), [imageError, setImageError] = useState(''), [preview, setPreview] = useState(''), [uploading, setUploading] = useState(false);
+  const imageInput = useRef(null);
+  useEffect(() => {
+    if (!imageFile) { setPreview(''); return; }
+    const url = URL.createObjectURL(imageFile);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
+  const chooseImage = event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const invalid = staffImageError(file);
+    setImageError(invalid); setError(''); setImageFile(invalid ? null : file);
+    if (invalid) event.target.value = '';
+  };
+  const cancelImage = () => { setImageFile(null); setImageError(''); if (imageInput.current) imageInput.current.value = ''; };
   const lock = useRef(false), set = (key, value) => setForm(previous => ({ ...previous, [key]: value }));
   const submit = async event => {
     event.preventDefault(); if (lock.current) return;
     setError('');
     try {
-      if (!member) { const invalid = passwordError(form.temporaryPassword, form.confirmation); if (invalid) throw Error(invalid); }
+      if (imageError) throw Error(imageError);
+      if (!member) { const invalid = passwordError(form.temporaryPassword); if (invalid) throw Error(invalid); }
       if (member && !staffActions(member, actorId).edit) throw Error('Nhân viên này không còn ở trạng thái cho phép chỉnh sửa.');
       const key = member ? 'PUT /api/v1/admin/staff/{id}' : 'POST /api/v1/admin/staff';
-      const input = Object.fromEntries(['fullName', 'email', 'phone', 'staffCode', 'departmentCode', 'jobTitle', 'contactExtension'].map(name => [name, form[name].trim()]));
+      const input = Object.fromEntries(['fullName', 'email', 'phone', 'staffCode', 'departmentCode', 'jobTitle', 'url'].map(name => [name, form[name].trim()]));
       if (!member) { input.username = form.username.trim(); input.temporaryPassword = form.temporaryPassword; }
       const body = prepareBody(key, input);
       lock.current = true; setBusy(true);
       if (member) {
         const current = await callBackend('GET /api/v1/admin/staff/{id}', { path: { id: member.staffProfileId } });
         if (staffFingerprint(current) !== staffFingerprint(member) || !staffActions(current, actorId).edit) { onRefresh(); throw Error('Hồ sơ đã thay đổi. Đóng biểu mẫu và mở lại trước khi lưu.'); }
+      }
+      if (imageFile) {
+        setUploading(true);
+        try {
+          body.url = await uploadStaffImage(imageFile);
+          set('url', body.url); setImageFile(null);
+          if (imageInput.current) imageInput.current.value = '';
+        } catch (cause) { throw Error(`Không tải được ảnh. ${staffError(cause)}`); }
+        finally { setUploading(false); }
       }
       const saved = await callBackend(key, { path: member ? { id: member.staffProfileId } : {}, body });
       onSaved(saved, member ? 'Đã cập nhật hồ sơ nhân viên.' : 'Đã tạo tài khoản staff. Nhân viên phải đổi mật khẩu trong lần đăng nhập đầu tiên.', !member);
@@ -46,8 +73,7 @@ export function StaffForm({ member, actorId, onClose, onSaved, onRefresh }) {
       <fieldset className="um-form" disabled={busy}>
         {!member && <><div className="um-form-section"><h3>Thông tin đăng nhập</h3><span className="um-badge um-blue">Vai trò · Staff</span></div>
           <label className="um-field um-wide"><span>Tên đăng nhập *</span><input required minLength={4} maxLength={100} pattern="[a-zA-Z0-9._-]+" autoComplete="off" value={form.username} onChange={e => set('username', e.target.value)} placeholder="Ví dụ: staff.khoa01" /><small>Từ 4 ký tự; dùng chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch nối.</small></label>
-          <PasswordField label="Mật khẩu tạm thời *" value={form.temporaryPassword} onChange={value => set('temporaryPassword', value)} />
-          <PasswordField label="Nhập lại mật khẩu *" value={form.confirmation} onChange={value => set('confirmation', value)} reveal={false} />
+          <PasswordField label="Mật khẩu tạm thời *" value={form.temporaryPassword} onChange={value => set('temporaryPassword', value)} wide />
           <p className="um-form-note um-wide">Mật khẩu từ 8–72 ký tự. Nhân viên phải đổi mật khẩu khi đăng nhập lần đầu.</p></>}
         <div className="um-form-section"><h3>Hồ sơ nhân viên</h3>{member && <span className="um-readonly-name">@{member.account.username}</span>}</div>
         <label className="um-field"><span>Họ và tên *</span><input required maxLength={160} value={form.fullName} onChange={e => set('fullName', e.target.value)} autoComplete="off" /></label>
@@ -56,10 +82,17 @@ export function StaffForm({ member, actorId, onClose, onSaved, onRefresh }) {
         <label className="um-field"><span>Số điện thoại</span><input type="tel" maxLength={32} value={form.phone} onChange={e => set('phone', e.target.value)} /></label>
         <label className="um-field"><span>Mã khoa</span><input maxLength={64} value={form.departmentCode} onChange={e => set('departmentCode', e.target.value)} placeholder="Ví dụ: KHOA01" /></label>
         <label className="um-field"><span>Chức danh</span><input maxLength={100} value={form.jobTitle} onChange={e => set('jobTitle', e.target.value)} /></label>
-        <label className="um-field"><span>Số máy lẻ</span><input maxLength={20} value={form.contactExtension} onChange={e => set('contactExtension', e.target.value)} /></label>
+        <div className="um-image-picker um-wide">
+          <div className="um-image-preview">{preview || form.url ? <img src={preview || form.url} alt="Ảnh nhân viên xem trước" /> : <span>Chưa có ảnh</span>}</div>
+          <div className="um-image-controls">
+            <label className="um-field"><span>Ảnh nhân viên</span><input ref={imageInput} aria-label="Ảnh nhân viên" type="file" accept={STAFF_IMAGE_ACCEPT} onChange={chooseImage} aria-describedby="staff-image-help" aria-invalid={!!imageError} /><small id="staff-image-help">Chọn ảnh JPG, PNG hoặc WebP từ máy, tối đa 20 MB. Ảnh sẽ được tải lên khi lưu.</small></label>
+            {(imageFile || imageError) && <button type="button" className="um-text-button" onClick={cancelImage}>Bỏ ảnh đã chọn</button>}
+            {imageError && <p className="um-image-error" role="alert">{imageError}</p>}
+          </div>
+        </div>
       </fieldset>
       {error && <p className="um-notice um-error" role="alert">{error}</p>}
-      <footer className="um-dialog-footer"><button type="button" disabled={busy} onClick={onClose}>Đóng</button><button type="submit" className="um-primary" disabled={busy}>{busy ? 'Đang lưu…' : member ? 'Lưu thay đổi' : 'Tạo tài khoản'}</button></footer>
+      <footer className="um-dialog-footer"><button type="button" disabled={busy} onClick={onClose}>Đóng</button><button type="submit" className="um-primary" disabled={busy || !!imageError}>{uploading ? 'Đang tải ảnh…' : busy ? 'Đang lưu…' : member ? 'Lưu thay đổi' : 'Tạo tài khoản'}</button></footer>
     </form>
   </Dialog>;
 }
@@ -73,14 +106,14 @@ const actionCopy = {
 
 export function StaffActionDialog({ action, actorId, onClose, onSaved, onRefresh }) {
   const { kind, member } = action, [title, description] = actionCopy[kind];
-  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [confirmed, setConfirmed] = useState(false), [password, setPassword] = useState(''), [confirmation, setConfirmation] = useState('');
+  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [confirmed, setConfirmed] = useState(false), [password, setPassword] = useState('');
   const lock = useRef(false);
   const submit = async event => {
     event.preventDefault(); if (lock.current) return;
     setError('');
     try {
       if (!confirmed) throw Error('Vui lòng xác nhận thao tác với tài khoản này.');
-      if (kind === 'reset') { const invalid = passwordError(password, confirmation); if (invalid) throw Error(invalid); }
+      if (kind === 'reset') { const invalid = passwordError(password); if (invalid) throw Error(invalid); }
       if (!staffActions(member, actorId)[kind]) throw Error('Thao tác không phù hợp với trạng thái nhân viên.');
       lock.current = true; setBusy(true);
       const current = await callBackend('GET /api/v1/admin/staff/{id}', { path: { id: member.staffProfileId } });
@@ -100,9 +133,8 @@ export function StaffActionDialog({ action, actorId, onClose, onSaved, onRefresh
   };
   return <Dialog title={title} description={description} busy={busy} onClose={onClose}>
     <div className="um-target"><strong>{staffDisplayName(member)}</strong><span>@{member.account.username} · {member.staffCode}</span></div>
-    {kind === 'deactivate' && <p className="um-action-warning">Hệ thống hiện chưa hỗ trợ kích hoạt lại nhân viên đã ngừng hoạt động. Nếu chỉ cần tạm chặn đăng nhập, hãy dùng Khóa tài khoản.</p>}
     <form onSubmit={submit}><fieldset className="um-form" disabled={busy}>
-      {kind === 'reset' && <><PasswordField label="Mật khẩu tạm thời mới *" value={password} onChange={setPassword} /><PasswordField label="Nhập lại mật khẩu *" value={confirmation} onChange={setConfirmation} reveal={false} /></>}
+      {kind === 'reset' && <PasswordField label="Mật khẩu tạm thời mới *" value={password} onChange={setPassword} wide />}
       <label className="um-confirm um-wide"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />Tôi xác nhận {title.toLocaleLowerCase('vi')} cho @{member.account.username}.</label>
     </fieldset>{error && <p className="um-notice um-error" role="alert">{error}</p>}
       <footer className="um-dialog-footer"><button type="button" disabled={busy} onClick={onClose}>Quay lại</button><button type="submit" disabled={busy} className={kind === 'deactivate' || kind === 'lock' ? 'um-danger' : 'um-primary'}>{busy ? 'Đang xử lý…' : title}</button></footer>

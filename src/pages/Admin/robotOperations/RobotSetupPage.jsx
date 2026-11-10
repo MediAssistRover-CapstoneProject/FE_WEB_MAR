@@ -20,19 +20,24 @@ function RobotSetupWorkspace() {
   const [params, setParams] = useSearchParams();
   const setup = useRobotSetup(params.get('robotId') || '', params.get('mapId') || '');
   const { catalog, robotId, mapId, live, asset, busy, pending } = setup;
-  const [now, setNow] = useState(Date.now), [seed, setSeed] = useState(null), [endpointId, setEndpointId] = useState(''), [confirmed, setConfirmed] = useState(false);
+  const [, setClockTick] = useState(0);
+  const now = Date.now();
+  const [seed, setSeed] = useState(null), [endpointId, setEndpointId] = useState(''), [confirmed, setConfirmed] = useState(false);
   const [choosing, setChoosing] = useState(false), [duration, setDuration] = useState(7200), [editing, setEditing] = useState(false), [localError, setLocalError] = useState(''), [copied, setCopied] = useState(false);
+  const [compactContext, setCompactContext] = useState('');
   const map = catalog.maps.find(value => value.mapId === mapId), robot = catalog.robots.find(value => value.robotId === robotId);
   const snapshot = live.snapshot?.robot?.robotId === robotId ? live.snapshot : null, session = snapshot?.navigationSession;
   const currentAsset = asset?.mapId === mapId ? asset : null;
   const state = setupReadiness({ ...live, snapshot, asset: currentAsset, map, now, pending });
   const block = setupWriteBlock(snapshot, live.receivedAt, now), locked = !!busy || !!pending;
-  const canInitialize = !locked && !block && state.matches && state.connected && session.state !== 'WAITING_FOR_PI';
+  const canInitialize = !locked && !block && state.fresh && state.idle && state.matches;
   const points = catalog.endpoints.filter(point => point.mapId === mapId && point.active && point.accessible).sort((a, b) => (a.endpointType === 'PARK' ? 0 : 1) - (b.endpointType === 'PARK' ? 0 : 1));
   const command = state.open ? setupPiCommand(session) : '';
   const seedVisible = seed || (state.matches && session.initialization?.pose ? { xM: session.initialization.pose.x_m, yM: session.initialization.pose.y_m, yawRad: session.initialization.pose.yaw_rad } : null);
-  const expanded = !state.ready || editing;
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(timer); }, []);
+  const context = JSON.stringify([robotId, mapId, currentAsset?.metadata.asset_hash, session?.sessionId, session?.initialization?.revision]);
+  const expanded = compactContext !== context || editing;
+  useEffect(() => { if (state.ready) setCompactContext(context); }, [state.ready, context]);
+  useEffect(() => { const timer = setInterval(() => setClockTick(value => value + 1), 500); return () => clearInterval(timer); }, []);
   useEffect(() => {
     setSeed(null); setEndpointId(''); setConfirmed(false); setChoosing(false); setLocalError(''); setCopied(false); setEditing(false);
   }, [robotId, mapId, currentAsset?.metadata.asset_hash, session?.sessionId, session?.initialization?.revision]);
@@ -66,13 +71,16 @@ function RobotSetupWorkspace() {
     {!setup.loading && !catalog.robots.length && <p className="rsu-message">Chưa có robot trong hệ thống.</p>}
     {!setup.loading && !catalog.maps.length && <p className="rsu-message">Chưa có bản đồ. <Link to="/admin/map">Mở Bản đồ để quét và lưu map.</Link></p>}
     {setup.notice && !state.ready && <p className="rsu-message rsu-notice" role="status">{setup.notice}</p>}
+    {state.fresh && state.matches && !state.connected && <p className="rsu-message rsu-notice">Bạn có thể lưu vị trí khởi tạo khi đang chờ Pi. Robot chỉ sẵn sàng sau khi Pi kết nối, xác minh vị trí và xác nhận cấu hình dẫn đường.</p>}
+    {snapshot && <p className="rsu-hint" data-setup-transport>{now - (live.streamAt || 0) <= 4000 ? 'Đang nhận trạng thái trực tiếp từ máy chủ.' : 'Đang cập nhật trạng thái qua REST dự phòng.'} Cấu hình dẫn đường được kiểm tra riêng mỗi 5 giây.</p>}
     {pending && <p className="rsu-message rsu-warning" role="status">Đang đối chiếu yêu cầu trước. Các thao tác thiết lập tạm khóa để tránh gửi lặp. <button className="rsu-text-button" onClick={check} disabled={!!busy}>Kiểm tra lại</button></p>}
     {state.open && !state.matches && currentAsset?.loaded && <div className="rsu-message rsu-warning" role="alert">Robot đang có phiên trên {catalog.maps.find(value => value.mapId === session.mapId)?.mapName || 'bản đồ khác'} hoặc phiên bản dữ liệu đã thay đổi. {catalog.maps.some(value => value.mapId === session.mapId) && session.mapId !== mapId && <button className="rsu-text-button" disabled={locked} onClick={() => setup.chooseMap(session.mapId)}>Xem bản đồ của phiên</button>} Đóng phiên hiện tại trước khi mở phiên mới.</div>}
+    {state.open && <section className="rsu-card rsu-restart" aria-label="Tạo lại phiên vận hành"><div><h3>Tạo phiên mới khi cần khởi động lại robot</h3><p>Dừng tiến trình navigation cũ trên Pi và bảo đảm robot đã hết nhiệm vụ, ngừng di chuyển. UI sẽ đóng phiên cũ, mở phiên mới ngay và cập nhật lệnh chạy Pi; không cần chờ hết 2 giờ.</p></div><div className="rsu-restart-actions"><label className="rsu-field">Thời hạn phiên mới<select aria-label="Thời hạn phiên mới" value={duration} disabled={locked} onChange={event => setDuration(Number(event.target.value))}><option value={7200}>2 giờ</option><option value={14400}>4 giờ</option><option value={28800}>8 giờ</option></select></label><button type="button" className="rsu-button rsu-primary" disabled={locked || !!block || !state.fresh || !state.matches} onClick={() => act('restart', { durationSec: duration, expectedSessionId: session.sessionId })}>{busy === 'close' ? 'Đang đóng phiên cũ…' : busy === 'open' ? 'Đang tạo mã phiên mới…' : 'Dừng phiên và mở phiên mới'}</button></div>{block && <p className="rsu-hint">{block}</p>}</section>}
     <ol className="rsu-steps" aria-label="Tiến trình thiết lập">{steps.map((label, index) => <li key={label} className={state.ready || index < state.step ? 'is-complete' : index === state.step ? 'is-current' : ''} aria-current={!state.ready && index === state.step ? 'step' : undefined}><span>{state.ready || index < state.step ? '✓' : index + 1}</span><strong>{label}</strong></li>)}</ol>
-    {state.ready && !editing && <div className="rsu-ready-banner" role="status"><div><strong>Robot đã sẵn sàng nhận nhiệm vụ</strong><p>{robot?.robotName || robot?.robotCode} · {map?.mapName} · Phiên đến {expires(session?.expiresAt)}</p></div><button className="rsu-button" onClick={() => setEditing(true)}>Xem thiết lập</button></div>}
+    {!expanded && <div className={`rsu-ready-banner${state.ready ? '' : ' is-checking'}`} role="status"><div><strong>{state.ready ? 'Robot đã sẵn sàng nhận nhiệm vụ' : 'Đang kiểm tra lại trạng thái robot'}</strong><p>{state.ready ? `${robot?.robotName || robot?.robotCode} · ${map?.mapName} · Phiên đến ${expires(session?.expiresAt)}` : 'Chưa đủ xác nhận sẵn sàng. Xem các kiểm tra bên dưới hoặc mở thiết lập để kiểm tra chi tiết.'}</p></div><button className="rsu-button" onClick={() => setEditing(true)}>Xem thiết lập</button></div>}
     <div className="rsu-workspace">
       <section className="rsu-card rsu-map-card"><div className="rsu-panel-heading"><div><span className="rsu-eyebrow">BẢN ĐỒ VẬN HÀNH</span><h3>{map?.mapName || 'Vị trí robot trên bản đồ'}</h3></div>{map && <span className="rsu-badge">Phiên bản {map.versionNo}</span>}</div>
-        <RobotSetupMap key={`${mapId}:${currentAsset?.url}`} asset={currentAsset} endpoints={expanded ? points : []} seed={state.localized && !editing ? null : seedVisible} pose={state.pose} choosing={choosing} disabled={!canInitialize || !expanded} onPoint={place} onEndpoint={choosePoint} onLoaded={setup.markImageLoaded} onImageError={() => setLocalError('Không đọc được ảnh bản đồ. Bấm tải lại bản đồ để thử lại.')} />
+        <RobotSetupMap key={`${mapId}:${currentAsset?.url}`} asset={currentAsset} endpoints={expanded ? points : []} seed={!expanded || state.localized && !editing ? null : seedVisible} pose={state.pose} choosing={choosing} disabled={!canInitialize || !expanded} onPoint={place} onEndpoint={choosePoint} onLoaded={setup.markImageLoaded} onImageError={() => setLocalError('Không đọc được ảnh bản đồ. Bấm tải lại bản đồ để thử lại.')} />
         <footer className="rsu-map-footer"><span>{state.pose ? `Robot: X ${number(state.pose.xM)} m · Y ${number(state.pose.yM)} m · ${number(state.pose.yawRad * 180 / Math.PI)}°` : 'Chưa có vị trí robot được xác minh trên bản đồ này.'}</span>{map && <button type="button" className="rsu-text-button" disabled={locked} onClick={() => { setConfirmed(false); setSeed(null); setEndpointId(''); setup.reloadAsset(); }}>Tải lại bản đồ</button>}</footer>
       </section>
       <aside className="rsu-controls">

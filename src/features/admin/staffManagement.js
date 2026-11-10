@@ -29,17 +29,16 @@ export function filterStaff(members, { search = '', status = '', department = ''
 
 export function staffFingerprint(member) {
   const a = member.account || {};
-  return JSON.stringify([member.staffProfileId, member.active, member.staffCode, member.departmentCode, member.jobTitle, member.contactExtension, a.accountId, a.role, a.status, a.username, a.fullName, a.email, a.phone, a.mustChangePassword, a.updatedAt]);
+  return JSON.stringify([member.staffProfileId, member.active, member.staffCode, member.departmentCode, member.jobTitle, member.contactExtension, member.url, a.accountId, a.role, a.status, a.username, a.fullName, a.email, a.phone, a.mustChangePassword, a.updatedAt]);
 }
 
-export function passwordError(value, confirmation) {
+export function passwordError(value) {
   if (value.length < 8 || value.length > 72) return 'Mật khẩu phải có từ 8 đến 72 ký tự.';
   if (new TextEncoder().encode(value).length > 72) return 'Mật khẩu vượt giới hạn 72 byte. Hãy dùng mật khẩu ngắn hơn.';
-  if (value !== confirmation) return 'Hai lần nhập mật khẩu chưa khớp.';
   return '';
 }
 
 export function staffError(error) {
   const message = error?.message || 'Không thực hiện được thao tác. Vui lòng thử lại.';
-  return ({ 'Username already exists': 'Tên đăng nhập đã được sử dụng.', 'Email already exists': 'Email đã được sử dụng.', 'Phone already exists': 'Số điện thoại đã được sử dụng.', 'Staff code already exists': 'Mã nhân viên đã được sử dụng.' })[message] || message;
+  return ({ 'Username already exists': 'Tên đăng nhập đã được sử dụng.', 'Email already exists': 'Email đã được sử dụng.', 'Phone already exists': 'Số điện thoại đã được sử dụng.', 'Staff code already exists': 'Mã nhân viên đã được sử dụng.', 'url must be a fixed image URL from the configured S3 bucket': 'Vui lòng dùng liên kết ảnh đã tải lên kho ảnh của hệ thống.' })[message] || message;
 }
