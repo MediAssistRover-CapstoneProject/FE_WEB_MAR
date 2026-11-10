@@ -9,10 +9,10 @@ import { matchingPresentation, presentationViewport } from '../../../features/op
 import MapPresentationCanvas from '../MapPresentationCanvas.jsx';
 import { jobPresentation, selectedStep, statusInfo } from '../../../features/operations/liveOperations.js';
 import { vi } from '../../../i18n/vi.js';
+import RobotCamera from '../robotOperations/RobotCamera.jsx';
 import './robotMonitor.css';
 
 const dateTime = value => value ? new Date(value).toLocaleString('vi-VN') : 'Chưa ghi nhận';
-const cameraKey = 'mar.robotCameraUrl';
 
 function useRobotSnapshot(robotId, enabled, revision) {
   const [state, setState] = useState({ snapshot: null, error: '', receivedAt: null });
@@ -171,35 +171,6 @@ function RobotMap({ snapshot, job, endpoints, fresh, revision, auto }) {
   </section>;
 }
 
-function RobotCamera() {
-  const container = useRef(null);
-  const [url, setUrl] = useState(() => localStorage.getItem(cameraKey) || import.meta.env.VITE_ROBOT_CAMERA_URL || '');
-  const [loaded, setLoaded] = useState(false), [failed, setFailed] = useState(false), [revision, setRevision] = useState(0);
-  useEffect(() => {
-    const update = () => { setLoaded(false); setFailed(false); setUrl(localStorage.getItem(cameraKey) || import.meta.env.VITE_ROBOT_CAMERA_URL || ''); };
-    window.addEventListener('storage', update);
-    return () => window.removeEventListener('storage', update);
-  }, []);
-  useEffect(() => {
-    if (!url || loaded || failed) return;
-    const timer = setTimeout(() => setFailed(true), 10000);
-    return () => clearTimeout(timer);
-  }, [url, loaded, failed, revision]);
-  let source = '';
-  try {
-    const parsed = new URL(url);
-    if (['http:', 'https:'].includes(parsed.protocol) && !parsed.username && !parsed.password && !(location.protocol === 'https:' && parsed.protocol === 'http:')) source = parsed.href;
-  } catch { /* Missing or invalid configuration is shown in the camera panel. */ }
-  return <section className="rm-card" ref={container}>
-    <header><h3>Camera robot</h3><button type="button" aria-label="Phóng lớn camera" onClick={() => container.current?.requestFullscreen?.().catch(() => {})}>⛶</button></header>
-    <div className="rm-camera">
-      {source && !failed && <img key={revision + source} src={source} alt="Video từ camera robot đã cấu hình" onLoad={() => setLoaded(true)} onError={() => { setLoaded(false); setFailed(true); }} />}
-      {(!source || !loaded || failed) && <div className="rm-placeholder"><span>▣</span><p>{failed ? 'Chưa kết nối được camera.' : source ? 'Đang kết nối camera…' : 'Chưa cấu hình nguồn camera.'}</p><Link to="/admin/system-settings?tab=robot-camera">Cấu hình camera →</Link></div>}
-    </div>
-    <footer><small>{loaded && !failed ? 'Nguồn video trực tiếp · Chưa có thời điểm từng khung hình' : 'Camera cần truy cập được từ trình duyệt.'}</small>{source && <button onClick={() => { setFailed(false); setLoaded(false); setRevision(n => n + 1); }}>Kết nối lại</button>}</footer>
-  </section>;
-}
-
 export default function RobotMonitor({ jobs, catalogs, auto, revision, onOpen }) {
   const robotId = catalogs.robots[0]?.robotId;
   const { snapshot, error, receivedAt } = useRobotSnapshot(robotId, auto, revision);
@@ -256,7 +227,7 @@ export default function RobotMonitor({ jobs, catalogs, auto, revision, onOpen })
           {rows.map((job, index) => { const entry = jobPresentation(job, catalogs); return <button className="rm-queue-row" key={job.jobId} onClick={() => onOpen(job)}><span className="rm-order" title="Thứ tự hiển thị">{index + 1}</span><strong>{entry.title}</strong><span>{entry.target || 'Chưa có điểm đến'}</span><span className="rm-pill">{job.status === 'QUEUED' ? 'Chờ thực hiện' : statusInfo(job.status).label}</span><span aria-hidden="true">›</span></button>; })}
         </>}
       </section>
-    </div><aside className="rm-right"><RobotCamera /><section className="rm-card rm-current">
+    </div><aside className="rm-right"><RobotCamera key={robotId} robotId={robotId} /><section className="rm-card rm-current">
       <header><h3>Nhiệm vụ hiện tại</h3>{current && <span className="rm-pill is-good">{statusInfo(current.status).label}</span>}</header>
       {current ? <><strong className="rm-mission-title">{info.title}</strong><p>{info.target || 'Chưa có điểm đến'}</p><small>{current.jobCode}</small>
         <ol>{(detail?.steps || []).slice().sort((a, b) => a.executionSequenceNo - b.executionSequenceNo).map(item => <li key={item.jobStepId} className={item.status === 'SUCCEEDED' ? 'is-done' : item.jobStepId === step?.jobStepId ? 'is-current' : ''}><strong>{vi(item.stepTypeSnapshot)}</strong><small>{statusInfo(item.status).label}</small></li>)}</ol>

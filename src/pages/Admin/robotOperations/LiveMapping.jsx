@@ -8,6 +8,7 @@ import SavedMappingImage from './SavedMappingImage.jsx';
 import MappingMapPanel from './MappingMapPanel.jsx';
 import { autonomyBlock, MappingAutonomy, prepareMappingWorkflow } from '../../../features/robotOperations/mappingOperations.js';
 import MappingRecoveryPanel from './MappingRecoveryPanel.jsx';
+import RobotCamera from './RobotCamera.jsx';
 
 function SnapshotImage({ jobId, kind, enabled }) {
   const [frame, setFrame] = useState(null), [message, setMessage] = useState('Đang chờ ảnh từ Pi.');
@@ -56,7 +57,7 @@ function SnapshotImage({ jobId, kind, enabled }) {
   return <><div className={'ro-preview ' + (kind === 'map' ? 'map' : '')}>{frame ? <div className="ro-map-frame" key={frame.url}><img src={frame.url} alt={kind === 'map' ? 'Bản đồ đang quét từ robot' : 'Ảnh camera robot qua MQTT'} />{position?.x !== undefined && <svg className="ro-pose-overlay" viewBox={`0 0 ${position.width} ${position.height}`} role="img" aria-label="Vị trí và hướng robot trên bản đồ"><g transform={`translate(${position.x} ${position.y}) rotate(${position.angle})`}><circle r={position.radius} fill="#0879ee" fillOpacity=".7" stroke="white" strokeWidth="1"/><path d={`M ${position.radius * 1.8} 0 L ${position.radius * .3} ${-position.radius * .55} L ${position.radius * .3} ${position.radius * .55} Z`} fill="#ff7900" stroke="white" strokeWidth=".6"/></g></svg>}</div> : <p>{enabled ? message : 'Chưa có phiên quét đang kết nối.'}</p>}</div>{kind === 'map' && <div className="ro-pose-status"><strong>● Robot</strong><span>{position?.message || 'Chờ bản đồ và tọa độ từ robot.'}</span><small>Chấm xanh: vị trí · Mũi tên cam: hướng phía trước</small></div>}<small>{frame?.captured ? `Ảnh chụp lúc ${new Date(frame.captured).toLocaleString('vi-VN')}` : message}</small></>;
 }
 
-export const ROBOT_CAMERA_URL_KEY = 'mar.robotCameraUrl';
+export { ROBOT_CAMERA_URL_KEY } from '../../../features/media/robotCameraClient.js';
 
 function MotionStatus({ session }) {
   let gate;
@@ -73,40 +74,6 @@ function MotionStatus({ session }) {
   return <p className="ro-help" role="status">{gate && Number.isFinite(age) && age >= -1000 && age < 10000
     ? (labels[gate.reason] || `Robot dừng hoặc giới hạn: ${gate.reason || 'chưa rõ nguyên nhân'}`)
     : 'Chưa có phản hồi chuyển động mới từ Pi.'}</p>;
-}
-
-function Camera({ jobId, enabled }) {
-  const [stream, setStream] = useState(''), [message, setMessage] = useState('');
-  const [streamUrl, setStreamUrl] = useState('');
-  useEffect(() => {
-    setMessage('');
-    const saved = localStorage.getItem(ROBOT_CAMERA_URL_KEY) || import.meta.env.VITE_ROBOT_CAMERA_URL || '';
-    setStreamUrl(saved);
-    try {
-      const value = new URL(saved);
-      setStream(['http:', 'https:'].includes(value.protocol) && !value.username && !value.password && (location.protocol !== 'https:' || value.protocol === 'https:') ? value.href : '');
-    } catch { setStream(''); }
-  }, [jobId]);
-  const connect = event => {
-    event.preventDefault();
-    try {
-      const value = new URL(streamUrl.trim());
-      if (!['http:', 'https:'].includes(value.protocol) || value.username || value.password) throw Error('Nhập URL video HTTP hoặc HTTPS, không kèm tài khoản.');
-      if (location.protocol === 'https:' && value.protocol !== 'https:') throw Error('Trang HTTPS cần nguồn video HTTPS.');
-      setStream(value.href); setMessage('Đang kết nối video từ robot…');
-      try { localStorage.setItem(ROBOT_CAMERA_URL_KEY, value.href); } catch { /* Video still works without persistence. */ }
-    } catch (error) { setMessage(error instanceof TypeError ? 'URL video chưa hợp lệ.' : error.message); }
-  };
-  return <section className="ro-card"><h3>Camera robot <span className="ro-badge">{stream ? 'Video cùng mạng' : 'Ảnh MQTT'}</span></h3>
-    {stream ? <div className="ro-preview"><img src={stream} alt="Video trực tiếp từ robot" onLoad={() => setMessage('Đã nhận hình từ nguồn video.')} onError={() => { setStream(''); setMessage('Không kết nối được video. Đã chuyển về ảnh MQTT.'); }} /></div> : <SnapshotImage jobId={jobId} kind="camera" enabled={enabled} />}
-    {stream && <button type="button" onClick={() => { setStream(''); setMessage('Đã chuyển về ảnh MQTT.'); }}>Dùng ảnh MQTT</button>}
-    {message && <p role="status">{message}</p>}
-    <details className="ro-details"><summary>Kết nối video trực tiếp</summary><form onSubmit={connect}>
-      <Field label="URL video từ robot"><input type="url" required value={streamUrl} onChange={event => setStreamUrl(event.target.value)} placeholder="http://IP_PI:8080/stream?topic=/ascamera/camera_publisher/rgb0/image&type=mjpeg" /></Field>
-      <div className="ro-actions"><button type="submit">Xem video trực tiếp</button></div>
-      <small>Máy này cần truy cập được Pi. Nếu video lỗi, camera tự chuyển về ảnh MQTT của phiên quét.</small>
-    </form></details>
-  </section>;
 }
 
 export default function LiveMapping({ onMapSaved, embedded = false }) {
@@ -353,7 +320,7 @@ export default function LiveMapping({ onMapSaved, embedded = false }) {
       <ErrorNotice error={error} />
       <ErrorNotice error={actionError} />
       <div className="ro-actions ro-session-actions"><button disabled={busy || jog.current.active || autonomy.current.active} onClick={() => { reload(); setRevision(v => v + 1); }}>Tải lại trạng thái</button>{jobId && !activeJob && <button disabled={busy} onClick={() => {track(null);setSetupOpen(true);}}>Thiết lập phiên mới</button>}</div>
-      <div className="ro-columns"><div className="ro-stack">{jobId&&<JobStatus detail={detail} session={session} saving={saving} />}<MappingMapPanel title={mapTitle}>{mapId ? <SavedMappingImage key={mapId} mapId={mapId} /> : detail?.job.status === 'SUCCEEDED' ? <p className="ro-help">Nhiệm vụ đã kết thúc nhưng chưa có mã bản đồ đăng ký. Kiểm tra bước COMMIT_MAP_ARTIFACT.</p> : <SnapshotImage jobId={jobId} kind="map" enabled={!!session && !!checkedAt && !error} />}<p className="ro-muted">Ảnh bản đồ do robot gửi về qua BE.</p></MappingMapPanel><MappingRecoveryPanel jobId={jobId} required={detail?.job.status === 'RECOVERY_REQUIRED'} busy={busy} stop={async () => { if (autonomy.current.active) await autonomy.current.stop(); if (jog.current.active) await jog.current.stop(); }} onRecovered={() => { autoSavePending.current = null; setSaving(false); setRevision(v => v + 1); }} /></div><aside className="ro-stack"><Camera jobId={jobId} enabled={!!session && !!checkedAt && !error} />{savedMapAction}{autonomyPanel}{drivePanel}</aside></div>
+      <div className="ro-columns"><div className="ro-stack">{jobId&&<JobStatus detail={detail} session={session} saving={saving} />}<MappingMapPanel title={mapTitle}>{mapId ? <SavedMappingImage key={mapId} mapId={mapId} /> : detail?.job.status === 'SUCCEEDED' ? <p className="ro-help">Nhiệm vụ đã kết thúc nhưng chưa có mã bản đồ đăng ký. Kiểm tra bước COMMIT_MAP_ARTIFACT.</p> : <SnapshotImage jobId={jobId} kind="map" enabled={!!session && !!checkedAt && !error} />}<p className="ro-muted">Ảnh bản đồ do robot gửi về qua BE.</p></MappingMapPanel><MappingRecoveryPanel jobId={jobId} required={detail?.job.status === 'RECOVERY_REQUIRED'} busy={busy} stop={async () => { if (autonomy.current.active) await autonomy.current.stop(); if (jog.current.active) await jog.current.stop(); }} onRecovered={() => { autoSavePending.current = null; setSaving(false); setRevision(v => v + 1); }} /></div><aside className="ro-stack"><RobotCamera key={robotId} robotId={robotId} variant="mapping" fallback={<SnapshotImage jobId={jobId} kind="camera" enabled={detail?.job?.robotId === robotId && !!session && !!checkedAt && !error} />} />{savedMapAction}{autonomyPanel}{drivePanel}</aside></div>
     </>}
   </section>;
 }

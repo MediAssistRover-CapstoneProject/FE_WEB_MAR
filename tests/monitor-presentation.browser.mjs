@@ -99,4 +99,7 @@ try {
   assert.deepEqual(writes, [], 'map monitoring must not modify navigation data');
   assert.deepEqual(errors, []);
   console.log('Live edited map passed: rotation, coordinate alignment, follow, zoom, fallback, refresh, mobile and read-only API calls.');
+} catch (error) {
+  console.error('Monitor page errors:', errors, 'URL:', page.url(), 'Page:', await page.locator('body').innerText().catch(() => 'unavailable'));
+  throw error;
 } finally { await browser.close(); }

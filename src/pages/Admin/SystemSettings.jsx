@@ -8,7 +8,7 @@ injectStyles('mediassist-style-pages-Admin-SystemSettings-jsx', inlineStyles+`.s
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminApi } from '../../features/admin/adminApi.js';
-import { ROBOT_CAMERA_URL_KEY } from './robotOperations/LiveMapping.jsx';
+import { ROBOT_CAMERA_URL_KEY } from '../../features/media/robotCameraClient.js';
 
 export function RobotCameraSettings() {
   const [url, setUrl] = useState(() => localStorage.getItem(ROBOT_CAMERA_URL_KEY) || import.meta.env.VITE_ROBOT_CAMERA_URL || '');
@@ -21,10 +21,11 @@ export function RobotCameraSettings() {
         if (location.protocol === 'https:' && parsed.protocol !== 'https:') throw Error('Trang HTTPS cần URL video HTTPS.');
         localStorage.setItem(ROBOT_CAMERA_URL_KEY, parsed.href);
       } else localStorage.removeItem(ROBOT_CAMERA_URL_KEY);
-      setMessage('Đã lưu trên trình duyệt này. Mở lại Bản đồ → Quét để áp dụng. Để trống để dùng ảnh MQTT.');
+      window.dispatchEvent(new Event('mediassist-camera-settings'));
+      setMessage('Đã lưu nguồn video dự phòng. Camera trực tiếp vẫn tự kết nối qua máy chủ.');
     } catch (error) { setMessage(error.message); }
   };
-  return <div className="settings-form"><label><b>URL video trực tiếp từ robot</b><span>Chỉ dùng khi máy mở web truy cập được Pi cùng mạng. Để trống để xem ảnh MQTT qua máy chủ.</span><input type="url" placeholder="http://IP_PI:8080/stream?topic=/ascamera/camera_publisher/rgb0/image" value={url} onChange={(event) => setUrl(event.target.value)} /></label><button type="button" onClick={save}>Lưu nguồn camera</button>{message && <p role="status">{message}</p>}</div>;
+  return <div className="settings-form"><label><b>URL video dự phòng từ robot</b><span>Camera trực tiếp tự kết nối qua máy chủ khi mở trang theo dõi hoặc quét bản đồ. Chỉ nhập URL này khi cần nguồn video dự phòng và máy truy cập được Pi cùng mạng.</span><input type="url" placeholder="http://IP_PI:8080/stream?topic=/ascamera/camera_publisher/rgb0/image" value={url} onChange={(event) => setUrl(event.target.value)} /></label><button type="button" onClick={save}>Lưu nguồn camera</button>{message && <p role="status">{message}</p>}</div>;
 }
 
 export function RobotConnectionSettings() {

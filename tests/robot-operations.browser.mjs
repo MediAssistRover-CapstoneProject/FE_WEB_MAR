@@ -6,7 +6,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_EXECUTABLE });
 const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:5175';
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
-await context.addInitScript(() => { if (!localStorage.getItem('mediassist-rover.session')) localStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { role: 'ADMIN', username: 'test' }, tokens: { accessToken: 'test-only' } })); });
+await context.addInitScript(() => { if (!localStorage.getItem('mediassist-rover.session')) localStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { accountId: '22222222-2222-4222-8222-222222222222', role: 'ADMIN', username: 'test' }, tokens: { accessToken: 'test-only' } })); });
 let job = null, speechJob = null, receipt = null, mappingOpen = false, ready = true, failPoll = false, camera = false, pendingTts = 0, ttsFailure = false, emptyCatalog = false, rejectMotion = false, forbidCatalog = false, saveFailure = true, accountRole = 'ADMIN';
 const writes = [], errors = [];
 const workflow = (id, type) => ({ workflow: { workflowId: id, workflowName: type === 'MAPPING' ? 'Quét và lưu' : 'Thông báo chung', serviceType: type, schemaVersion: 3, status: 'PUBLISHED', acceptsNewJobs: true, definitionHash: 'fixture', versionNo: 1 }, steps: [{ enabled: true, stepTypeCode: 'INTERACT', paramsJson: { action: 'SPEAK' } }] });
@@ -16,7 +16,7 @@ await context.route('**/api/v1/**', async route => {
   const req = route.request(), path = new URL(req.url()).pathname, method = req.method();
   const json = (value, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) });
   if (method === 'POST') writes.push({ path, body: req.postDataJSON(), at: Date.now(), headers: req.headers() });
-  if (path === '/api/v1/auth/me') return json({ role: accountRole, username: 'test' });
+  if (path === '/api/v1/auth/me') return json({ accountId: '22222222-2222-4222-8222-222222222222', role: accountRole, username: 'test' });
   if (path === '/api/v1/robots') return forbidCatalog ? json({ message: 'Forbidden' }, 403) : json({ content: emptyCatalog ? [] : [robot()], last: true });
   if (path === '/api/v1/floors') return json({ content: emptyCatalog ? [] : [{ floorId: 'floor-1', floorName: 'Tầng 1', active: true }], last: true });
   if (path.endsWith('/published/all')) return json(emptyCatalog ? [] : [workflow('map-workflow', 'MAPPING'), workflow('speech-workflow', 'SPEECH'), { workflow: { ...workflow('wrong', 'MAPPING').workflow, schemaVersion: 2 } }]);
@@ -50,7 +50,7 @@ try {
   await mkdir('.workstation-build/robot-operations', { recursive: true });
   await page.goto(`${base}/admin/system-settings`);
   await btn('Nguồn camera').click();
-  await page.getByLabel('URL video trực tiếp từ robot').waitFor();
+  await page.getByLabel('URL video dự phòng từ robot').waitFor();
   assert.equal(await page.getByText('Chi tiết quét map mới',{exact:true}).count(),0,'Session setup moved out of settings');
   assert.equal(await btn('Tạo nhiệm vụ quét').count(),0);
   assert.equal(writes.length,0);
