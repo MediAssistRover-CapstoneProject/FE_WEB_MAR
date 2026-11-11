@@ -44,7 +44,7 @@ export function setupReadiness({ snapshot, receivedAt, profile, profileContext, 
   ];
   const ready = loaded && checks.every(check => check.ok) && !pending;
   const step = !loaded ? 0 : !matches || session.state === 'WAITING_FOR_PI' ? 1 : !localized ? 2 : 3;
-  const title = pending ? 'Đang đối chiếu yêu cầu' : error ? 'Chưa nhận được trạng thái mới' : ready ? 'Sẵn sàng vận hành' : snapshot?.activeJobId ? 'Robot đang thực hiện nhiệm vụ' : !loaded ? 'Chọn robot và bản đồ' : !open ? 'Chưa mở phiên vận hành' : !matches ? 'Kiểm tra bản đồ của phiên' : session.state === 'WAITING_FOR_PI' ? 'Đang chờ Pi kết nối' : !localized ? 'Đang chờ xác minh vị trí' : 'Đang kiểm tra sẵn sàng';
+  const title = pending ? 'Đang đối chiếu yêu cầu' : error ? 'Chưa nhận được trạng thái mới' : ready ? 'Sẵn sàng vận hành' : snapshot?.activeJobId ? 'Robot đang thực hiện nhiệm vụ' : !loaded ? 'Chờ bản đồ đang hoạt động' : !open ? 'Chưa mở phiên vận hành' : !matches ? 'Kiểm tra bản đồ của phiên' : session.state === 'WAITING_FOR_PI' ? 'Đang chờ Pi kết nối' : !localized ? 'Đang chờ xác minh vị trí' : 'Đang kiểm tra sẵn sàng';
   return { fresh, connected, open, loaded, matches, localized: !!localized, acknowledged: !!acknowledged, idle, checks, ready, step, title, pose: localized ? pose : null };
 }
 

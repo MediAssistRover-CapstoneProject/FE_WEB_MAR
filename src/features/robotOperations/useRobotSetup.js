@@ -17,10 +17,11 @@ function waitForSnapshot(signal) {
   });
 }
 
-export function useRobotSetup(initialRobot = '', initialMap = '') {
+export function useRobotSetup(initialRobot = '') {
   const [catalog, setCatalog] = useState({ robots: [], maps: [], endpoints: [] });
   const [loading, setLoading] = useState(true), [catalogError, setCatalogError] = useState('');
-  const [robotId, setRobotId] = useState(initialRobot), [mapId, setMapId] = useState(initialMap);
+  const [robotId, setRobotId] = useState(initialRobot);
+  const mapId = catalog.maps.find(map => map.status === 'ACTIVE')?.mapId || '';
   const [asset, setAsset] = useState(null), [assetError, setAssetError] = useState(''), [assetRevision, setAssetRevision] = useState(0);
   const [live, setLive] = useState({ snapshot: null, receivedAt: 0, profile: null, profileContext: '', error: '' });
   const [busy, setBusy] = useState(''), [notice, setNotice] = useState(''), [error, setError] = useState(''), [pending, setPending] = useState(null);
@@ -151,14 +152,6 @@ export function useRobotSetup(initialRobot = '', initialMap = '') {
     checkProfile();
     return () => { controller.abort(); clearTimeout(timer); };
   }, [robotId, profileScope, profileEligible, updateLive]);
-  useEffect(() => {
-    if (!robotId || mapId || !catalog.maps.length) return;
-    const snapshot = live.snapshot;
-    if (snapshot?.robot?.robotId !== robotId) return;
-    const preferred = openSetupSession(snapshot.navigationSession) ? snapshot.navigationSession.mapId : snapshot.robot.currentMapId;
-    setMapId(catalog.maps.some(map => map.mapId === preferred) ? preferred : catalog.maps.find(map => map.status === 'ACTIVE')?.mapId || '');
-  }, [robotId, mapId, catalog.maps, live.snapshot]);
-
   const perform = async (kind, { seed, endpointId, confirmed, durationSec = 7200, expectedSessionId } = {}) => {
     if (writeLock.current || pending || !isOperator(getSession())) return;
     writeLock.current = true; setBusy(kind); setNotice(''); setError(''); sequence.current++;
@@ -248,9 +241,8 @@ export function useRobotSetup(initialRobot = '', initialMap = '') {
       if (mounted.current) setBusy('');
     }
   };
-  const chooseRobot = id => { if (writeLock.current) return; sequence.current++; setRobotId(id); setMapId(''); setError(''); };
-  const chooseMap = id => { if (!writeLock.current) { setMapId(id); setError(''); } };
+  const chooseRobot = id => { if (writeLock.current) return; sequence.current++; setRobotId(id); setError(''); };
   const reloadAsset = useCallback(() => { if (!writeLock.current) setAssetRevision(value => value + 1); }, []);
   const markImageLoaded = useCallback(() => setAsset(value => value && !value.loaded ? { ...value, loaded: true } : value), []);
-  return { catalog, loading, catalogError, robotId, mapId, chooseRobot, chooseMap, asset, assetError, markImageLoaded, reloadAsset, live, poseFeed: poseFeed.current, busy, notice, error, pending, perform, refresh };
+  return { catalog, loading, catalogError, robotId, mapId, chooseRobot, asset, assetError, markImageLoaded, reloadAsset, live, poseFeed: poseFeed.current, busy, notice, error, pending, perform, refresh };
 }

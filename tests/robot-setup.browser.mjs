@@ -30,7 +30,7 @@ await page.addInitScript(() => {
 });
 const world = (x, y) => ({ xM: -2 + Math.cos(.35) * x - Math.sin(.35) * y, yM: 3 + Math.sin(.35) * x + Math.cos(.35) * y });
 const endpoint = { endpointId, mapId, endpointName: 'Điểm đỗ A', endpointType: 'PARK', ...world(2, 1), yawRad: 0, active: true, accessible: true };
-const maps = [mapId, otherMap].map((value, index) => ({ mapId: value, mapName: index ? 'Bản đồ tầng 2' : 'Khu khám bệnh · Tầng 1', versionNo: 2, status: 'ACTIVE', assetHash: hash }));
+const maps = [otherMap, mapId].map(value => ({ mapId: value, mapName: value === otherMap ? 'Bản đồ tầng 2' : 'Khu khám bệnh · Tầng 1', versionNo: 2, status: value === otherMap ? 'INACTIVE' : 'ACTIVE', assetHash: hash }));
 let session = { state: 'NONE' }, connected = false, acknowledged = false, activeJob = null, wrongRobot = false, metadataHash = hash, endpointMoved = false, loseInitialization = false, heldSession = null;
 let snapshotFailure = false, openCount = 0, failClose = false, failOpen = false, loseOpen = false, heldOpen = null;
 let snapshotDelay = 0, profileDelay = 0, snapshotReads = 0, profileReads = 0, poseAge = 0, delayAfterInitialization = 0, nextSnapshotDelay = 0;
@@ -115,6 +115,12 @@ try {
   await expect(page.getByRole('heading', { name: 'Thiết lập vận hành', exact: true, level: 2 })).toBeVisible();
   await expect(page.locator('.sidebar .nav-item').filter({ hasText: 'Thiết lập vận hành' })).toHaveAttribute('aria-current', 'page');
   await expect(button('Mở phiên vận hành')).toBeEnabled();
+  await expect(page.getByRole('combobox', { name: 'Bản đồ vận hành', exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Bản đồ vận hành', { exact: true })).toHaveText('Khu khám bệnh · Tầng 1 · v2');
+  await page.goto(`${base}/admin/robot-setup?robotId=${robotId}&mapId=${otherMap}`);
+  await expect(button('Mở phiên vận hành')).toBeEnabled();
+  await expect(page).toHaveURL(`${base}/admin/robot-setup?robotId=${robotId}&mapId=${mapId}`);
+  await expect(page.getByLabel('Bản đồ vận hành', { exact: true })).toHaveText('Khu khám bệnh · Tầng 1 · v2');
   assert.equal(writes.length, 0, 'Opening the page never changes robot state');
   await page.getByLabel('Thời gian vận hành', { exact: true }).selectOption('28800');
   await button('Mở phiên vận hành').click();
@@ -196,11 +202,13 @@ try {
   await expect(page.getByRole('alert').filter({ hasText: 'không đúng robot' })).toBeVisible();
   await expect(seedButton()).toBeDisabled(); wrongRobot = false;
   await waitConnected();
-  await page.getByLabel('Bản đồ vận hành', { exact: true }).selectOption(otherMap);
+  session = { ...session, mapId: otherMap };
   await expect(page.getByRole('alert').filter({ hasText: 'Robot đang có phiên trên' })).toBeVisible();
+  await expect(page.getByLabel('Bản đồ vận hành', { exact: true })).toHaveText('Khu khám bệnh · Tầng 1 · v2');
+  await expect(button('Xem bản đồ của phiên')).toHaveCount(0);
   assert.equal(writes.length, 2);
-  await button('Xem bản đồ của phiên').click();
-  await expect(readyBanner).toBeVisible(); await button('Xem thiết lập').click(); await waitConnected();
+  session = { ...session, mapId };
+  await expect(page.locator('.rsu-state')).toContainText('Sẵn sàng vận hành'); await waitConnected();
   // Map clicks use the original rotated coordinate frame, and never write on selection.
   await button('Đặt vị trí và hướng trên bản đồ').click();
   const svg = page.getByRole('img', { name: 'Bản đồ thiết lập vận hành', exact: true });
@@ -403,6 +411,14 @@ try {
   await expect(page.locator('.rsu-checks')).toContainText('Pi chưa kết nối MQTT');
   await expect(page.locator('[data-setup-transport]')).toContainText('Đã đồng bộ');
   assert.equal(writes.length, 13, 'streaming, switching robots and fallback never write robot state');
+  // With no active map, neither a URL nor an old robot session can supply one.
+  maps.find(map => map.mapId === mapId).status = 'INACTIVE';
+  await page.goto(`${base}/admin/robot-setup?robotId=${robotId}&mapId=${otherMap}`);
+  await expect(page.getByLabel('Bản đồ vận hành', { exact: true })).toHaveText('Chưa có bản đồ đang hoạt động');
+  await expect(button('Dừng phiên và mở phiên mới')).toBeDisabled();
+  await expect(page.locator('.rsu-map-view svg')).toHaveCount(0);
+  await expect(page).toHaveURL(`${base}/admin/robot-setup?robotId=${robotId}`);
+  assert.equal(writes.length, 13);
   // Staff cannot access setup through its URL or legacy screen query.
   await page.evaluate(() => localStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { role: 'STAFF', username: 'staff' }, tokens: { accessToken: 'fixture' } })));
   await page.goto(`${base}/admin/robot-setup`);

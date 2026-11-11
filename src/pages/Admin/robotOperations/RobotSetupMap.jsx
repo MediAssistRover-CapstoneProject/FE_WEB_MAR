@@ -14,7 +14,7 @@ export default memo(function RobotSetupMap({ asset, endpoints, seed, pose, snaps
   if (remembered.current?.scope !== scope) remembered.current = null;
   if (current) remembered.current = { scope, pose: current };
   const displayPose = current || remembered.current?.pose;
-  if (!asset) return <div className="rsu-map-empty"><span aria-hidden="true">⌖</span><strong>Chọn bản đồ để bắt đầu</strong><p>Bản đồ quét và vị trí robot sẽ xuất hiện tại đây.</p></div>;
+  if (!asset) return <div className="rsu-map-empty"><span aria-hidden="true">⌖</span><strong>Chờ bản đồ đang hoạt động</strong><p>Bản đồ quét và vị trí robot sẽ xuất hiện tại đây.</p></div>;
   const map = asset.geometry, yaw = map.originYawRad, w = map.widthM, h = map.heightM;
   const corners = [[0, 0], [w, 0], [w, h], [0, h]].map(([x, y]) => ({ x: map.originXM + Math.cos(yaw) * x - Math.sin(yaw) * y, y: map.originYM + Math.sin(yaw) * x + Math.cos(yaw) * y }));
   const left = Math.min(...corners.map(p => p.x)), right = Math.max(...corners.map(p => p.x)), bottom = Math.min(...corners.map(p => p.y)), top = Math.max(...corners.map(p => p.y));

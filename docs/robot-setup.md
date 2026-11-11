@@ -2,7 +2,7 @@
 
 Admin mở **Robot → Thiết lập vận hành**, đường dẫn `/admin/robot-setup`. Trang **Trạng thái robot** có liên kết mở nhanh, truyền robot đang xem. Staff không thấy menu hoặc truy cập trang này; tài khoản demo không gọi API thiết lập.
 
-1. Chọn robot và bản đồ đã lưu. Bản đồ phải ACTIVE và có `navigation_reload_safe: true` để mở phiên.
+1. Chọn robot. Trang tự hiển thị bản đồ ACTIVE trong thư viện, không cho chọn bản đồ tại đây và không lấy bản đồ từ URL hay phiên cũ của robot. Bản đồ phải có `navigation_reload_safe: true` để mở phiên. Nếu chưa có bản đồ ACTIVE, cần kích hoạt trong thư viện bản đồ trước.
 2. Mở phiên 2, 4 hoặc 8 giờ. Trong container Pi, dừng `robot.zsh run` và chạy lệnh navigation được hiển thị. Web chưa tự khởi chạy Pi. Trang dùng lại phiên còn hiệu lực, không tự mở/đóng phiên hoặc khởi tạo khi tải lại.
 3. Chọn endpoint đang hoạt động/có thể tiếp cận hoặc kéo vị trí và hướng trên ảnh quét. Xác nhận robot thực tế đang ở đúng vị trí rồi gửi SEED. GLOBAL nằm trong **Định vị nâng cao**. Đây là khai báo vị trí hiện tại, không phải lệnh đi đến endpoint.
 4. Chờ trạng thái phiên READY, pose mới đúng map/frame, kết nối/heartbeat mới, profile endpoint/zone đã ACK và robot IDLE/dispatchReady. Checklist tự cập nhật; trạng thái không được bật thủ công. Khi sẵn sàng, hướng dẫn thu gọn thành bản đồ và trạng thái vận hành.
