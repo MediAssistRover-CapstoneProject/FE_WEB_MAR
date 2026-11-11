@@ -49,13 +49,11 @@ const hold = async (name, ms = 720) => { await btn(name).hover(); await page.mou
 try {
   await mkdir('.workstation-build/robot-operations', { recursive: true });
   await page.goto(`${base}/admin/system-settings`);
-  await btn('Nguồn camera').click();
-  await page.getByLabel('URL video dự phòng từ robot').waitFor();
+  assert.equal(await btn('Nguồn camera').count(),0,'Fallback camera settings have been removed');
   assert.equal(await page.getByText('Chi tiết quét map mới',{exact:true}).count(),0,'Session setup moved out of settings');
   assert.equal(await btn('Tạo nhiệm vụ quét').count(),0);
   assert.equal(writes.length,0);
-  await page.getByRole('link',{name:'Mở Quét map mới →',exact:true}).click();
-  assert.ok(page.url().includes('stage=scan'),'Settings opens the scan directly');
+  await page.goto(`${base}/admin/map?stage=scan`);
   assert.equal(await btn('Robot thật').count(), 0);
   await page.getByText('Chi tiết quét map mới').waitFor();
   const setup=page.locator('.ro-setup'),setupSummary=setup.locator(':scope>summary');

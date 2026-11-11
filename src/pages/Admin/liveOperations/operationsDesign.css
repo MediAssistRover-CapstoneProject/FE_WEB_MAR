@@ -54,8 +54,15 @@
 .lo-page .rm-robot-telemetry small { margin: 0 0 7px; display: block; font-size: 10px; color: #6f89a6; white-space: nowrap; }
 .lo-page .rm-robot-telemetry strong { display: block; font-size: 11px; line-height: 1.5; font-weight: 500; white-space: nowrap; }
 .lo-page .rm-robot-bar.is-connected .rm-robot-telemetry > div:first-child svg { color: #228668; }
-.lo-page .rm-layout { grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); gap: 20px; }
+.lo-page .rm-layout { grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); grid-template-areas: 'map camera' 'map mission'; grid-template-rows: auto minmax(260px, 1fr); align-items: stretch; gap: 20px; }
 .lo-page .rm-left, .lo-page .rm-right { gap: 20px; }
+.lo-page .rm-left { grid-area: map; display: flex; }
+.lo-page .rm-left > .rm-map { display: flex; flex-direction: column; width: 100%; }
+.lo-page .rm-map > :not(.rm-map-canvas) { flex-shrink: 0; }
+.lo-page .rm-map-canvas { flex: 1 0 auto; }
+.lo-page .rm-right { display: contents; }
+.lo-page .rm-right > .rc-camera-card { grid-area: camera; }
+.lo-page .rm-right > .rm-current { grid-area: mission; contain: size; }
 .lo-page .rm-card { border: 1px solid var(--lo-line); border-radius: 16px; box-shadow: 0 4px 18px #1f466803; }
 .lo-page .rm-card > header { padding: 19px 21px; gap: 10px; border-bottom: 1px solid #edf1f6; }
 .lo-page .rm-card h3 { font-size: 13px; font-weight: 650; letter-spacing: -.15px; }
@@ -97,9 +104,9 @@
 .lo-page .rm-queue-empty strong { display: block; font-size: 11px; color: #6d829a; font-weight: 500; }
 .lo-page .rm-queue-empty p { font-size: 10px; margin-top: 6px; color: #97a5b7; line-height: 1.6; }
 
-.lo-page .rm-current { display: flex; flex-direction: column; min-height: 0; max-height: 460px; padding-bottom: 0; overflow: hidden; }
+.lo-page .rm-current { display: flex; flex-direction: column; min-height: 0; padding-bottom: 0; overflow: hidden; }
 .lo-page .rm-current > header { flex-shrink: 0; background: linear-gradient(115deg, #f6faff, #fff); }
-.lo-page .rm-mission-body { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; }
+.lo-page .rm-mission-body { flex: 1; height: 0; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; }
 .lo-page .rm-mission-body:focus-visible { outline: 2px solid #93b9fb; outline-offset: -3px; }
 .lo-page .rm-mission-title { padding: 21px 22px 0; font-size: 17px; line-height: 1.5; font-weight: 650; overflow-wrap: anywhere; }
 .lo-page .rm-mission-body > p, .lo-page .rm-mission-body > small { display: block; margin: 8px 22px; color: #657d9b; overflow-wrap: anywhere; line-height: 1.7; }
@@ -116,7 +123,7 @@
 .lo-page .rm-pill.is-running { background: #edf4ff; color: #3274d6; }
 .lo-page .rm-pill.is-success { background: #e9f8f1; color: #248369; }
 .lo-page .rm-pill.is-failed, .lo-page .rm-pill.is-attention { background: #fff0f0; color: #bb4b60; }
-.lo-page .rm-mission-empty { padding: 28px 23px 20px; gap: 10px; }
+.lo-page .rm-mission-empty { min-height: 100%; padding: 28px 23px 20px; gap: 10px; }
 .lo-page .rm-mission-empty > span { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 17px; color: #7395c4; background: #f0f5fe; margin-bottom: 4px; }
 .lo-page .rm-mission-empty svg { width: 28px; height: 28px; }
 .lo-page .rm-mission-empty strong { font-size: 12px; font-weight: 500; }
@@ -133,7 +140,6 @@
 .lo-page .rc-camera-card footer { padding: 12px 16px; gap: 9px; background: #fcfdff; }
 .lo-page .rc-camera-card footer small { font-size: 9px; line-height: 1.7; }
 .lo-page .rc-camera-card footer button { font-size: 10px; padding: 7px 9px; border-radius: 7px; }
-.lo-page .rc-options { padding: 2px 16px 15px; font-size: 10px; }
 
 .lo-page .lo-explorer { border: 1px solid #e0e8f2; border-radius: 16px; background: #fff; overflow: hidden; scroll-margin-top: 18px; }
 .lo-page .lo-explorer > summary { list-style: none; display: flex; align-items: center; gap: 13px; padding: 21px 24px; color: var(--lo-ink); font-size: 13px; border-bottom: 1px solid transparent; }
@@ -167,8 +173,12 @@
 }
 @media (max-width: 1000px) {
   .lo-page .lo-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .lo-page .rm-layout { grid-template-columns: minmax(0, 1fr); }
-  .lo-page .rm-right { grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .lo-page .rm-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'map' 'right'; grid-template-rows: auto auto; }
+  .lo-page .rm-right { display: grid; grid-area: right; grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .lo-page .rm-right > .rc-camera-card, .lo-page .rm-right > .rm-current { grid-area: auto; }
+  .lo-page .rm-right > .rm-current { contain: none; }
+  .lo-page .rm-current { max-height: 460px; }
+  .lo-page .rm-mission-body { height: auto; }
   .lo-page .rm-map-canvas { height: 430px; }
   .lo-page .rm-robot-telemetry { gap: 28px; }
   .lo-page .lo-statusline { padding-bottom: 15px; }

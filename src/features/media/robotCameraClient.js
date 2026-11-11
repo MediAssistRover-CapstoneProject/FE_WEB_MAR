@@ -2,7 +2,6 @@ import { apiRequest, API_BASE_URL } from '../api/client.js';
 import { getSession } from '../auth/session.js';
 import { RobotCameraConnection } from './robotCamera.js';
 
-export const ROBOT_CAMERA_URL_KEY = 'mar.robotCameraUrl';
 const connections = new Map(), closing = new Map();
 const request = (path, options = {}) => apiRequest(path, { ...options,
   signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(10000)]) : AbortSignal.timeout(10000) });
@@ -45,13 +44,4 @@ if (typeof window !== 'undefined') {
   };
   window.addEventListener('pagehide', stop);
   window.addEventListener('mediassist-session-expired', stop);
-}
-
-export function configuredCameraUrl() {
-  try {
-    const saved = localStorage.getItem(ROBOT_CAMERA_URL_KEY) || import.meta.env.VITE_ROBOT_CAMERA_URL || '';
-    const url = new URL(saved);
-    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password
-      && !(location.protocol === 'https:' && url.protocol !== 'https:') ? url.href : '';
-  } catch { return ''; }
 }

@@ -24,7 +24,7 @@ function ProtectedRoute({ children, adminOnly = false, allowPasswordChange = fal
   }, []);
   if (!authenticated || !hasSession()) return <Navigate to="/login" replace />;
   if (getSession()?.tokens?.mustChangePassword && !allowPasswordChange) return <Navigate to="/change-password" replace />;
-  if (adminOnly && getSession()?.account?.role !== 'ADMIN') return <Navigate to="/admin/workflow-catalog" replace />;
+  if (adminOnly && getSession()?.account?.role !== 'ADMIN') return <Navigate to="/admin/live-operations" replace />;
   return children;
 }
 

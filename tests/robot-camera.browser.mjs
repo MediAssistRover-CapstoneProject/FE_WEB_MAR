@@ -12,6 +12,7 @@ const writes = [], errors = [];
 page.on('pageerror', error => errors.push(error.message));
 await page.addInitScript(accountId => {
   localStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { accountId, username: 'camera-test', role: 'ADMIN' }, tokens: { accessToken: 'fixture' } }));
+  localStorage.setItem('mar.robotCameraUrl', 'http://pi.example.test:8080/stream');
   window.fakeRooms = []; window.captureRequests = 0;
   navigator.mediaDevices.getUserMedia = async () => { window.captureRequests++; throw Error('Local capture must never be requested'); };
 }, accountId);
@@ -61,14 +62,11 @@ try {
   await page.evaluate(async ({ robotId }) => {
     const { default: React } = await import('/node_modules/.vite/deps/react.js');
     const { default: ReactDOM } = await import('/node_modules/.vite/deps/react-dom_client.js');
-    const source = await fetch('/src/pages/Admin/robotOperations/RobotCamera.jsx').then(response => response.text());
-    const routerModule = source.match(/["']([^"']*\/react-router-dom\.js[^"']*)["']/)[1];
-    const { MemoryRouter } = await import(routerModule);
     const { default: Camera } = await import('/src/pages/Admin/robotOperations/RobotCamera.jsx');
     const root = ReactDOM.createRoot(document.getElementById('test-root'));
     window.renderCamera = (id, shared = false) => root.render(React.createElement(React.StrictMode, null,
-      React.createElement(MemoryRouter, null, id ? React.createElement(React.Fragment, null,
-        React.createElement(Camera, { key: id, robotId: id }), shared ? React.createElement(Camera, { key: id + '-second', robotId: id }) : null) : null)));
+      id ? React.createElement(React.Fragment, null,
+        React.createElement(Camera, { key: id, robotId: id }), shared ? React.createElement(Camera, { key: id + '-second', robotId: id }) : null) : null));
     window.renderCamera(robotId, true);
   }, { robotId });
   await expect(page.locator('.rc-live')).toHaveCount(2);
@@ -106,6 +104,9 @@ try {
   await page.waitForTimeout(400);
   await page.evaluate(id => window.renderCamera(id), robotId);
   await expect(page.locator('.rc-camera-card')).toContainText('Robot chưa kết nối dịch vụ camera');
+  await expect(page.locator('.rc-video img')).toHaveCount(0);
+  await expect(page.getByText('Nguồn video dự phòng', { exact: true })).toHaveCount(0);
+  await expect(page.locator('a[href*="tab=robot-camera"]')).toHaveCount(0);
   deviceOnline = true;
   await page.getByRole('button', { name: 'Kết nối lại', exact: true }).click();
   await expect(page.locator('.rc-live')).toHaveCount(1);

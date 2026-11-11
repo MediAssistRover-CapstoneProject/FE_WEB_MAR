@@ -7,14 +7,13 @@ import { screenTitles } from '../../api/workspaceCatalog.js';
 import { pathForScreen } from '../screenRoutes.js';
 import './AdminSidebar.css';
 
-const adminOnly = new Set(['Fall Camera', 'Robot Setup', 'Workflow Dispatch', 'AI Test', 'Users & Roles', 'System Settings', 'Audit Logs', 'Analytics', 'History & Replay']);
+const adminOnly = new Set(['Fall Camera', 'Robot Setup', 'Workflows', 'Workflow Dispatch', 'AI Test', 'Users & Roles', 'System Settings', 'Audit Logs', 'Analytics', 'History & Replay']);
 const menuLabels = {
   'Fall Camera': 'Camera & AI té ngã',
   'Facility Management': 'Thông tin bệnh viện',
   'AI Test': 'Kiểm thử AI',
   Workflows: 'Thiết kế quy trình',
   'Workflow Dispatch': 'Điều phối quy trình',
-  'Workflow Management': 'Danh mục quy trình',
 };
 
 const iconPaths = {
@@ -55,7 +54,7 @@ export default function AdminSidebar({ active, onSelect, onLogout }) {
 
   const select = item => {
     setMobileOpen(false);
-    if (item === 'Workflows') navigate(role === 'ADMIN' ? '/workflow' : pathForScreen('Workflow Management'));
+    if (item === 'Workflows') navigate(pathForScreen('Workflows'));
     else onSelect(item);
   };
 

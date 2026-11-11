@@ -76,6 +76,7 @@ export default function AdminApp({ onLanding }) {
     finally { clearSession(); if (onLanding) onLanding(); else navigate('/'); }
   };
   if (screenSlug === 'missions' || !screenSlug && requested === 'Missions') return <Navigate to="/admin/live-operations" replace />;
+  if (screenSlug === 'workflow-catalog' || !screenSlug && requested === 'Workflow Management') return <Navigate to={getSession()?.account?.role === 'ADMIN' ? '/workflow' : '/admin/live-operations'} replace />;
   if (screen === 'Robot Setup' && getSession()?.account?.role !== 'ADMIN') return <Navigate to="/admin/robots" replace />;
   return <div className="app"><AdminSidebar active={screen} onSelect={value => navigate(pathForScreen(value))} onLogout={handleLogout} /><main className="workspace"><AdminTopbar title={screen === 'Fall Camera' ? 'Camera & AI té ngã' : screen === 'Emergency Center' && getSession()?.account?.role === 'ADMIN' ? 'Giám sát SOS' : screen === 'AI Test' ? 'Kiểm thử AI' : screenTitles[screen] || vi(screen)} /><div className="content">{screen === 'Dashboard' ? <BackendDashboard /> : backendScreens.has(screen) ? <BackendWorkspace key={screen} section={screen} /> : <PageRouter page={screen} />}</div></main></div>;
 }

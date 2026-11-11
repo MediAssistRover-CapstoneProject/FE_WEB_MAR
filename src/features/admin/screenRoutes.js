@@ -12,7 +12,6 @@ const screenRoutes = {
   'History & Replay': '/admin/history-replay',
   Analytics: '/admin/analytics',
   'Audit Logs': '/admin/audit-logs',
-  'Workflow Management': '/admin/workflow-catalog',
   'Workflow Dispatch': '/admin/workflow-dispatch',
   'Voice & Scripts': '/admin/voice-scripts',
   'AI Test': '/admin/ai-test',
@@ -27,7 +26,7 @@ const slugToScreen = Object.fromEntries(Object.entries(screenRoutes)
   .map(([screen, path]) => [path.slice('/admin/'.length), screen]));
 
 export function pathForScreen(screen) {
-  const canonicalScreen = screen === 'Public Catalog' ? 'Facility Management' : screen;
+  const canonicalScreen = screen === 'Public Catalog' ? 'Facility Management' : screen === 'Workflow Management' ? 'Workflows' : screen;
   return canonicalScreen === 'Workflows' ? '/workflow' : screenRoutes[canonicalScreen] || '/admin';
 }
 

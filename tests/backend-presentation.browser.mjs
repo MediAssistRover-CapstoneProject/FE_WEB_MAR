@@ -36,7 +36,7 @@ await page.route('**/api/v1/**', async route => {
   if (path === '/api/v1/service-requests') return list([{ serviceRequestId: id(6), requestCode: 'REQ-1234567890ABCDEF', requestType: 'DELIVERY', status: 'RECOVERY_REQUIRED', requestedAt: date }]);
   return list([]);
 });
-const go = section => page.goto(`http://127.0.0.1:5173/admin?screen=${encodeURIComponent(section)}`);
+const go = section => page.goto(`${process.env.TEST_URL || 'http://127.0.0.1:5173'}/admin?screen=${encodeURIComponent(section)}`);
 const screenshot = name => page.screenshot({ path: `.workstation-build/presentation-${name}.png`, fullPage: true });
 try {
   await mkdir('.workstation-build', { recursive: true });
@@ -48,30 +48,25 @@ try {
   await screenshot('audit');
 
   await go('System Settings');
-  await page.locator('.be-records button').first().click();
-  await page.locator('.be-record-detail').getByText('30 giây', { exact: true }).waitFor();
-  assert.equal(await page.locator('.be-record-detail').getByText('Số', { exact: true }).count(), 1);
-  assert.equal(await page.locator('.be-record-detail').getByText(setting.description, { exact: true }).count(), 0);
+  const settingForm = page.getByRole('form', { name: 'Thời gian báo robot mất kết nối', exact: true });
+  await settingForm.getByRole('spinbutton').waitFor();
+  assert.equal(await settingForm.getByRole('spinbutton').inputValue(), '30');
+  assert.equal(await page.getByText(setting.description, { exact: true }).count(), 0);
   await screenshot('settings');
-  await page.locator('.be-technical > summary').click();
-  assert.ok(await page.getByText(setting.settingKey, { exact: true }).isVisible());
-  await page.getByRole('button', { name: 'Chỉnh sửa thông tin', exact: true }).click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: 'Xác nhận', exact: true }).click();
-  await dialog.getByText('Đã lưu thành công.', { exact: true }).waitFor();
+  await settingForm.getByRole('spinbutton').fill('60');
+  await settingForm.getByRole('button', { name: 'Lưu', exact: true }).click();
+  await settingForm.getByText('Đã lưu cấu hình.', { exact: true }).waitFor();
   assert.equal(writes.at(-1).path, `/api/v1/admin/system-settings/${id(1)}`);
   assert.equal(writes.at(-1).body.dataType, 'NUMBER');
-  assert.deepEqual(writes.at(-1).body.settingValue, { value: 30 });
-  await dialog.getByRole('button', { name: 'Hoàn tất', exact: true }).click();
+  assert.deepEqual(writes.at(-1).body.settingValue, { value: 60 });
 
   await page.getByRole('navigation', { name: 'Danh mục chức năng' }).getByRole('button', { name: 'Lưu trữ dữ liệu', exact: true }).click();
-  await page.getByText('10 chính sách lưu trữ', { exact: true }).waitFor();
-  const titles = await page.locator('.be-records strong').allTextContents();
+  await page.getByText('10 nhóm dữ liệu', { exact: true }).waitFor();
+  const titles = await page.locator('.sys-table tbody strong').allTextContents();
   assert.equal(new Set(titles).size, 10);
   assert.ok(titles.every(title => title !== 'Bản ghi' && !title.includes('_')));
-  assert.equal(await page.locator('.be-list-head').getByText('Trang 1', { exact: true }).count(), 0);
-  await page.locator('.be-records button').filter({ hasText: 'Nhật ký kiểm toán' }).click();
-  await page.locator('.be-record-detail h3').getByText('Nhật ký kiểm toán', { exact: true }).waitFor();
+  await page.getByRole('row').filter({ hasText: 'Nhật ký kiểm toán' }).getByRole('button').click();
+  await page.getByRole('heading', { name: 'Điều chỉnh · Nhật ký kiểm toán', exact: true }).waitFor();
   await screenshot('retention');
 
   await go('Robot Status');
@@ -103,7 +98,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   for (const section of ['Dashboard', 'Analytics', 'System Settings', 'Robot Status']) {
     await go(section);
-    await page.locator('.be-workspace').first().waitFor();
+    await page.locator(section === 'System Settings' ? '.sys-page' : '.be-workspace').first().waitFor();
     if (section === 'Robot Status') await page.locator('.be-filter > summary').click();
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${section} should fit mobile`);
   }

@@ -4,6 +4,10 @@
 
 Trang `/workflow` đã thay trình tạo workflow cũ. Xem [hướng dẫn và contract đầu vào](../docs/workflow-designer.md).
 
+Đã gỡ trang/menu Danh mục quy trình để dùng thư viện trong Thiết kế quy trình.
+`/admin/workflow-catalog` và `?screen=Workflow%20Management` chuyển Admin về `/workflow`;
+Staff được chuyển về Vận hành trực tiếp. Kiểm tra menu desktop/mobile và các liên kết cũ bằng `tests/sidebar.browser.mjs`.
+
 ```powershell
 node --test tests/workflow-designer.test.mjs tests/workflow-step-contracts.test.mjs tests/patrol-workflow.test.mjs tests/api-client.test.mjs tests/backend-contract.test.mjs
 node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5186 --strictPort
@@ -91,7 +95,7 @@ Phần xem trước có chiều cao giới hạn trên desktop/mobile.
 trang Quét (`/admin/map?stage=scan`), cùng trạng thái, camera, điều khiển và lưu map.
 Form mặc định thu gọn, có nút Hiện/Ẩn chi tiết và tóm tắt lựa chọn; giữ dữ liệu
 khi đóng/mở và tự thu gọn sau khi tạo phiên. Cài đặt hệ thống
-giữ cấu hình kết nối/nguồn camera và đường dẫn sang trang Quét.
+giữ cấu hình vận hành, MQTT và lưu trữ; nguồn camera dự phòng đã được gỡ.
 Khung map cao 700px trên desktop, 280px trên mobile; giữ tỉ lệ ảnh,
 có phóng to/thu nhỏ, vừa khung và toàn màn hình cho cả ảnh đang quét và ảnh đã lưu.
 
@@ -198,6 +202,8 @@ The design check uses fully mocked APIs on an isolated Vite origin (default
 `http://127.0.0.1:5198`, override with `TEST_BASE_URL`). It checks the always-visible
 overview, opening the correct detail group from a metric, map/mission placement,
 connection loss and layouts at 390/1024/1536px without sending API mutations.
+On desktop, the current mission ends level with the map; the job queue spans
+the full monitor width beneath both columns, including when no mission is active.
 It also checks that a 20-step mission scrolls internally, including wheel input
 at both ends, while the page, mission header and action remain still.
 Screenshots: `.workstation-build/live-operations-design/`.

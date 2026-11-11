@@ -22,6 +22,7 @@ try {
   assert.equal(new Set(screens).size, screens.length, 'Mỗi màn hình chỉ xuất hiện một lần trong cấu trúc menu');
   assert.equal(screens.includes('Crowd Heatmap'),false);
   assert.equal(screens.includes('Missions'), false);
+  assert.equal(screens.includes('Workflow Management'), false);
   for (const screen of screens) {
     const path = pathForScreen(screen);
     if (path.startsWith('/admin/')) assert.equal(screenForSlug(path.slice('/admin/'.length)), screen, `Route must retain the sidebar screen: ${screen}`);
@@ -29,6 +30,8 @@ try {
   assert.equal(pathForScreen('Public Catalog'), '/admin/facility');
   assert.equal(screenForSlug('public-catalog'), 'Facility Management');
   assert.equal(screenForSlug('missions'), null);
+  assert.equal(screenForSlug('workflow-catalog'), null);
+  assert.equal(pathForScreen('Workflow Management'), '/workflow');
 
   await page.goto(base+'/admin');
   const sidebar = page.locator('aside.sidebar');
@@ -58,9 +61,7 @@ try {
 
   await menu.getByRole('button', { name: vi('Automation') }).click();
   await menu.getByRole('button', { name: 'Thiết kế quy trình' }).waitFor();
-  await menu.getByRole('button', { name: 'Danh mục quy trình' }).click();
-  await page.waitForURL('**/admin/workflow-catalog');
-  assert.equal(await menu.getByRole('button', { name: vi('Automation') }).getAttribute('aria-expanded'), 'true');
+  assert.equal(await menu.getByRole('button', { name: 'Danh mục quy trình', exact: true }).count(), 0);
   await menu.getByRole('button', { name: 'Thiết kế quy trình' }).click();
   await page.waitForURL(/\/workflow(s)?$/);
   await page.locator('.wfd-page').waitFor();
@@ -71,6 +72,12 @@ try {
   assert.equal(await workflowSidebar.getByRole('button', { name: vi('Automation') }).getAttribute('aria-expanded'), 'true');
   assert.equal(await workflowSidebar.getByRole('button', { name: vi('Automation') }).evaluate(element => getComputedStyle(element).backgroundColor), 'rgb(245, 248, 254)');
   await page.screenshot({ path: '.workstation-build/sidebar-workflows.png' });
+  for (const oldPath of ['/admin/workflow-catalog', '/admin?screen=Workflow%20Management', '/admin/workflow-catalog?tab=published']) {
+    await page.goto(base + oldPath);
+    await page.waitForURL('**/workflow');
+    await page.locator('.wfd-page').waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Danh mục quy trình', exact: true }).count(), 0);
+  }
   await page.goto(base+'/admin/crowd-heatmap');
   await page.getByRole('heading',{name:'Bảng điều khiển',exact:true,level:1}).waitFor();
   await page.goto(base+'/admin?screen=Crowd%20Heatmap');
@@ -108,7 +115,15 @@ try {
   await page.waitForURL('**/admin/live-operations');
   await page.getByRole('button', { name: 'Mở menu' }).click();
   assert.equal(await menu.getByRole('button', { name: 'Nhiệm vụ', exact: true }).count(), 0);
-  console.log('PASS: sidebar gọn, đủ màn hình, hai loại quy trình rõ ràng và mở được trên mobile.');
+  for (const oldPath of ['/admin/workflow-catalog', '/admin?screen=Workflow%20Management', '/workflow']) {
+    await page.goto(base + oldPath);
+    await page.waitForURL('**/admin/live-operations');
+    await page.getByRole('button', { name: 'Mở menu' }).click();
+    await menu.getByRole('button', { name: vi('Automation'), exact: true }).click();
+    assert.equal(await menu.getByRole('button', { name: 'Thiết kế quy trình', exact: true }).count(), 0);
+    assert.equal(await menu.getByRole('button', { name: 'Danh mục quy trình', exact: true }).count(), 0);
+  }
+  console.log('PASS: sidebar navigation and mobile, one workflow designer entry, removed catalog redirects, role-safe workflow access.');
 } finally {
   await browser.close();
 }

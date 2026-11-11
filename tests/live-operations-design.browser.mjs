@@ -69,9 +69,18 @@ try {
   await expect(page.locator('.lo-metrics')).toBeVisible();
   await expect(page.locator('.lo-explorer')).not.toHaveAttribute('open', '');
   await expect(page.locator('.lo-metric strong')).toHaveText(['3', '2', '1', '1']);
+  const checkMonitorLayout = async width => {
+    const map = await page.locator('.rm-map').boundingBox(), mission = await page.locator('.rm-current').boundingBox();
+    const queue = await page.locator('.rm-queue').boundingBox(), layout = await page.locator('.rm-layout').boundingBox();
+    assert.ok(Math.abs(queue.x - layout.x) <= 1 && Math.abs(queue.width - layout.width) <= 1, 'job queue spans the full monitor width');
+    assert.ok(queue.y >= Math.max(map.y + map.height, mission.y + mission.height), 'job queue follows both map and mission');
+    if (width > 1000) assert.ok(Math.abs(map.y + map.height - mission.y - mission.height) <= 1, 'mission bottom aligns with the map');
+  };
+  await checkMonitorLayout(1536);
   await page.screenshot({ path: `${output}/desktop.png`, fullPage: true });
   for (const width of [1024, 390]) {
     await page.setViewportSize({ width, height: 900 });
+    await checkMonitorLayout(width);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `layout fits ${width}px`);
     await page.screenshot({ path: `${output}/${width === 390 ? 'mobile' : 'tablet'}.png`, fullPage: true });
   }
@@ -87,7 +96,8 @@ try {
     const cameraBounds = await page.locator('.rm-right .rc-camera-card').boundingBox();
     const missionBounds = await mission.boundingBox();
     assert.ok(cameraBounds.y + cameraBounds.height <= missionBounds.y, 'camera remains above the mission');
-    assert.ok(missionBounds.height <= 461, 'long content cannot grow the mission card');
+    await checkMonitorLayout(width);
+    if (width <= 1000) assert.ok(missionBounds.height <= 461, 'long content stays bounded when stacked');
     assert.ok(await body.evaluate(el => el.scrollHeight > el.clientHeight), 'long mission has its own scroll area');
     const headerY = (await mission.locator('header').boundingBox()).y;
     const actionY = (await mission.getByRole('button').boundingBox()).y;
@@ -120,6 +130,11 @@ try {
   await expect(page.locator('.rm-robot-telemetry')).toContainText('Chờ tín hiệu robot');
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: `${output}/disconnected.png`, fullPage: true });
+  jobs.splice(0, jobs.length);
+  await page.reload();
+  await expect(page.locator('.rm-mission-empty')).toBeVisible();
+  await checkMonitorLayout(1536);
+  await page.screenshot({ path: `${output}/empty-mission.png`, fullPage: true });
   assert.deepEqual(writes, []);
   assert.deepEqual(errors, []);
   console.log('PASS: overview, metric navigation, responsive 390/1024/1536px, camera above mission, bounded 20-step mission with contained wheel scrolling and fixed header/action, honest disconnected state; all APIs mocked and no mutations.');

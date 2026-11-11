@@ -198,6 +198,7 @@ export default function RobotMonitor({ jobs, catalogs, auto, revision, onOpen })
     <div className="rm-layout"><div className="rm-left">
       <RobotMap snapshot={snapshot} livePose={livePose} job={current} endpoints={catalogs.endpoints} fresh={fresh} revision={revision} auto={auto}
         stepDetail={<MissionProgress current={current} detail={detail} catalogs={catalogs} stale={dataFreshness(detailReceivedAt, now, !!detailError).stale} connected={!!connected} auto={auto} />} />
+    </div><aside className="rm-right"><RobotCamera key={robotId} robotId={robotId} placeholderIcon={<OperationsIcon name="camera" />} /><CurrentMission current={current} catalogs={catalogs} detail={detail} error={detailError} onOpen={onOpen} /></aside></div>
       <section className="rm-card rm-queue"><header><div className="rm-card-title"><span className="rm-card-icon"><OperationsIcon name="list" /></span><div><h3>Danh sách công việc</h3><small>Các lượt chạy của robot đang theo dõi</small></div></div><span className="rm-card-count">{tab === 'scheduled' ? upcoming.length : rows.length} công việc</span></header>
         <nav aria-label="Hàng đợi của robot">{[['running', 'Đang thực hiện', active.length], ['queue', 'Chờ thực hiện', waiting.length], ['scheduled', 'Theo lịch', upcoming.length]].map(([key, title, count]) => <button key={key} aria-pressed={tab === key} onClick={() => setTab(key)}>{title} <b>{count}</b></button>)}</nav>
         <p className="rm-caption">{tab === 'queue' ? 'Sắp theo ưu tiên và thời điểm vào hàng đợi. Máy chủ quyết định công việc đủ điều kiện chạy tiếp.' : tab === 'scheduled' ? 'Thời điểm kích hoạt kế tiếp từ lịch trên máy chủ.' : 'Công việc đang được robot tiếp nhận hoặc thực hiện.'}</p>
@@ -206,7 +207,6 @@ export default function RobotMonitor({ jobs, catalogs, auto, revision, onOpen })
           {rows.map((job, index) => { const entry = jobPresentation(job, catalogs); return <button className="rm-queue-row" key={job.jobId} onClick={() => onOpen(job)}><span className="rm-order" title="Thứ tự hiển thị">{index + 1}</span><strong>{entry.title}</strong><span>{entry.target || 'Chưa có điểm đến'}</span><span className="rm-pill">{job.status === 'QUEUED' ? 'Chờ thực hiện' : statusInfo(job.status).label}</span><span aria-hidden="true">›</span></button>; })}
         </>}
       </section>
-    </div><aside className="rm-right"><RobotCamera key={robotId} robotId={robotId} placeholderIcon={<OperationsIcon name="camera" />} /><CurrentMission current={current} catalogs={catalogs} detail={detail} error={detailError} onOpen={onOpen} /></aside></div>
   </div>;
 }
 
