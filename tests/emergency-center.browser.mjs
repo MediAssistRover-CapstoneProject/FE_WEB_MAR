@@ -16,6 +16,11 @@ async function fixture(account = { role: 'STAFF', accountId: id(50), fullName: '
   const statuses = ['OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'FALSE_ALARM'];
   const state = { failList: false, failDetail: false, failCatalogs: false, slowId: null, rows: statuses.map((status, index) => ({ incidentId: id(index + 1), status, incidentType: index % 2 ? 'SUSPECTED_FALL' : 'SOS', severity: index % 2 ? 'WARNING' : 'CRITICAL', description: `Nội dung kiểm tra sự cố ${index + 1}.`, robotId: id(20), mapId: id(21), endpointId: id(22), xM: 0, yM: 0, occurredAt: '2026-11-03T03:00:00Z', acknowledgedByAccountId: index ? id(50) : null, acknowledgedAt: index ? '2026-11-03T03:02:00Z' : null, resolvedAt: index >= 3 ? '2026-11-03T03:10:00Z' : null, closedAt: index >= 4 ? '2026-11-03T03:15:00Z' : null, rowVersion: 1 })) };
   const paged = (rows, url) => { const page = Number(url.searchParams.get('page') || 0), size = Number(url.searchParams.get('size') || 10); return { content: rows.slice(page * size, (page + 1) * size), totalElements: rows.length, totalPages: Math.ceil(rows.length / size), last: (page + 1) * size >= rows.length }; };
+  const source = { mapId: id(21), assetHash: 'a'.repeat(64), widthM: 10, heightM: 6, widthPx: 200, heightPx: 120, resolutionMPerPixel: .05, originXM: -5, originYM: -3, originYawRad: 0, frameId: 'map' };
+  const metadata = { map_id: id(21), asset_hash: source.assetHash, width_m: 10, height_m: 6, width_px: 200, height_px: 120, resolution_m_per_pixel: .05, origin_x_m: -5, origin_y_m: -3, origin_yaw_rad: 0, frame_id: 'map', pixel_center_to_map: [[.05, 0, -4.975], [0, -.05, 2.975], [0, 0, 1]] };
+  const area = (label, x, y, w, h, color) => ({ id: label, type: 'ROOM', label, color, points: [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }], fontSizeM: .23, lineWidthM: .03 });
+  const presentation = { source, document: { schemaVersion: 1, rotationDegrees: -12, backgroundColor: '#ffffff', features: [area('Phòng 01', .5, .5, 2.2, 1.6, '#5e85dc'), area('Phòng 02', 3, .5, 2.2, 1.6, '#3b9d96'), area('Phòng 03', 5.5, .5, 2.2, 1.6, '#c79a55'), area('Phòng trực', .5, 4, 2.2, 1.5, '#7e6cc1'), area('Sảnh', 4, 2.5, 3.2, 2.2, '#81a1bf')] } };
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=', 'base64');
   await page.route('**/api/v1/**', async route => {
     const request = route.request(), url = new URL(request.url()), path = url.pathname;
     const reply = (value, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) });
@@ -29,6 +34,11 @@ async function fixture(account = { role: 'STAFF', accountId: id(50), fullName: '
       return reply(row);
     }
     reads.push(path + url.search);
+    if (path.endsWith('/image-metadata')) return reply(metadata);
+    if (path.endsWith('/image.png')) return route.fulfill({ contentType: 'image/png', body: png });
+    if (path.endsWith('/presentation/published')) return reply(presentation);
+    if (path.endsWith('/snapshot')) return reply({ robot: { robotId: id(20), robotName: 'MAR-01', status: 'BUSY' }, activeJobId: id(60), mqttConnected: true, heartbeatFresh: true, observedAt: new Date().toISOString() });
+    if (path === '/api/v1/media-sessions') return reply([{ incidentId: id(1), robotId: id(20), mode: 'ASSIST', state: 'ACTIVE' }, { incidentId: id(1000), robotId: id(20), mode: 'ASSIST', state: 'RINGING' }]);
     if (path === '/api/v1/auth/me') return reply(account);
     if (path === '/api/v1/emergency-incidents') {
       if (state.failList) return reply({ message: 'Không tải được danh sách thử nghiệm' }, 503);
@@ -54,16 +64,40 @@ async function fixture(account = { role: 'STAFF', accountId: id(50), fullName: '
 try {
   const admin = await fixture({ role: 'ADMIN', accountId: id(50), fullName: 'Quản trị viên kiểm thử' }); await admin.start();
   assert.equal(await admin.page.locator('.ec-header h2').innerText(), 'Giám sát SOS');
+  assert.equal(await admin.page.locator('.ec-incident').count(), 4, 'only nonterminal incidents appear in ongoing queue');
+  await admin.page.getByText('Đang hỗ trợ qua cuộc gọi', { exact: true }).waitFor();
+  assert.equal(admin.reads.some(read => /^\/api\/v1\/media\?/.test(read)), false, 'do not fetch global media library');
+  await admin.page.locator('.ec-map-preview [role=img]').waitFor();
+  assert.equal(await admin.page.locator('.ec-map-preview title').textContent(), 'Vị trí ghi nhận trong sự cố');
+  const pulse = admin.page.locator('.ec-sos-pulse');
+  assert.equal(await pulse.evaluate(node => getComputedStyle(node).animationName), 'ec-sos-ripple');
+  assert.equal(await pulse.evaluate(node => getComputedStyle(node).animationDuration), '1.8s');
+  await admin.page.emulateMedia({ reducedMotion: 'reduce' });
+  assert.equal(await pulse.evaluate(node => getComputedStyle(node).animationName), 'none', 'respect reduced motion while keeping the location visible');
+  assert.equal(await admin.page.locator('.ec-sos-marker-core').isVisible(), true);
+  await admin.page.emulateMedia({ reducedMotion: 'no-preference' });
+  await admin.page.locator('.ec-metric').filter({ hasText: 'Chưa tiếp nhận' }).click();
+  assert.equal(await admin.page.locator('.ec-incident').count(), 1);
+  await admin.page.getByRole('button', { name: 'Bỏ lọc nhanh' }).click();
+  assert.equal(await admin.page.locator('.ec-incident').count(), 4);
+  await admin.page.locator('.ec-tabs').getByRole('button', { name: /^Đang diễn ra/ }).click();
+  await admin.page.locator('.ec-detail-header').waitFor();
+
   await admin.page.getByRole('button', { name: 'Giám sát SOS', exact: true }).waitFor();
   await admin.page.getByText('Chế độ giám sát · Staff tiếp nhận và cập nhật kết quả xử lý SOS.', { exact: true }).waitFor();
   for (let index = 0; index < 6; index++) {
-    await admin.page.locator('.ec-incident').nth(index).click();
+    if (index === 4) await admin.page.locator('.ec-tabs').getByRole('button', { name: 'Lịch sử', exact: true }).click();
+    await admin.page.locator(`[data-incident-id="${id(index + 1)}"]`).click();
     await admin.page.locator('.ec-description').getByText(`Nội dung kiểm tra sự cố ${index + 1}.`, { exact: true }).waitFor();
+    await admin.page.locator('.ec-sos-marker').waitFor();
+    assert.equal(await admin.page.locator('.ec-sos-marker.is-active').count(), index < 3 ? 1 : 0, 'pulse only while waiting for or receiving support');
+    assert.equal(await admin.page.locator('.ec-sos-pulse').count(), index < 3 ? 1 : 0, 'stop pulse when resolved, closed or false alarm');
     assert.equal(await admin.page.locator('.ec-next-step button, .ec-false-alarm').count(), 0, 'admin must have no incident mutation controls in any state');
     assert.equal(await admin.page.getByRole('dialog').count(), 0);
   }
   assert.equal(admin.writes.length, 0);
-  await admin.page.locator('.ec-incident').first().click();
+  await admin.page.locator('.ec-tabs').getByRole('button', { name: /^Đang diễn ra/ }).click();
+  await admin.page.locator(`[data-incident-id="${id(1)}"]`).click();
   await admin.page.getByText('Đang chờ staff tiếp nhận và xác minh tình huống thực tế.', { exact: true }).waitFor();
   await admin.page.screenshot({ path: `${output}/admin-monitoring.png`, fullPage: true });
   assert.deepEqual(admin.errors, []); await admin.context.close();
@@ -106,6 +140,7 @@ try {
   await f.page.getByRole('button', { name: 'Đóng hồ sơ', exact: true }).waitFor();
   assert.equal(f.writes[1].body.resolutionNote, 'Đã kiểm tra và hoàn thành hỗ trợ thực tế.');
 
+  await f.page.locator('.ec-tabs').getByRole('button', { name: 'Lịch sử', exact: true }).click();
   await f.page.getByLabel('Trạng thái sự cố').selectOption('CLOSED');
   await f.page.locator('.ec-detail-kicker').getByText('Đã đóng', { exact: true }).waitFor();
   assert.equal(await f.page.getByRole('button', { name: 'Đóng hồ sơ', exact: true }).count(), 0);
@@ -122,9 +157,10 @@ try {
   f.state.failDetail = false; f.state.failList = false;
   await f.page.getByRole('button', { name: 'Tải lại', exact: true }).click();
   await f.page.getByLabel('Trạng thái sự cố').selectOption('');
-  await f.page.locator('.ec-incident').nth(5).waitFor();
+  await f.page.locator('.ec-tabs').getByRole('button', { name: /^Đang diễn ra/ }).click();
+  await f.page.locator(`[data-incident-id="${id(3)}"]`).waitFor();
   f.state.slowId = id(2);
-  await f.page.locator('.ec-incident').nth(1).click(); await f.page.locator('.ec-incident').nth(2).click();
+  await f.page.locator(`[data-incident-id="${id(2)}"]`).click(); await f.page.locator(`[data-incident-id="${id(3)}"]`).click();
   await f.page.getByRole('button', { name: 'Xác nhận xử lý xong', exact: true }).waitFor();
   await f.page.waitForTimeout(800);
   assert.match(await f.page.locator('.ec-reference').innerText(), /11111111/);
@@ -147,7 +183,7 @@ try {
   assert.deepEqual(f.errors, []); await f.context.close();
 
   const g = await fixture({ role: 'STAFF', accountId: id(70), fullName: 'Nhân viên khác' }); await g.start();
-  await g.page.locator('.ec-incident').nth(1).click();
+  await g.page.locator(`[data-incident-id="${id(2)}"]`).click();
   await g.page.getByText(/Sự cố do nhân viên khác tiếp nhận/).waitFor();
   assert.equal(await g.page.getByRole('button', { name: 'Bắt đầu xử lý', exact: true }).count(), 0);
   assert.equal(g.reads.some(read => read.startsWith('/api/v1/admin/staff')), false);
@@ -155,8 +191,8 @@ try {
 
   const h = await fixture(); h.state.rows = [];
   await h.page.goto(`${base}/admin/emergency-center`);
-  await h.page.getByText('Chưa có sự cố được ghi nhận', { exact: true }).waitFor();
-  await h.page.getByText('Chọn một sự cố để xem vị trí, tiến trình và thao tác tiếp theo.', { exact: true }).waitFor();
+  await h.page.getByText('Không có SOS đang diễn ra', { exact: true }).waitFor();
+  await h.page.getByText('Chọn một sự cố để xem vị trí, người phụ trách và tiến trình hỗ trợ.', { exact: true }).waitFor();
   assert.equal(h.writes.length, 0); assert.deepEqual(h.errors, []); await h.context.close();
 
   const p = await fixture();

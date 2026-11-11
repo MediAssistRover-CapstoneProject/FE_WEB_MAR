@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { incidentActions, assertIncidentAction, incidentPresentation, incidentQuery, incidentTimeline, newerIncident } from '../src/features/operations/emergencyCenter.js';
+import { incidentActions, assertIncidentAction, incidentPresentation, incidentQuery, incidentTimeline, newerIncident, prioritizeIncidents, filterActiveIncidents, incidentOverdue, loadIncidentHistory } from '../src/features/operations/emergencyCenter.js';
 
 test('incident actions follow the BE state machine, including false alarms', () => {
   const account = { role: 'STAFF', accountId: 'owner' };
@@ -60,4 +60,45 @@ test('date filters cover the full local day and reject reversed ranges', () => {
   assert.equal(query.from, new Date(2026, 10, 3, 0, 0, 0).toISOString());
   assert.equal(query.to, new Date(2026, 10, 3, 23, 59, 59, 999).toISOString());
   assert.throws(() => incidentQuery({ from: '2026-11-04', to: '2026-11-03' }), /Ngày kết thúc/);
+});
+
+test('routing identifies the designated responder and blocks another staff account', () => {
+  const row = { status: 'OPEN', sosResponderAccountId: 'duty', sosRoutingStatus: 'ASSIGNED' };
+  assert.deepEqual(incidentActions(row, { role: 'STAFF', accountId: 'other' }), []);
+  assert.deepEqual(incidentActions(row, { role: 'STAFF', accountId: 'duty' }), ['acknowledge', 'false-alarm']);
+  assert.deepEqual(incidentActions({ ...row, sosResponderAccountId: null, sosRoutingStatus: 'NO_ACTIVE_SHIFT' }, { role: 'STAFF', accountId: 'duty' }), []);
+  assert.equal(incidentPresentation(row, { staff: [{ account: { accountId: 'duty', fullName: 'Nhân viên trực' } }] }).responder, 'Nhân viên trực');
+});
+
+test('queue prioritizes waiting incidents, uses reception time for overdue, and filters assigned responders correctly', () => {
+  const now = Date.parse('2026-11-11T08:00:00Z');
+  const rows = [
+    { incidentId: 'handled', status: 'IN_PROGRESS', occurredAt: '2026-11-11T07:00:00Z', acknowledgedByAccountId: 's', severity: 'CRITICAL' },
+    { incidentId: 'recent', status: 'OPEN', occurredAt: '2026-11-11T07:59:00Z', sosResponderAccountId: 's', severity: 'CRITICAL' },
+    { incidentId: 'old', status: 'OPEN', occurredAt: '2026-11-11T07:50:00Z', severity: 'WARNING', incidentType: 'SUSPECTED_FALL' },
+    { incidentId: 'done', status: 'RESOLVED', occurredAt: '2026-11-11T07:40:00Z' },
+  ];
+  assert.deepEqual(prioritizeIncidents(rows, now).map(row => row.incidentId), ['old', 'recent', 'handled', 'done']);
+  assert.equal(incidentOverdue(rows[0], now), false);
+  assert.equal(incidentOverdue({ status: 'OPEN', occurredAt: 'invalid' }, now), false);
+  assert.deepEqual(filterActiveIncidents(rows, {}, 'unassigned', now).map(row => row.incidentId), ['old']);
+  assert.deepEqual(filterActiveIncidents(rows, { type: 'SOS' }, 'overdue', now), []);
+  assert.deepEqual(filterActiveIncidents(rows, { type: 'SUSPECTED_FALL' }, 'overdue', now).map(row => row.incidentId), ['old']);
+});
+
+test('history merges separate BE status streams into globally ordered pages and exact totals', async () => {
+  const rows = Array.from({ length: 39 }, (_, index) => ({ incidentId: String(index), status: index % 3 ? 'CLOSED' : 'FALSE_ALARM', occurredAt: new Date(Date.UTC(2026, 10, 11, 0, index)).toISOString() })).reverse();
+  const queries = [];
+  const fetchPage = async query => {
+    queries.push(query);
+    const filtered = rows.filter(row => row.status === query.status);
+    return { content: filtered.slice(query.page * query.size, (query.page + 1) * query.size), totalPages: Math.ceil(filtered.length / query.size), totalElements: filtered.length };
+  };
+  const result = await loadIncidentHistory(fetchPage, {}, 2);
+  assert.deepEqual(result.content, rows.slice(20, 30));
+  assert.equal(result.totalElements, 39); assert.equal(result.totalPages, 4);
+  assert.ok(queries.every(query => ['CLOSED', 'FALSE_ALARM'].includes(query.status) && query.size === 10));
+  const closed = await loadIncidentHistory(fetchPage, { status: 'CLOSED' }, 0);
+  assert.equal(closed.totalElements, 26); assert.ok(closed.content.every(row => row.status === 'CLOSED'));
+  await assert.rejects(() => loadIncidentHistory(async () => ({ content: null }), {}, 0), /không đúng định dạng/);
 });

@@ -19,6 +19,7 @@ export function incidentActions(incident, account) {
   // Admin uses this page for monitoring. Staff reception/routing is managed
   // separately by BE; do not expose incident mutations in the admin view.
   if (account?.role !== 'STAFF') return [];
+  if (incident.sosRoutingStatus && incident.sosResponderAccountId !== account.accountId) return [];
   const owner = !!account.accountId && account.accountId === incident.acknowledgedByAccountId;
   if (incident.status === 'OPEN') return ['acknowledge', ...(!incident.acknowledgedByAccountId || owner ? ['false-alarm'] : [])];
   if (incident.status === 'ACKNOWLEDGED') return owner ? ['start', 'false-alarm'] : [];
@@ -54,9 +55,65 @@ export function incidentPresentation(incident, catalogs = {}, account = {}) {
     map: map?.mapName || map?.mapCode || (incident.mapId ? `Bản đồ · ${incident.mapId.slice(0, 8)}` : 'Chưa ghi nhận bản đồ'),
     endpoint: endpoint?.endpointName || endpoint?.endpointCode || (incident.endpointId ? `Điểm · ${incident.endpointId.slice(0, 8)}` : 'Chưa ghi nhận điểm cụ thể'),
     owner: person(incident.acknowledgedByAccountId),
+    responder: incident.sosResponderAccountId ? person(incident.sosResponderAccountId) : null,
     resolver: incident.resolvedByAccountId ? person(incident.resolvedByAccountId) : null,
     coordinates: typeof incident.xM === 'number' && typeof incident.yM === 'number' ? `${incident.xM.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} m · ${incident.yM.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} m` : null,
   };
+}
+
+export const ACTIVE_INCIDENT_STATUSES = ['OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS', 'RESOLVED'];
+export const HISTORY_INCIDENT_STATUSES = ['CLOSED', 'FALSE_ALARM'];
+export const WAIT_WARNING_MINUTES = 5;
+export const SOS_ROUTING_LABELS = {
+  ASSIGNED: 'Đã tìm được nhân viên trực',
+  NO_MONITORING_ROOM: 'Chưa cấu hình phòng trực SOS',
+  ROOM_UNAVAILABLE: 'Phòng trực SOS không khả dụng',
+  NO_ACTIVE_SHIFT: 'Chưa có nhân viên trong ca trực',
+  AMBIGUOUS_SHIFT: 'Ca trực bị trùng, cần kiểm tra',
+};
+export const hasIncidentResponder = incident => !!(incident.acknowledgedByAccountId || incident.sosResponderAccountId);
+export const incidentOverdue = (incident, now = Date.now()) => incident.status === 'OPEN'
+  && Number.isFinite(Date.parse(incident.occurredAt)) && now - Date.parse(incident.occurredAt) >= WAIT_WARNING_MINUTES * 60000;
+
+export function prioritizeIncidents(rows, now = Date.now()) {
+  const rank = row => row.status === 'OPEN' ? (incidentOverdue(row, now) ? 0 : 1) : row.status === 'RESOLVED' ? 3 : 2;
+  return [...rows].sort((a, b) => rank(a) - rank(b)
+    || (a.severity === 'CRITICAL' ? 0 : 1) - (b.severity === 'CRITICAL' ? 0 : 1)
+    || (a.status === 'OPEN' && b.status === 'OPEN' ? Date.parse(a.occurredAt) - Date.parse(b.occurredAt) : Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
+    || a.incidentId.localeCompare(b.incidentId));
+}
+
+export function filterActiveIncidents(rows, filters, quick, now = Date.now()) {
+  const query = incidentQuery(filters);
+  return prioritizeIncidents(rows.filter(row => (!filters.status || row.status === filters.status)
+    && (!filters.severity || row.severity === filters.severity) && (!filters.type || row.incidentType === filters.type)
+    && (!filters.mapId || row.mapId === filters.mapId)
+    && (!query.from || Date.parse(row.occurredAt) >= Date.parse(query.from))
+    && (!query.to || Date.parse(row.occurredAt) <= Date.parse(query.to))
+    && (!quick || quick === 'open' && row.status === 'OPEN'
+      || quick === 'handling' && ['ACKNOWLEDGED', 'IN_PROGRESS'].includes(row.status)
+      || quick === 'unassigned' && !hasIncidentResponder(row) && row.status !== 'RESOLVED'
+      || quick === 'overdue' && incidentOverdue(row, now))), now);
+}
+
+// BE accepts one status per request. Merge the first N rows of each terminal
+// stream so history remains globally ordered and paginated without loading it all.
+export async function loadIncidentHistory(fetchPage, filters, page, size = 10) {
+  const statuses = filters.status ? [filters.status] : HISTORY_INCIDENT_STATUSES;
+  const streams = await Promise.all(statuses.map(async status => {
+    const first = await fetchPage({ ...incidentQuery(filters), status, page: 0, size });
+    if (!Array.isArray(first?.content) || !Number.isFinite(first.totalElements)) throw Error('Danh sách sự cố không đúng định dạng.');
+    const parts = [first];
+    for (let index = 1; index <= page && index < first.totalPages; index++) {
+      const value = await fetchPage({ ...incidentQuery(filters), status, page: index, size });
+      if (!Array.isArray(value?.content)) throw Error('Danh sách sự cố không đúng định dạng.');
+      parts.push(value);
+    }
+    return { rows: parts.flatMap(part => part.content), total: first.totalElements };
+  }));
+  const rows = streams.flatMap(stream => stream.rows).sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || a.incidentId.localeCompare(b.incidentId));
+  const totalElements = streams.reduce((sum, stream) => sum + stream.total, 0);
+  return { content: rows.slice(page * size, (page + 1) * size), totalElements, totalPages: Math.ceil(totalElements / size) };
 }
 
 export function incidentQuery(filters) {
