@@ -8,6 +8,7 @@ export const ROOM_TYPES = [
   ['PHARMACY', 'Kho dược'],
   ['LABORATORY', 'Phòng xét nghiệm'],
   ['WAITING_AREA', 'Khu chờ'],
+  ['SOS', 'Phòng trực SOS'],
   ['OTHER', 'Khác'],
 ];
 
