@@ -48,9 +48,15 @@ export default function MapPresentationWorkspace(props) {
     const room = rooms.find(value => value.roomId === roomId);
     if (!room) { update({ roomId: null }); return; }
     const endpoint = endpoints.find(value => value.roomId === room.roomId && value.active && value.accessible);
+    const chosenEndpoint = endpoint || endpoints.find(value => value.endpointId === selected.endpointId);
     update({ roomId: room.roomId, roomCode: room.roomCode, roomName: room.roomName, label: room.roomName,
       roomType: room.roomType, departmentCode: room.departmentCode || '', roomDescription: room.description || '',
-      roomPublicVisible: room.publicVisible !== false, endpointId: endpoint?.endpointId || selected.endpointId || null });
+      roomPublicVisible: room.publicVisible !== false, endpointId: chosenEndpoint?.endpointId || null,
+      endpointName: chosenEndpoint?.endpointName || '' });
+  };
+  const chooseEndpoint = endpointId => {
+    const endpoint = endpoints.find(value => value.endpointId === endpointId);
+    update({ endpointId: endpoint?.endpointId || null, endpointName: endpoint?.endpointName || '' });
   };
   return <div className={`mp-editor${expanded ? ' is-expanded' : ''}`}>
     <header className="mp-heading">
@@ -93,6 +99,7 @@ export default function MapPresentationWorkspace(props) {
             <label className="mp-field">Tên phòng *<input maxLength={160} placeholder="Phòng khám 01" value={selected.roomName ?? selected.label} onChange={e => update({ roomName: e.target.value, label: e.target.value })} /></label>
             <label className="mp-field">Loại phòng *<RoomTypeSelect required value={selected.roomType || ''} onChange={roomType => update({ roomType })} /></label>
             <label className="mp-field">Mã khoa<RoomDepartmentSelect value={selected.departmentCode || ''} onChange={departmentCode => update({ departmentCode })} /></label>
+            <label className="mp-field">Tên endpoint *<input maxLength={160} placeholder="Ví dụ: Cửa phòng khám 01" value={selected.endpointName || ''} onChange={e => update({ endpointName: e.target.value })} /></label>
             <label className="mp-field">Mô tả<textarea rows="3" value={selected.roomDescription || ''} onChange={e => update({ roomDescription: e.target.value })} /></label>
             <label className="mp-room-public"><input type="checkbox" checked={selected.roomPublicVisible !== false} onChange={e => update({ roomPublicVisible: e.target.checked })} />Hiển thị phòng trong thông tin bệnh viện</label>
           </div>}
@@ -108,7 +115,7 @@ export default function MapPresentationWorkspace(props) {
           {area && <div className="mp-room-note"><span className="mp-room-sample" style={{ backgroundColor: `${selectedAreaColor}18`, borderColor: selectedAreaColor }} /><div><strong>Nền màu nhạt, viền mảnh</strong><p>Màu riêng giúp phân biệt các phòng cạnh nhau, vẫn thấy rõ map bên dưới.</p></div></div>}
           <label className="mp-field mp-color-field">{area ? selected.type === 'ROOM' ? 'Màu phòng' : 'Màu hành lang' : 'Màu hiển thị'}<input type="color" value={area ? selectedAreaColor : selected.color} onChange={e => update({ color: e.target.value })} /></label>
           <div className="mp-field"><span>Cỡ nhãn</span><div className="mp-segmented">{[['Nhỏ', .7], ['Vừa', 1], ['Lớn', 1.5]].map(([name, factor]) => { const size = Math.min(5, Math.max(.05, Math.round(baseFont * factor * 100) / 100)); return <button key={name} aria-pressed={Math.abs(selected.fontSizeM - size) < .005} onClick={() => update({ fontSizeM: size })}>{name}</button>; })}</div></div>
-          <label className="mp-field">{roomFeature ? 'Endpoint của phòng *' : 'Gắn điểm đích thật'}<select value={selected.endpointId || ''} onChange={e => update({ endpointId: e.target.value || null })}><option value="">{roomFeature ? 'Chọn endpoint của phòng' : 'Không gắn điểm'}</option>{endpoints.filter(e => e.active && e.accessible && (!roomFeature || !e.roomId || e.roomId === selected.roomId)).map(e => <option key={e.endpointId} value={e.endpointId}>{e.endpointName}</option>)}</select></label>
+          <label className="mp-field">{roomFeature ? 'Endpoint của phòng *' : 'Gắn điểm đích thật'}<select value={selected.endpointId || ''} onChange={e => roomFeature ? chooseEndpoint(e.target.value) : update({ endpointId: e.target.value || null })}><option value="">{roomFeature ? 'Chọn endpoint của phòng' : 'Không gắn điểm'}</option>{endpoints.filter(e => e.active && e.accessible && (!roomFeature || !e.roomId || e.roomId === selected.roomId)).map(e => <option key={e.endpointId} value={e.endpointId}>{e.endpointName}</option>)}</select></label>
           <details className="mp-advanced"><summary>Tùy chỉnh nâng cao</summary><label className="mp-field">Cỡ chữ (m)<input type="number" min=".05" max="5" step=".01" value={selected.fontSizeM} onChange={e => update({ fontSizeM: Number(e.target.value) })} /></label>{!area && <label className="mp-field">Độ dày nét (m)<input type="number" min=".01" max="2" step=".01" value={selected.lineWidthM} onChange={e => update({ lineWidthM: Number(e.target.value) })} /></label>}<p className="mp-field-label">Tọa độ đỉnh (m)</p>{selected.points.map((point, index) => <div className="mp-coordinate" key={index}><small>{index + 1}</small>{['x', 'y'].map(axis => <label key={axis}><span>{axis.toUpperCase()}</span><input aria-label={`Đỉnh ${index + 1} ${axis}`} type="number" step=".01" min="0" max={axis === 'x' ? entry.source.widthM : entry.source.heightM} value={point[axis]} onChange={e => update({ points: selected.points.map((v, i) => i === index ? { ...v, [axis]: Number(e.target.value) } : v) })} /></label>)}</div>)}<div className="mp-layer-order"><button onClick={() => change({ ...document, features: [selected, ...document.features.filter(f => f.id !== selectedId)] })}>Đưa xuống dưới</button><button onClick={() => change({ ...document, features: [...document.features.filter(f => f.id !== selectedId), selected] })}>Đưa lên trên</button></div></details>
           <div className="mp-object-actions"><button onClick={duplicateSelected}>⧉ Nhân bản</button><button className="mp-delete" onClick={removeSelected}>Xóa <kbd>Del</kbd></button></div>
         </fieldset> : <div className="mp-empty-selection"><ToolIcon name="select" /><strong>Chọn đối tượng để chỉnh</strong><p>Bấm lên phòng, tường hoặc tên trong danh sách bên dưới.</p><button className="mp-button" disabled={locked || preview} onClick={() => chooseTool('ROOM')}>+ Vẽ phòng <kbd>R</kbd></button></div>}</div>

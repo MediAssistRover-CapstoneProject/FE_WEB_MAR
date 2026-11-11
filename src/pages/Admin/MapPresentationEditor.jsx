@@ -15,11 +15,12 @@ function hydrateRoomFeatures(document, endpoints, rooms) {
     if (feature.type !== 'ROOM') return feature;
     const endpoint = endpoints.find(value => value.endpointId === feature.endpointId);
     const room = rooms.find(value => value.roomId === feature.roomId || value.roomId === endpoint?.roomId);
-    if (!room) return feature;
+    if (!room) return { ...feature, endpointName: feature.endpointName ?? endpoint?.endpointName ?? '' };
     return { ...feature, roomId: room.roomId, roomCode: feature.roomCode || room.roomCode,
       roomName: feature.roomName || room.roomName, label: feature.label || room.roomName,
       roomType: feature.roomType || room.roomType, departmentCode: feature.departmentCode ?? room.departmentCode ?? '',
-      roomDescription: feature.roomDescription ?? room.description ?? '', roomPublicVisible: feature.roomPublicVisible ?? room.publicVisible };
+      roomDescription: feature.roomDescription ?? room.description ?? '', roomPublicVisible: feature.roomPublicVisible ?? room.publicVisible,
+      endpointName: feature.endpointName ?? endpoint?.endpointName ?? '' };
   }) };
 }
 
@@ -297,8 +298,8 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
       const snapshot = name === 'unpublish' ? current.current : persistRoomColors(current.current), changed = JSON.stringify(snapshot) !== saved;
       const issues = presentationIssues(snapshot, entry.source); if (issues.length) throw Error(issues[0]);
       if (name === 'publish') {
-        const incomplete = snapshot.features.find(feature => feature.type === 'ROOM' && (!feature.endpointId || !feature.roomCode?.trim() || !(feature.roomName || feature.label)?.trim() || !feature.roomType?.trim()));
-        if (incomplete) throw Error(`Phòng "${incomplete.roomName || incomplete.label || 'chưa đặt tên'}" cần đủ mã phòng, tên, loại phòng và điểm đích trước khi áp dụng.`);
+        const incomplete = snapshot.features.find(feature => feature.type === 'ROOM' && (!feature.endpointId || !feature.endpointName?.trim() || !feature.roomCode?.trim() || !(feature.roomName || feature.label)?.trim() || !feature.roomType?.trim()));
+        if (incomplete) throw Error(`Phòng "${incomplete.roomName || incomplete.label || 'chưa đặt tên'}" cần đủ mã phòng, tên, loại phòng, điểm đích và tên endpoint trước khi áp dụng.`);
       }
       let value = entry;
       if (name !== 'unpublish' && (changed || !entry.revision)) value = await mapPresentationApi.save(mapId, { expectedRevision: entry.revision, sourceAssetHash: entry.source.assetHash, document: snapshot });
@@ -320,7 +321,7 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
         setRooms(previous => [...previous.filter(room => !synchronized.some(value => value.roomId === room.roomId)), ...synchronized]);
         setEndpoints(previous => previous.map(endpoint => {
           const feature = value.draft.features.find(item => item.type === 'ROOM' && item.endpointId === endpoint.endpointId);
-          return feature ? { ...endpoint, roomId: feature.roomId, publicVisible: feature.roomPublicVisible !== false || endpoint.publicVisible } : endpoint;
+          return feature ? { ...endpoint, endpointName: (feature.endpointName || endpoint.endpointName || '').trim(), roomId: feature.roomId, publicVisible: feature.roomPublicVisible !== false || endpoint.publicVisible } : endpoint;
         }));
       }
       setNotice(name === 'publish' ? 'Đã áp dụng bản đồ và đồng bộ phòng, điểm đích vào database.' : name === 'unpublish' ? 'Đã bỏ áp dụng bản vẽ, giữ lại bản nháp.' : 'Đã lưu bản nháp trên máy chủ.');
@@ -339,7 +340,7 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     const dy = Math.min(.15, entry.source.heightM - Math.max(...selected.points.map(p => p.y)));
     const clone = { ...selected, id: crypto.randomUUID(), label: selected.label ? (selected.label + ' (bản sao)').slice(0, 120) : '', points: selected.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
     if (clone.type === 'ROOM') {
-      clone.color = nextRoomColor(clone.points, document.features); clone.roomId = null; clone.endpointId = null;
+      clone.color = nextRoomColor(clone.points, document.features); clone.roomId = null; clone.endpointId = null; clone.endpointName = '';
       clone.roomCode = nextRoomCode([...roomCatalog.current, ...document.features]); clone.roomName = clone.label; clone.roomPublicVisible = true;
     }
     change({ ...document, features: [...document.features, clone] }); setSelectedId(clone.id);
