@@ -73,11 +73,11 @@ try {
   await expect(offline.getByRole('status')).toHaveText('Đã lưu cấu hình.');
   assert.equal(writes.length, 1, 'Duplicate submissions must not send duplicate writes');
   assert.deepEqual(writes[0].body, { settingValue: { value: 60 }, dataType: 'NUMBER', category: 'OPERATIONS', description: 'Backend description', publicSetting: false });
-  const sos = form('Phòng tiếp nhận SOS');
-  await expect(sos.locator('option').filter({ hasText: 'Phòng đã đóng' })).toBeDisabled();
-  await sos.getByRole('combobox').selectOption(id(7)); await sos.getByRole('button', { name: 'Lưu', exact: true }).click();
-  await expect(sos.getByRole('status')).toBeVisible();
-  assert.equal(writes[1].method, 'POST'); assert.equal(writes[1].body.settingKey, 'sos.monitoring-room-id');
+  const sos = page.getByRole('region', { name: 'Phòng tiếp nhận SOS', exact: true });
+  await expect(sos).toContainText('Chưa cấu hình phòng tiếp nhận SOS.');
+  await expect(sos.getByRole('combobox')).toHaveCount(0);
+  await expect(sos.getByRole('link', { name: /Quản lý phòng/ })).toHaveAttribute('href', '/admin/facility?tab=rooms');
+  assert.equal(writes.length, 1, 'SOS is managed only through room APIs');
   await button('Chẩn đoán MQTT').click();
   await expect(page.getByRole('cell', { name: 'MAR-01', exact: true })).toBeVisible();
   await expect(page.getByLabel('Lý do thay đổi')).not.toBeVisible();
@@ -151,7 +151,7 @@ try {
   await expect(page.getByRole('alert')).toContainText('Đăng nhập tài khoản quản trị viên');
   assert.equal(calls.filter(call => call.includes('/admin/system-settings')).length, settingsReads);
   assert.deepEqual(errors, []);
-  console.log('PASS: controller methods/payloads, bounds, SOS selection, MQTT revision conflict, retention policy keys and preview/execute gating, removed fallback-camera settings, load failure recovery, all tabs at 1500/1100/768/390px. All APIs mocked.');
+  console.log('PASS: controller methods/payloads, bounds, read-only SOS configuration, MQTT revision conflict, retention policy keys and preview/execute gating, removed fallback-camera settings, load failure recovery, all tabs at 1500/1100/768/390px. All APIs mocked.');
 } catch (error) {
   console.log(await page.evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth, overflow: [...document.querySelectorAll('body *')].map(element => ({ tag: element.tagName, class: element.className?.baseVal ?? element.className, right: Math.round(element.getBoundingClientRect().right), width: Math.round(element.getBoundingClientRect().width), scrollWidth: element.scrollWidth })).filter(item => item.right > innerWidth + 1).slice(0, 35) })));
   await snapshot('failure'); throw error;

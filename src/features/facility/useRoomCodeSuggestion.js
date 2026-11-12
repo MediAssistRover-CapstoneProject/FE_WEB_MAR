@@ -3,15 +3,15 @@ import { readCatalog } from '../api/backendApi.js';
 import { nextRoomCode } from './roomDefaults.js';
 
 export function useRoomCodeSuggestion(enabled) {
-  const [result, setResult] = useState({ code: '', loading: enabled, error: '' });
+  const [result, setResult] = useState({ code: '', rooms: null, loading: enabled, error: '' });
   useEffect(() => {
-    if (!enabled) { setResult({ code: '', loading: false, error: '' }); return; }
+    if (!enabled) { setResult({ code: '', rooms: null, loading: false, error: '' }); return; }
     const controller = new AbortController();
-    setResult({ code: '', loading: true, error: '' });
-    readCatalog('GET /api/v1/rooms', { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]) }).then(rooms => {
-      if (!controller.signal.aborted) setResult({ code: nextRoomCode(rooms), loading: false, error: '' });
+    setResult({ code: '', rooms: null, loading: true, error: '' });
+    readCatalog('GET /api/v1/rooms', { query: { includeDeleted: true }, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]) }).then(rooms => {
+      if (!controller.signal.aborted) setResult({ code: nextRoomCode(rooms), rooms, loading: false, error: '' });
     }).catch(() => {
-      if (!controller.signal.aborted) setResult({ code: '', loading: false, error: 'Chưa tự tạo được mã phòng. Bạn có thể nhập mã thủ công.' });
+      if (!controller.signal.aborted) setResult({ code: '', rooms: null, loading: false, error: 'Chưa tự tạo được mã phòng. Bạn có thể nhập mã thủ công.' });
     });
     return () => controller.abort();
   }, [enabled]);

@@ -5,17 +5,19 @@ function query(path, params = {}) {
   return `${path}${search.size ? `?${search}` : ''}`;
 }
 
-function catalog(resource, params) { return apiRequest(query(`/api/v1/${resource}`, params)); }
+function catalog(resource, params, options) { return apiRequest(query(`/api/v1/${resource}`, params), options); }
 
 export const facilityApi = {
-  listFloors: (params) => catalog('floors', params),
-  listMaps: (params) => catalog('maps', params),
+  listFloors: (params, options) => catalog('floors', params, options),
+  listMaps: (params, options) => catalog('maps', params, options),
   deleteMap: (id, reason) => apiRequest(`/api/v1/maps/${encodeURIComponent(id)}`, { method: 'DELETE', body: { reason } }),
-  listZones: (params) => catalog('zones', params),
-  listRooms: (params) => catalog('rooms', params),
+  listZones: (params, options) => catalog('zones', params, options),
+  listRooms: (params, options) => catalog('rooms', params, options),
+  createRoom: body => apiRequest('/api/v1/rooms', { method: 'POST', body, retry: false }),
+  updateRoom: (id, body) => apiRequest(`/api/v1/rooms/${encodeURIComponent(id)}`, { method: 'PUT', body, retry: false }),
   listPublicRooms: (params, options) => apiRequest(query('/api/v1/public/rooms', params), { skipAuth: true, ...options }),
-  listEndpoints: (params) => catalog('endpoints', params),
-  listEndpointGroups: (params) => catalog('endpoint-groups', params),
+  listEndpoints: (params, options) => catalog('endpoints', params, options),
+  listEndpointGroups: (params, options) => catalog('endpoint-groups', params, options),
   listEndpointGroupMembers: (params) => catalog('endpoint-group-members', params),
   getMapArtifact: (id) => apiRequest(`/api/v1/maps/${id}/artifact-metadata`),
   getMapImageMetadata: (id, options) => apiRequest(`/api/v1/maps/${id}/image-metadata`, options),
@@ -34,8 +36,8 @@ export const facilityApi = {
   removeEndpointGroupMember: (groupId, endpointId) => apiRequest(`/api/v1/endpoint-group-members/${groupId}/${endpointId}`, { method: 'DELETE' }),
   activateMap: (id) => apiRequest(`/api/v1/maps/${id}/activate`, { method: 'POST' }),
   archiveMap: (id) => apiRequest(`/api/v1/maps/${id}/archive`, { method: 'POST' }),
-  activateEndpoint: (id) => apiRequest(`/api/v1/endpoints/${id}/activate`, { method: 'POST' }),
-  deactivateEndpoint: (id) => apiRequest(`/api/v1/endpoints/${id}/deactivate`, { method: 'POST' }),
+  activateEndpoint: (id) => apiRequest(`/api/v1/endpoints/${id}/activate`, { method: 'POST', body: { reason: 'Kích hoạt lại điểm đích.' }, retry: false }),
+  deactivateEndpoint: (id) => apiRequest(`/api/v1/endpoints/${id}/deactivate`, { method: 'POST', body: { reason: 'Ngừng sử dụng điểm đích.' }, retry: false }),
 };
 
 // Facility list endpoints accept page/size only, NOT mapId filters. Fetch every

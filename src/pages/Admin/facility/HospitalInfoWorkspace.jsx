@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { callBackend } from '../../../features/api/backendApi.js';
-import { facilityApi } from '../../../features/facility/facilityApi.js';
+import { allFacilityPages, facilityApi } from '../../../features/facility/facilityApi.js';
+import { getSession } from '../../../features/auth/session.js';
+import RoomsWorkspace from './RoomsWorkspace.jsx';
 import '../liveOperations/liveOperations.css';
 
 function Icon({ name = 'building', ...props }) {
@@ -56,12 +58,14 @@ export default function HospitalInfoWorkspace() {
   const [selectedHospital, setSelectedHospital] = useState(DEFAULT_HOSPITALS[0]);
   const [floors, setFloors] = useState(DEFAULT_FLOORS);
   const [selectedFloor, setSelectedFloor] = useState(DEFAULT_FLOORS[1]);
-  const [activeMaps, setActiveMaps] = useState([]);
-  const [selectedMapId, setSelectedMapId] = useState('');
-  const [rooms, setRooms] = useState([]);
-  const [selectedRoom, setSelectedRoom] = useState(null);
-  const [roomsLoading, setRoomsLoading] = useState(false);
-  const [roomsError, setRoomsError] = useState('');
+  const [roomSummary, setRoomSummary] = useState(null);
+  const [roomSummaryError, setRoomSummaryError] = useState('');
+  const pendingCount = roomSummaryError ? '—' : '…';
+  const roomCount = roomSummary?.total ?? pendingCount;
+  const canManageRooms = getSession()?.account?.role === 'ADMIN';
+  const [roomDirty, setRoomDirty] = useState(false);
+  const [roomBusy, setRoomBusy] = useState(false);
+  const [roomsRefresh, setRoomsRefresh] = useState(0);
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState('');
 
@@ -78,6 +82,8 @@ export default function HospitalInfoWorkspace() {
   }, [queryTab, setSearchParams]);
 
   const selectTab = next => {
+    if (next === tab || roomBusy) return;
+    if (roomDirty && !window.confirm('Bạn có thay đổi phòng hoặc điểm chưa lưu. Bỏ thay đổi và chuyển tab?')) return;
     setTab(next);
     setSearch('');
     setSearchParams(prev => {
@@ -114,48 +120,22 @@ export default function HospitalInfoWorkspace() {
       })
       .catch(() => {});
 
-    callBackend('GET /api/v1/maps', { query: { page: 0, size: 100 } }, { signal: controller.signal })
-      .then(res => {
-        const rows = (Array.isArray(res) ? res : res?.content) || [];
-        const active = rows.filter(map => map.status === 'ACTIVE');
-        setActiveMaps(active);
-        setSelectedMapId(current => active.some(map => map.mapId === current) ? current : active[0]?.mapId || '');
-      })
-      .catch(() => {
-        setActiveMaps([]);
-        setSelectedMapId('');
-      });
-
     return () => controller.abort();
   }, []);
 
+  // The badge is visible on every tab. Load its data without mounting the room
+  // editor; while that editor is open, its successful loads and edits own counts.
   useEffect(() => {
-    if (!selectedMapId) {
-      setRooms([]);
-      setSelectedRoom(null);
-      setRoomsError(activeMaps.length ? '' : 'Chưa có map nào đang hoạt động.');
-      return undefined;
-    }
+    if (tab === 'rooms') return;
     const controller = new AbortController();
-    setRoomsLoading(true);
-    setRoomsError('');
-    facilityApi.listPublicRooms({ mapId: selectedMapId, page: 0, size: 100 }, { signal: controller.signal })
-      .then(res => {
-        const rows = (Array.isArray(res) ? res : res?.content) || [];
-        setRooms(rows);
-        setSelectedRoom(current => rows.find(room => room.roomId === current?.roomId) || rows[0] || null);
+    setRoomSummaryError('');
+    allFacilityPages(params => facilityApi.listRooms({ ...params, ...(canManageRooms ? { includeDeleted: true } : {}) }, { signal: controller.signal }))
+      .then(rooms => {
+        if (!controller.signal.aborted) setRoomSummary({ total: rooms.length, active: rooms.filter(room => room.active).length });
       })
-      .catch(error => {
-        if (error.name === 'AbortError') return;
-        setRooms([]);
-        setSelectedRoom(null);
-        setRoomsError(error.message || 'Không tải được danh sách phòng của map đang hoạt động.');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setRoomsLoading(false);
-      });
+      .catch(error => { if (!controller.signal.aborted) setRoomSummaryError(error.message || 'Không tải được số lượng phòng.'); });
     return () => controller.abort();
-  }, [selectedMapId, activeMaps.length]);
+  }, [tab, roomsRefresh, canManageRooms]);
 
   const filteredFloors = floors.filter(f =>
     !search ||
@@ -163,21 +143,11 @@ export default function HospitalInfoWorkspace() {
     (f.floorCode && f.floorCode.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const filteredRooms = rooms.filter(room => {
-    if (!search) return true;
-    const value = search.toLowerCase();
-    return [room.roomName, room.roomCode, room.roomType, room.departmentCode]
-      .some(field => field?.toLowerCase().includes(value));
-  });
-
-  const selectedMap = activeMaps.find(map => map.mapId === selectedMapId);
-  const roomFloor = floors.find(floor => floor.floorId === selectedRoom?.floorId);
-
   const metrics = [
     { label: 'Cơ sở bệnh viện', count: hospitals.length, tone: 'blue', icon: 'building' },
     { label: 'Số tầng hoạt động', count: floors.filter(f => f.active).length, tone: 'amber', icon: 'layers' },
-    { label: 'Phòng trên map hoạt động', count: rooms.length, tone: 'green', icon: 'room' },
-    { label: 'Trạng thái phát hành', count: 'Công khai', tone: 'green', icon: 'check' },
+    { label: 'Phòng trong danh mục', count: roomCount, tone: 'green', icon: 'room' },
+    { label: tab === 'rooms' ? 'Phòng hoạt động' : 'Trạng thái phát hành', count: tab === 'rooms' ? roomSummary?.active ?? pendingCount : 'Công khai', tone: 'green', icon: 'check' },
   ];
 
   return (
@@ -188,11 +158,16 @@ export default function HospitalInfoWorkspace() {
           <span className="lo-title-icon"><Icon name="building" /></span>
           <div>
             <h2>Thông tin bệnh viện</h2>
-            <p>Quản lý hồ sơ cơ sở y tế, sơ đồ tầng, phòng theo map hoạt động.</p>
+            <p>Quản lý hồ sơ cơ sở y tế, tầng, thông tin phòng và điểm đến robot.</p>
           </div>
         </div>
         <div className="lo-header-actions">
-          <button className="lo-button" onClick={() => {
+          <button className="lo-button" disabled={roomBusy} onClick={() => {
+            if (tab === 'rooms') {
+              if (!roomDirty || window.confirm('Bỏ thay đổi chưa lưu và tải lại danh mục phòng?')) setRoomsRefresh(value => value + 1);
+              return;
+            }
+            setRoomsRefresh(value => value + 1);
             setToast('Đã làm mới thông tin mới nhất từ máy chủ.');
             setTimeout(() => setToast(''), 4000);
           }}>
@@ -204,8 +179,7 @@ export default function HospitalInfoWorkspace() {
       {/* Sync Status */}
       <div className="lo-sync" role="status">
         <span className="lo-connection" />
-        Dữ liệu đã đồng bộ từ máy chủ và danh mục công khai
-        <span>· Cập nhật tức thời</span>
+        {tab === 'rooms' ? 'Danh mục quản trị · Bao gồm phòng nội bộ, phòng ngừng hoạt động và phòng chưa có điểm' : 'Thông tin cơ sở y tế'}
       </div>
 
       {toast && (
@@ -237,6 +211,7 @@ export default function HospitalInfoWorkspace() {
             <nav className="lo-groups" aria-label="Nhóm dữ liệu">
               <button
                 type="button"
+                disabled={roomBusy}
                 aria-pressed={tab === 'hospital'}
                 className={tab === 'hospital' ? 'is-active' : ''}
                 onClick={() => selectTab('hospital')}
@@ -246,6 +221,7 @@ export default function HospitalInfoWorkspace() {
               </button>
               <button
                 type="button"
+                disabled={roomBusy}
                 aria-pressed={tab === 'floors'}
                 className={tab === 'floors' ? 'is-active' : ''}
                 onClick={() => selectTab('floors')}
@@ -255,21 +231,23 @@ export default function HospitalInfoWorkspace() {
               </button>
               <button
                 type="button"
+                disabled={roomBusy}
                 aria-pressed={tab === 'rooms'}
+                title={roomSummaryError || (!roomSummary ? 'Đang tải số lượng phòng…' : undefined)}
                 className={tab === 'rooms' ? 'is-active' : ''}
                 onClick={() => selectTab('rooms')}
               >
                 Danh sách phòng
-                <span>{rooms.length}</span>
+                <span>{roomCount}</span>
               </button>
             </nav>
             <span className="lo-total">
-              {tab === 'hospital' ? `${hospitals.length} cơ sở` : tab === 'floors' ? `${floors.length} tầng` : `${rooms.length} phòng`}
+              {tab === 'hospital' ? `${hospitals.length} cơ sở` : tab === 'floors' ? `${floors.length} tầng` : `${roomCount} phòng`}
             </span>
           </div>
 
           {/* Filters Bar */}
-          {tab !== 'hospital' && (
+          {tab === 'floors' && (
             <div className="lo-filters">
               <label className="lo-search">
                 <Icon name="search" />
@@ -280,12 +258,6 @@ export default function HospitalInfoWorkspace() {
                   onChange={e => setSearch(e.target.value)}
                 />
               </label>
-              {tab === 'rooms' && (
-                <select aria-label="Chọn map đang hoạt động" value={selectedMapId} onChange={e => setSelectedMapId(e.target.value)}>
-                  {!activeMaps.length && <option value="">Chưa có map hoạt động</option>}
-                  {activeMaps.map(map => <option key={map.mapId} value={map.mapId}>{map.mapName} · v{map.versionNo}</option>)}
-                </select>
-              )}
               {search && (
                 <button className="lo-text-button" onClick={() => setSearch('')}>
                   Xóa tìm kiếm
@@ -497,62 +469,7 @@ export default function HospitalInfoWorkspace() {
           </div>
         )}
 
-        {/* TAB 3: ROOMS ON ACTIVE MAP */}
-        {tab === 'rooms' && (
-          <div className="lo-layout">
-            <aside className="lo-job-list" aria-label="Danh sách phòng theo map đang hoạt động">
-              <header>
-                <strong>{filteredRooms.length} phòng</strong>
-                <span>{selectedMap?.mapName || 'Chưa chọn map'}</span>
-              </header>
-              <div className="lo-job-items">
-                {roomsLoading && <div className="lo-loading"><span className="lo-spinner" />Đang tải danh sách phòng…</div>}
-                {!roomsLoading && roomsError && <p className="lo-list-empty" role="alert">{roomsError}</p>}
-                {!roomsLoading && !roomsError && !filteredRooms.length && <p className="lo-list-empty">Map này chưa có phòng công khai gắn với endpoint đang hoạt động.</p>}
-                {!roomsLoading && filteredRooms.map(room => (
-                  <button key={room.roomId} type="button" className={`lo-job-item ${selectedRoom?.roomId === room.roomId ? 'is-selected' : ''}`} onClick={() => setSelectedRoom(room)}>
-                    <div className="lo-job-item-top">
-                      <span className="lo-badge lo-success"><i />Đang hoạt động</span>
-                      <span>{room.roomCode}</span>
-                    </div>
-                    <strong>{room.roomName}</strong>
-                    <span className="lo-job-target"><Icon name="room" />{room.departmentCode || room.roomType || 'Phòng bệnh viện'}</span>
-                    <div className="lo-job-item-bottom">
-                      <time>{room.roomType || 'Chưa phân loại'}</time>
-                      <Icon name="arrow" />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </aside>
-
-            {selectedRoom ? (
-              <article className="lo-detail" aria-label="Chi tiết phòng">
-                <header className="lo-detail-header"><div>
-                  <div className="lo-detail-kicker">
-                    <span className="lo-badge lo-success"><i />Có thể tra cứu</span>
-                    <span>Mã phòng: {selectedRoom.roomCode}</span>
-                  </div>
-                  <h3>{selectedRoom.roomName}</h3>
-                  <p><Icon name="pin" />{roomFloor?.floorName || 'Tầng chưa xác định'} · {selectedMap?.mapName}</p>
-                </div></header>
-                <dl className="lo-job-facts">
-                  <div><dt>Loại phòng</dt><dd>{selectedRoom.roomType || 'Chưa phân loại'}</dd></div>
-                  <div><dt>Khoa phụ trách</dt><dd>{selectedRoom.departmentCode || 'Chưa cập nhật'}</dd></div>
-                  <div><dt>Tầng</dt><dd>{roomFloor?.floorName || selectedRoom.floorId}</dd></div>
-                  <div><dt>Map đang hoạt động</dt><dd>{selectedMap?.mapName} · v{selectedMap?.versionNo}</dd></div>
-                </dl>
-                <div className="lo-instruction" style={{ marginTop: '20px' }}>
-                  <strong>Thông tin phòng</strong>
-                  <p>{selectedRoom.description || 'Chưa có mô tả chi tiết cho phòng này.'}</p>
-                </div>
-                <div className="lo-detail-actions" style={{ marginTop: '20px' }}>
-                  <Link to={`/admin/map?mapId=${encodeURIComponent(selectedMapId)}`} className="lo-button lo-primary"><Icon name="building" />Xem phòng trên Map Studio</Link>
-                </div>
-              </article>
-            ) : !roomsLoading && <article className="lo-detail"><div className="lo-empty"><span className="lo-empty-icon"><Icon name="room" /></span><h3>Chưa có phòng để hiển thị</h3><p>Hãy chọn map đang hoạt động có phòng và endpoint đã được công khai.</p></div></article>}
-          </div>
-        )}
+        {tab === 'rooms' && <RoomsWorkspace onCountChange={setRoomSummary} onDirtyChange={setRoomDirty} onBusyChange={setRoomBusy} refreshKey={roomsRefresh} />}
       </div>
     </section>
   );

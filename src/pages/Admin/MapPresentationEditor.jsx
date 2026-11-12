@@ -1,27 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiRequest } from '../../features/api/client.js';
+import { getSession } from '../../features/auth/session.js';
 import { allFacilityPages, facilityApi } from '../../features/facility/facilityApi.js';
 import { insideMap, mapPresentationApi, newFeature, presentationIssues } from '../../features/facility/mapPresentation.js';
 import { fromView, normalizeRotation, rotationBounds, straightenRotation, viewRectangle, contentBounds } from '../../features/facility/mapPresentationView.js';
 import { doorFitsMap, doorGeometry } from '../../features/facility/doorGeometry.js';
 import { doorOnWall, getDoorWall, getWallEdge, snapDrawingPoint } from '../../features/facility/mapDrawingAssist.js';
 import { nextRoomColor, nextRoomName, persistRoomColors, preserveRoomColors } from '../../features/facility/roomAppearance.js';
-import { nextRoomCode } from '../../features/facility/roomDefaults.js';
+import { isSosRoom, nextRoomCode, roomTypePatch } from '../../features/facility/roomDefaults.js';
+import { hydrateRoomFeatures, removedPublishedRooms } from '../../features/facility/roomEditing.js';
 import MapPresentationWorkspace from './MapPresentationWorkspace.jsx';
 import './mapPresentation.css';
-
-function hydrateRoomFeatures(document, endpoints, rooms) {
-  return { ...document, features: document.features.map(feature => {
-    if (feature.type !== 'ROOM') return feature;
-    const endpoint = endpoints.find(value => value.endpointId === feature.endpointId);
-    const room = rooms.find(value => value.roomId === feature.roomId || value.roomId === endpoint?.roomId);
-    if (!room) return feature;
-    return { ...feature, roomId: room.roomId, roomCode: feature.roomCode || room.roomCode,
-      roomName: feature.roomName || room.roomName, label: feature.label || room.roomName,
-      roomType: feature.roomType || room.roomType, departmentCode: feature.departmentCode ?? room.departmentCode ?? '',
-      roomDescription: feature.roomDescription ?? room.description ?? '', roomPublicVisible: feature.roomPublicVisible ?? room.publicVisible };
-  }) };
-}
 
 export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyChange }) {
   const [entry, setEntry] = useState(null), [document, setDocument] = useState(null), [saved, setSaved] = useState('');
@@ -35,10 +24,12 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
   const [snapEnabled, setSnapEnabled] = useState(true), [drawingAssist, setDrawingAssist] = useState(null);
   const [drawingPreview, setDrawingPreview] = useState([]), [doorPreview, setDoorPreview] = useState(null);
   const svgRef = useRef(null), contentRef = useRef(null), drag = useRef(null), current = useRef(document), rotationGesture = useRef(null);
-  const doorEdge = useRef(null), lastPointer = useRef(null), roomCatalog = useRef([]);
+  const doorEdge = useRef(null), lastPointer = useRef(null), roomCatalog = useRef([]), roomFloorId = useRef(null), actionLock = useRef(false);
+  const [catalogStale, setCatalogStale] = useState(false);
   current.current = document;
   const dirty = document && JSON.stringify(document) !== saved;
   const selected = document?.features.find(f => f.id === selectedId);
+  const removedRooms = removedPublishedRooms(entry?.published, document, endpoints);
   const rotation = document?.rotationDegrees ?? 0;
   const fitBounds = entry ? contentBounds(entry.source, document?.features, endpoints, rotation) : null;
   const clearDrawingHints = () => { setDrawingAssist(null); setDrawingPreview(values => values.length ? [] : values); setDoorPreview(null); };
@@ -52,13 +43,14 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     if (!mapId) { setLoading(false); return; }
     const controller = new AbortController(); let url;
     setLoading(true); setError(''); setImageError(''); setEntry(null); setDocument(null); setImageUrl(''); setPoints([]); setSelectedId(''); setHistory([]); setFuture([]);
-    Promise.all([mapPresentationApi.get(mapId, controller.signal), allFacilityPages(facilityApi.listEndpoints), allFacilityPages(facilityApi.listRooms), allFacilityPages(facilityApi.listMaps)]).then(([value, rows, roomRows, maps]) => {
+    Promise.all([mapPresentationApi.get(mapId, controller.signal), allFacilityPages(facilityApi.listEndpoints), allFacilityPages(params => facilityApi.listRooms({ ...params, ...(getSession()?.account?.role === 'ADMIN' ? { includeDeleted: true } : {}) })), allFacilityPages(facilityApi.listMaps)]).then(([value, rows, roomRows, maps]) => {
       if (controller.signal.aborted) return;
       const mapEndpoints = rows.filter(e => e.mapId === mapId);
       const floorId = maps.find(map => map.mapId === mapId)?.floorId;
+      roomFloorId.current = floorId; setCatalogStale(false);
       const mapRooms = roomRows.filter(room => !floorId || room.floorId === floorId);
       roomCatalog.current = roomRows;
-      const hydratedDraft = hydrateRoomFeatures(value.draft, mapEndpoints, mapRooms);
+      const hydratedDraft = hydrateRoomFeatures(value.draft, mapEndpoints, mapRooms, value.published);
       setEntry(value); setDocument(hydratedDraft); setSaved(JSON.stringify(value.draft)); setEndpoints(mapEndpoints); setRooms(mapRooms);
       setView(contentBounds(value.source, hydratedDraft?.features || value.draft?.features, mapEndpoints, value.draft.rotationDegrees ?? 0));
     }).catch(e => { if (!controller.signal.aborted) setError(e.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
@@ -92,6 +84,13 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     else change(next);
   };
   const update = patch => {
+    if (isSosRoom(patch.roomType) && current.current.features.some(feature => feature.id !== selectedId && feature.type === 'ROOM' && isSosRoom(feature.roomType))) {
+      setNotice('Mỗi bản vẽ chỉ được có một phòng SOS. Đổi phòng SOS cũ về loại thường trước khi chọn phòng mới.');
+      return;
+    }
+    if (selected?.type === 'ROOM' && Object.hasOwn(patch, 'roomType') && !Object.hasOwn(patch, 'roomCode')) {
+      patch = { ...patch, ...roomTypePatch(selected, patch.roomType, [...roomCatalog.current, ...current.current.features], selected) };
+    }
     let next = { ...selected, ...patch };
     if (patch.color && ['ROOM', 'CORRIDOR'].includes(next.type)) next.color = patch.color.toUpperCase();
     if (next.type === 'DOOR' && patch.points) {
@@ -292,6 +291,9 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     } else if (JSON.stringify(active.before) !== JSON.stringify(current.current)) { setHistory(h => [...h.slice(-49), active.before]); setFuture([]); }
   };
   const action = async name => {
+    if (actionLock.current) return;
+    if (name === 'publish' && catalogStale) { setError('Đã áp dụng, chưa tải lại được dữ liệu. Tải lại bản vẽ trước khi áp dụng tiếp.'); return; }
+    actionLock.current = true;
     setBusy(true); setError(''); setNotice('');
     try {
       const snapshot = name === 'unpublish' ? current.current : persistRoomColors(current.current), changed = JSON.stringify(snapshot) !== saved;
@@ -322,9 +324,21 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
           const feature = value.draft.features.find(item => item.type === 'ROOM' && item.endpointId === endpoint.endpointId);
           return feature ? { ...endpoint, roomId: feature.roomId, publicVisible: feature.roomPublicVisible !== false || endpoint.publicVisible } : endpoint;
         }));
+        setHistory([]); setFuture([]);
+        window.dispatchEvent(new Event('mediassist-facility-updated'));
+        try {
+          const [roomRows, endpointRows] = await Promise.all([allFacilityPages(params => facilityApi.listRooms({ ...params, ...(getSession()?.account?.role === 'ADMIN' ? { includeDeleted: true } : {}) })), allFacilityPages(facilityApi.listEndpoints)]);
+          roomCatalog.current = roomRows;
+          setRooms(roomRows.filter(room => !roomFloorId.current || room.floorId === roomFloorId.current));
+          setEndpoints(endpointRows.filter(endpoint => endpoint.mapId === mapId));
+        } catch (error) {
+          setCatalogStale(true);
+          setError(`Đã áp dụng, chưa tải lại được dữ liệu: ${error.message}. Tải lại bản vẽ trước khi áp dụng tiếp.`);
+          return;
+        }
       }
       setNotice(name === 'publish' ? 'Đã áp dụng bản đồ và đồng bộ phòng, điểm đích vào database.' : name === 'unpublish' ? 'Đã bỏ áp dụng bản vẽ, giữ lại bản nháp.' : 'Đã lưu bản nháp trên máy chủ.');
-    } catch (e) { setError(e.message); } finally { setBusy(false); }
+    } catch (e) { setError(e.message); } finally { actionLock.current = false; setBusy(false); }
   };
   const discardReload = () => { if (!dirty || window.confirm('Bỏ các chỉnh sửa chưa lưu và tải lại?')) setReload(v => v + 1); };
   const pointerCancel = () => {
@@ -340,13 +354,14 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     const clone = { ...selected, id: crypto.randomUUID(), label: selected.label ? (selected.label + ' (bản sao)').slice(0, 120) : '', points: selected.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
     if (clone.type === 'ROOM') {
       clone.color = nextRoomColor(clone.points, document.features); clone.roomId = null; clone.endpointId = null;
+      if (isSosRoom(clone.roomType)) clone.roomType = 'GENERAL';
       clone.roomCode = nextRoomCode([...roomCatalog.current, ...document.features]); clone.roomName = clone.label; clone.roomPublicVisible = true;
     }
     change({ ...document, features: [...document.features, clone] }); setSelectedId(clone.id);
   };
   const removeSelected = () => {
     if (!selected || busy || preview) return;
-    if (selected.type === 'ROOM' && selected.roomId && !window.confirm('Chỉ xóa hình phòng khỏi giao diện. Phòng và lịch sử đang dùng phòng này vẫn được giữ trong database. Tiếp tục?')) return;
+    if (selected.type === 'ROOM' && selected.roomId && !window.confirm('Khi Áp dụng bản đồ, phòng này sẽ ngừng hoạt động nếu không còn dùng trên map khác; các điểm đến của phòng trên map này cũng ngừng sử dụng. Lịch sử được giữ lại. Bạn vẫn có thể hoàn tác trước khi áp dụng. Xóa phòng khỏi bản vẽ?')) return;
     change({ ...document, features: document.features.filter(feature => feature.id !== selected.id) }); setSelectedId('');
   };
   useEffect(() => {
@@ -402,7 +417,7 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
   return <MapPresentationWorkspace {...{
     entry, document, selected, selectedId, setSelectedId, tool, setTool, points, setPoints,
     busy, dirty, locked, preview, setPreview, opacity, setOpacity, endpoints, rooms, imageUrl, imageError,
-    error, notice, history, future, undo, redo, action, discardReload, update, change,
+    error, notice, removedRooms, history, future, undo, redo, action, discardReload, update, change,
     finish, zoom, view, setView, svgRef, pointerDown, pointerMove, pointerUp, featureDown,
     pointerCancel, pointerLeave, expanded, setExpanded, spacePanning, showEndpoints, setShowEndpoints, duplicateSelected,
     rotation, rotate, beginRotation, endRotation, fitBounds, contentRef, showGrid, setShowGrid,

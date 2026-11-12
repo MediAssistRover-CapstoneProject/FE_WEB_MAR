@@ -1,6 +1,6 @@
 export const settingSpecs = {
   'operations.robot_offline_threshold_seconds': { title: 'Thời gian báo robot mất kết nối', hint: 'Robot được đánh dấu ngoại tuyến khi không có heartbeat trong khoảng thời gian này.', type: 'NUMBER', category: 'OPERATIONS', min: 10, max: 3600, unit: 'giây' },
-  'sos.monitoring-room-id': { title: 'Phòng tiếp nhận SOS', hint: 'Hệ thống tìm nhân viên đang trực tại phòng này để phân công xử lý SOS.', type: 'STRING', category: 'OPERATIONS', room: true },
+  'sos.monitoring-room-id': { title: 'Phòng tiếp nhận SOS', hint: 'Được quản lý qua loại phòng SOS trong danh mục phòng.', type: 'STRING', category: 'SOS', managed: true },
   'retention.execution_enabled': { title: 'Cho phép xử lý dữ liệu hết hạn', hint: 'Cho phép máy chủ thực hiện lưu trữ hoặc xóa theo chính sách. Bật mục này chưa tự chạy xử lý.', type: 'BOOLEAN', category: 'RETENTION' },
   'retention.default_mode': { title: 'Cách xử lý mặc định', hint: 'Áp dụng cho nhóm dữ liệu chưa có cách xử lý riêng.', type: 'STRING', category: 'RETENTION', options: { DISABLED: 'Không xử lý', ARCHIVE: 'Lưu trữ rồi xóa bản gốc', DELETE: 'Xóa dữ liệu hết hạn' } },
   'retention.batch_size': { title: 'Số bản ghi mỗi đợt', type: 'NUMBER', category: 'RETENTION', min: 1, max: 5000, unit: 'bản ghi' },
@@ -25,6 +25,7 @@ export function retentionSpec(dataset, field) {
 }
 
 export function settingPayload(row, key, spec, input) {
+  if (spec.managed) throw Error('Đổi phòng tiếp nhận SOS trong danh mục phòng.');
   let value = input;
   if (spec.type === 'NUMBER') {
     if (String(input).trim() === '') throw Error('Vui lòng nhập giá trị.');

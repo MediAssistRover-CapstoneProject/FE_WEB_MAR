@@ -1,6 +1,6 @@
 import { apiRequest } from '../api/client.js';
 import { doorFitsMap, doorGeometry } from './doorGeometry.js';
-import { DEFAULT_ROOM_DEPARTMENT_CODE } from './roomDefaults.js';
+import { DEFAULT_ROOM_DEPARTMENT_CODE, isSosRoom } from './roomDefaults.js';
 
 const path = id => `/api/v1/maps/${encodeURIComponent(id)}/presentation`;
 export const mapPresentationApi = {
@@ -34,6 +34,9 @@ export function newFeature(type, points, source) {
 export function presentationIssues(document, source) {
   const errors = [];
   if (!document || document.schemaVersion !== 1 || !Array.isArray(document.features)) return ['Bản vẽ không đúng định dạng.'];
+  if (document.features.filter(feature => feature.type === 'ROOM' && isSosRoom(feature.roomType)).length > 1) {
+    errors.push('Mỗi bản vẽ chỉ được có một phòng SOS. Đổi phòng SOS cũ về loại thường trước khi chọn phòng mới.');
+  }
   const rotation = document.rotationDegrees ?? 0;
   if (!Number.isFinite(rotation) || rotation < -180 || rotation > 180) errors.push('Góc xoay bản đồ phải từ -180° đến 180°.');
   if (document.features.length > 500) errors.push('Tối đa 500 đối tượng.');

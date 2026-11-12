@@ -14,6 +14,7 @@ export function createSystemSettingsApi(request = apiRequest) {
   return {
     listSettings: signal => all('/api/v1/admin/system-settings', signal),
     listRooms: signal => all('/api/v1/rooms', signal),
+    listFloors: signal => all('/api/v1/floors', signal),
     listRobots: signal => all('/api/v1/robots', signal),
     saveSetting: (row, body) => request('/api/v1/admin/system-settings' + (row ? `/${encodeURIComponent(row.systemSettingId)}` : ''), { method: row ? 'PUT' : 'POST', body, retry: false }),
     mqttStatus: signal => request('/api/v1/admin/mqtt-rollout', { signal }),

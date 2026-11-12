@@ -3,9 +3,10 @@ import { schemaOf, initialValue, operations, canUse } from '../../../features/ap
 import { callBackend, readCatalog } from '../../../features/api/backendApi.js';
 import { fieldLabel, references, resources, valueAt, recordTitle } from '../../../features/api/workspaceCatalog.js';
 import { vi } from '../../../i18n/vi.js';
-import { DEFAULT_ROOM_DEPARTMENT_CODE } from '../../../features/facility/roomDefaults.js';
+import { DEFAULT_ROOM_DEPARTMENT_CODE, roomTypePatch } from '../../../features/facility/roomDefaults.js';
 import RoomDepartmentSelect from '../facility/RoomDepartmentSelect.jsx';
 import RoomTypeSelect from '../facility/RoomTypeSelect.jsx';
+import RoomSosNotice from '../facility/RoomSosNotice.jsx';
 import { useRoomCodeSuggestion } from '../../../features/facility/useRoomCodeSuggestion.js';
 
 function ReferenceField({ name, value, onChange, required, context, inputId, disabled }) {
@@ -21,6 +22,12 @@ function ReferenceField({ name, value, onChange, required, context, inputId, dis
     readCatalog(op.key, { signal: controller.signal }).then(setRows).catch(e => { if (e.name !== 'AbortError') setError(e.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [op?.key, local, context?.role, revision]);
+  useEffect(() => {
+    if (name !== 'roomId' || local) return;
+    const refresh = () => setRevision(value => value + 1);
+    window.addEventListener('mediassist-facility-updated', refresh);
+    return () => window.removeEventListener('mediassist-facility-updated', refresh);
+  }, [name, local]);
   const allowQuickRoomCreate = name === 'roomId' && context?.quickRoomCreate === true && context?.role === 'ADMIN';
   const idKey = reference?.[1];
   const options = rows.filter(row => (!context?.mapId || !row.mapId || row.mapId === context.mapId || source?.id === 'maps') && (!allowQuickRoomCreate || row.active !== false)).map(row => local ? row : { value: valueAt(row, idKey), label: recordTitle(row) + (row.jobCode || row.requestCode ? ` · ${(row.jobCode || row.requestCode).slice(-6)}` : '') + (row.active === false ? ' · Ngừng hoạt động' : '') }).filter(row => row.value != null);
@@ -37,6 +44,7 @@ function ReferenceField({ name, value, onChange, required, context, inputId, dis
 }
 
 function QuickRoomCreate({ onCreated, disabled }) {
+  const writeLock = useRef(false);
   const [open, setOpen] = useState(false), [floors, setFloors] = useState([]), [loading, setLoading] = useState(false), [saving, setSaving] = useState(false), [error, setError] = useState('');
   const [form, setForm] = useState({ floorId: '', roomCode: '', roomName: '', roomType: 'PHARMACY', departmentCode: DEFAULT_ROOM_DEPARTMENT_CODE, description: '' });
   const roomCode = useRoomCodeSuggestion(open);
@@ -54,9 +62,10 @@ function QuickRoomCreate({ onCreated, disabled }) {
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [open]);
-  const set = (name, value) => setForm(current => ({ ...current, [name]: value }));
+  const set = (name, value) => setForm(current => ({ ...current, ...(name === 'roomType'
+    ? roomTypePatch(current, value, roomCode.rooms) : { [name]: value }) }));
   const submit = async event => {
-    event.preventDefault(); if (saving || roomCode.loading) return; setSaving(true); setError('');
+    event.preventDefault(); if (writeLock.current || saving || roomCode.loading) return; writeLock.current = true; setSaving(true); setError('');
     try {
       if (!form.floorId || !form.roomCode.trim() || !form.roomName.trim() || !form.roomType.trim()) throw Error('Vui lòng chọn tầng và nhập đủ mã, tên, loại phòng.');
       const room = await callBackend('POST /api/v1/rooms', { body: {
@@ -68,20 +77,23 @@ function QuickRoomCreate({ onCreated, disabled }) {
         ...(form.description.trim() ? { description: form.description.trim() } : {}),
         active: true,
         publicVisible: false,
-      } });
+      } }, { retry: false });
+      if (!room?.roomId) throw Error('Chưa xác nhận được phòng mới. Tải lại danh mục để kiểm tra trước khi tạo tiếp.');
+      window.dispatchEvent(new Event('mediassist-facility-updated'));
       onCreated(room); setOpen(false); setForm({ floorId: '', roomCode: '', roomName: '', roomType: 'PHARMACY', departmentCode: DEFAULT_ROOM_DEPARTMENT_CODE, description: '' });
     } catch (cause) { setError(cause.message || 'Không thể tạo phòng.'); }
-    finally { setSaving(false); }
+    finally { writeLock.current = false; setSaving(false); }
   };
   return <><button type="button" className="be-create-inline" disabled={disabled} onClick={() => setOpen(true)}>+ Thêm phòng mới</button>
     {open && <dialog open className="be-dialog be-quick-room" aria-label="Thêm phòng mới">
       <header className="be-heading"><div><h2>Thêm phòng mới</h2><p>Phòng sẽ được lưu vào Danh mục bệnh viện và tự chọn cho ca trực này.</p></div><button type="button" disabled={saving} onClick={() => setOpen(false)}>Đóng</button></header>
-      <form onSubmit={submit}><fieldset className="be-form-body" disabled={saving}>
+      <form onSubmit={submit}><fieldset className="be-form-body" disabled={saving || roomCode.loading}>
         <div className="be-fields">
           <div className="be-field"><label>Tầng *</label><select required value={form.floorId} disabled={loading} onChange={event => set('floorId', event.target.value)}><option value="">{loading ? 'Đang tải tầng…' : 'Chọn tầng'}</option>{floors.filter(floor => floor.active !== false).map(floor => <option key={floor.floorId} value={floor.floorId}>{floor.floorCode} · {floor.floorName}</option>)}</select></div>
           <div className="be-field"><label htmlFor="quick-room-code">Mã phòng *</label><input id="quick-room-code" required maxLength="64" value={form.roomCode} placeholder={roomCode.loading ? 'Đang tạo mã phòng…' : 'ROOM_01'} onChange={event => set('roomCode', event.target.value.toUpperCase())} /><small>Mã được điền tự động; bạn có thể chỉnh sửa.</small></div>
           <div className="be-field"><label>Tên phòng *</label><input required maxLength="160" value={form.roomName} placeholder="VD: Kho dược tầng 1" onChange={event => set('roomName', event.target.value)} /></div>
           <div className="be-field"><label htmlFor="quick-room-type">Loại phòng *</label><RoomTypeSelect id="quick-room-type" required value={form.roomType} onChange={value => set('roomType', value)} /></div>
+          <div className="be-wide"><RoomSosNotice type={form.roomType} /></div>
           <div className="be-field"><label htmlFor="quick-room-department">Mã khoa/phòng ban</label><RoomDepartmentSelect id="quick-room-department" value={form.departmentCode} onChange={value => set('departmentCode', value)} /></div>
           <div className="be-field be-wide"><label>Mô tả</label><textarea rows="3" value={form.description} onChange={event => set('description', event.target.value)} /></div>
         </div>

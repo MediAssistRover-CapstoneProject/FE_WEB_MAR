@@ -5,6 +5,7 @@ import { doorGeometry, setDoorOpening } from '../../features/facility/doorGeomet
 import { areaColor, roomColorsFor } from '../../features/facility/roomAppearance.js';
 import RoomDepartmentSelect from './facility/RoomDepartmentSelect.jsx';
 import RoomTypeSelect from './facility/RoomTypeSelect.jsx';
+import RoomSosNotice from './facility/RoomSosNotice.jsx';
 
 const tools = [
   ['select', 'Chọn', 'V', 'Chọn và kéo đối tượng'],
@@ -63,6 +64,7 @@ export default function MapPresentationWorkspace(props) {
       </div>
     </header>
     {error && <p className="mp-error" role="alert">{error}</p>}{notice && <p className="mp-notice" role="status">{notice}</p>}
+    {!!props.removedRooms?.length && <p className="mp-notice" role="note">Có {props.removedRooms.length} phòng bị xóa khỏi bản vẽ: {props.removedRooms.map(room => room.roomName || room.label || room.roomCode).join(', ')}. Khi Áp dụng bản đồ, các điểm đến của phòng trên map này sẽ ngừng sử dụng; phòng ngừng hoạt động nếu không còn dùng trên map khác. Lưu nháp chưa thay đổi trạng thái phòng.</p>}
     {entry.sourceChanged && <p className="mp-error" role="alert">Map gốc đã thay đổi. Chọn đúng phiên bản map trong thư viện để tiếp tục.</p>}
     <div className="mp-toolbar" role="toolbar" aria-label="Công cụ chỉnh bản đồ">
       <div className="mp-tool-list">{tools.map(([id, label, shortcut, hint], index) => <button key={id} className={index === 2 ? 'mp-tool-divider' : ''} type="button" aria-label={`${id === 'select' || id === 'pan' ? label : 'Vẽ ' + label.toLowerCase()} (${shortcut})`} title={`${hint} · ${shortcut}`} aria-pressed={tool === id} disabled={locked || preview} onClick={() => chooseTool(id)}><ToolIcon name={id} /><span>{label}</span><kbd>{shortcut}</kbd></button>)}</div>
@@ -92,6 +94,7 @@ export default function MapPresentationWorkspace(props) {
             <label className="mp-field">Mã phòng *<input maxLength={64} placeholder="ROOM_01" value={selected.roomCode || ''} onChange={e => update({ roomCode: e.target.value.toUpperCase() })} /></label>
             <label className="mp-field">Tên phòng *<input maxLength={160} placeholder="Phòng khám 01" value={selected.roomName ?? selected.label} onChange={e => update({ roomName: e.target.value, label: e.target.value })} /></label>
             <label className="mp-field">Loại phòng *<RoomTypeSelect required value={selected.roomType || ''} onChange={roomType => update({ roomType })} /></label>
+            <RoomSosNotice type={selected.roomType} previousType={rooms.find(room => room.roomId === selected.roomId)?.roomType} map />
             <label className="mp-field">Mã khoa<RoomDepartmentSelect value={selected.departmentCode || ''} onChange={departmentCode => update({ departmentCode })} /></label>
             <label className="mp-field">Mô tả<textarea rows="3" value={selected.roomDescription || ''} onChange={e => update({ roomDescription: e.target.value })} /></label>
             <label className="mp-room-public"><input type="checkbox" checked={selected.roomPublicVisible !== false} onChange={e => update({ roomPublicVisible: e.target.checked })} />Hiển thị phòng trong thông tin bệnh viện</label>

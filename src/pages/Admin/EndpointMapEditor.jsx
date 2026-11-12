@@ -1,5 +1,5 @@
 import FacilityGeometryPreview from './FacilityGeometryPreview.jsx';
-import { ENDPOINT_CATEGORIES } from '../../features/facility/facilityContract.js';
+import EndpointFields, { EndpointLifecycle } from './EndpointFields.jsx';
 import './endpointMapEditor.css';
 
 function Field({ label, children, ...props }) {
@@ -7,13 +7,8 @@ function Field({ label, children, ...props }) {
 }
 
 export default function EndpointMapEditor({ map, zones, rooms, endpoints, endpoint, setEndpoint, drawing, setDrawing, busy, onSave, hasUnsavedChanges=false, onToggleActive }) {
-  zones=zones.filter(zone=>zone.active===true);
   const locked = busy || map.status === 'ARCHIVED';
   const selected = endpoints.find(p => p.endpointId === endpoint.endpointId);
-  const placed = endpoint.xM !== '' && endpoint.yM !== '';
-  const degrees = endpoint.yawRad === '' ? '' : Number((Number(endpoint.yawRad) * 180 / Math.PI).toFixed(4));
-  const set = (key, value) => setEndpoint(e => ({ ...e, [key]: value }));
-  const setAngle = value => set('yawRad', value === '' ? '' : Number(value) * Math.PI / 180);
   const reset = () => { setEndpoint(selected ? { ...selected } : { endpointCode:'', endpointName:'', endpointType:'WAYPOINT', xM:'', yM:'', yawRad:0, zoneId:'', roomId:'', active:true, accessible:true, publicVisible:false, description:'' }); setDrawing(false); };
   const create = () => { setEndpoint({ endpointCode:'', endpointName:'', endpointType:'WAYPOINT', xM:'', yM:'', yawRad:0, zoneId:'', roomId:'', active:true, accessible:true, publicVisible:false, description:'' }); setDrawing(true); };
   return <div className="ep-editor" data-map-id={map.mapId}>
@@ -26,31 +21,10 @@ export default function EndpointMapEditor({ map, zones, rooms, endpoints, endpoi
     <aside className="ls-panel ep-properties">
       <div className="ep-panel-heading"><div><h3>{selected?'Chỉnh điểm đích':'Tạo điểm đích'}</h3><p>{selected?endpoint.endpointCode:'Chọn vị trí trên map để bắt đầu'}</p></div><button type="button" className="ls-btn" disabled={locked} onClick={create}>+ Điểm mới</button></div>
       <Field label="Điểm đã lưu"><select aria-label="Điểm đã lưu" disabled={locked} value={endpoint.endpointId||''} onChange={e=>{const p=endpoints.find(p=>p.endpointId===e.target.value);if(p){setEndpoint({...p});setDrawing(false);}else create();}}><option value="">Điểm mới</option>{endpoints.map(p=><option key={p.endpointId} value={p.endpointId}>{p.endpointCode} — {p.endpointName}{!p.active?' · Ngừng sử dụng':!p.accessible?' · Không thể tiếp cận':''}</option>)}</select></Field>
-      {selected&&<section className="ep-lifecycle" aria-label="Trạng thái điểm đích">
-        <div className="ep-lifecycle-heading"><strong>Trạng thái sử dụng</strong><span className={'ep-state '+(selected.active?'active':'inactive')} role="status">{selected.active?'Đang hoạt động':'Ngừng sử dụng'}</span></div>
-        <p>{selected.active?'Ngừng sử dụng để loại điểm khỏi danh sách điều phối mới. Thao tác này không hủy nhiệm vụ đang chạy.':'Điểm vẫn được lưu trên bản đồ để tra cứu. Kích hoạt lại khi cần sử dụng cho điều phối.'}</p>
-        <button type="button" className={'ls-btn '+(selected.active?'danger':'primary')} disabled={locked||hasUnsavedChanges||!onToggleActive} onClick={onToggleActive}>{busy?'Đang cập nhật…':selected.active?'Ngừng sử dụng điểm':'Kích hoạt lại điểm'}</button>
-        {hasUnsavedChanges&&<small role="status">Lưu hoặc bỏ thay đổi trước khi đổi trạng thái điểm.</small>}
-      </section>}
+      {selected&&<EndpointLifecycle point={selected} locked={locked} busy={busy} hasUnsavedChanges={hasUnsavedChanges} onToggleActive={onToggleActive}/>}
       <form onSubmit={e=>{e.preventDefault();onSave();}}>
         <fieldset disabled={locked}>
-          <div className="ep-step"><b>1</b><strong>Thông tin điểm</strong></div>
-          <Field label="Mã điểm" required maxLength={64} placeholder="VD: PHONG_101" value={endpoint.endpointCode} onChange={e=>set('endpointCode',e.target.value)}/>
-          <Field label="Tên điểm" required maxLength={160} placeholder="VD: Trước cửa phòng 101" value={endpoint.endpointName} onChange={e=>set('endpointName',e.target.value)}/>
-          <div className="ep-step"><b>2</b><strong>Vị trí và hướng đến</strong></div>
-          <div className={'ep-position '+(placed?'ready':'')}><span>{placed?'● Đã chọn vị trí':'○ Chưa chọn vị trí'}</span><small>{placed?selected?'Kéo điểm để đổi vị trí; bấm “Đặt lại vị trí / hướng” để đặt cả hướng.':'Kéo trực tiếp điểm cam để đổi vị trí trước khi lưu.':'Bấm “Đặt điểm trên map”, hoặc nhập X/Y.'}</small></div>
-          <div className="ep-coordinate-fields">{[['xM','X (m)'],['yM','Y (m)']].map(([key,label])=><Field key={key} label={label} required type="number" step="any" value={endpoint[key]} onChange={e=>set(key,e.target.value)}/>)}</div>
-          <div className="ep-heading-editor"><div className="ep-compass" aria-hidden="true"><span className="north">90°</span><span className="east">0°</span><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="34" fill="none" stroke="#dce5f0" strokeDasharray="3 4"/><path d="M50 12V88M12 50H88" stroke="#e2e8f0"/><g transform={`translate(50 50) rotate(${-Number(degrees||0)})`}><circle r="7" fill="#f59e0b"/><path d="M5 0H29M22 -7L30 0L22 7" fill="none" stroke="#d97706" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/></g></svg></div><Field label="Hướng đến (độ)" type="number" min={-180} max={180} step="any" required value={degrees} onChange={e=>setAngle(e.target.value)}/></div>
-          <input className="ep-angle-slider" aria-label="Xoay hướng đến" type="range" min="-180" max="180" step="1" value={degrees||0} onChange={e=>setAngle(e.target.value)}/>
-          <div className="ep-angle-presets">{[-180,-90,0,90,180].map(angle=><button type="button" key={angle} className={'ls-btn '+(Number(degrees)===angle?'active':'')} onClick={()=>setAngle(angle)}>{angle}°</button>)}</div>
-          <p className="ls-hint">Khi lưu, máy chủ kiểm tra tâm điểm nằm trên ô trống. Bộ điều hướng vẫn kiểm tra kích thước robot và đường đi. Hướng này cũng dùng làm gợi ý định vị; hướng dừng cuối phụ thuộc chế độ điều hướng trên Pi.</p>
-          <details className="ep-options"><summary>Cài đặt điểm và liên kết</summary>
-            <Field label="Chức năng điểm"><select aria-label="Chức năng điểm" value={endpoint.endpointType} onChange={e=>set('endpointType',e.target.value)}>{Object.entries(ENDPOINT_CATEGORIES).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></Field>
-            <Field label="Vùng liên kết"><select aria-label="Vùng liên kết" value={endpoint.zoneId||''} onChange={e=>set('zoneId',e.target.value)}><option value="">Không liên kết</option>{zones.map(z=><option key={z.zoneId} value={z.zoneId}>{z.zoneName}</option>)}</select></Field>
-            <Field label="Phòng liên kết"><select aria-label="Phòng liên kết" value={endpoint.roomId||''} onChange={e=>set('roomId',e.target.value)}><option value="">Không liên kết</option>{rooms.map(r=><option key={r.roomId} value={r.roomId}>{r.roomName}</option>)}</select></Field>
-            <Field label="Mô tả" value={endpoint.description||''} onChange={e=>set('description',e.target.value)}/>
-            {[...(!selected?[['active','Điểm hoạt động']]:[]),['accessible','Có thể tiếp cận'],['publicVisible','Hiển thị công khai']].map(([key,label])=><label className="ep-check" key={key}><input type="checkbox" checked={!!endpoint[key]} onChange={e=>set(key,e.target.checked)}/>{label}</label>)}
-          </details>
+          <EndpointFields endpoint={endpoint} setEndpoint={setEndpoint} mapId={map.mapId} zones={zones} rooms={rooms}/>
           <div className="ep-save-bar"><button type="submit" className="ls-btn primary">{busy?'Đang lưu…':selected?'Lưu thay đổi':'Lưu điểm đích'}</button><button type="button" className="ls-btn" onClick={reset}>Bỏ thay đổi</button></div>
         </fieldset>
       </form>

@@ -97,17 +97,26 @@ function SettingForm({ rows, settingKey, spec = settingSpecs[settingKey], rooms,
 }
 
 function GeneralSettings() {
-  const settings = useResource(api.listSettings), rooms = useResource(api.listRooms);
+  const settings = useResource(api.listSettings), rooms = useResource(api.listRooms), floors = useResource(api.listFloors);
   const rows = settings.data || [], [updates, setUpdates] = useState({});
   const values = rows.map(row => updates[row.settingKey] || row).concat(Object.values(updates).filter(row => !rows.some(value => value.settingKey === row.settingKey)));
   const onSaved = result => setUpdates(previous => ({ ...previous, [result.settingKey]: result }));
-  const reload = () => { setUpdates({}); settings.reload(); rooms.reload(); };
+  const reload = () => { setUpdates({}); settings.reload(); rooms.reload(); floors.reload(); };
+  useEffect(() => {
+    const refresh = () => { settings.reload(); rooms.reload(); floors.reload(); };
+    window.addEventListener('mediassist-facility-updated', refresh);
+    return () => window.removeEventListener('mediassist-facility-updated', refresh);
+  }, []);
+  const sosSetting = values.find(row => row.settingKey === 'sos.monitoring-room-id');
+  const sosRoomId = sosSetting?.active === false ? '' : sosSetting?.settingValue?.value;
+  const sosRoom = rooms.data?.find(room => room.roomId === sosRoomId);
+  const sosUnavailable = !sosRoom || !sosRoom.active || (sosRoom.floorId && !floors.data?.some(floor => floor.floorId === sosRoom.floorId && floor.active));
   const other = values.filter(row => !settingSpecs[row.settingKey] && !row.settingKey.startsWith('retention.') && row.settingKey !== 'robot.speech.profile');
   return <>
     <PanelHeader title="Vận hành chung" description="Các thiết lập ảnh hưởng trực tiếp đến robot và người tiếp nhận hỗ trợ." reload={reload} loading={settings.loading} />
     <ResourceMessage resource={settings} />
     {settings.data && <div className="sys-main-grid"><div className="sys-stack"><section className="sys-card"><div className="sys-card-heading"><span className="sys-card-icon"><Icon name="connection" /></span><div><h3>Kết nối robot</h3><p>Nhận biết robot mất tín hiệu kịp thời.</p></div></div><SettingForm rows={values} settingKey="operations.robot_offline_threshold_seconds" onSaved={onSaved} disabled={settings.loading || !!settings.error} /></section>
-      <section className="sys-card"><div className="sys-card-heading"><span className="sys-card-icon is-purple"><Icon name="sliders" /></span><div><h3>Tiếp nhận khẩn cấp</h3><p>Chọn nơi chịu trách nhiệm tiếp nhận SOS.</p></div></div><SettingForm rows={values} settingKey="sos.monitoring-room-id" rooms={rooms.data} onSaved={onSaved} disabled={settings.loading || !!settings.error || rooms.loading || !!rooms.error} /><Feedback error={rooms.error} /><p className="sys-footnote">Cần có nhân viên đang trực tại phòng đã chọn. <Link to="/admin/staff-shifts">Xem lịch trực ↗</Link></p></section>
+      <section className="sys-card" aria-label="Phòng tiếp nhận SOS"><div className="sys-card-heading"><span className="sys-card-icon is-purple"><Icon name="sliders" /></span><div><h3>Tiếp nhận khẩn cấp</h3><p>Phòng tiếp nhận được cập nhật khi lưu loại phòng SOS trong danh mục.</p></div></div><ResourceMessage resource={rooms} /><ResourceMessage resource={floors} />{!settings.loading && !settings.error && !rooms.loading && !rooms.error && !floors.loading && !floors.error && <p className="sys-muted">{!sosRoomId ? 'Chưa cấu hình phòng tiếp nhận SOS.' : sosUnavailable ? 'Phòng tiếp nhận SOS không còn khả dụng.' : `${sosRoom.roomName || sosRoom.roomCode} · ${sosRoom.roomCode}`}</p>}<Link className="sys-link" to="/admin/facility?tab=rooms">Quản lý phòng tiếp nhận SOS →</Link><p className="sys-footnote">Cần đúng một nhân viên có ca trực hợp lệ, đã check-in và chưa check-out tại phòng tiếp nhận; tầng của phòng phải đang hoạt động. <Link to="/admin/staff-shifts">Xem lịch trực ↗</Link></p></section>
       {other.length > 0 && <details className="sys-card sys-details"><summary>Cấu hình khác <span>{other.length} mục</span></summary><p className="sys-muted">Thông tin dành cho quản trị kỹ thuật.</p>{other.map(row => <div className="sys-technical-row" key={row.systemSettingId}><strong>{vi(row.settingKey)}</strong><code>{row.settingKey}</code><pre>{JSON.stringify(row.settingValue?.value, null, 2)}</pre></div>)}</details>}
     </div><aside className="sys-help"><span className="sys-eyebrow">THIẾT LẬP LIÊN QUAN</span><h3>Chuẩn bị robot trước khi giao việc</h3><p>Bản đồ đang hoạt động, phiên navigation và vị trí robot được quản lý tại trang thiết lập vận hành.</p><Link className="sys-link" to="/admin/robot-setup">Thiết lập vận hành <span>↗</span></Link><div className="sys-help-divider" /><h3>Giọng nói & thông báo</h3><p>Chọn giọng đọc, tốc độ và nội dung thông báo tại mục Giọng nói.</p><Link className="sys-link" to="/admin/voice-scripts">Mở cấu hình giọng nói <span>↗</span></Link></aside></div>}
   </>;

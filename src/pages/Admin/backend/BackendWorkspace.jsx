@@ -5,7 +5,8 @@ import { callBackend, watchJob } from '../../../features/api/backendApi.js';
 import { operations, canUse, requestSchema, initialValue, prepareBody, prepareValue } from '../../../features/api/contract.js';
 import { resources, resourceOperations, actionLabel, recordTitle, recordTimestamp, recordStatus, settingDisplayValue, statusTone, fieldLabel, screenTitles } from '../../../features/api/workspaceCatalog.js';
 import { vi } from '../../../i18n/vi.js';
-import { DEFAULT_ROOM_DEPARTMENT_CODE } from '../../../features/facility/roomDefaults.js';
+import { DEFAULT_ROOM_DEPARTMENT_CODE, roomTypePatch, validateSosRoom } from '../../../features/facility/roomDefaults.js';
+import RoomSosNotice from '../facility/RoomSosNotice.jsx';
 import { useRoomCodeSuggestion } from '../../../features/facility/useRoomCodeSuggestion.js';
 import SchemaFields from './SchemaFields.jsx';
 import RecordDetails, { displayValue } from './RecordDetails.jsx';
@@ -196,7 +197,8 @@ function JobInstruction({ detail, open }) {
 
 export function OperationDialog({ op, resource, row: raw, bindings, role, preset, onClose, onSaved, title: customTitle, description, choiceOverrides, beforeSubmit, lockShiftTimes = false }) {
   const ref = useRef(null), lock = useRef(false), requestIdentity = useRef(null);
-  const roomCode = useRoomCodeSuggestion(op.key === 'POST /api/v1/rooms');
+  const roomOperation = op.key === 'POST /api/v1/rooms' || op.key === 'PUT /api/v1/rooms/{id}';
+  const roomCode = useRoomCodeSuggestion(roomOperation);
   const row = unwrap(raw), choices = useMemo(() => localChoices(raw), [raw]);
   const currentStep = raw?.steps?.find(s => s.jobStepId === raw.job?.selectedJobStepId);
   const responseAction = op.path === '/api/v1/job-steps/{id}/responses';
@@ -215,6 +217,8 @@ export function OperationDialog({ op, resource, row: raw, bindings, role, preset
   const schema = requestSchema(op.key);
   const missingPaths = paths(op).filter(p => !initialPath[p.name]);
   const hasBody = !!op.body;
+  const changeBody = next => setBody(current => roomOperation && next.roomType !== current.roomType
+    ? { ...next, ...roomTypePatch(next, next.roomType, roomCode.rooms, { roomId: row?.roomId }) } : next);
   const selectPath = next => {
     setPath(next);
     const child = raw?.steps?.find(s => s.stepId === next.stepId) || raw?.tasks?.find(s => s.taskId === next.taskId) || raw?.transitions?.find(s => s.transitionId === next.transitionId) || raw?.slots?.find(s => s.slotId === next.slotId);
@@ -226,6 +230,7 @@ export function OperationDialog({ op, resource, row: raw, bindings, role, preset
     try {
       if (sensitiveAction(op) && !confirm) throw Error('Vui lòng xác nhận thao tác.');
       const payload = hasBody ? responseAction ? staffResponse(currentStep, body) : prepareBody(op.key, body) : undefined;
+      if (op.key === 'POST /api/v1/rooms' || op.key === 'PUT /api/v1/rooms/{id}') validateSosRoom(payload, row);
       const typedQuery = prepareValue(query, paramsSchema(queryParams(op)));
       const signature = JSON.stringify({ path, query: typedQuery, body: payload });
       if (requestIdentity.current?.signature !== signature) requestIdentity.current = { signature, key: crypto.randomUUID() };
@@ -238,6 +243,7 @@ export function OperationDialog({ op, resource, row: raw, bindings, role, preset
       } else setResult(output ?? null);
       setCompleted(true);
       if (write(op)) onSaved();
+      if (write(op) && op.path.startsWith('/api/v1/rooms')) window.dispatchEvent(new Event('mediassist-facility-updated'));
       if (op.path === '/api/v1/auth/change-password') { clearSession(); window.location.assign('/login'); }
     } catch (e) { setError(e.message || 'Không thực hiện được thao tác.'); }
     finally { lock.current = false; setBusy(false); }
@@ -246,10 +252,11 @@ export function OperationDialog({ op, resource, row: raw, bindings, role, preset
   return <dialog className="be-dialog be-workspace" ref={ref} aria-label={title} onCancel={e => { if (busy) e.preventDefault(); else onClose(); }}>
     <header className="be-heading"><div><h2>{title}</h2><p>{description || <>{resource.title}{raw ? ` · ${recordTitle(row)}` : ''}</>}</p></div><button type="button" disabled={busy} aria-label="Đóng biểu mẫu" onClick={onClose}>Đóng</button></header>
     {completed ? <><p className="be-success" role="status">{write(op) ? 'Đã lưu thành công.' : 'Đã tải dữ liệu.'}</p><RecordDetails value={result} /><button className="primary" onClick={onClose}>Hoàn tất</button></> : <form onSubmit={submit}>
-      <fieldset disabled={busy} className="be-form-body">
+      <fieldset disabled={busy || roomCode.loading} className="be-form-body">
         {!!missingPaths.length && <SchemaFields schema={paramsSchema(missingPaths)} value={path} onChange={selectPath} context={{ role, choices: { ...choices, ...choiceOverrides } }} />}
         {!!queryParams(op).length && <SchemaFields schema={paramsSchema(queryParams(op))} value={query} onChange={setQuery} context={{ role }} />}
-        {hasBody && (responseAction ? <StepConfirmation step={currentStep} value={body} onChange={setBody} /> : <SchemaFields key={JSON.stringify(path)} schema={schema} value={body} onChange={setBody} visibleFields={lockShiftTimes && op.method === 'PUT' ? ['staffProfileId', 'roomId', 'note'] : undefined} lockedFields={lockShiftTimes ? ['startsAt', 'endsAt'] : undefined} context={{ role, choices: { ...choices, ...choiceOverrides }, quickRoomCreate: op.key === 'POST /api/v1/admin/shifts' || op.key === 'PUT /api/v1/admin/shifts/{shiftId}' }} />)}
+        {hasBody && (responseAction ? <StepConfirmation step={currentStep} value={body} onChange={setBody} /> : <SchemaFields key={JSON.stringify(path)} schema={schema} value={body} onChange={changeBody} visibleFields={lockShiftTimes && op.method === 'PUT' ? ['staffProfileId', 'roomId', 'note'] : undefined} lockedFields={lockShiftTimes ? ['startsAt', 'endsAt'] : undefined} context={{ role, choices: { ...choices, ...choiceOverrides }, quickRoomCreate: op.key === 'POST /api/v1/admin/shifts' || op.key === 'PUT /api/v1/admin/shifts/{shiftId}' }} />)}
+        {(op.key === 'POST /api/v1/rooms' || op.key === 'PUT /api/v1/rooms/{id}') && <RoomSosNotice type={body.roomType} previousType={row?.roomType} active={body.active} />}
         {!hasBody && write(op) && <p>Thực hiện “{title}” cho bản ghi đang chọn.</p>}
         {op.path.endsWith('/retention/runs') && <p className={query.dryRun ? 'be-muted' : 'be-error'}>{query.dryRun ? 'Chỉ xem trước; không xóa dữ liệu.' : 'Thao tác thật có thể lưu trữ hoặc xóa dữ liệu theo chính sách máy chủ. Hãy kiểm tra kết quả xem trước trước khi tiếp tục.'}</p>}
         {sensitiveAction(op) && <label className="be-check be-confirm"><input type="checkbox" checked={confirm} onChange={e => setConfirm(e.target.checked)} />Tôi xác nhận thực hiện thao tác này.</label>}
