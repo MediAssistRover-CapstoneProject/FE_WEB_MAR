@@ -25,6 +25,7 @@ export const workflowApi = {
   deleteTask: (id, taskId) => apiRequest(`/api/v1/admin/workflows/${id}/tasks/${taskId}`, { method: 'DELETE' }),
   addStep: (id, body) => apiRequest(`/api/v1/admin/workflows/${id}/steps`, { method: 'POST', body }),
   updateStep: (id, stepId, body) => apiRequest(`/api/v1/admin/workflows/${id}/steps/${stepId}`, { method: 'PUT', body }),
+  saveSpeech: (id, body) => apiRequest(`/api/v1/admin/workflows/${id}/speech`, { method: 'PUT', body }),
   deleteStep: (id, stepId) => apiRequest(`/api/v1/admin/workflows/${id}/steps/${stepId}`, { method: 'DELETE' }),
   addTransition: (id, body) => apiRequest(`/api/v1/admin/workflows/${id}/transitions`, { method: 'POST', body }),
   validate: (id) => apiRequest(`/api/v1/admin/workflows/${id}/validate`, { method: 'POST' }),

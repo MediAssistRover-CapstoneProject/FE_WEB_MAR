@@ -1,0 +1,171 @@
+.workflow-speech {
+  gap: 20px;
+}
+
+.workflow-speech .be-card {
+  padding: 22px;
+  border: 1px solid #dce5f1;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.ws-picker .ai-fields {
+  margin: 0;
+}
+
+.ws-workflow-heading,
+.ws-step-heading,
+.ws-save {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.ws-workflow-heading h3,
+.ws-step h4 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.ws-workflow-heading h3 span {
+  display: inline-block;
+  margin-left: 8px;
+  color: #62738c;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ws-workflow-heading p,
+.ws-step-heading p {
+  margin: 7px 0 0;
+  color: #62738c;
+  font-size: 13px;
+}
+
+.ws-search {
+  max-width: 580px;
+}
+
+.ws-steps {
+  display: grid;
+  gap: 14px;
+}
+
+.workflow-speech .ws-step.is-editing {
+  border-color: #80aef0;
+  box-shadow: 0 0 0 2px #edf4ff;
+}
+
+.ws-step-heading .be-actions {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.ws-step .ws-text {
+  margin: 18px 0 0;
+  color: #314968;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.ws-step .ai-note {
+  margin-top: 14px;
+}
+
+.ws-speech-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.ws-step .ai-form {
+  margin: 20px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid #e5edf6;
+}
+
+.ws-step small {
+  color: #62738c;
+  font-weight: 400;
+  text-align: right;
+}
+
+.ws-binding {
+  display: block;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f1f5fa;
+  color: #62738c;
+  font-size: 13px;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.workflow-speech .ws-save {
+  position: sticky;
+  z-index: 1;
+  bottom: 16px;
+  flex-wrap: wrap;
+  border-color: #c5d8f2;
+  background: #f8fbff;
+  box-shadow: 0 6px 24px #1831530d;
+}
+
+.ws-save > div:first-child {
+  flex: 1;
+  min-width: 220px;
+}
+
+.ws-save .be-actions {
+  margin: 0;
+}
+
+.ws-save p {
+  max-width: 720px;
+  margin: 6px 0 0;
+  color: #62738c;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ws-save > .be-error {
+  flex-basis: 100%;
+  color: #b91c1c;
+}
+
+.ws-empty {
+  color: #62738c;
+  line-height: 1.7;
+}
+
+.workflow-speech button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 800px) {
+  .ws-step-heading,
+  .ws-workflow-heading,
+  .ws-step-heading .be-actions {
+    flex-wrap: wrap;
+  }
+
+  .ws-speech-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-speech .ws-save {
+    position: static;
+  }
+
+  .workflow-speech .be-card {
+    padding: 16px;
+  }
+
+  .ws-workflow-heading h3 span {
+    display: block;
+    margin: 8px 0 0;
+  }
+}
