@@ -5,7 +5,7 @@ import { chromium, expect } from '@playwright/test';
 const base = process.env.WORKFLOW_TEST_URL || 'http://127.0.0.1:5186';
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_EXECUTABLE || 'C:/Program Files/Google/Chrome/Application/chrome.exe' });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-const errors = [], writes = [];
+const errors = [], writes = [], reads = [];
 let fail = false, slow = false;
 const workflow = { workflowId: 'delivery-v1', workflowCode: 'DELIVERY', workflowName: 'Giao thuốc',
   status: 'PUBLISHED', versionNo: 1, rowVersion: 4, acceptsNewJobs: true };
@@ -42,7 +42,7 @@ await page.route('**/*', async route => {
   const match = path.match(/^\/api\/v1\/admin\/workflows\/([^/]+)(\/speech)?$/);
   if (match) {
     const [, id, speech] = match;
-    if (!speech) return json(documents.get(id));
+    if (!speech) { reads.push(id); return json(documents.get(id)); }
     const body = request.postDataJSON(); writes.push({ id, body });
     if (fail) return json({ message: 'Bước đã được người khác chỉnh sửa.' }, 409);
     if (slow) await new Promise(resolve => setTimeout(resolve, 300));
@@ -68,12 +68,16 @@ try {
   await expect(workspace).toContainText('Chọn workflow để xem');
   await expect(page.getByLabel('Workflow', { exact: true })).toBeEnabled();
   assert.deepEqual(await page.getByLabel('Workflow', { exact: true }).locator('option').evaluateAll(items => items.map(item => item.value)),
-    ['', 'delivery-v1', 'draft']);
+    ['', 'delivery-v1', 'draft', 'empty', 'confirm', 'overridden']);
+  assert.deepEqual(reads, [], 'opening the picker does not download any workflow graphs');
+  await mkdir('.workstation-build/workflow-speech', { recursive: true });
+  await page.screenshot({ path: '.workstation-build/workflow-speech/empty.png', fullPage: true });
   await page.getByLabel('Tìm workflow').fill('Quy trình chờ');
-  await expect(page.getByLabel('Workflow', { exact: true }).locator('option')).toHaveCount(1);
+  await expect(page.getByLabel('Workflow', { exact: true }).locator('option')).toHaveCount(2);
   await page.getByLabel('Tìm workflow').fill('');
   await page.getByLabel('Workflow', { exact: true }).selectOption('delivery-v1');
   await expect(workspace.locator('.ws-step h4').first()).toHaveText('Nhận thuốc');
+  assert.deepEqual(reads, ['delivery-v1'], 'selection downloads only that workflow graph');
   await card('Nhận thuốc').getByRole('button', { name: 'Nghe thử trên máy' }).click();
   assert.equal((await page.evaluate(() => window.__speech))[0].volume, 0);
   await card('Đến phòng bệnh').getByRole('button', { name: 'Sửa lời nói' }).click();
@@ -88,6 +92,7 @@ try {
   await expect(workspace.locator('.ws-step')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Lưu và áp dụng', exact: true })).toBeEnabled();
   await page.getByLabel('Tìm bước hoặc lời nói').fill('');
+  await page.screenshot({ path: '.workstation-build/workflow-speech/editing.png', fullPage: true });
   page.once('dialog', dialog => dialog.dismiss());
   await page.getByRole('button', { name: 'FAQ trả lời nhanh', exact: true }).click();
   await expect(workspace).toBeVisible();
@@ -104,6 +109,7 @@ try {
   assert.equal(writes[1].body.steps.length, 2);
   assert.equal(writes[1].body.expectedRowVersion, 4);
   assert.equal(writes[1].body.publish, true);
+  assert.deepEqual(reads, ['delivery-v1'], 'saving reuses the returned graph without another GET');
   await page.getByRole('button', { name: 'Tải lại', exact: true }).click();
   await expect(card('Đến phòng bệnh')).toContainText('Xin mời nhận thuốc.');
   await expect(card('Đọc dữ liệu liên kết').getByRole('button', { name: 'Sửa lời nói' })).toBeDisabled();
@@ -117,6 +123,11 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   await page.screenshot({ path: '.workstation-build/workflow-speech/mobile.png', fullPage: true });
+  for (const width of [320, 768, 1024]) {
+    await page.setViewportSize({ width, height: 900 });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `layout fits ${width}px`);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.getByLabel('Workflow', { exact: true }).selectOption('draft');
   await page.evaluate(async () => {
     const { newDocument, fingerprint } = await import('/src/features/workflows/designer/designerModel.js');
@@ -137,11 +148,12 @@ try {
   await expect(workspace).toContainText('chưa có bước phát lời nói');
   await expect(workspace.locator('.ws-step')).toHaveCount(0);
   await expect(page.getByLabel('Workflow', { exact: true })).toBeEnabled();
-  await expect(page.getByLabel('Workflow', { exact: true }).locator('option[value="empty"]')).toHaveCount(0);
-  documents.clear(); documents.set('empty', empty);
+  await expect(page.getByLabel('Workflow', { exact: true }).locator('option[value="empty"]')).toHaveCount(1);
+  documents.clear();
   await page.getByRole('button', { name: 'Tải lại', exact: true }).click();
-  await expect(workspace).toContainText('Chưa có workflow có bước phát lời nói trên máy chủ.');
-  await expect(page.getByLabel('Workflow', { exact: true }).locator('option')).toHaveCount(1);
+  await expect(workspace).toContainText('Chưa có workflow trên máy chủ.');
+  // Keep the selected workflow as a fallback option even if it leaves the list.
+  await expect(page.getByLabel('Workflow', { exact: true }).locator('option')).toHaveCount(2);
   assert.deepEqual(errors, []);
   console.log('PASS workflow speech editing, preview, multi-step save, conflicts, version selection, draft saving, bound fields and mobile layout. All APIs mocked.');
 } catch (error) {

@@ -1,5 +1,22 @@
 # Kiểm tra FE
 
+## Lời nói workflow
+
+Tab `/admin/voice-scripts?tab=workflow-speech` tải danh sách phân trang trước,
+chỉ tải graph khi chọn workflow. Danh sách gồm các workflow hiện có; workflow
+không có bước SPEAK hiển thị hướng dẫn thêm bước. Request đọc được hủy khi đổi
+lựa chọn/rời tab và giới hạn chờ 20 giây.
+
+```powershell
+node --test tests/workflow-speech.test.mjs
+$env:WORKFLOW_TEST_URL='http://localhost:5173'
+node tests/workflow-speech.browser.mjs
+node tests/workflow-speech-loading.browser.mjs
+```
+
+Browser tests giả lập API; kiểm tra 201 workflow không tải trước graph, hủy
+request, xử lý lỗi, tải lại, timeout và luồng sửa/lưu/phát hành lời nói.
+
 ## Workflow Designer kéo thả
 
 Trang `/workflow` đã thay trình tạo workflow cũ. Xem [hướng dẫn và contract đầu vào](../docs/workflow-designer.md).

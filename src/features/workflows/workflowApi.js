@@ -6,8 +6,8 @@ function query(path, params = {}) {
 }
 
 export const workflowApi = {
-  list: (params) => apiRequest(query('/api/v1/admin/workflows', params)),
-  get: (id) => apiRequest(`/api/v1/admin/workflows/${id}`),
+  list: (params, options) => apiRequest(query('/api/v1/admin/workflows', params), options),
+  get: (id, options) => apiRequest(`/api/v1/admin/workflows/${id}`, options),
   listPublished: params => apiRequest(query('/api/v1/workflows/published', params)),
   listStepTypes: () => apiRequest('/api/v1/workflows/step-types'),
   listMaps: params => apiRequest(query('/api/v1/maps', params)),

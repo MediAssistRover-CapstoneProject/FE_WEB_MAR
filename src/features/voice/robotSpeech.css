@@ -1,0 +1,163 @@
+.robot-voice-page.rv-page {
+  --rv-ink: #19324f;
+  --rv-muted: #74859b;
+  --rv-line: #e2eaf4;
+  --rv-blue: #2878ef;
+  display: grid;
+  gap: 20px;
+  padding: 6px 0 12px;
+  min-width: 0;
+  color: var(--rv-ink);
+  font-variant-numeric: tabular-nums;
+}
+.robot-voice-page.rv-page :is(h2, h3, p) { margin: 0; }
+.robot-voice-page svg { width: 17px; height: 17px; flex: none; }
+.robot-voice-page :is(button, input, select, textarea) { font: inherit; }
+.robot-voice-page :is(button, input, select, textarea):focus-visible { outline: 3px solid #2878ef26; outline-offset: 3px; }
+.robot-voice-page .rv-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 2px; }
+.robot-voice-page .rv-heading-copy { display: flex; align-items: center; gap: 15px; min-width: 0; }
+.robot-voice-page .rv-heading-icon { display: grid; place-items: center; width: 48px; height: 48px; flex: none; border: 1px solid #d8e7fd; border-radius: 14px; background: #eaf2ff; color: var(--rv-blue); }
+.robot-voice-page .rv-heading-icon svg { width: 25px; height: 25px; }
+.robot-voice-page .rv-eyebrow { display: block; margin-bottom: 5px; color: #8192a9; font-size: 9px; font-weight: 650; letter-spacing: 1.5px; }
+.robot-voice-page.rv-page h2 { font-size: 23px; letter-spacing: -.55px; font-weight: 650; line-height: 1.4; }
+.robot-voice-page .rv-heading p { margin-top: 6px; color: var(--rv-muted); font-size: 12px; line-height: 1.8; }
+.robot-voice-page .rv-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 39px; padding: 10px 14px; border: 1px solid #dce5f0; border-radius: 8px; background: #fff; color: #506986; font-size: 12px; font-weight: 550; line-height: 1.4; cursor: pointer; transition: background .15s, border-color .15s; }
+.robot-voice-page .rv-button:hover:not(:disabled) { background: #f3f7ff; border-color: #bdd3f5; }
+.robot-voice-page .rv-refresh { flex: none; }
+.robot-voice-page .rv-primary { background: var(--rv-blue); color: #fff; border-color: var(--rv-blue); box-shadow: 0 3px 8px #2878ef14; }
+.robot-voice-page .rv-primary:hover:not(:disabled) { color: #fff; background: #1d68d8; border-color: #1d68d8; }
+.robot-voice-page button:disabled { opacity: .45; cursor: not-allowed; }
+
+.robot-voice-page .rv-service { display: flex; align-items: center; gap: 13px; padding: 16px 19px; border: 1px solid #dce7f4; border-radius: 12px; background: #f1f6fd; }
+.robot-voice-page .rv-service-icon { width: 34px; height: 34px; display: grid; place-items: center; flex: none; color: #5d82b5; background: #e4edfa; border-radius: 10px; }
+.robot-voice-page .rv-service-copy { min-width: 0; }
+.robot-voice-page .rv-service strong { font-size: 12px; font-weight: 600; }
+.robot-voice-page .rv-service p { margin-top: 4px; font-size: 11px; line-height: 1.7; color: #748aa7; }
+.robot-voice-page .rv-service.is-ready { background: #f2faf6; border-color: #d8ece2; }
+.robot-voice-page .is-ready .rv-service-icon { background: #e4f4ec; color: #2d9470; }
+.robot-voice-page .is-ready strong { color: #2d7f63; }
+.robot-voice-page .rv-service.is-warning { background: #fffaf0; border-color: #f0e5cd; }
+.robot-voice-page .is-warning .rv-service-icon { background: #fbefd4; color: #ab843d; }
+.robot-voice-page .is-warning strong { color: #96723c; }
+.robot-voice-page .is-warning p { color: #9e8a65; }
+.robot-voice-page .rv-scope { display: inline-flex; align-items: center; gap: 7px; margin-left: auto; padding-left: 18px; border-left: 1px solid #dce5ed; color: #8093a5; font-size: 10px; white-space: nowrap; }
+.robot-voice-page .rv-scope svg { width: 15px; height: 15px; }
+.robot-voice-page .rv-notice { display: flex; align-items: flex-start; gap: 9px; padding: 12px 15px; border: 1px solid var(--rv-line); border-radius: 9px; background: #f3f7ff; color: #5f7898; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.robot-voice-page .rv-notice svg { width: 16px; height: 16px; margin-top: 2px; }
+.robot-voice-page .rv-notice.is-error { background: #fff5f4; color: #b74f49; border-color: #f0d9d6; }
+.robot-voice-page .rv-notice.is-success { background: #f0faf5; color: #358663; border-color: #d5ebdf; }
+
+.robot-voice-page .rv-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.robot-voice-page .rv-card { min-width: 0; border: 1px solid var(--rv-line); border-radius: 14px; background: #fff; box-shadow: 0 3px 12px #213c5d03; overflow: hidden; }
+.robot-voice-page .rv-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 88px; padding: 20px 22px; border-bottom: 1px solid #edf1f7; }
+.robot-voice-page .rv-card-title { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.robot-voice-page .rv-card-title > div { min-width: 0; }
+.robot-voice-page .rv-card-icon { width: 35px; height: 35px; display: grid; place-items: center; flex: none; color: #4b83d4; background: #eef5ff; border-radius: 10px; }
+.robot-voice-page .rv-card-icon.is-purple { background: #f1effc; color: #8d7ac4; }
+.robot-voice-page.rv-page h3 { font-size: 14px; line-height: 1.6; font-weight: 650; letter-spacing: -.15px; }
+.robot-voice-page .rv-card-heading p { margin-top: 4px; color: var(--rv-muted); font-size: 11px; line-height: 1.6; }
+.robot-voice-page .rv-badge { display: inline-flex; padding: 5px 8px; border: 1px solid #e0ece5; border-radius: 6px; color: #54846d; background: #f3f9f5; font-size: 10px; font-weight: 550; line-height: 1.5; white-space: nowrap; }
+.robot-voice-page .rv-badge.is-dirty { color: #ad7b29; background: #fff8e9; border-color: #f1e4c8; }
+.robot-voice-page .rv-form { display: grid; gap: 24px; border: 0; padding: 24px 22px 0; margin: 0; min-width: 0; }
+.robot-voice-page .rv-field { display: grid; gap: 10px; min-width: 0; }
+.robot-voice-page .rv-field label { color: #49627f; font-size: 12px; font-weight: 600; line-height: 1.5; }
+.robot-voice-page .rv-label-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.robot-voice-page .rv-count { color: #95a2b5; font-size: 10px; flex: none; }
+.robot-voice-page.rv-page :is(select, textarea, input[type=number]) { width: 100%; min-width: 0; min-height: 42px; padding: 10px 12px; border: 1px solid #dce5f0; border-radius: 8px; color: var(--rv-ink); background: #fff; font-size: 12px; font-weight: 400; line-height: 1.7; }
+.robot-voice-page.rv-page textarea { resize: vertical; min-height: 136px; }
+.robot-voice-page.rv-page textarea::placeholder { color: #9aa8ba; }
+.robot-voice-page .rv-hint { font-size: 11px; color: #8696ab; line-height: 1.8; }
+.robot-voice-page .rv-voice-select { position: relative; min-width: 0; }
+.robot-voice-page .rv-voice-avatar { position: absolute; display: grid; place-items: center; left: 11px; top: 50%; transform: translateY(-50%); width: 31px; height: 31px; border: 1px solid #dce9fb; border-radius: 9px; background: #edf4ff; color: #558ad7; pointer-events: none; }
+.robot-voice-page.rv-page .rv-voice-select select { min-height: 54px; padding-left: 54px; font-size: 14px; font-weight: 550; background: #fcfdff; }
+.robot-voice-page .rv-speed-field { padding-top: 1px; }
+.robot-voice-page .rv-speed-value { display: flex; align-items: center; position: relative; width: 85px; }
+.robot-voice-page.rv-page .rv-speed-value input { min-height: 35px; height: 35px; padding: 5px 23px 5px 10px; font-weight: 550; font-variant-numeric: tabular-nums; appearance: textfield; -moz-appearance: textfield; }
+.robot-voice-page .rv-speed-value input::-webkit-inner-spin-button { appearance: none; }
+.robot-voice-page .rv-speed-value > span { position: absolute; right: 11px; color: #8a9cb3; font-size: 12px; pointer-events: none; }
+.robot-voice-page.rv-page input.rv-speed-slider { width: 100%; padding: 0; min-height: 24px; margin: 3px 0 0; border: 0; outline-offset: 3px; appearance: none; background: transparent; cursor: pointer; }
+.robot-voice-page .rv-speed-slider::-webkit-slider-runnable-track { height: 5px; border-radius: 6px; background: linear-gradient(to right, #598eea var(--range-progress), #e9eef6 var(--range-progress)); }
+.robot-voice-page .rv-speed-slider::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; margin-top: -5.5px; border: 3px solid #fff; border-radius: 50%; background: #4483e8; box-shadow: 0 0 0 1px #bcd3f8, 0 2px 5px #17407f1a; }
+.robot-voice-page .rv-speed-slider::-moz-range-track { height: 5px; border-radius: 6px; background: #e9eef6; }
+.robot-voice-page .rv-speed-slider::-moz-range-progress { height: 5px; border-radius: 6px; background: #598eea; }
+.robot-voice-page .rv-speed-slider::-moz-range-thumb { width: 12px; height: 12px; border: 3px solid #fff; border-radius: 50%; background: #4483e8; box-shadow: 0 0 0 1px #bcd3f8; }
+.robot-voice-page .rv-speed-labels { display: flex; justify-content: space-between; color: #8c9bb0; font-size: 10px; margin-top: -7px; }
+.robot-voice-page .rv-settings-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin: 1px -22px 0; padding: 18px 22px; border-top: 1px solid #edf1f7; background: #fcfdff; }
+.robot-voice-page .rv-settings-footer > div { display: flex; gap: 8px; }
+.robot-voice-page .rv-reset { padding-inline: 11px; }
+.robot-voice-page .rv-save-state { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; color: #81948b; }
+.robot-voice-page .rv-save-state > span { width: 5px; height: 5px; border-radius: 50%; background: #6ea78c; }
+.robot-voice-page .rv-save-state.is-dirty { color: #a78a55; }
+.robot-voice-page .rv-save-state.is-dirty > span { background: #c89e50; }
+
+.robot-voice-page .rv-preview-body { display: grid; gap: 22px; padding: 22px; }
+.robot-voice-page .rv-voice-stage { position: relative; overflow: hidden; padding: 16px 19px; border: 1px solid #dce8fa; border-radius: 11px; background: radial-gradient(ellipse at 50% 10%, #e6eefe 0, #f3f7ff 70%); }
+.robot-voice-page .rv-stage-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.robot-voice-page .rv-stage-label { font-size: 8px; letter-spacing: 1.5px; font-weight: 650; color: #879bbb; }
+.robot-voice-page .rv-stage-format { font-size: 9px; color: #7190bd; border: 1px solid #dbe6f7; border-radius: 5px; padding: 3px 7px; background: #ffffff73; }
+.robot-voice-page .rv-wave { height: 83px; display: flex; justify-content: center; align-items: center; gap: 5px; padding: 10px 0; }
+.robot-voice-page .rv-wave > span { width: 4px; height: var(--bar-height); max-height: 100%; border-radius: 5px; background: linear-gradient(to top, #89a8e0, #427ad3); opacity: .7; }
+.robot-voice-page .rv-wave > span:nth-child(3n) { opacity: .35; }
+.robot-voice-page .rv-stage-profile { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-top: 3px; }
+.robot-voice-page .rv-stage-profile strong { font-size: 20px; font-weight: 600; text-transform: capitalize; color: #42689d; letter-spacing: -.3px; }
+.robot-voice-page .rv-stage-profile > span { display: inline-flex; align-items: center; gap: 7px; font-size: 10px; color: #8096b5; }
+.robot-voice-page .rv-stage-profile i { width: 3px; height: 3px; border-radius: 50%; background: #b4c4da; }
+.robot-voice-page .rv-preview-form { padding: 0; gap: 18px; }
+.robot-voice-page .rv-preview-warning { display: flex; align-items: flex-start; gap: 7px; background: #fffaee; border: 1px solid #f1e6cd; padding: 10px 11px; border-radius: 8px; color: #a18047; font-size: 11px; line-height: 1.8; }
+.robot-voice-page .rv-preview-warning svg { width: 14px; height: 14px; margin-top: 3px; }
+.robot-voice-page .rv-preview-button { color: #fff; background: #3577d8; border-color: #3577d8; width: 100%; min-height: 43px; }
+.robot-voice-page .rv-preview-button:hover:not(:disabled) { color: #fff; background: #2868c6; border-color: #2868c6; }
+.robot-voice-page .rv-player { border-top: 1px solid #edf1f7; padding-top: 16px; }
+.robot-voice-page .rv-player-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.robot-voice-page .rv-player-heading > span { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; color: #6f85a1; }
+.robot-voice-page .rv-player-heading svg { width: 14px; height: 14px; }
+.robot-voice-page .rv-player .rv-hint { margin-top: 10px; font-size: 10px; }
+.robot-voice-page .rv-stop { display: inline-flex; align-items: center; gap: 5px; border: 0; padding: 4px 0; min-height: 28px; color: #6f85a1; background: transparent; font-size: 10px; font-weight: 500; white-space: nowrap; }
+.robot-voice-page .rv-stop:hover:not(:disabled) { color: #2878ef; background: transparent; }
+.robot-voice-page .rv-player audio { display: block; width: 100%; height: 38px; margin-top: 12px; }
+.robot-voice-page .rv-player audio[hidden] { display: none; }
+.robot-voice-page .rv-footnote { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 9px; padding: 0 3px; color: #8798ae; }
+.robot-voice-page .rv-footnote svg { width: 14px; height: 14px; margin-top: 2px; }
+.robot-voice-page .rv-footnote p { font-size: 11px; line-height: 1.8; }
+.robot-voice-page .rv-loading { display: flex; align-items: center; gap: 10px; padding: 26px; border: 1px solid var(--rv-line); border-radius: 13px; background: #fff; color: var(--rv-muted); font-size: 12px; }
+
+@media (max-width: 1100px) {
+  .robot-voice-page .rv-layout { grid-template-columns: minmax(0, 1fr); }
+  .robot-voice-page .rv-settings-footer { flex-wrap: nowrap; }
+}
+@media (max-width: 600px) {
+  .robot-voice-page.rv-page { gap: 16px; }
+  .robot-voice-page .rv-heading { align-items: flex-start; flex-wrap: wrap; gap: 14px; }
+  .robot-voice-page .rv-heading-copy { gap: 11px; }
+  .robot-voice-page .rv-heading-icon { width: 40px; height: 42px; border-radius: 11px; }
+  .robot-voice-page .rv-heading-icon svg { width: 23px; height: 23px; }
+  .robot-voice-page .rv-eyebrow { font-size: 8px; }
+  .robot-voice-page.rv-page h2 { font-size: 20px; }
+  .robot-voice-page .rv-heading p { font-size: 11px; }
+  .robot-voice-page .rv-refresh { min-height: 34px; padding: 8px 11px; font-size: 11px; margin-left: auto; }
+  .robot-voice-page .rv-service { align-items: flex-start; flex-wrap: wrap; padding: 15px; gap: 10px; }
+  .robot-voice-page .rv-service-copy { flex: 1; }
+  .robot-voice-page .rv-service strong { font-size: 11px; }
+  .robot-voice-page .rv-service p { font-size: 10px; }
+  .robot-voice-page .rv-scope { width: 100%; margin: 4px 0 0; padding: 11px 0 0; border-left: 0; border-top: 1px solid #e5e9eb; }
+  .robot-voice-page .rv-card-heading { padding: 17px 18px; flex-wrap: wrap; gap: 12px; }
+  .robot-voice-page .rv-card-heading p { font-size: 10px; }
+  .robot-voice-page .rv-card-title { gap: 10px; }
+  .robot-voice-page.rv-page h3 { font-size: 13px; }
+  .robot-voice-page .rv-badge { font-size: 9px; margin-left: 45px; }
+  .robot-voice-page .rv-form { padding: 20px 18px 0; gap: 22px; }
+  .robot-voice-page .rv-settings-footer { flex-wrap: wrap; margin: 0 -18px; padding: 16px 18px; }
+  .robot-voice-page .rv-settings-footer > div { width: 100%; }
+  .robot-voice-page .rv-settings-footer .rv-primary { flex: 1; }
+  .robot-voice-page .rv-settings-footer .rv-reset { min-width: 85px; }
+  .robot-voice-page .rv-preview-body { padding: 18px; gap: 20px; }
+  .robot-voice-page .rv-preview-form { padding: 0; gap: 18px; }
+  .robot-voice-page .rv-voice-stage { padding: 14px; }
+  .robot-voice-page .rv-wave { gap: 4px; }
+  .robot-voice-page .rv-stage-profile strong { font-size: 19px; }
+  .robot-voice-page .rv-stage-profile > span { font-size: 9px; }
+  .robot-voice-page .rv-player-heading { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .robot-voice-page * { transition: none !important; }
+}

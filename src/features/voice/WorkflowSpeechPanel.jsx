@@ -9,6 +9,24 @@ import { designerStorageKey } from '../workflows/designer/designerStorage.js';
 import { clearSyncedSpeechDrafts, editableSpeechData, isBound, speechChanges, speechData, speechError, speechSteps } from './workflowSpeech.js';
 import './workflowSpeech.css';
 
+function SpeechIcon({ name }) {
+  const shapes = {
+    speech: <><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9H13a8.5 8.5 0 0 1 8 8v.5Z" /><path d="M8 12h.01M12 12h.01M16 12h.01" /></>,
+    search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></>,
+    refresh: <><path d="M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 13 3M18 18A8 8 0 0 1 5 15" /></>,
+    workflow: <><rect x="8" y="3" width="8" height="5" rx="1.5" /><rect x="2" y="16" width="8" height="5" rx="1.5" /><rect x="14" y="16" width="8" height="5" rx="1.5" /><path d="M12 8v4M6 16v-4h12v4" /></>,
+    play: <><path d="m9 5 11 7-11 7V5Z" /></>,
+    stop: <rect x="6" y="6" width="12" height="12" rx="2" />,
+    edit: <><path d="m16 4 4 4M4 20l4-1 12-12a2.8 2.8 0 0 0-4-4L4 15l-1 6 5-2" /></>,
+    chevron: <path d="m6 15 6-6 6 6" />,
+    arrow: <><path d="M7 17 17 7M7 7h10v10" /></>,
+    check: <path d="m5 12 4 4L19 6" />,
+    info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 7h.01" /></>,
+    save: <><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z" /><path d="M7 3v6h10V3M7 21v-8h10v8" /></>,
+  };
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{shapes[name] || shapes.speech}</svg>;
+}
+
 export default function WorkflowSpeechPanel({ onDirtyChange }) {
   const session = getSession();
   if (session?.account?.role !== 'ADMIN' || session?.mode === 'demo')
@@ -21,6 +39,7 @@ function SpeechWorkspace({ onDirtyChange }) {
   const workflowId = params.get('workflowId') || '';
   const [catalog, setCatalog] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState('');
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(false);
   const [drafts, setDrafts] = useState({});
@@ -57,15 +76,20 @@ function SpeechWorkspace({ onDirtyChange }) {
   }, [dirty, saving]);
   useEffect(() => {
     let active = true;
-    setCatalogLoading(true);
-    loadAllPages(workflowApi.list)
-      .then(items => Promise.all(items.map(item => workflowApi.get(item.workflowId))))
-      .then(details => {
-        if (active) setCatalog(details.filter(item => speechSteps(item).length > 0).map(item => item.workflow));
-      })
-      .catch(e => { if (active) setError(e.message); })
-      .finally(() => { if (active) setCatalogLoading(false); });
-    return () => { active = false; };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    setCatalogLoading(true); setCatalogError('');
+    // The list already contains picker labels. Fetch a graph only after selection.
+    // Defer starting so StrictMode's discarded mount does not send duplicate requests.
+    Promise.resolve().then(() => {
+      controller.signal.throwIfAborted();
+      return loadAllPages(query => workflowApi.list(query, { signal: controller.signal }));
+    })
+      .then(items => { if (active) setCatalog(items); })
+      .catch(e => { if (active) setCatalogError(controller.signal.aborted
+        ? 'Tải danh sách workflow quá lâu. Hãy bấm Tải lại để thử lại.' : e.message); })
+      .finally(() => { clearTimeout(timer); if (active) setCatalogLoading(false); });
+    return () => { active = false; clearTimeout(timer); controller.abort(); };
   }, [revision]);
   useEffect(() => {
     if (savedSelection.current === workflowId && workflowId) {
@@ -73,14 +97,20 @@ function SpeechWorkspace({ onDirtyChange }) {
       return;
     }
     let active = true;
+    const controller = new AbortController();
     setDetail(null); setDrafts({}); setEditing(''); setError(''); setMessage('');
     stop();
     if (!workflowId) { setLoading(false); return; }
+    const timer = setTimeout(() => controller.abort(), 20000);
     setLoading(true);
-    workflowApi.get(workflowId).then(value => { if (active) setDetail(value); })
-      .catch(e => { if (active) setError(e.message); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    Promise.resolve().then(() => {
+      controller.signal.throwIfAborted();
+      return workflowApi.get(workflowId, { signal: controller.signal });
+    }).then(value => { if (active) setDetail(value); })
+      .catch(e => { if (active) setError(controller.signal.aborted
+        ? 'Tải các bước workflow quá lâu. Hãy bấm Tải lại để thử lại.' : e.message); })
+      .finally(() => { clearTimeout(timer); if (active) setLoading(false); });
+    return () => { active = false; clearTimeout(timer); controller.abort(); };
   }, [workflowId, revision]);
 
   function stop() {
@@ -178,34 +208,37 @@ function SpeechWorkspace({ onDirtyChange }) {
   const changedCodes = new Set(changes.map(change => change.stepCode));
   const inactive = workflow?.status === 'ARCHIVED';
   return <section className="ai-workspace workflow-speech" aria-label="Lời nói workflow">
-    <header className="ai-heading"><div><h2>Lời nói workflow</h2><p>Sửa nhanh lời robot đọc ở từng bước tương tác.</p></div>
-      <button disabled={saving || loading || catalogLoading} onClick={() => {
+    <header className="ws-heading"><div className="ws-heading-copy"><span className="ws-heading-icon"><SpeechIcon name="speech" /></span><div>
+      <span className="ws-eyebrow">NỘI DUNG TƯƠNG TÁC</span><h2>Lời nói workflow</h2><p>Chỉnh nội dung và nghe thử lời robot đọc trong từng bước.</p></div></div>
+      <button className="ws-button ws-refresh" disabled={saving || loading || catalogLoading} onClick={() => {
         if (!dirty || window.confirm('Bỏ các thay đổi chưa lưu và tải lại từ máy chủ?')) setRevision(value => value + 1);
-      }}>Tải lại</button>
+      }}><SpeechIcon name="refresh" />Tải lại</button>
     </header>
-    <div className="be-card ws-picker"><div className="ai-fields">
-      <label>Tìm workflow<input type="search" value={workflowSearch} onChange={e => setWorkflowSearch(e.target.value)} placeholder="Tên hoặc mã workflow" /></label>
+    <div className="be-card ws-picker"><div className="ws-card-heading"><div className="ws-card-title"><span className="ws-small-icon"><SpeechIcon name="workflow" /></span><div><h3>Chọn workflow</h3><p>Tìm quy trình bạn muốn chỉnh lời nói.</p></div></div>
+      <span className="ws-badge">{catalogLoading ? 'Đang tải…' : `${catalog.length} workflow`}</span></div><div className="ai-fields">
+      <label>Tìm workflow<span className="ws-search-control"><SpeechIcon name="search" /><input type="search" value={workflowSearch} onChange={e => setWorkflowSearch(e.target.value)} placeholder="Tên hoặc mã workflow" /></span></label>
       <label>Workflow<select aria-label="Workflow" value={workflowId} disabled={saving || catalogLoading} onChange={e => selectWorkflow(e.target.value)}>
         <option value="">{catalogLoading ? 'Đang tải workflow…' : 'Chọn workflow cần sửa lời nói'}</option>
-        {workflowId && workflow?.workflowId === workflowId && steps.length > 0 && !catalog.some(item => item.workflowId === workflowId)
-          && <option value={workflowId}>{workflow.workflowName}</option>}
+        {workflowId && !catalog.some(item => item.workflowId === workflowId)
+          && <option value={workflowId}>{workflow?.workflowId === workflowId ? workflow.workflowName : 'Workflow đang chọn'}</option>}
         {listed.map(item => <option key={item.workflowId} value={item.workflowId}>{item.workflowName} · v{item.versionNo} · {workflowStatusLabel(item.status)}</option>)}
       </select></label>
-    </div>{!catalogLoading && !catalog.length && <p>Chưa có workflow có bước phát lời nói trên máy chủ. <Link className="ai-link" to="/workflow">Mở trình thiết kế workflow</Link></p>}</div>
+    </div>
+      {!catalogLoading && !catalogError && !catalog.length && <p>Chưa có workflow trên máy chủ. <Link className="ai-link" to="/workflow">Mở trình thiết kế workflow</Link></p>}</div>
+    {catalogError && <p className="be-error" role="alert">{catalogError}</p>}
     {error && <p className="be-error" role="alert">{error}</p>}
     {message && <p className="be-success" role="status">{message}</p>}
-    {loading && <p role="status">Đang tải các bước tương tác…</p>}
-    {!workflowId && !loading && <div className="be-card ws-empty">Chọn workflow để xem và chỉnh lời nói của robot.</div>}
+    {loading && <div className="be-card ws-loading" role="status"><span className="ws-small-icon"><SpeechIcon name="refresh" /></span><div><strong>Đang tải các bước tương tác…</strong><p>Nội dung lời nói sẽ xuất hiện tại đây.</p></div></div>}
+    {!workflowId && !loading && <div className="be-card ws-empty"><span className="ws-empty-icon"><SpeechIcon name="speech" /></span><h3>Lời nói theo từng bước</h3><p>Chọn workflow để xem và chỉnh lời nói của robot.</p><span className="ws-empty-hint">Chỉnh nội dung · Nghe thử · Lưu và áp dụng</span></div>}
     {workflow && <>
-      <div className="ws-workflow-heading"><div><h3>{workflow.workflowName} <span>v{workflow.versionNo} · {workflowStatusLabel(workflow.status)}</span></h3>
-        <p>{steps.length} bước phát lời nói{dirty ? ` · ${changes.length} bước đã sửa` : ''}</p></div>
-        <Link className="ai-link" to={`/workflow?workflowId=${workflow.workflowId}`} onClick={event => {
+      <div className="ws-workflow-heading"><div className="ws-workflow-copy"><div className="ws-workflow-meta"><span className="ws-workflow-code">{workflow.workflowCode}</span><span className={`ws-badge ws-status-${workflow.status?.toLowerCase()}`}>{workflowStatusLabel(workflow.status)}</span><span className="ws-version">Phiên bản {workflow.versionNo}</span></div><h3>{workflow.workflowName}</h3></div>
+        <div className="ws-workflow-actions"><div className="ws-workflow-count"><strong>{steps.length}</strong><span>bước phát lời nói</span></div><Link className="ws-button" to={`/workflow?workflowId=${workflow.workflowId}`} onClick={event => {
           if (saving || dirty && !window.confirm('Bỏ các thay đổi chưa lưu để mở trình thiết kế workflow?')) event.preventDefault();
-        }}>Mở workflow ↗</Link>
+        }}>Mở workflow<SpeechIcon name="arrow" /></Link></div>
       </div>
-      <label className="ws-search">Tìm bước hoặc lời nói<input type="search" value={stepSearch} onChange={e => setStepSearch(e.target.value)} placeholder="Tên bước, mã bước hoặc câu robot đọc" /></label>
+      <div className="ws-list-toolbar"><div><h3>Các bước phát lời nói <span>{shown.length}</span></h3><p>Theo thứ tự thực hiện trong workflow.</p></div><label className="ws-search"><span>Tìm bước hoặc lời nói</span><span className="ws-search-control"><SpeechIcon name="search" /><input type="search" value={stepSearch} onChange={e => setStepSearch(e.target.value)} placeholder="Tìm bước hoặc nội dung lời nói…" /></span></label></div>
       {inactive && <p className="ai-note">Phiên bản này đã ngừng sử dụng. Chọn bản nháp hoặc phiên bản đang phát hành để chỉnh sửa.</p>}
-      {!steps.length && <div className="be-card ws-empty">Workflow này chưa có bước phát lời nói. Thêm bước Tương tác với hành động Phát lời nói trong trình thiết kế.</div>}
+      {!steps.length && <div className="be-card ws-empty"><span className="ws-empty-icon"><SpeechIcon name="speech" /></span><h3>Chưa có nội dung lời nói</h3><p>Workflow này chưa có bước phát lời nói. Thêm bước Tương tác với hành động Phát lời nói trong trình thiết kế.</p></div>}
       {!!steps.length && !shown.length && <p role="status">Không có bước phù hợp với nội dung tìm kiếm.</p>}
       <div className="ws-steps">{shown.map(step => {
         const data = drafts[step.stepCode] ?? speechData(step);
@@ -214,12 +247,12 @@ function SpeechWorkspace({ onDirtyChange }) {
         const text = typeof data?.text === 'string' ? data.text : 'Lời nói lấy từ biến khi workflow chạy';
         const issue = changedCodes.has(step.stepCode) ? speechError(data) : '';
         const task = detail.tasks?.find(item => item.taskId === step.taskId);
-        return <article className={`be-card ws-step${open ? ' is-editing' : ''}`} key={step.stepCode}>
-          <div className="ws-step-heading"><div><h4>{step.stepName}</h4><p>{task?.taskName ? `${task.taskName} · ` : ''}Bước {step.sequenceNo}{step.enabled === false ? ' · Đã tắt' : ''}{changedCodes.has(step.stepCode) ? ' · Chưa lưu' : ''}</p></div>
-            <div className="be-actions"><button disabled={saving || typeof data?.text !== 'string' || !data.text.trim() || !!speechError(data)} onClick={() => playing === step.stepCode ? stop() : preview(step, data)}>{playing === step.stepCode ? 'Dừng nghe' : 'Nghe thử trên máy'}</button>
-              <button aria-expanded={open} disabled={saving || !editable} onClick={() => setEditing(open ? '' : step.stepCode)}>{open ? 'Thu gọn' : 'Sửa lời nói'}</button></div>
+        return <article className={`be-card ws-step${open ? ' is-editing' : ''}${changedCodes.has(step.stepCode) ? ' is-dirty' : ''}`} key={step.stepCode}>
+          <div className="ws-step-heading"><div className="ws-step-identity"><span className="ws-step-number">{String(step.sequenceNo).padStart(2, '0')}</span><div><div className="ws-step-title"><h4>{step.stepName}</h4>{changedCodes.has(step.stepCode) && <span className="ws-badge ws-dirty-badge">Chưa lưu</span>}{step.enabled === false && <span className="ws-badge">Đã tắt</span>}</div><p>{task?.taskName ? `${task.taskName} · ` : ''}Bước {step.sequenceNo}</p></div></div>
+            <div className="be-actions"><button className="ws-button" disabled={saving || typeof data?.text !== 'string' || !data.text.trim() || !!speechError(data)} onClick={() => playing === step.stepCode ? stop() : preview(step, data)}><SpeechIcon name={playing === step.stepCode ? 'stop' : 'play'} />{playing === step.stepCode ? 'Dừng nghe' : 'Nghe thử trên máy'}</button>
+              <button className="ws-button ws-edit-button" aria-expanded={open} disabled={saving || !editable} onClick={() => setEditing(open ? '' : step.stepCode)}><SpeechIcon name={open ? 'chevron' : 'edit'} />{open ? 'Thu gọn' : 'Sửa lời nói'}</button></div>
           </div>
-          {!open && <p className="ws-text">{text}</p>}
+          {!open && <div className="ws-utterance"><SpeechIcon name="speech" /><div><span>Lời robot đọc</span><p className="ws-text">{text}</p></div></div>}
           {!editableSpeechData(step) && <p className="ai-note">Nội dung bước này được liên kết với nguồn dữ liệu. Mở workflow để chỉnh nguồn.</p>}
           {open && <fieldset disabled={saving} className="ai-form">
             <label>Nội dung nói{isBound(data?.text) ? <span className="ws-binding">Đang lấy từ biến. Chỉnh nguồn trong workflow.</span>
@@ -230,16 +263,16 @@ function SpeechWorkspace({ onDirtyChange }) {
                   : <input type="number" min={field.min} max={field.max} step="1" placeholder="Theo mặc định robot" value={data?.[field.key] ?? ''} onChange={e => changeField(step, field.key, e.target.value === '' ? '' : Number(e.target.value))} />}
             </label>)}</div>
             {issue && <p className="be-error" role="alert">{issue}</p>}
-            <div className="be-actions"><button disabled={!changedCodes.has(step.stepCode)} onClick={() => resetStep(step)}>Hoàn tác bước này</button></div>
+            <div className="be-actions ws-editor-actions"><span>Chỉ lưu những bước có thay đổi.</span><button className="ws-button" disabled={!changedCodes.has(step.stepCode)} onClick={() => resetStep(step)}><SpeechIcon name="refresh" />Hoàn tác bước này</button></div>
           </fieldset>}
         </article>;
       })}</div>
-      {!!steps.length && <footer className="be-card ws-save"><div><strong>{dirty ? `${changes.length} bước có thay đổi` : 'Lời nói đã đồng bộ với workflow'}</strong>
-        <p>Nghe thử dùng giọng trên máy này. Giọng thực tế phụ thuộc cấu hình phát của robot.</p>
-        {workflow.status === 'PUBLISHED' && <p>Lưu và áp dụng sẽ phát hành phiên bản mới. Chọn phiên bản mới khi giao nhiệm vụ. Lịch đã gắn phiên bản cũ tiếp tục dùng phiên bản đó.</p>}
+      {!!steps.length && workflow.status === 'PUBLISHED' && <div className="ws-publish-note"><SpeechIcon name="info" /><p>Lưu và áp dụng sẽ phát hành phiên bản mới. Chọn phiên bản mới khi giao nhiệm vụ. Lịch đã gắn phiên bản cũ tiếp tục dùng phiên bản đó.</p></div>}
+      {!!steps.length && <footer className={`be-card ws-save${dirty ? ' has-changes' : ''}`}><div className="ws-save-summary"><span className="ws-save-icon"><SpeechIcon name={dirty ? 'edit' : 'check'} /></span><div><strong>{dirty ? `${changes.length} bước có thay đổi` : 'Lời nói đã đồng bộ với workflow'}</strong>
+        <p>Nghe thử dùng giọng trên máy này. Giọng thực tế phụ thuộc cấu hình phát của robot.</p></div>
       </div><div className="be-actions">
         {workflow.status !== 'PUBLISHED' && <button disabled={saving || !dirty || !!invalid || inactive} onClick={() => save(false)}>Lưu bản nháp</button>}
-        <button className="primary" disabled={saving || !dirty || !!invalid || inactive} onClick={() => save(true)}>{saving ? 'Đang lưu…' : 'Lưu và áp dụng'}</button>
+        <button className="primary ws-button" disabled={saving || !dirty || !!invalid || inactive} onClick={() => save(true)}><SpeechIcon name="save" />{saving ? 'Đang lưu…' : 'Lưu và áp dụng'}</button>
       </div>{invalid && <p className="be-error" role="alert">{invalid}</p>}</footer>}
     </>}
   </section>;
