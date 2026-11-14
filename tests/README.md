@@ -132,10 +132,17 @@ Thư viện có nút “Xóa bản đồ” cho ADMIN (không áp dụng tài kh
 Ngay trong khung danh sách map, “Chọn để xóa” mở checkbox từng bản đồ,
 “Chọn tất cả”, số lượng đã chọn và nút “Xóa đã chọn”. Chọn để xóa không đổi
 bản đồ đang xem và không thu gọn danh sách; “Hủy chọn” xóa các dấu chọn.
-Hộp xác nhận yêu cầu lý do 5–500 ký tự, gọi `DELETE /api/v1/maps/{id}` với
-`{ reason }`. Theo contract BE, thao tác chuyển map sang `ARCHIVED` và ẩn khỏi
-danh sách sử dụng; dữ liệu quét vẫn được giữ lại. FE chỉ bỏ map khỏi danh sách
-sau khi API thành công, chọn map còn lại và bỏ liên kết quay về map vừa xóa.
+Hộp xác nhận tải `GET /api/v1/maps/{id}/deletion-impact` để hiện số endpoint,
+phòng/vùng sẽ xóa, phòng dùng chung được giữ và các ràng buộc. Không gửi yêu cầu
+xóa nếu kiểm tra chưa xong, bị lỗi hoặc còn ràng buộc; có nút kiểm tra lại.
+Sau khi nhập lý do 5–500 ký tự, UI gọi `DELETE /api/v1/maps/{id}/force` với
+`{ reason }` và header `X-Confirm-Hard-Delete: true`. API xóa cứng map cùng endpoint,
+phòng riêng của map, vùng, nhóm điểm, bản vẽ và dữ liệu quét trong database.
+Phòng dùng chung với map khác được giữ lại. Tham chiếu từ job/yêu cầu/ca trực hoặc
+phiên điều hướng đang mở sẽ chặn cả giao dịch. FE chỉ bỏ map khỏi danh sách khi
+API xác nhận đúng `resourceId`, `resourceType: MAP` và `deleted.Map = 1`, chọn map
+còn lại và bỏ liên kết quay về map vừa xóa. Phản hồi `ARCHIVED` không được coi là
+đã xóa. Kiểm tra client bằng `node --test tests/map-deletion-api.test.mjs`.
 Xóa nhiều map gửi lần lượt từng API với cùng lý do. Nếu chỉ một phần thành công,
 FE bỏ các map đã xóa, giữ các map bị lỗi trong hộp xác nhận để thử lại riêng.
 Test xóa bao phủ hủy/Escape, lý do không hợp lệ, lỗi máy chủ, khóa thao tác khi

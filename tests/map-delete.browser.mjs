@@ -12,22 +12,27 @@ await context.addInitScript(() => {
 const page = await context.newPage(), errors = [], deletes = [];
 page.on('pageerror', error => errors.push(error.message));
 const map = (id, status) => ({ mapId: id, mapName: `Bản đồ ${id}`, floorId: 'floor-1', versionNo: 1, status, widthM: 10, heightM: 8, resolutionMPerPixel: .05, originXM: 0, originYM: 0, originYawRad: 0 });
-let maps = [map('a', 'ACTIVE'), map('b', 'DRAFT')], failDelete = false, releaseDelete, autoDelete = false;
+let maps = [map('a', 'ACTIVE'), map('b', 'DRAFT')], failDelete = false, releaseDelete, autoDelete = false, failImpact = false, blockImpact = false;
 const failIds = new Set();
 await page.route(url => url.pathname.startsWith('/api/'), async route => {
   const request = route.request(), path = new URL(request.url()).pathname;
   const reply = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
   if (request.method() === 'DELETE') {
+    assert.equal(request.headers()['x-confirm-hard-delete'], 'true');
     deletes.push({ path, body: request.postDataJSON() });
-    assert.match(path, /^\/api\/v1\/maps\/[a-g]$/);
-    const id = path.split('/').at(-1);
+    assert.match(path, /^\/api\/v1\/maps\/[a-g]\/force$/);
+    const id = path.split('/').at(-2);
     if (failDelete || failIds.has(id)) return reply({ message: 'Bạn không có quyền xóa bản đồ này.' }, 403);
     if (!autoDelete) await new Promise(resolve => { releaseDelete = resolve; });
     const deleted = maps.find(item => item.mapId === id);
     maps = maps.filter(item => item.mapId !== id);
-    return reply({ ...deleted, status: 'ARCHIVED' });
+    return reply({ resourceId: deleted.mapId, resourceType: 'MAP', deleted: { Map: 1, Endpoint: 2, Room: 1 } });
   }
   if (request.method() !== 'GET') throw Error(`Unexpected write: ${request.method()} ${path}`);
+  if (path.endsWith('/deletion-impact')) {
+    if (failImpact) return reply({ message: 'Chưa đọc được dữ liệu liên quan.' }, 503);
+    return reply({ resourceId: path.split('/').at(-2), resourceType: 'MAP', canHardDelete: !blockImpact, blockers: blockImpact ? ['Shift.room_id còn 1 bản ghi tham chiếu.'] : [], dependencies: { Map: 1, Endpoint: 2, Room: 1, Zone: 1, sharedRooms: 1 } });
+  }
   if (path.endsWith('/image-metadata')) return reply({ map_id: path.split('/')[4], width_px: 200, height_px: 160, resolution_m_per_pixel: .05, origin_x_m: 0, origin_y_m: 0, origin_yaw_rad: 0 });
   if (path.endsWith('/image.png')) return route.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=', 'base64') });
   if (path.endsWith('/published/all')) return reply([]);
@@ -45,6 +50,9 @@ try {
   await expect(selectedMap).toContainText('Bản đồ a');
   await deleteButton.click();
   await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('Xóa vĩnh viễn');
+  await expect(dialog).toContainText('2 endpoint · 1 phòng sẽ xóa');
+  await expect(dialog).toContainText('Giữ 1 phòng dùng chung');
   await expect(dialog).toContainText('Bản đồ này đang hoạt động');
   await expect(reason).toBeFocused();
   await expect(confirm).toBeDisabled();
@@ -63,6 +71,27 @@ try {
   await dialog.getByRole('button', { name: 'Hủy', exact: true }).click();
   assert.equal(deletes.length, 0, 'Cancel does not delete');
 
+  // A failed preview or an external reference prevents a permanent-delete request.
+  failImpact = true;
+  await deleteButton.click();
+  await reason.fill('Xóa map và dữ liệu liên quan.');
+  await expect(dialog.getByRole('alert')).toContainText('Chưa đọc được dữ liệu liên quan');
+  await expect(confirm).toBeDisabled();
+  failImpact = false;
+  await dialog.getByRole('button', { name: 'Kiểm tra lại', exact: true }).click();
+  await expect(confirm).toBeEnabled();
+  await dialog.getByRole('button', { name: 'Hủy', exact: true }).click();
+  blockImpact = true;
+  await deleteButton.click();
+  await reason.fill('Xóa map và dữ liệu liên quan.');
+  await expect(dialog).toContainText('Shift.room_id');
+  await expect(confirm).toBeDisabled();
+  assert.equal(deletes.length, 0, 'Preview failures and blockers never send DELETE');
+  blockImpact = false;
+  await dialog.getByRole('button', { name: 'Kiểm tra lại', exact: true }).click();
+  await expect(confirm).toBeEnabled();
+  await dialog.getByRole('button', { name: 'Hủy', exact: true }).click();
+
   // A server rejection preserves the map, reason and retry action.
   failDelete = true;
   await deleteButton.click();
@@ -71,7 +100,7 @@ try {
   await expect(dialog.getByRole('alert')).toContainText('Bạn không có quyền');
   await expect(reason).toHaveValue('  Bản quét cũ, đã có bản thay thế.  ');
   await expect(selectedMap).toContainText('Bản đồ a');
-  assert.deepEqual(deletes[0], { path: '/api/v1/maps/a', body: { reason: 'Bản quét cũ, đã có bản thay thế.' } });
+  assert.deepEqual(deletes[0], { path: '/api/v1/maps/a/force', body: { reason: 'Bản quét cũ, đã có bản thay thế.' } });
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   await page.screenshot({ path: '.workstation-build/map-delete/error-mobile.png', fullPage: true });
@@ -175,7 +204,7 @@ try {
   await expect(page.locator('.sml-count')).toHaveText('5');
   await expect(bulkDelete).toHaveText('Xóa đã chọn (1)');
   assert.equal(new URL(page.url()).searchParams.has('mapId'), false);
-  assert.deepEqual(deletes.slice(requestsBeforeBulk).map(item => item.path), ['/api/v1/maps/a', '/api/v1/maps/b', '/api/v1/maps/c']);
+  assert.deepEqual(deletes.slice(requestsBeforeBulk).map(item => item.path), ['/api/v1/maps/a/force', '/api/v1/maps/b/force', '/api/v1/maps/c/force']);
   assert.ok(deletes.slice(requestsBeforeBulk).every(item => item.body.reason === 'Dọn các bản quét cũ.'));
   await page.screenshot({ path: '.workstation-build/map-delete/bulk-partial-error-mobile.png', fullPage: true });
   failIds.clear();
@@ -185,7 +214,7 @@ try {
   await expect(dialog).toHaveCount(0);
   await expect(page.locator('.sml-count')).toHaveText('4');
   await expect(bulkDelete).toHaveText('Xóa đã chọn (0)');
-  assert.equal(deletes.at(-1).path, '/api/v1/maps/c', 'Retry sends only the failed map');
+  assert.equal(deletes.at(-1).path, '/api/v1/maps/c/force', 'Retry sends only the failed map');
 
   // Refresh prunes selections removed on the server; exiting select mode resets them.
   await checkMap('e').check();

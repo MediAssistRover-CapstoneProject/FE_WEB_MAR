@@ -10,7 +10,12 @@ function catalog(resource, params, options) { return apiRequest(query(`/api/v1/$
 export const facilityApi = {
   listFloors: (params, options) => catalog('floors', params, options),
   listMaps: (params, options) => catalog('maps', params, options),
-  deleteMap: (id, reason) => apiRequest(`/api/v1/maps/${encodeURIComponent(id)}`, { method: 'DELETE', body: { reason } }),
+  getMapDeletionImpact: (id, options) => apiRequest(`/api/v1/maps/${encodeURIComponent(id)}/deletion-impact`, options),
+  deleteMap: async (id, reason) => {
+    const result = await apiRequest(`/api/v1/maps/${encodeURIComponent(id)}/force`, { method: 'DELETE', headers: { 'X-Confirm-Hard-Delete': 'true' }, body: { reason }, retry: false });
+    if (result?.resourceId !== id || result?.resourceType !== 'MAP' || result?.deleted?.Map !== 1) throw new Error('Máy chủ chưa xác nhận xóa vĩnh viễn bản đồ. Hãy tải lại danh sách để kiểm tra.');
+    return result;
+  },
   listZones: (params, options) => catalog('zones', params, options),
   listRooms: (params, options) => catalog('rooms', params, options),
   createRoom: body => apiRequest('/api/v1/rooms', { method: 'POST', body, retry: false }),

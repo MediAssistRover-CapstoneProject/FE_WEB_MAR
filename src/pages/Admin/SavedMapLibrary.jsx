@@ -40,7 +40,8 @@ export default function SavedMapLibrary({onOpen,onDeleted,initialMapId=''}){
     setCheckedIds(ids=>ids.filter(id=>!deletedIds.has(id)));
     setSelected(id=>!deletedIds.has(id)?id:remaining.find(item=>item.status==='ACTIVE')?.mapId||remaining[0]?.mapId||'');
     if(!remaining.length)setBulkMode(false);
-    setNotice(deleted.length===1?`Đã xóa bản đồ “${deleted[0].mapName}” khỏi danh sách sử dụng.`:`Đã xóa ${deleted.length} bản đồ khỏi danh sách sử dụng.`);
+    setNotice(deleted.length===1?`Đã xóa bản đồ “${deleted[0].mapName}” cùng dữ liệu liên quan khỏi database.`:`Đã xóa ${deleted.length} bản đồ cùng dữ liệu liên quan khỏi database.`);
+    window.dispatchEvent(new Event('mediassist-facility-updated'));
     summary.current?.focus();
     onDeleted?.([...deletedIds]);
   };

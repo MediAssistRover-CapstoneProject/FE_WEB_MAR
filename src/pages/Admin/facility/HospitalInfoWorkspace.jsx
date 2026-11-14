@@ -33,20 +33,11 @@ const DEFAULT_HOSPITALS = [
     contactEmail: 'contact@mediassist-hospital.vn',
     operatingHours: 'Khám bệnh: 07:00 - 17:00 · Cấp cứu 24/7',
     bedCapacity: 500,
-    totalFloors: 5,
     status: 'ACTIVE',
     publicVisible: true,
     description: 'Bệnh viện đạt chuẩn quốc tế tích hợp hệ thống hỗ trợ vận chuyển y tế tự hành bằng robot MAR-01.',
     overview: 'Cơ sở được trang bị hạ tầng dẫn đường tự động, trung tâm cấp cứu phản ứng nhanh và kết nối robot chuyên dụng giao thuốc đến từng phòng bệnh.',
   },
-];
-
-const DEFAULT_FLOORS = [
-  { floorId: 'FL-B1', floorCode: 'B1', floorName: 'Tầng Hầm B1', levelNo: -1, description: 'Bãi đỗ xe, trung tâm kỹ thuật điện máy và trạm sạc bảo dưỡng robot MAR.', active: true, departments: 'Nhà xe, Phòng máy biến áp, Kho bảo dưỡng cơ điện' },
-  { floorId: 'FL-01', floorCode: 'T1', floorName: 'Tầng 1 - Sảnh Tiếp Đón', levelNo: 1, description: 'Sảnh trung tâm đón tiếp người bệnh, quầy tiếp nhận BHYT, Khoa Cấp cứu và Nhà thuốc bệnh viện.', active: true, departments: 'Khoa Cấp cứu (A&E), Tiếp đón & Thanh toán, Nhà thuốc trung tâm' },
-  { floorId: 'FL-02', floorCode: 'T2', floorName: 'Tầng 2 - Khám Bệnh & Xét Nghiệm', levelNo: 2, description: 'Khu vực khám ngoại trú các chuyên khoa nội, ngoại, nhi và trung tâm chẩn đoán hình ảnh, xét nghiệm máu.', active: true, departments: 'Khoa Khám bệnh, Phòng xét nghiệm sinh hóa, Phòng chụp X-Quang / CT' },
-  { floorId: 'FL-03', floorCode: 'T3', floorName: 'Tầng 3 - Điều Trị Nội Trú', levelNo: 3, description: 'Khu buồng bệnh nội trú, khoa hồi sức cấp cứu tích cực (ICU) và cụm phòng phẫu thuật kỹ thuật cao.', active: true, departments: 'Khu nội trú A & B, Đơn vị Hồi sức tích cực (ICU), Khu mổ vô trùng' },
-  { floorId: 'FL-04', floorCode: 'T4', floorName: 'Tầng 4 - Điều Hành & Hành Chính', levelNo: 4, description: 'Văn phòng ban giám đốc, hội trường nghiên cứu y khoa và trung tâm kiểm soát điều hành robot MAR-01.', active: true, departments: 'Ban Giám đốc, Phòng CNTT & Điều phối Robot, Phòng Quản lý chất lượng' },
 ];
 
 export default function HospitalInfoWorkspace() {
@@ -56,8 +47,10 @@ export default function HospitalInfoWorkspace() {
 
   const [hospitals, setHospitals] = useState(DEFAULT_HOSPITALS);
   const [selectedHospital, setSelectedHospital] = useState(DEFAULT_HOSPITALS[0]);
-  const [floors, setFloors] = useState(DEFAULT_FLOORS);
-  const [selectedFloor, setSelectedFloor] = useState(DEFAULT_FLOORS[1]);
+  const [floors, setFloors] = useState([]);
+  const [selectedFloor, setSelectedFloor] = useState(null);
+  const [floorsLoading, setFloorsLoading] = useState(true);
+  const [floorsError, setFloorsError] = useState('');
   const [roomSummary, setRoomSummary] = useState(null);
   const [roomSummaryError, setRoomSummaryError] = useState('');
   const pendingCount = roomSummaryError ? '—' : '…';
@@ -110,18 +103,28 @@ export default function HospitalInfoWorkspace() {
       })
       .catch(() => {});
 
-    callBackend('GET /api/v1/floors', { query: { page: 0, size: 50 } }, { signal: controller.signal })
-      .then(res => {
-        const rows = Array.isArray(res) ? res : res?.content;
-        if (rows && rows.length > 0) {
-          setFloors(rows);
-          setSelectedFloor(rows[0]);
-        }
-      })
-      .catch(() => {});
-
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setFloorsLoading(true);
+    setFloorsError('');
+    allFacilityPages(params => facilityApi.listFloors(params, { signal: controller.signal }))
+      .then(rows => {
+        if (controller.signal.aborted) return;
+        setFloors(rows);
+        setSelectedFloor(current => rows.find(floor => floor.floorId === current?.floorId) || rows[0] || null);
+      })
+      .catch(error => {
+        if (controller.signal.aborted) return;
+        setFloors([]);
+        setSelectedFloor(null);
+        setFloorsError(error.message || 'Không tải được danh sách tầng.');
+      })
+      .finally(() => { if (!controller.signal.aborted) setFloorsLoading(false); });
+    return () => controller.abort();
+  }, [roomsRefresh]);
 
   // The badge is visible on every tab. Load its data without mounting the room
   // editor; while that editor is open, its successful loads and edits own counts.
@@ -145,7 +148,7 @@ export default function HospitalInfoWorkspace() {
 
   const metrics = [
     { label: 'Cơ sở bệnh viện', count: hospitals.length, tone: 'blue', icon: 'building' },
-    { label: 'Số tầng hoạt động', count: floors.filter(f => f.active).length, tone: 'amber', icon: 'layers' },
+    { label: 'Số tầng hoạt động', count: floorsLoading ? '…' : floorsError ? '—' : floors.filter(f => f.active).length, tone: 'amber', icon: 'layers' },
     { label: 'Phòng trong danh mục', count: roomCount, tone: 'green', icon: 'room' },
     { label: tab === 'rooms' ? 'Phòng hoạt động' : 'Trạng thái phát hành', count: tab === 'rooms' ? roomSummary?.active ?? pendingCount : 'Công khai', tone: 'green', icon: 'check' },
   ];
@@ -168,8 +171,6 @@ export default function HospitalInfoWorkspace() {
               return;
             }
             setRoomsRefresh(value => value + 1);
-            setToast('Đã làm mới thông tin mới nhất từ máy chủ.');
-            setTimeout(() => setToast(''), 4000);
           }}>
             <Icon name="refresh" />Làm mới
           </button>
@@ -290,7 +291,7 @@ export default function HospitalInfoWorkspace() {
                     <strong>{item.hospitalName || item.title}</strong>
                     <span className="lo-job-target"><Icon name="pin" />{item.address}</span>
                     <div className="lo-job-item-bottom">
-                      <time>{item.totalFloors || 5} tầng chức năng</time>
+                      <time>{floors.filter(floor => floor.hospitalInformationId === item.hospitalInformationId).length} tầng chức năng</time>
                       <Icon name="arrow" />
                     </div>
                   </button>
@@ -380,7 +381,11 @@ export default function HospitalInfoWorkspace() {
                 <span>Cập nhật mới</span>
               </header>
               <div className="lo-job-items">
-                {filteredFloors.map(floor => (
+                {floorsLoading ? <p className="lo-list-empty" role="status">Đang tải danh sách tầng…</p>
+                  : floorsError ? <div className="lo-notice lo-notice-error" role="alert"><p>Không tải được danh sách tầng: {floorsError}</p><button type="button" className="lo-text-button" onClick={() => setRoomsRefresh(value => value + 1)}>Thử lại</button></div>
+                  : !floors.length ? <p className="lo-list-empty" role="status">Chưa có tầng nào trong cơ sở.</p>
+                  : !filteredFloors.length ? <p className="lo-list-empty">Không tìm thấy tầng phù hợp.</p>
+                  : filteredFloors.map(floor => (
                   <button
                     key={floor.floorId}
                     type="button"
@@ -406,7 +411,7 @@ export default function HospitalInfoWorkspace() {
               </div>
             </aside>
 
-            {selectedFloor && (
+            {!floorsLoading && !floorsError && selectedFloor && (
               <article className="lo-detail" aria-label="Chi tiết tầng">
                 <header className="lo-detail-header">
                   <div>
