@@ -57,7 +57,7 @@ function ResourceWorkspace({ section }) {
   const role = getSession()?.account?.role;
   const available = [
     ...(section === 'Voice & Scripts' 
-      ? [{ id: 'robot-voice', title: 'Giọng robot' }, { id: 'workflow-speech', title: 'Lời nói workflow' }, { id: 'ai-knowledge', title: 'Dữ liệu AI' }, { id: 'ai-faq', title: 'FAQ trả lời nhanh' }]
+      ? [{ id: 'robot-voice', title: 'Giọng robot' }, { id: 'workflow-speech', title: 'Lời nói workflow' }, { id: 'ai-knowledge', title: 'Dữ liệu AI' }]
       : []),
     ...resources.filter(r => r.section === section && r.section !== 'Voice & Scripts' && (!r.adminOnly || role === 'ADMIN') && (!r.staffOnly || role === 'STAFF')),
   ];
@@ -69,9 +69,17 @@ function ResourceWorkspace({ section }) {
   const [speechDirty, setSpeechDirty] = useState(false);
   const [geometry, setGeometry] = useState('');
   useEffect(() => {
-    const nextTab = queryTab;
-    if (nextTab && available.some(r => r.id === nextTab)) setTab(nextTab);
-  }, [queryTab, available]);
+    const valid = available.some(r => r.id === queryTab);
+    const nextTab = valid ? queryTab : section === 'Voice & Scripts' ? available[0]?.id : null;
+    if (nextTab) setTab(nextTab);
+    if (section === 'Voice & Scripts' && queryTab && !valid && nextTab) {
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', nextTab);
+        return next;
+      }, { replace: true });
+    }
+  }, [queryTab, available, section, setSearchParams]);
   const selectTab = id => {
     if (id !== tab && speechDirty && !window.confirm('Bỏ các thay đổi giọng nói chưa lưu để chuyển tab?')) return;
     setTab(id);
@@ -87,7 +95,7 @@ function ResourceWorkspace({ section }) {
     {section === 'Facility Management' && role === 'ADMIN' && <div className="be-actions"><button type="button" aria-pressed={!geometry} onClick={() => setGeometry('')}>Danh mục máy chủ</button><button type="button" aria-pressed={geometry === 'zone'} onClick={() => setGeometry('zone')}>Vẽ vùng trên bản đồ máy chủ</button><button type="button" aria-pressed={geometry === 'endpoint'} onClick={() => setGeometry('endpoint')}>Đặt điểm và nhóm trên bản đồ máy chủ</button></div>}
     {geometry ? <div className="ls-studio"><FacilityCatalogEditor key={geometry} stage={geometry} /></div> : <>
     {available.length > 1 && (['Facility Management', 'Public Catalog'].includes(section) ? <CatalogNavigation available={available} resource={resource} onSelect={selectTab} section={section} /> : <nav className="be-tabs" aria-label="Danh mục chức năng">{available.map(r => <button type="button" key={r.id} className={resource?.id === r.id ? 'selected' : ''} aria-pressed={resource?.id === r.id} onClick={() => selectTab(r.id)}>{r.title}</button>)}</nav>)}
-    {resource?.id === 'robot-voice' ? (role === 'ADMIN' && getSession()?.mode !== 'demo' ? <RobotSpeechPanel onDirtyChange={setSpeechDirty} /> : <p role="alert">Chức năng này yêu cầu tài khoản ADMIN đang đăng nhập.</p>) : resource?.id === 'workflow-speech' ? <WorkflowSpeechPanel onDirtyChange={setSpeechDirty} /> : ['ai-knowledge', 'ai-faq'].includes(resource?.id) ? <AiAdminPanel key={resource.id} section={resource.id} /> : resource?.id === 'speech-announcement' ? <SpeechAnnouncement /> : resource ? <ResourcePanel key={resource.id} resource={resource} role={role} /> : <p role="status">Tài khoản này không có quyền sử dụng mục này.</p>}
+    {resource?.id === 'robot-voice' ? (role === 'ADMIN' && getSession()?.mode !== 'demo' ? <RobotSpeechPanel onDirtyChange={setSpeechDirty} /> : <p role="alert">Chức năng này yêu cầu tài khoản ADMIN đang đăng nhập.</p>) : resource?.id === 'workflow-speech' ? <WorkflowSpeechPanel onDirtyChange={setSpeechDirty} /> : resource?.id === 'ai-knowledge' ? <AiAdminPanel key={resource.id} section={resource.id} /> : resource?.id === 'speech-announcement' ? <SpeechAnnouncement /> : resource ? <ResourcePanel key={resource.id} resource={resource} role={role} /> : <p role="status">Tài khoản này không có quyền sử dụng mục này.</p>}
     </>}
   </section>;
 }

@@ -38,6 +38,7 @@ await page.route('**/*', async route => {
     return route.fulfill({ status: 200, contentType: 'audio/wav', body: wav });
   }
   if (path === '/api/v1/admin/workflows') return json({ content: [], last: true });
+  if (path === '/api/v1/admin/knowledge/documents') return json([]);
   return json({ content: [], last: true });
 });
 
@@ -149,6 +150,14 @@ try {
   await page.goto(base + '/admin/voice-scripts?tab=ai-voice');
   await expect(panel.getByRole('combobox', { name: 'Giọng robot', exact: true })).toHaveValue('nova');
   assert.ok(!requests.some(item => item.path.includes('/assistant/voice')), 'old voice links also use the robot API');
+  await page.goto(base + '/admin/voice-scripts?tab=ai-faq');
+  await expect(page).toHaveURL(/tab=robot-voice/);
+  await expect(panel).toBeVisible();
+  await expect(page.getByRole('button', { name: 'FAQ trả lời nhanh', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Dữ liệu AI', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Kho dữ liệu AI', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Quản lý FAQ bệnh viện' })).toHaveCount(0);
+  assert.ok(!requests.some(item => item.path.includes('/assistant/faqs')), 'removed feature never loads its API');
   assert.deepEqual(errors, []);
-  console.log('PASS robot speech settings API, exact save payload, WAV polling, cancellation, errors, retries, tab navigation and mobile layout. All APIs mocked.');
+  console.log('PASS robot speech settings API, exact save payload, WAV polling, cancellation, errors, retries, tab navigation, removed feature URLs and mobile layout. All APIs mocked.');
 } finally { await browser.close(); }

@@ -94,7 +94,7 @@ try {
   await page.getByLabel('Tìm bước hoặc lời nói').fill('');
   await page.screenshot({ path: '.workstation-build/workflow-speech/editing.png', fullPage: true });
   page.once('dialog', dialog => dialog.dismiss());
-  await page.getByRole('button', { name: 'FAQ trả lời nhanh', exact: true }).click();
+  await page.getByRole('button', { name: 'Giọng robot', exact: true }).click();
   await expect(workspace).toBeVisible();
   fail = true;
   await page.getByRole('button', { name: 'Lưu và áp dụng', exact: true }).click();
