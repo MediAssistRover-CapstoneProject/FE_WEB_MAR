@@ -28,17 +28,19 @@ export function ErrorNotice({ error }) {
   if (!error) return null;
   return <div className="ro-error" role="alert"><p>{friendlyError(error)}</p><details><summary>Chi tiết lỗi</summary><p>{error.message}</p></details></div>;
 }
-export function JobStatus({ detail, session, saving, error, title = 'Trạng thái nhiệm vụ' }) {
+export function JobStatus({ detail, session, saving, error, title = 'Trạng thái nhiệm vụ', collapsible = false }) {
   const job = detail?.job;
+  const Container = collapsible ? 'details' : 'section';
   let label = job ? jobLabels[job.status] || 'Đang cập nhật' : 'Chưa có nhiệm vụ';
   if (saving && job?.status !== 'SUCCEEDED' && !['FAILED', 'CANCELLED', 'RECOVERY_REQUIRED'].includes(job?.status)) label = 'Đang lưu và kết thúc';
   else if (session?.state === 'MAPPING' && job?.status === 'RUNNING') label = 'Đang quét bản đồ';
-  return <section className="ro-card" aria-label={title}>
-    <h3>{title}</h3><p className={'ro-status ' + (job?.status === 'SUCCEEDED' ? 'ro-success' : '')} role="status">{label}</p>
+  return <Container className={'ro-card' + (collapsible ? ' ro-job-status' : '')} aria-label={title}>
+    {collapsible ? <summary className="ro-job-status-summary"><span>{title}</span><span className="ro-job-status-toggle"><span className="ro-job-status-expand">Mở chi tiết</span><span className="ro-job-status-collapse">Thu gọn</span></span></summary> : <h3>{title}</h3>}
+    <p className={'ro-status ' + (job?.status === 'SUCCEEDED' ? 'ro-success' : '')} role="status">{label}</p>
     {job?.status === 'RECOVERY_REQUIRED' && <p className="ro-error">Robot cần được kiểm tra và xác nhận dừng. Xem bằng chứng trong phần phục hồi trên trang này hoặc Vận hành trực tiếp; không tạo thêm nhiệm vụ cho robot này.</p>}
     {job && ['FAILED', 'TIMED_OUT', 'CANCELLED'].includes(job.status) && <p>Nhiệm vụ chưa hoàn tất thành công. Kiểm tra chi tiết trước khi thử lại.</p>}
     {error && <ErrorNotice error={error} />}
     {detail?.steps?.length > 0 && <ol className="ro-steps">{detail.steps.map((step, index) => <li key={step.jobStepId || index}><span>{detail.tasks?.find(t => t.jobTaskId === step.jobTaskId)?.taskNameSnapshot || `Bước ${index + 1}`}</span><small>{jobLabels[step.status] || ({ PENDING: 'Chờ thực hiện', SKIPPED: 'Đã bỏ qua' })[step.status] || 'Đang cập nhật'}</small></li>)}</ol>}
     {job && <details className="ro-details"><summary>Chi tiết kỹ thuật</summary><dl><dt>Mã nhiệm vụ</dt><dd>{job.jobCode || job.jobId}</dd><dt>Trạng thái BE</dt><dd>{job.status}</dd>{session && <><dt>Phiên quét</dt><dd>{session.mapping_session_id}</dd><dt>Trạng thái phiên</dt><dd>{session.state}</dd></>}{job.failureReason && <><dt>Lý do</dt><dd>{job.failureReason}</dd></>}</dl><pre>{JSON.stringify({ result: job.resultJson, steps: detail.steps?.map(s => ({ step: s.stepCodeSnapshot, status: s.status, result: s.resultJson, error: s.errorDetailsJson })) }, null, 2)}</pre></details>}
-  </section>;
+  </Container>;
 }

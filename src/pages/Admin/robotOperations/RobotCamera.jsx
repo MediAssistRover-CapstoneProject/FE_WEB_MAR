@@ -42,19 +42,18 @@ export default function RobotCamera({ robotId, variant = 'monitor', fallback = n
       track.detach(element); element.srcObject = null;
     };
   }, [current.track, paused]);
-  const canFallback = !paused && robotId && ['unavailable', 'error'].includes(current.phase);
+  const showFallback = authorized && !paused && !!robotId && !!fallback && ['unavailable', 'error'].includes(current.phase);
   const live = !paused && playing && !stale && current.phase === 'live';
   const message = !robotId ? 'Chọn robot để xem camera.' : paused ? 'Đã ngừng xem camera.'
     : !authorized ? 'Đăng nhập tài khoản có quyền để xem camera robot.'
     : stale ? 'Camera chưa có khung hình mới. Đang chờ robot gửi lại.'
     : current.phase === 'live' && !playing ? 'Đang chờ khung hình đầu tiên từ camera…' : current.message;
   return <section className={`rc-camera-card ${variant === 'mapping' ? 'ro-card' : 'rm-card'}`} ref={container} aria-label="Camera robot">
-    <header className="rc-heading"><h3>Camera robot</h3><span className={live ? 'rc-live' : 'rc-waiting'}>{paused ? 'Đã ngừng xem' : live ? 'Trực tiếp' : 'Đang chờ'}</span><button type="button" aria-label="Phóng lớn camera" onClick={() => container.current?.requestFullscreen?.().catch(() => {})}>⛶</button></header>
+    <header className="rc-heading"><h3>Camera robot</h3><span className={live ? 'rc-live' : 'rc-waiting'}>{paused ? 'Đã ngừng xem' : live ? 'Trực tiếp' : showFallback ? 'Ảnh dự phòng' : 'Đang chờ'}</span><button type="button" aria-label="Phóng lớn camera" onClick={() => container.current?.requestFullscreen?.().catch(() => {})}>⛶</button></header>
     <div className="rc-video">
-      <video ref={video} autoPlay muted playsInline aria-label="Camera trực tiếp của robot" hidden={!current.track || paused} />
-      {!live && <div className="rc-placeholder" role="status"><span aria-hidden="true">{placeholderIcon || '▣'}</span><p>{message}</p>{playBlocked && <button onClick={() => video.current?.play().then(() => setPlayBlocked(false)).catch(() => setPlayBlocked(true))}>Phát camera</button>}</div>}
+      <video ref={video} autoPlay muted playsInline aria-label="Camera trực tiếp của robot" hidden={!current.track || paused || showFallback} />
+      {showFallback ? <div className="rc-fallback">{fallback}</div> : !live && <div className="rc-placeholder" role="status"><span aria-hidden="true">{placeholderIcon || '▣'}</span><p>{message}</p>{playBlocked && <button onClick={() => video.current?.play().then(() => setPlayBlocked(false)).catch(() => setPlayBlocked(true))}>Phát camera</button>}</div>}
     </div>
-    {canFallback && fallback && <div className="rc-fallback">{fallback}</div>}
     <footer><small>{live ? 'Camera từ robot đang chọn' : message}</small><div>{robotId && authorized && <><button type="button" disabled={current.phase === 'connecting' && !paused} onClick={() => { if (paused) setPaused(false); else lease.current?.retry(); }}>{paused ? 'Mở camera' : 'Kết nối lại'}</button>{!paused && <button type="button" onClick={() => setPaused(true)}>Ngừng xem</button>}</>}</div></footer>
   </section>;
 }

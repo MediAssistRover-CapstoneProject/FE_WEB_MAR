@@ -75,10 +75,10 @@ kiểm tra lại bước trước khi gửi xác nhận và robot thay đổi kh
 `/admin/map?stage=scan` dùng giao diện React cho các API quét của `mapping.html`:
 tạo mapping-job, theo dõi mapping-session/snapshot, ảnh map/camera, mapping-control
 và sự kiện lưu map. Chọn robot, tầng, quy trình đã phát hành và tên map trong
-“Chi tiết quét map mới”. Giữ nút để di chuyển; nhả, rời trang, đổi mục hoặc mất
+“Thiết lập phiên quét”. Giữ nút để di chuyển; nhả, rời trang, đổi mục hoặc mất
 kết nối thì ngừng gia hạn và gửi lệnh dừng. Tay cầm hoặc tự quét đang giữ quyền
-điều khiển sẽ khóa nút di chuyển. Hiển thị phản hồi vật cản từ Pi; camera có thể
-nhập URL video trực tiếp và chuyển về ảnh MQTT nếu nguồn video lỗi.
+điều khiển sẽ khóa nút di chuyển. Hiển thị phản hồi vật cản từ Pi; camera dùng
+phiên media của robot và có ảnh MQTT dự phòng khi dịch vụ camera không khả dụng.
 
 Workstations chỉ giữ Bản đồ máy chủ, Phát thông báo và Mô phỏng cục bộ; không nhúng
 giao diện quét map. Link cũ `/workstations?mode=mapping` chuyển đến trang quét trong

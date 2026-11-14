@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getSession } from '../../../features/auth/session.js';
 import { jobPath, post, readTracking, request, writeTracking } from '../../../features/robotOperations/api.js';
-import { committedMapId, isOperator, MappingJog, movementBlock, receiptLabels, terminalJobs } from '../../../features/robotOperations/model.js';
+import { committedMapId, isOperator, jobLabels, MappingJog, movementBlock, receiptLabels, terminalJobs } from '../../../features/robotOperations/model.js';
 import { ErrorNotice, Field, JobStatus, Picker, useCatalog } from './Shared.jsx';
 import { mapPose } from '../../../features/robotOperations/mapPose.js';
 import SavedMappingImage from './SavedMappingImage.jsx';
@@ -9,6 +9,18 @@ import MappingMapPanel from './MappingMapPanel.jsx';
 import { autonomyBlock, MappingAutonomy, prepareMappingWorkflow } from '../../../features/robotOperations/mappingOperations.js';
 import MappingRecoveryPanel from './MappingRecoveryPanel.jsx';
 import RobotCamera from './RobotCamera.jsx';
+import './scanWorkspace.css';
+
+function ScanIcon({ name = 'scan' }) {
+  const paths = {
+    scan: <><path d="M8 3H4a1 1 0 0 0-1 1v4m13-5h4a1 1 0 0 1 1 1v4M3 16v4a1 1 0 0 0 1 1h4m8 0h4a1 1 0 0 0 1-1v-4M7 12h10M12 7v10"/><circle cx="12" cy="12" r="3"/></>,
+    robot: <><rect x="5" y="7" width="14" height="12" rx="4"/><path d="M12 3v4M2 11v4m20-4v4M9 15h6"/><path d="M9 11h.01M15 11h.01"/></>,
+    layers: <><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></>,
+    refresh: <><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 6a8 8 0 0 1 13 2M5 16a8 8 0 0 0 13 2"/></>,
+    drive: <><path d="m8 6 4-4 4 4M12 2v8m-6 6-4-4 4-4M2 12h8m6 6-4 4-4-4m4 4v-8m6-6 4 4-4 4m4-4h-8"/></>,
+  };
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name] || paths.scan}</svg>;
+}
 
 function SnapshotImage({ jobId, kind, enabled }) {
   const [frame, setFrame] = useState(null), [message, setMessage] = useState('Đang chờ ảnh từ Pi.');
@@ -54,7 +66,7 @@ function SnapshotImage({ jobId, kind, enabled }) {
     return () => { controller.abort(); clearTimeout(timer); if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [jobId, kind, enabled]);
   const position = kind === 'map' && frame ? mapPose(frame.state, frame.revision, now) : null;
-  return <><div className={'ro-preview ' + (kind === 'map' ? 'map' : '')}>{frame ? <div className="ro-map-frame" key={frame.url}><img src={frame.url} alt={kind === 'map' ? 'Bản đồ đang quét từ robot' : 'Ảnh camera robot qua MQTT'} />{position?.x !== undefined && <svg className="ro-pose-overlay" viewBox={`0 0 ${position.width} ${position.height}`} role="img" aria-label="Vị trí và hướng robot trên bản đồ"><g transform={`translate(${position.x} ${position.y}) rotate(${position.angle})`}><circle r={position.radius} fill="#0879ee" fillOpacity=".7" stroke="white" strokeWidth="1"/><path d={`M ${position.radius * 1.8} 0 L ${position.radius * .3} ${-position.radius * .55} L ${position.radius * .3} ${position.radius * .55} Z`} fill="#ff7900" stroke="white" strokeWidth=".6"/></g></svg>}</div> : <p>{enabled ? message : 'Chưa có phiên quét đang kết nối.'}</p>}</div>{kind === 'map' && <div className="ro-pose-status"><strong>● Robot</strong><span>{position?.message || 'Chờ bản đồ và tọa độ từ robot.'}</span><small>Chấm xanh: vị trí · Mũi tên cam: hướng phía trước</small></div>}<small>{frame?.captured ? `Ảnh chụp lúc ${new Date(frame.captured).toLocaleString('vi-VN')}` : message}</small></>;
+  return <><div className={'ro-preview ' + (kind === 'map' ? 'map' : '')}>{frame ? <div className="ro-map-frame" key={frame.url}><img src={frame.url} alt={kind === 'map' ? 'Bản đồ đang quét từ robot' : 'Ảnh camera robot qua MQTT'} />{position?.x !== undefined && <svg className="ro-pose-overlay" viewBox={`0 0 ${position.width} ${position.height}`} role="img" aria-label="Vị trí và hướng robot trên bản đồ"><g transform={`translate(${position.x} ${position.y}) rotate(${position.angle})`}><circle r={position.radius} fill="#0879ee" fillOpacity=".7" stroke="white" strokeWidth="1"/><path d={`M ${position.radius * 1.8} 0 L ${position.radius * .3} ${-position.radius * .55} L ${position.radius * .3} ${position.radius * .55} Z`} fill="#ff7900" stroke="white" strokeWidth=".6"/></g></svg>}</div> : <div className="ro-preview-empty"><ScanIcon /><strong>{kind === 'map' ? 'Không gian quét của bạn' : 'Camera robot'}</strong><p>{enabled ? message : 'Chọn robot và tạo phiên quét để bắt đầu.'}</p>{kind === 'map' && <span>Bản đồ sẽ xuất hiện khi robot gửi dữ liệu LiDAR.</span>}</div>}</div>{kind === 'map' && <div className="ro-pose-status"><strong>● Robot</strong><span>{position?.message || 'Chờ bản đồ và tọa độ từ robot.'}</span><small>Chấm xanh: vị trí · Mũi tên cam: hướng phía trước</small></div>}<small>{frame?.captured ? `Ảnh chụp lúc ${new Date(frame.captured).toLocaleString('vi-VN')}` : message}</small></>;
 }
 
 
@@ -273,7 +285,7 @@ export default function LiveMapping({ onMapSaved, embedded = false }) {
   </section> : null;
   const autoReport = session?.autonomy, autoOwned = autonomy.current.active || !!autoReport?.control_selected;
   const autoBlock = autonomyBlock(current.current);
-  const autonomyPanel = <section className="ro-card ro-autonomy-card" aria-label="Tự động quét bản đồ"><div className="ro-section-heading"><h3>Tự động quét bản đồ</h3><span className="ro-badge">{autoReport?.exploration_mode === 'frontier' ? 'Tìm vùng chưa quét' : 'Tránh vật cản'}</span></div>
+  const autonomyPanel = <section className="ro-card ro-autonomy-card" aria-label="Tự động quét bản đồ"><div className="ro-section-heading"><div className="ro-panel-title"><span className="ro-panel-icon"><ScanIcon /></span><div><span className="ro-eyebrow">CHẾ ĐỘ TỰ ĐỘNG</span><h3>Tự động quét bản đồ</h3></div></div><span className="ro-badge">{autoReport?.exploration_mode === 'frontier' ? 'Tìm vùng chưa quét' : 'Tránh vật cản'}</span></div>
     <p>Pi tự tìm đường theo cấu hình và LiDAR. Hết thời gian không có nghĩa đã quét hết bản đồ.</p>
     <Field label="Giới hạn tự quét (giây)"><input type="number" min="10" max={Math.min(600, Number(autoReport?.profile_max_duration_sec) || 600)} step="1" value={autoSeconds} disabled={autoOwned || busy} onChange={e => setAutoSeconds(e.target.value)} /></Field>
     <label className="ro-check"><input type="checkbox" checked={autoReport?.exploration_mode === 'frontier' ? false : autoReturn} disabled={autoOwned || busy || autoReport?.exploration_mode === 'frontier'} onChange={e => setAutoReturn(e.target.checked)} />Dừng khi quay về gần điểm đầu sau khi đã đi đủ quãng đường</label>
@@ -284,7 +296,7 @@ export default function LiveMapping({ onMapSaved, embedded = false }) {
     {autoReport?.control_selected && !autonomy.current.active && <p className="ro-help">Pi vẫn giữ quyền tự quét. Bấm Dừng tự quét và chờ phản hồi trước khi điều khiển tay.</p>}
     {autoReport && <details className="ro-details"><summary>Thông tin tự quét từ Pi</summary><pre>{JSON.stringify({ observedAt: session.motionObservedAt, ...autoReport }, null, 2)}</pre></details>}
   </section>;
-  const drivePanel = <section className="ro-card ro-drive-card"><h3>Di chuyển khi quét</h3><p>Giữ nút để di chuyển, nhả để dừng. Tự dừng khi hết thời gian đã chọn.</p><div className="ro-fields"><Field label="Tốc độ tiến"><select value={speed} disabled={jog.current.active} onChange={e => setSpeed(e.target.value)}><option value="0.05">0,05 m/s</option><option value="0.08">0,08 m/s</option><option value="0.10">0,10 m/s</option><option value="0.15">0,15 m/s</option><option value="0.20">0,20 m/s</option><option value="0.25">0,25 m/s</option><option value="0.30">0,30 m/s</option></select></Field><Field label="Thời gian tối đa (giây)"><input type="number" min="0.4" max="10" step="0.2" value={seconds} disabled={jog.current.active} onChange={e => setSeconds(e.target.value)} /></Field></div>
+  const drivePanel = <section className="ro-card ro-drive-card"><div className="ro-panel-title"><span className="ro-panel-icon"><ScanIcon name="drive" /></span><div><span className="ro-eyebrow">ĐIỀU KHIỂN TAY</span><h3>Di chuyển khi quét</h3></div></div><p>Giữ nút để di chuyển, nhả để dừng. Tự dừng khi hết thời gian đã chọn.</p><div className="ro-fields"><Field label="Tốc độ tiến"><select value={speed} disabled={jog.current.active} onChange={e => setSpeed(e.target.value)}><option value="0.05">0,05 m/s</option><option value="0.08">0,08 m/s</option><option value="0.10">0,10 m/s</option><option value="0.15">0,15 m/s</option><option value="0.20">0,20 m/s</option><option value="0.25">0,25 m/s</option><option value="0.30">0,30 m/s</option></select></Field><Field label="Thời gian tối đa (giây)"><input type="number" min="0.4" max="10" step="0.2" value={seconds} disabled={jog.current.active} onChange={e => setSeconds(e.target.value)} /></Field></div>
     <Field label="Tốc độ quay"><select value={turnSpeed} disabled={jog.current.active} onChange={e => setTurnSpeed(e.target.value)}>{[0.20, 0.35, 0.45, 0.50, 0.80, 1.00].map(value => <option key={value} value={value.toFixed(2)}>{value.toFixed(2).replace('.', ',')} rad/s</option>)}</select></Field>
     <div className="ro-drive ro-drive-pad" aria-label="Điều khiển robot quét bản đồ">
       <button className="ro-forward" disabled={!!block || busy} {...handlers(Number(speed), 0)}>↑ Tiến</button>
@@ -302,7 +314,7 @@ export default function LiveMapping({ onMapSaved, embedded = false }) {
     {!operator ? <p className="ro-help">Chỉ quản trị viên đăng nhập thật được tạo phiên quét và điều khiển robot.</p> : <>
       <ErrorNotice error={catalogError} />
       <details className="ro-card ro-setup" open={setupOpen} onToggle={event=>setSetupOpen(event.currentTarget.open)}>
-        <summary className="ro-setup-summary"><span className="ro-setup-copy"><strong>Chi tiết quét map mới</strong><small title={setupSummary}>{setupSummary}</small></span><span className="ro-setup-toggle"><span>{setupOpen?'Ẩn chi tiết':'Hiện chi tiết'}</span><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m5 7.5 5 5 5-5" strokeLinecap="round" strokeLinejoin="round"/></svg></span></summary>
+        <summary className="ro-setup-summary"><span className="ro-panel-icon"><ScanIcon /></span><span className="ro-setup-copy"><strong>Thiết lập phiên quét</strong><small title={setupSummary}>{setupSummary}</small></span><span className="ro-setup-toggle"><span>{setupOpen?'Ẩn chi tiết':'Hiện chi tiết'}</span><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m5 7.5 5 5 5-5" strokeLinecap="round" strokeLinejoin="round"/></svg></span></summary>
         <div className="ro-setup-content"><p className="ro-setup-intro">Thiết lập thông tin phiên quét. Camera và bản đồ LiDAR cập nhật bên dưới.</p>{loading && <p role="status">Đang tải robot, tầng và quy trình…</p>}
         <form onSubmit={create}><fieldset disabled={busy || loading || Boolean(activeJob)}><div className="ro-fields">
           <Picker label="Robot" value={robotId} onChange={id => { track(null); setRobotId(id); }} items={catalog.robots} idKey="robotId" nameKey="robotName" empty="Chưa có robot trên máy chủ" />
@@ -318,8 +330,25 @@ export default function LiveMapping({ onMapSaved, embedded = false }) {
        </details>
       <ErrorNotice error={error} />
       <ErrorNotice error={actionError} />
-      <div className="ro-actions ro-session-actions"><button disabled={busy || jog.current.active || autonomy.current.active} onClick={() => { reload(); setRevision(v => v + 1); }}>Tải lại trạng thái</button>{jobId && !activeJob && <button disabled={busy} onClick={() => {track(null);setSetupOpen(true);}}>Thiết lập phiên mới</button>}</div>
-      <div className="ro-columns"><div className="ro-stack">{jobId&&<JobStatus detail={detail} session={session} saving={saving} />}<MappingMapPanel title={mapTitle}>{mapId ? <SavedMappingImage key={mapId} mapId={mapId} /> : detail?.job.status === 'SUCCEEDED' ? <p className="ro-help">Nhiệm vụ đã kết thúc nhưng chưa có mã bản đồ đăng ký. Kiểm tra bước COMMIT_MAP_ARTIFACT.</p> : <SnapshotImage jobId={jobId} kind="map" enabled={!!session && !!checkedAt && !error} />}<p className="ro-muted">Ảnh bản đồ do robot gửi về qua BE.</p></MappingMapPanel><MappingRecoveryPanel jobId={jobId} required={detail?.job.status === 'RECOVERY_REQUIRED'} busy={busy} stop={async () => { if (autonomy.current.active) await autonomy.current.stop(); if (jog.current.active) await jog.current.stop(); }} onRecovered={() => { autoSavePending.current = null; setSaving(false); setRevision(v => v + 1); }} /></div><aside className="ro-stack"><RobotCamera key={robotId} robotId={robotId} variant="mapping" fallback={<SnapshotImage jobId={jobId} kind="camera" enabled={detail?.job?.robotId === robotId && !!session && !!checkedAt && !error} />} />{savedMapAction}{autonomyPanel}{drivePanel}</aside></div>
+      <div className="ro-session-bar">
+        <div className="ro-session-meta"><span><ScanIcon name="robot" /><strong>{catalog.robots.find(r => r.robotId === robotId)?.robotName || 'Chưa chọn robot'}</strong></span><span><ScanIcon name="layers" />{catalog.floors.find(f => f.floorId === floorId)?.floorName || 'Chưa chọn tầng'}</span><span className={'ro-connection ' + (ready && !error ? 'is-ready' : '')}><i />{ready && !error ? 'Robot đã kết nối' : robotId ? 'Chờ kết nối robot' : 'Chưa có kết nối'}</span></div>
+        <div className="ro-actions ro-session-actions"><button disabled={busy || jog.current.active || autonomy.current.active} onClick={() => { reload(); setRevision(v => v + 1); }}><ScanIcon name="refresh" />Tải lại trạng thái</button>{jobId && !activeJob && <button disabled={busy} onClick={() => {track(null);setSetupOpen(true);}}>Thiết lập phiên mới</button>}</div>
+      </div>
+      <div className="ro-columns">
+        <div className="ro-stack ro-map-column">
+          <MappingMapPanel title={mapTitle} subtitle={mapName.trim() || 'Không gian quét'} stateLabel={saving ? 'Đang lưu và kết thúc' : detail?.job ? jobLabels[detail.job.status] || 'Đang cập nhật' : 'Chưa bắt đầu'}>
+            {mapId ? <SavedMappingImage key={mapId} mapId={mapId} /> : detail?.job.status === 'SUCCEEDED' ? <p className="ro-help">Nhiệm vụ đã kết thúc nhưng chưa có mã bản đồ đăng ký. Kiểm tra bước COMMIT_MAP_ARTIFACT.</p> : <SnapshotImage jobId={jobId} kind="map" enabled={!!session && !!checkedAt && !error} />}
+            <p className="ro-muted">Bản đồ LiDAR từ robot · Phóng to để kiểm tra chi tiết không gian quét.</p>
+          </MappingMapPanel>
+          {jobId && <JobStatus detail={detail} session={session} saving={saving} collapsible />}
+          <MappingRecoveryPanel jobId={jobId} required={detail?.job.status === 'RECOVERY_REQUIRED'} busy={busy} stop={async () => { if (autonomy.current.active) await autonomy.current.stop(); if (jog.current.active) await jog.current.stop(); }} onRecovered={() => { autoSavePending.current = null; setSaving(false); setRevision(v => v + 1); }} />
+          {autonomyPanel}
+        </div>
+        <aside className="ro-stack ro-control-column">
+          <RobotCamera key={robotId} robotId={robotId} variant="mapping" fallback={<SnapshotImage jobId={jobId} kind="camera" enabled={detail?.job?.robotId === robotId && !!session && !!checkedAt && !error} />} />
+          {savedMapAction}{drivePanel}
+        </aside>
+      </div>
     </>}
   </section>;
 }

@@ -58,7 +58,7 @@ try {
   assert.equal(await button('Tạo nhiệm vụ quét').count(), 0, 'Dispatch does not mount mapping controls');
   await page.goto(base + '/workstations?mode=mapping');
   await page.waitForURL('**/admin/map?stage=scan');
-  await page.getByText('Chi tiết quét map mới', { exact: true }).click();
+  await page.getByText('Thiết lập phiên quét', { exact: true }).click();
   await page.getByLabel('Robot', { exact: true }).selectOption('robot-1');
   await page.getByLabel('Tầng', { exact: true }).selectOption('floor-1');
   await page.getByLabel('Quy trình quét đã phát hành').selectOption('map-workflow');
@@ -83,10 +83,8 @@ try {
 
   gate = 'REAR_OBSTACLE';
   await page.getByText('Robot dừng: có vật cản phía sau', { exact: true }).waitFor();
-  await page.getByText('Kết nối video trực tiếp', { exact: true }).click();
-  await page.getByLabel('URL video từ robot').fill('ftp://robot/video');
-  await button('Xem video trực tiếp').click();
-  await page.getByText('Nhập URL video HTTP hoặc HTTPS, không kèm tài khoản.', { exact: true }).waitFor();
+  await page.getByRole('region', { name: 'Camera robot', exact: true }).waitFor();
+  assert.equal(await page.getByLabel('URL video từ robot').count(), 0, 'Camera uses the robot media session instead of a manually entered URL');
 
   const beforeSwitch = motion().length;
   await button('↓ Lùi').focus();

@@ -53,15 +53,16 @@ export default function MapStudioFigma({initialStage='scan'}) {
     <SavedMapLibrary onOpen={openMap} onDeleted={mapDeleted} initialMapId={mapId}/>
   </section>;
 
-  return <section className="ls-studio">
+  return <section className={'ls-studio' + (stage === 'scan' ? ' ls-scan-studio' : '')}>
     <header className="ls-heading">
       <div>
-        <h2>{vi(workflow[index][1])}</h2>
+        {stage==='scan'&&<span className="ls-scan-eyebrow">MAP STUDIO / TẠO BẢN ĐỒ</span>}
+        <h2>{stage==='scan'?'Quét bản đồ':vi(workflow[index][1])}</h2>
         <p>{stage==='scan'?'Quét không gian để tạo bản đồ cho robot.':stage==='zone'?'Thiết lập vùng di chuyển trên bản đồ đã chọn.':stage==='presentation'?'Chỉnh map thô thành bản đồ dễ đọc, thêm phòng, tường và nhãn.':'Đặt vị trí và hướng đến của robot trên bản đồ.'}</p>
       </div>
       <div className="ls-actions">
         <Button onClick={openLibrary}>← Thư viện bản đồ</Button>
-        {stage==='scan'&&<Button onClick={()=>navigate('/admin/system-settings')}>Cấu hình kết nối robot →</Button>}
+        {stage==='scan'&&<Button onClick={()=>navigate('/admin/system-settings')}>Kết nối robot ↗</Button>}
         {stage==='zone'&&<Button tone="primary" onClick={()=>setStage('endpoint')}>Tiếp tục: Điểm đích →</Button>}
       </div>
     </header>

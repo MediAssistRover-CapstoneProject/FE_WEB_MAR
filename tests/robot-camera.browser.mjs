@@ -64,9 +64,12 @@ try {
     const { default: ReactDOM } = await import('/node_modules/.vite/deps/react-dom_client.js');
     const { default: Camera } = await import('/src/pages/Admin/robotOperations/RobotCamera.jsx');
     const root = ReactDOM.createRoot(document.getElementById('test-root'));
-    window.renderCamera = (id, shared = false) => root.render(React.createElement(React.StrictMode, null,
+    const fallback = React.createElement(React.Fragment, null,
+      React.createElement('div', { className: 'ro-preview' }, React.createElement('img', { alt: 'Ảnh camera dự phòng', src: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=' })),
+      React.createElement('small', null, 'Ảnh camera gần nhất'));
+    window.renderCamera = (id, shared = false, withFallback = false) => root.render(React.createElement(React.StrictMode, null,
       id ? React.createElement(React.Fragment, null,
-        React.createElement(Camera, { key: id, robotId: id }), shared ? React.createElement(Camera, { key: id + '-second', robotId: id }) : null) : null));
+        React.createElement(Camera, { key: id, robotId: id, fallback: withFallback ? fallback : null }), shared ? React.createElement(Camera, { key: id + '-second', robotId: id }) : null) : null));
     window.renderCamera(robotId, true);
   }, { robotId });
   await expect(page.locator('.rc-live')).toHaveCount(2);
@@ -107,9 +110,23 @@ try {
   await expect(page.locator('.rc-video img')).toHaveCount(0);
   await expect(page.getByText('Nguồn video dự phòng', { exact: true })).toHaveCount(0);
   await expect(page.locator('a[href*="tab=robot-camera"]')).toHaveCount(0);
+  await page.evaluate(id => window.renderCamera(id, false, true), robotId);
+  await expect(page.locator('.rc-video > .rc-fallback')).toBeVisible();
+  await expect(page.locator('.rc-placeholder')).toHaveCount(0);
+  await expect(page.locator('.rc-camera-card > .rc-fallback')).toHaveCount(0);
+  await expect(page.locator('.rc-live')).toHaveCount(0);
+  await expect(page.getByAltText('Ảnh camera dự phòng')).toBeVisible();
+  const bounds = await page.locator('.rc-video').boundingBox(), backup = await page.locator('.rc-fallback').boundingBox();
+  assert.ok(backup.y >= bounds.y && backup.y + backup.height <= bounds.y + bounds.height + 1, 'Fallback stays inside the single camera viewport');
+  await page.getByRole('button', { name: 'Ngừng xem', exact: true }).click();
+  await expect(page.locator('.rc-fallback')).toHaveCount(0);
+  await expect(page.locator('.rc-placeholder')).toContainText('Đã ngừng xem');
+  await page.getByRole('button', { name: 'Mở camera', exact: true }).click();
+  await expect(page.locator('.rc-video > .rc-fallback')).toBeVisible();
   deviceOnline = true;
   await page.getByRole('button', { name: 'Kết nối lại', exact: true }).click();
   await expect(page.locator('.rc-live')).toHaveCount(1);
+  await expect(page.locator('.rc-fallback')).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   assert.equal(await page.evaluate(() => window.captureRequests), 0);

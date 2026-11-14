@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-export default function MappingMapPanel({title,children}) {
+export default function MappingMapPanel({title,subtitle,stateLabel,children}) {
   const panel=useRef(null);
   const [zoom,setZoom]=useState(1),[fullscreen,setFullscreen]=useState(false),[message,setMessage]=useState('');
   useEffect(()=>{
@@ -20,7 +20,7 @@ export default function MappingMapPanel({title,children}) {
     }catch{setMessage('Trình duyệt chưa mở được toàn màn hình. Bạn vẫn có thể dùng nút phóng to.');}
   };
   return <section ref={panel} className="ro-card ro-map-card" style={{'--ro-map-zoom':zoom}}>
-    <header className="ro-map-heading"><h3>{title}</h3><div className="ro-map-tools" role="group" aria-label="Hiển thị bản đồ">
+    <header className="ro-map-heading"><div className="ro-map-title"><span className="ro-map-kicker">LIDAR / 2D</span><h3>{subtitle || title}</h3>{subtitle && <span className="ro-map-description">{title}</span>}</div>{stateLabel && <span className="ro-map-state">{stateLabel}</span>}<div className="ro-map-tools" role="group" aria-label="Hiển thị bản đồ">
       <button type="button" aria-label="Thu nhỏ bản đồ" disabled={zoom<=1} onClick={()=>setZoom(z=>Math.max(1,z/1.25))}>−</button>
       <button type="button" onClick={()=>setZoom(1)}>Vừa khung</button>
       <button type="button" aria-label="Phóng to bản đồ" disabled={zoom>=4} onClick={()=>setZoom(z=>Math.min(4,z*1.25))}>+</button>
