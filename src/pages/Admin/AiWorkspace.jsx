@@ -3,11 +3,10 @@ import { Link } from 'react-router-dom';
 import { apiRequest, API_BASE_URL } from '../../features/api/client.js';
 import { getSession } from '../../features/auth/session.js';
 import './aiWorkspace.css';
+import { KNOWLEDGE_DOCUMENTS as DOCS, documentStatuses as statuses, documentPending, loadKnowledgeDocuments, documentUploadBody } from '../../features/api/knowledgeDocuments.js';
 
 const VOICE = '/api/v1/admin/assistant/voice';
-const DOCS = '/api/v1/admin/knowledge/documents';
-const statuses = { READY:'Sẵn sàng', UPLOADED:'Chờ xử lý', PROCESSING:'Đang xử lý', FAILED:'Xử lý lỗi', ARCHIVED:'Đã xóa khỏi AI' };
-const emptyDocument = () => ({title:'', category:'HOSPITAL_INFO', language:'vi-VN', visibility:'PUBLIC', content:'', expectedVersionId:null});
+
 const isAdmin = () => getSession()?.account?.role === 'ADMIN' && getSession()?.mode !== 'demo';
 const Notice = ({error, message}) => <>{error && <p role="alert" className="be-error">{error}</p>}{message && <p role="status" className="be-success">{message}</p>}</>;
 function useActions() {
@@ -65,62 +64,53 @@ function VoiceEditor() {
   </>}</section>;
 }
 function KnowledgeEditor() {
-  const [docs,setDocs]=useState([]), [form,setForm]=useState(emptyDocument), [editing,setEditing]=useState(null), [file,setFile]=useState(null), [fileKey,setFileKey]=useState(0), [filter,setFilter]=useState('active'), [query,setQuery]=useState(''), [detail,setDetail]=useState(null), [loading,setLoading]=useState(true), [showAddForm,setShowAddForm]=useState(false), a=useActions();
-  const alive=useRef(false);
-  const load=async signal=>{const d=await apiRequest(DOCS,{signal});if(!Array.isArray(d))throw new Error('Không tải được danh sách tài liệu. Hãy đăng nhập bằng tài khoản ADMIN.');if(alive.current){setDocs(d);setLoading(false);}return d;};
+  const [docs,setDocs]=useState([]), [file,setFile]=useState(null), [fileKey,setFileKey]=useState(0);
+  const [filter,setFilter]=useState('all'), [query,setQuery]=useState(''), [detail,setDetail]=useState(null);
+  const [loading,setLoading]=useState(true), [showAddForm,setShowAddForm]=useState(false), a=useActions();
+  const alive=useRef(false), generation=useRef(0);
+  const load=async signal=>{
+    const current=++generation.current;
+    const rows=await loadKnowledgeDocuments(signal);
+    if(alive.current&&!signal?.aborted&&current===generation.current){setDocs(rows);setLoading(false);setDetail(previous=>previous?rows.find(d=>d.id===previous.id)||previous:null);}
+    return rows;
+  };
   useEffect(()=>{alive.current=true;const c=new AbortController();load(c.signal).catch(e=>{if(!c.signal.aborted){a.setError(e.message);setLoading(false);}});return()=>{alive.current=false;c.abort();};},[]);
-  useEffect(()=>{if(!docs.some(d=>['UPLOADED','PROCESSING'].includes(d.status)))return;const c=new AbortController();const timer=setTimeout(()=>load(c.signal).catch(e=>{if(!c.signal.aborted)a.setError(e.message);}),3000);return()=>{clearTimeout(timer);c.abort();};},[docs]);
-  const reset=()=>{setEditing(null);setForm(emptyDocument());setFile(null);setFileKey(n=>n+1);};
-  const patch=values=>setForm(s=>({...s,...values}));
+  useEffect(()=>{
+    if(!docs.some(documentPending))return;
+    const c=new AbortController();let timer;
+    const poll=async()=>{
+      try{await load(c.signal);}catch(e){if(!c.signal.aborted){a.setError(e.message);timer=setTimeout(poll,3000);}}
+    };
+    timer=setTimeout(poll,3000);
+    return()=>{clearTimeout(timer);c.abort();};
+  },[docs]);
+  const reset=()=>{setFile(null);setFileKey(n=>n+1);};
   const save=e=>{e.preventDefault();a.run(async signal=>{
-    if(!form.title.trim()||!form.category.trim())throw new Error('Hãy nhập tiêu đề và danh mục.');
-    if(!file&&!form.content.trim())throw new Error('Nhập nội dung hoặc chọn tài liệu.');
-    if(file&&file.size>25*1024*1024)throw new Error('Tệp phải nhỏ hơn hoặc bằng 25 MB.');
-    let body=form;
-    if(file){body=new FormData();body.append('file',file);for(const k of ['title','category','language','visibility'])body.append(k,form[k]);if(editing)body.append('expectedVersionId',form.expectedVersionId);}
-    await apiRequest(DOCS+(editing?'/'+editing:''),{method:editing?'PUT':'POST',body,signal});if(signal.aborted)return;reset();setShowAddForm(false);await load(signal);a.setMessage('Đã lưu. Đợi trạng thái Sẵn sàng để AI sử dụng nội dung mới.');
+    const uploaded=await apiRequest(DOCS,{method:'POST',body:documentUploadBody(file),signal});
+    if(signal.aborted)return;
+    reset();setShowAddForm(false);
+    a.setMessage(uploaded.status==='COMPLETED'?'Tài liệu đã sẵn sàng cho AI.':documentPending(uploaded)?'Đã nhận tài liệu. Đợi trạng thái Sẵn sàng để AI sử dụng.':`Trạng thái tài liệu: ${statuses[uploaded.status]||uploaded.status}. ${uploaded.errorCode||''}`);
+    await load(signal);
   });};
-  const shown=docs.filter(d=>(filter==='all'||(filter==='active'?d.status!=='ARCHIVED':d.status===filter))&&`${d.title} ${d.category}`.toLocaleLowerCase('vi').includes(query.toLocaleLowerCase('vi')));
-  const isFormOpen = showAddForm || Boolean(editing);
+  const shown=docs.filter(d=>(filter==='all'||d.status===filter)&&d.filename.toLocaleLowerCase('vi').includes(query.toLocaleLowerCase('vi')));
   return <><Notice {...a}/>
-  {!isFormOpen ? (
-    <div style={{ marginBottom: 16 }}>
-      <button type="button" className="primary" onClick={() => { setShowAddForm(true); reset(); }}>
-        + Thêm dữ liệu cho AI
-      </button>
-    </div>
-  ) : (
-    <form className="be-card" onSubmit={save}>
-      <header className="ai-heading">
-        <h3>{editing ? 'Sửa tài liệu' : 'Thêm dữ liệu cho AI'}</h3>
-        <div className="be-actions">
-          <button type="button" disabled={a.busy} onClick={reset}>Tạo mới</button>
-          <button type="button" onClick={() => { setShowAddForm(false); reset(); }}>Thu gọn</button>
-        </div>
-      </header>
-      <fieldset disabled={a.busy} className="ai-form">
-        <div className="ai-fields">
-          <label>Tiêu đề<input required maxLength={255} value={form.title} onChange={e=>patch({title:e.target.value})}/></label>
-          <label>Danh mục<input required maxLength={80} value={form.category} onChange={e=>patch({category:e.target.value})}/></label>
-          <label>Ngôn ngữ<select aria-label="Ngôn ngữ" value={form.language} onChange={e=>patch({language:e.target.value})}><option value="vi-VN">Tiếng Việt</option><option value="en-US">English</option></select></label>
-          <label>Phạm vi<select aria-label="Phạm vi" value={form.visibility} onChange={e=>patch({visibility:e.target.value})}><option value="PUBLIC">Công khai · kiosk được tra cứu</option><option value="INTERNAL">Nội bộ · nhân viên</option></select></label>
-        </div>
-        <label>Nội dung để AI tra cứu<textarea rows={7} maxLength={200000} value={form.content} onChange={e=>patch({content:e.target.value})}/></label>
-        <label>Tài liệu mới hoặc tệp thay thế<input key={fileKey} type="file" accept=".docx,.pdf,.jpg,.jpeg,.png" onChange={e=>setFile(e.target.files[0]||null)}/></label>
-        <p className="ai-note">DOCX, PDF, JPG, PNG · tối đa 25 MB. Nếu chọn tệp, nội dung được lấy từ tệp. Mỗi lần sửa lưu thành phiên bản mới.</p>
-        <div className="be-actions">
-          <button type="submit" className="primary">{a.busy?'Đang xử lý…':'Lưu và cập nhật AI'}</button>
-          <button type="button" onClick={() => { setShowAddForm(false); reset(); }}>{editing ? 'Hủy chỉnh sửa' : 'Thu gọn'}</button>
-        </div>
-      </fieldset>
-    </form>
-  )}
-  <section className="be-card"><header className="ai-heading"><h3>Kho dữ liệu AI</h3><button disabled={a.busy} onClick={()=>a.run(signal=>load(signal))}>Làm mới</button></header><div className="ai-fields"><label>Tìm tài liệu<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tiêu đề hoặc danh mục"/></label><label>Trạng thái<select aria-label="Trạng thái" value={filter} onChange={e=>setFilter(e.target.value)}><option value="active">Đang sử dụng / xử lý</option><option value="all">Tất cả</option><option value="ARCHIVED">Đã xóa khỏi AI</option><option value="FAILED">Xử lý lỗi</option></select></label></div><p>{shown.length} tài liệu · {docs.filter(d=>d.status==='READY').length} sẵn sàng</p><div className="ai-table"><table><thead><tr><th>Tài liệu</th><th>Phạm vi</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{shown.map(d=>{const busy=['UPLOADED','PROCESSING'].includes(d.status);return <tr key={d.id}><td><strong>{d.title}</strong><small>{d.category} · {d.filename}</small><small>{new Date(d.updatedAt).toLocaleString('vi-VN')}</small></td><td>{d.visibility==='PUBLIC'?'Công khai':'Nội bộ'}</td><td>{statuses[d.status]||d.status}</td><td><div className="be-actions">
-    <button disabled={a.busy} onClick={()=>a.run(async signal=>setDetail(await apiRequest(`${DOCS}/${d.id}`,{signal})))}>Xem</button>
-    <button disabled={a.busy||busy||d.status==='ARCHIVED'} onClick={()=>a.run(async signal=>{setShowAddForm(true);const editor=await apiRequest(`${DOCS}/${d.id}/editor`,{signal});setEditing(d.id);setForm({title:d.title,category:d.category,language:d.language,visibility:d.visibility,content:editor.content,expectedVersionId:editor.versionId});setFile(null);setFileKey(n=>n+1);})}>Sửa</button>
-    <button disabled={a.busy||busy} onClick={()=>a.run(async signal=>{await apiRequest(`${DOCS}/${d.id}/reindex`,{method:'POST',signal});await load(signal);})}>{d.status==='ARCHIVED'?'Khôi phục':'Xử lý lại'}</button>
-    {d.status!=='ARCHIVED'&&<button className="danger" disabled={a.busy} onClick={()=>{if(!window.confirm(`Xóa “${d.title}” khỏi nguồn trả lời AI? Có thể khôi phục trong danh sách đã xóa.`))return;a.run(async signal=>{await apiRequest(`${DOCS}/${d.id}`,{method:'DELETE',signal});if(editing===d.id)reset();if(detail?.id===d.id)setDetail(null);await load(signal);a.setMessage('Đã loại tài liệu khỏi nguồn trả lời AI.');});}}>Xóa khỏi AI</button>}
-  </div></td></tr>;})}</tbody></table></div>{!shown.length&&<p>{loading?'Đang tải kho dữ liệu…':'Không có tài liệu phù hợp.'}</p>}{detail&&<details open><summary>Nội dung: {detail.title}</summary>{detail.errorMessage&&<p className="be-error">{detail.errorMessage}</p>}<pre>{detail.preview}{'\n\n'}{detail.chunks?.map(c=>`${c.locator||''}\n${c.content}`).join('\n\n')}</pre><button onClick={()=>setDetail(null)}>Đóng nội dung</button></details>}</section></>;
+    {!showAddForm?<div style={{marginBottom:16}}><button type="button" className="primary" onClick={()=>{reset();setShowAddForm(true);}}>+ Thêm dữ liệu cho AI</button></div>:
+      <form className="be-card" onSubmit={save}><h3>Thêm dữ liệu cho AI</h3><fieldset disabled={a.busy} className="ai-form">
+        <label>Tài liệu<input key={fileKey} required type="file" accept=".pdf,.docx,.txt,.md" onChange={e=>setFile(e.target.files[0]||null)}/></label>
+        <p className="ai-note">PDF, DOCX, TXT hoặc MD · tối đa 20 MB. TXT và MD cần dùng UTF-8. Tài liệu được xử lý vào kho AI; tải lại cùng nội dung sẽ trả về tài liệu đã có.</p>
+        <div className="be-actions"><button type="submit" className="primary">{a.busy?'Đang tải lên…':'Tải tài liệu lên AI'}</button><button type="button" onClick={()=>{setShowAddForm(false);reset();}}>Thu gọn</button></div>
+      </fieldset></form>}
+    <section className="be-card"><header className="ai-heading"><h3>Kho dữ liệu AI</h3><button disabled={a.busy} onClick={()=>a.run(async signal=>{await load(signal);a.setMessage('Đã tải lại danh sách tài liệu.');})}>Làm mới</button></header>
+      <div className="ai-fields"><label>Tìm tài liệu<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tên tệp"/></label><label>Trạng thái<select aria-label="Trạng thái" value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">Tất cả</option>{Object.entries(statuses).map(([code,label])=><option key={code} value={code}>{label}</option>)}</select></label></div>
+      <p>{shown.length} tài liệu · {docs.filter(d=>d.status==='COMPLETED').length} sẵn sàng</p>
+      <div className="ai-table"><table><thead><tr><th>Tài liệu</th><th>Dung lượng</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{shown.map(d=><tr key={d.id}>
+        <td><strong>{d.filename}</strong><small>{new Date(d.updatedAt).toLocaleString('vi-VN')}</small></td><td>{(d.sizeBytes/1024).toLocaleString('vi-VN',{maximumFractionDigits:1})} KB</td>
+        <td>{statuses[d.status]||d.status}{d.errorCode&&<small className="be-error">{d.errorCode}</small>}</td>
+        <td><button disabled={a.busy} onClick={()=>a.run(async signal=>{const value=await apiRequest(`${DOCS}/${d.id}`,{signal});if(!signal.aborted)setDetail(value);})}>Xem trạng thái</button></td>
+      </tr>)}</tbody></table></div>
+      {!shown.length&&<p>{loading?'Đang tải kho dữ liệu…':'Không có tài liệu phù hợp.'}</p>}
+      {detail&&<details open><summary>{detail.filename}</summary><p>Trạng thái: {statuses[detail.status]||detail.status}</p>{detail.errorCode&&<p className="be-error">Mã lỗi: {detail.errorCode}</p>}<p>Cập nhật: {new Date(detail.updatedAt).toLocaleString('vi-VN')}</p><button onClick={()=>setDetail(null)}>Đóng</button></details>}
+    </section></>;
 }
 
 export function AiTestPage() {
@@ -130,13 +120,13 @@ export function AiTestPage() {
 function TestWorkspace() {
   const [info,setInfo]=useState(null),a=useActions();
   const frame=useRef(null),[height,setHeight]=useState(760);
-  const refresh=()=>a.run(async signal=>{const [voice,docs]=await Promise.all([apiRequest(VOICE,{signal}),apiRequest(DOCS,{signal})]);setInfo({voice,count:docs.filter(d=>d.status==='READY'&&d.visibility==='PUBLIC').length});});
-  useEffect(()=>{const c=new AbortController();Promise.all([apiRequest(VOICE,{signal:c.signal}),apiRequest(DOCS,{signal:c.signal})]).then(([voice,docs])=>{if(!c.signal.aborted)setInfo({voice,count:docs.filter(d=>d.status==='READY'&&d.visibility==='PUBLIC').length});}).catch(e=>{if(!c.signal.aborted)a.setError(e.message);});return()=>c.abort();},[]);
+  const refresh=()=>a.run(async signal=>{const [voice,docs]=await Promise.all([apiRequest(VOICE,{signal}),loadKnowledgeDocuments(signal)]);setInfo({voice,count:docs.filter(d=>d.status==='COMPLETED').length});});
+  useEffect(()=>{const c=new AbortController();Promise.all([apiRequest(VOICE,{signal:c.signal}),loadKnowledgeDocuments(c.signal)]).then(([voice,docs])=>{if(!c.signal.aborted)setInfo({voice,count:docs.filter(d=>d.status==='COMPLETED').length});}).catch(e=>{if(!c.signal.aborted)a.setError(e.message);});return()=>c.abort();},[]);
   // Isolate the existing kiosk engine so leaving the page tears down mic/audio.
   // All data requests still use the configured backend; no admin token enters the frame.
   const base=API_BASE_URL||window.location.origin;
   const srcDoc=`<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="${base}/assistant.css"><style>body{background:transparent;min-height:0}main{width:100%;margin:0}.card{box-shadow:none}.assistant-stage{display:flex;flex-direction:column;align-items:center;padding:20px}.voice-avatar{position:relative;inset:auto;width:100%;min-height:340px}#answer{white-space:pre-wrap;text-align:center}#mic{margin:16px}#sourceBadge.warning{color:#9a3412}#work{overflow-wrap:anywhere}</style></head><body><main><section class="card assistant-stage"><div id="voiceFace" class="voice-avatar"><div class="robot-face"><div class="robot-ear robot-ear-left"></div><div class="robot-ear robot-ear-right"></div><div class="robot-antenna"><span></span></div><div class="robot-screen"><div class="robot-eyes"><span class="robot-eye"></span><span class="robot-eye"></span></div><div class="robot-cheek robot-cheek-left"></div><div class="robot-cheek robot-cheek-right"></div><div class="robot-mouth"></div></div></div><strong id="faceStatus"></strong><small id="faceHint"></small></div><span id="sourceBadge" class="badge" hidden></span><p id="answer" aria-live="polite"></p><div id="actions"></div><button id="mic" disabled>🎙 Bật voice</button><button id="stopVoice" class="secondary">Dừng giọng nói</button><div id="work" role="status"></div><small id="sessionState"></small></section></main><script>window.MAR_TEST_MODE=true;window.MAR_API_BASE=${JSON.stringify(base).replace(/</g,'\\u003c')};<\/script><script src="${base}/kiosk-voice.js?v=automation-1"><\/script></body></html>`;
   useEffect(()=>{if(!frame.current)return;let observer;const load=()=>{try{const doc=frame.current.contentDocument;observer?.disconnect();observer=new ResizeObserver(()=>setHeight(Math.max(620,doc.body.scrollHeight+30)));observer.observe(doc.body);}catch{}};const f=frame.current;f.addEventListener('load',load);return()=>{f.removeEventListener('load',load);observer?.disconnect();};},[]);
-  return <section className="be-workspace ai-workspace"><header className="ai-heading"><div><h2>Kiểm thử AI bệnh viện</h2><p>Thử bằng microphone và loa của laptop, với nguồn bệnh viện và cấu hình giọng hiện tại.</p></div><Link className="ai-link" to="/admin/voice-scripts?tab=ai-voice">Điều chỉnh giọng và dữ liệu →</Link></header><Notice {...a}/><div className="be-card ai-heading"><div>{info?<><strong>{info.voice.kioskEngine==='CLOUD'?`Giọng AI ${info.voice.cloudVoice}`:'Giọng trên máy'} · {info.voice.rate}×</strong><p>{info.count} tài liệu công khai sẵn sàng · Cấu hình phiên bản {info.voice.revision}</p></>:<p>Đang tải cấu hình…</p>}</div><button disabled={a.busy} onClick={refresh}>Tải lại cấu hình kiểm thử</button></div>    <div className="be-card"><p>Bấm Bật voice, nói “hello” rồi đặt câu hỏi. Bấm mic để ngắt lời, Dừng giọng nói để tắt.</p><iframe ref={frame} title="Kiểm thử mic và giọng AI" allow="microphone; autoplay" srcDoc={srcDoc} style={{width:'100%',height,border:0}}/></div>
+  return <section className="be-workspace ai-workspace"><header className="ai-heading"><div><h2>Kiểm thử AI bệnh viện</h2><p>Thử bằng microphone và loa của laptop, với nguồn bệnh viện và cấu hình giọng hiện tại.</p></div><Link className="ai-link" to="/admin/voice-scripts?tab=ai-voice">Điều chỉnh giọng và dữ liệu →</Link></header><Notice {...a}/><div className="be-card ai-heading"><div>{info?<><strong>{info.voice.kioskEngine==='CLOUD'?`Giọng AI ${info.voice.cloudVoice}`:'Giọng trên máy'} · {info.voice.rate}×</strong><p>{info.count} tài liệu sẵn sàng · Cấu hình phiên bản {info.voice.revision}</p></>:<p>Đang tải cấu hình…</p>}</div><button disabled={a.busy} onClick={refresh}>Tải lại cấu hình kiểm thử</button></div>    <div className="be-card"><p>Bấm Bật voice, nói “hello” rồi đặt câu hỏi. Bấm mic để ngắt lời, Dừng giọng nói để tắt.</p><iframe ref={frame} title="Kiểm thử mic và giọng AI" allow="microphone; autoplay" srcDoc={srcDoc} style={{width:'100%',height,border:0}}/></div>
   </section>;
 }
