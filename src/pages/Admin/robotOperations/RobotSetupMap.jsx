@@ -1,12 +1,23 @@
-import { memo, useRef, useState, useSyncExternalStore } from 'react';
+import { memo, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { Link } from 'react-router-dom';
 import { endpointHeading, snapMapPoint } from '../../../features/facility/mapCoordinates.js';
 import { setupContext, setupLivePose } from '../../../features/robotOperations/robotSetup.js';
+import { presentationViewport } from '../../../features/operations/monitorPresentation.js';
+import MapPresentationCanvas from '../MapPresentationCanvas.jsx';
 
 const number = value => Number(value).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
 
-export default memo(function RobotSetupMap({ asset, endpoints, seed, pose, snapshot, poseFeed, allowLivePose, choosing, disabled, onPoint, onEndpoint, onLoaded, onImageError, onReload, reloading }) {
-  const svgRef = useRef(null), drag = useRef(null);
+export default memo(function RobotSetupMap({ asset, presentation, presentationNotice, endpoints, seed, pose, snapshot, poseFeed, allowLivePose, choosing, disabled, onPoint, onEndpoint, onLoaded, onImageError, onReload, reloading }) {
+  const svgRef = useRef(null), worldRef = useRef(null), drag = useRef(null);
   const [zoom, setZoom] = useState(1);
+  useEffect(() => {
+    if (!asset?.url || asset.loaded) return;
+    // A drawing can hide the raster completely; still verify that the original
+    // navigation image decodes before enabling any localization commands.
+    const image = new Image();
+    image.onload = onLoaded; image.onerror = onImageError; image.src = asset.url;
+    return () => { image.onload = null; image.onerror = null; };
+  }, [asset?.url, asset?.loaded, onLoaded, onImageError]);
   const livePose = useSyncExternalStore(poseFeed.subscribe, poseFeed.getSnapshot, poseFeed.getSnapshot);
   const current = (allowLivePose && setupLivePose(livePose, snapshot, asset)) || pose;
   const scope = JSON.stringify([asset?.mapId, asset?.metadata.asset_hash, setupContext(snapshot)]);
@@ -21,7 +32,7 @@ export default memo(function RobotSetupMap({ asset, endpoints, seed, pose, snaps
   const size = Math.max(right - left, top - bottom), pad = size * .08, width = (right - left + 2 * pad) / zoom, height = (top - bottom + 2 * pad) / zoom;
   const unit = size / 90;
   const worldPoint = event => {
-    const matrix = svgRef.current?.getScreenCTM(); if (!matrix) return null;
+    const matrix = worldRef.current?.getScreenCTM(); if (!matrix) return null;
     const p = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
     return { xM: p.x, yM: -p.y };
   };
@@ -31,25 +42,35 @@ export default memo(function RobotSetupMap({ asset, endpoints, seed, pose, snaps
     <title>{label}</title>
   </g>;
   const release = () => { drag.current = null; };
-  return <div className="rsu-map-view">
-    <div className="rsu-map-tools"><span>{choosing ? 'Bấm vị trí, kéo theo hướng robot rồi thả' : 'Bản đồ quét đã lưu'}</span><div><button type="button" aria-label="Thu nhỏ bản đồ thiết lập" onClick={() => setZoom(v => Math.max(1, v / 1.3))}>−</button><button type="button" onClick={() => setZoom(1)}>Vừa khung</button><button type="button" aria-label="Phóng to bản đồ thiết lập" onClick={() => setZoom(v => Math.min(5, v * 1.3))}>+</button></div></div>
-    <svg ref={svgRef} role="img" aria-label="Bản đồ thiết lập vận hành" viewBox={`${(left + right) / 2 - width / 2} ${-(bottom + top) / 2 - height / 2} ${width} ${height}`} style={{ touchAction: choosing ? 'none' : 'pan-y', cursor: choosing && !disabled ? 'crosshair' : 'default' }} onPointerDown={event => {
+  const pointerEvents = { style: { touchAction: choosing ? 'none' : 'pan-y', cursor: choosing && !disabled ? 'crosshair' : 'default' }, onPointerDown: event => {
       if (!choosing || disabled || !asset.loaded || event.button !== 0) return;
       const p = worldPoint(event), point = p && snapMapPoint(map, p.xM, p.yM); if (!point) return;
       event.preventDefault(); drag.current = { point, x: event.clientX, y: event.clientY };
       event.currentTarget.setPointerCapture(event.pointerId); onPoint({ ...point, yawRad: seed?.yawRad || 0 });
-    }} onPointerMove={event => {
+    }, onPointerMove: event => {
       if (!drag.current || disabled) return;
       const p = worldPoint(event); if (p && Math.hypot(event.clientX - drag.current.x, event.clientY - drag.current.y) > 5) onPoint({ ...drag.current.point, yawRad: endpointHeading(drag.current.point, p) });
-    }} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}>
-      <image href={asset.url} x="0" y={-h} width={w} height={h} preserveAspectRatio="none" transform={`translate(${map.originXM} ${-map.originYM}) rotate(${-yaw * 180 / Math.PI})`} onLoad={onLoaded} onError={onImageError} style={{ imageRendering: 'pixelated' }} />
+    }, onPointerUp: release, onPointerCancel: release, onLostPointerCapture: release };
+  const overlay = <g ref={worldRef} className="rsu-world-overlay" transform={presentation ? `translate(0 ${h}) rotate(${yaw * 180 / Math.PI}) translate(${-map.originXM} ${map.originYM})` : undefined}>
       {endpoints.map(point => <g key={point.endpointId} data-seed-endpoint={point.endpointId} role="button" tabIndex={disabled ? -1 : 0} aria-label={`Chọn vị trí ${point.endpointName}`} aria-disabled={disabled} transform={`translate(${point.xM} ${-point.yM})`} onPointerDown={event => event.stopPropagation()} onClick={() => { if (!disabled) onEndpoint(point); }} onKeyDown={event => { if (!disabled && ['Enter', ' '].includes(event.key)) { event.preventDefault(); onEndpoint(point); } }}>
         <circle r={unit * 1.7} fill="transparent" /><circle r={unit * .55} fill={point.endpointType === 'PARK' ? '#0f766e' : '#64748b'} stroke="white" strokeWidth={unit * .18} /><title>{point.endpointName}</title>
       </g>)}
       {marker(seed, '#d97706', 'Vị trí khởi tạo dự kiến', 'seed')}
       {marker(displayPose, current ? '#2563eb' : '#8793a3', current ? 'Vị trí robot đã xác minh' : 'Vị trí cuối — đang chờ xác minh', current ? 'verified' : 'last')}
-    </svg>
+    </g>;
+  const view = presentation && presentationViewport(presentation, zoom);
+  return <div className="rsu-map-view" data-map-view={presentation ? 'published' : 'original'}>
+    <div className="rsu-map-tools"><span>{choosing ? 'Bấm vị trí, kéo theo hướng robot rồi thả' : presentation ? 'Bản đồ đã chỉnh sửa' : 'Bản đồ quét đã lưu'}</span><div><button type="button" aria-label="Thu nhỏ bản đồ thiết lập" onClick={() => setZoom(v => Math.max(1, v / 1.3))}>−</button><button type="button" onClick={() => setZoom(1)}>Vừa khung</button><button type="button" aria-label="Phóng to bản đồ thiết lập" onClick={() => setZoom(v => Math.min(5, v * 1.3))}>+</button></div></div>
+    {presentation ? <MapPresentationCanvas source={presentation.source} document={presentation.document} preview svgRef={svgRef}
+      imageUrl={asset.url} opacity={presentation.document.features.length ? 0 : 1}
+      viewBox={`${view.x} ${view.y} ${view.width} ${view.height}`} role="img" aria-label="Bản đồ thiết lập vận hành" {...pointerEvents}>
+      {overlay}
+    </MapPresentationCanvas> : <svg ref={svgRef} role="img" aria-label="Bản đồ thiết lập vận hành" viewBox={`${(left + right) / 2 - width / 2} ${-(bottom + top) / 2 - height / 2} ${width} ${height}`} {...pointerEvents}>
+      <image href={asset.url} x="0" y={-h} width={w} height={h} preserveAspectRatio="none" transform={`translate(${map.originXM} ${-map.originYM}) rotate(${-yaw * 180 / Math.PI})`} onLoad={onLoaded} onError={onImageError} style={{ imageRendering: 'pixelated' }} />
+      {overlay}
+    </svg>}
     {!asset.loaded && <p role="status">Đang tải ảnh bản đồ…</p>}
+    {presentationNotice && <p className="rsu-presentation-status" role="status">{presentationNotice}{!presentation && <Link className="rsu-text-link" to={`/admin/map?mapId=${encodeURIComponent(asset.mapId)}&stage=presentation`}>Mở bản chỉnh sửa →</Link>}</p>}
     <div className="rsu-map-legend"><span><i className="rsu-dot rsu-dot-blue" />Vị trí đã xác minh</span><span><i className="rsu-dot rsu-dot-last" />Vị trí cuối, chưa xác minh</span><span><i className="rsu-dot rsu-dot-orange" />Vị trí khởi tạo dự kiến</span><span><i className="rsu-dot rsu-dot-teal" />Điểm đỗ / điểm đã lưu</span></div>
     <footer className="rsu-map-footer"><span data-setup-position>{displayPose ? `${current ? 'Robot' : 'Vị trí cuối'}: X ${number(displayPose.xM)} m · Y ${number(displayPose.yM)} m · ${number(displayPose.yawRad * 180 / Math.PI)}°${current ? '' : ' · Đang chờ xác minh'}` : 'Chưa có vị trí robot được xác minh trên bản đồ này.'}</span><button type="button" className="rsu-text-button" disabled={reloading} onClick={onReload}>Tải lại bản đồ</button></footer>
   </div>;

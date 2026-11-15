@@ -4,6 +4,7 @@ import { getSession } from '../auth/session.js';
 import { allRows, request } from './api.js';
 import { isOperator } from './model.js';
 import { loadSavedMap } from './savedMap.js';
+import { useSetupMapPresentation } from './useSetupMapPresentation.js';
 import { mapGeometry, insideMap } from '../facility/mapCoordinates.js';
 import { consumeSetupEvents, createSetupPoseFeed } from './robotSetupStream.js';
 import { openSetupSession, sameHash, setupContext, setupPendingResolved, setupSeed, setupWriteBlock } from './robotSetup.js';
@@ -23,6 +24,7 @@ export function useRobotSetup(initialRobot = '') {
   const [robotId, setRobotId] = useState(initialRobot);
   const mapId = catalog.maps.find(map => map.status === 'ACTIVE')?.mapId || '';
   const [asset, setAsset] = useState(null), [assetError, setAssetError] = useState(''), [assetRevision, setAssetRevision] = useState(0);
+  const { presentation, presentationNotice } = useSetupMapPresentation(asset);
   const [live, setLive] = useState({ snapshot: null, receivedAt: 0, profile: null, profileContext: '', error: '' });
   const [busy, setBusy] = useState(''), [notice, setNotice] = useState(''), [error, setError] = useState(''), [pending, setPending] = useState(null);
   const scope = useRef({ robotId, mapId }); scope.current = { robotId, mapId };
@@ -244,5 +246,5 @@ export function useRobotSetup(initialRobot = '') {
   const chooseRobot = id => { if (writeLock.current) return; sequence.current++; setRobotId(id); setError(''); };
   const reloadAsset = useCallback(() => { if (!writeLock.current) setAssetRevision(value => value + 1); }, []);
   const markImageLoaded = useCallback(() => setAsset(value => value && !value.loaded ? { ...value, loaded: true } : value), []);
-  return { catalog, loading, catalogError, robotId, mapId, chooseRobot, asset, assetError, markImageLoaded, reloadAsset, live, poseFeed: poseFeed.current, busy, notice, error, pending, perform, refresh };
+  return { catalog, loading, catalogError, robotId, mapId, chooseRobot, asset, assetError, markImageLoaded, reloadAsset, presentation, presentationNotice, live, poseFeed: poseFeed.current, busy, notice, error, pending, perform, refresh };
 }
