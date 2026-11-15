@@ -6,6 +6,7 @@ export default function OperationsIcon({ name = 'activity', ...props }) {
     search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></>,
     arrow: <path d="m9 5 7 7-7 7" />,
     check: <path d="m5 12 4 4L19 6" />,
+    cancel: <><circle cx="12" cy="12" r="9" /><path d="m9 9 6 6m0-6-6 6" /></>,
     alert: <><path d="m12 3 10 18H2Z" /><path d="M12 9v4m0 3v1" /></>,
     pin: <><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 0 1 14 0Z" /><circle cx="12" cy="10" r="2" /></>,
     time: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,

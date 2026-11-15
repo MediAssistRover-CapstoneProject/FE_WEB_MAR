@@ -33,7 +33,7 @@ export function monitorPoseView(memory, { snapshot, livePose, metadata, job, fre
   const session = snapshot?.navigationSession;
   const closed = ['NONE', 'CLOSED', 'EXPIRED'].includes(session?.state)
     || !!session?.expiresAt && !(Date.parse(session.expiresAt) > now);
-  if (closed) return { memory: null, pose: null, live: false, ageMs: null };
+  if (closed || !metadata) return { memory: null, pose: null, live: false, ageMs: null };
   let live = null;
   if (fresh && snapshot?.mqttConnected && snapshot.heartbeatFresh && metadata?.map_id === snapshot.robot?.currentMapId
     && (!snapshot.navigationSession?.expiresAt || Date.parse(snapshot.navigationSession.expiresAt) > now)

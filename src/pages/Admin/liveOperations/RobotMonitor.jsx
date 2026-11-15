@@ -6,7 +6,7 @@ import { loadSavedMap } from '../../../features/robotOperations/savedMap.js';
 import { imagePoint, matchingPlan, monitorPoseScope, monitorPoseView } from '../../../features/operations/monitorGeometry.js';
 import { matchingPresentation, presentationViewport } from '../../../features/operations/monitorPresentation.js';
 import MapPresentationCanvas from '../MapPresentationCanvas.jsx';
-import { dataFreshness, jobPresentation, newerJob, selectedStep, statusInfo } from '../../../features/operations/liveOperations.js';
+import { allowedJobActions, dataFreshness, jobPresentation, newerJob, selectedStep, statusInfo } from '../../../features/operations/liveOperations.js';
 import { vi } from '../../../i18n/vi.js';
 import RobotCamera from '../robotOperations/RobotCamera.jsx';
 import { useJobFeed } from '../../../features/operations/useJobFeed.js';
@@ -145,7 +145,7 @@ function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto, s
   </section>;
 }
 
-export default function RobotMonitor({ jobs, catalogs, auto, revision, onOpen }) {
+export default function RobotMonitor({ jobs, catalogs, auto, revision, onOpen, onCancel, role }) {
   const robotId = catalogs.robots[0]?.robotId;
   const { snapshot, livePose, error, receivedAt } = useRobotRealtime(robotId, auto, revision);
   const [now, setNow] = useState(Date.now()), [tab, setTab] = useState('queue');
@@ -188,17 +188,16 @@ export default function RobotMonitor({ jobs, catalogs, auto, revision, onOpen })
   const upcoming = schedules.filter(item => item.status === 'ACTIVE' && (!item.robotId || item.robotId === robotId) && item.nextRunAt && Date.parse(item.nextRunAt) >= now)
     .sort((a, b) => Date.parse(a.nextRunAt) - Date.parse(b.nextRunAt));
   const rows = tab === 'running' ? active : waiting;
-  const battery = Number.isFinite(robot?.batteryPercent) ? robot.batteryPercent : null;
   return <div className="rm-monitor">
     <div className={`rm-robot-bar ${connected ? 'is-connected' : 'is-disconnected'}`}>
       <div className="rm-robot-identity"><span className="rm-robot-avatar"><OperationsIcon name="robot" /></span><div><small>ROBOT ĐANG THEO DÕI</small><div className="rm-robot-name"><strong>{[robot?.robotName, robot?.robotCode].find(value => value?.trim() && value.trim().toLowerCase() !== 'string') || 'Robot'}</strong><span className={'rm-pill ' + (connected ? 'is-good' : '')}>{connected ? vi(robot?.status) : 'Chưa có kết nối mới'}</span></div></div></div>
-      <div className="rm-robot-telemetry"><div><OperationsIcon name="signal" /><span><small>Kết nối</small><strong>{connected ? 'Đã kết nối' : 'Chờ tín hiệu robot'}</strong></span></div><div><OperationsIcon name="battery" /><span><small>Pin ghi nhận</small><strong>{battery === null ? 'Chưa có dữ liệu' : `${battery}%`}</strong></span></div><div className="rm-robot-updated"><OperationsIcon name="time" /><span><small>Lần nhận gần nhất</small><strong>{receivedAt ? new Date(receivedAt).toLocaleTimeString('vi-VN') : 'Đang chờ dữ liệu'}</strong></span></div></div>
+      <div className="rm-robot-telemetry"><div><OperationsIcon name="signal" /><span><small>Kết nối</small><strong>{connected ? 'Đã kết nối' : 'Chờ tín hiệu robot'}</strong></span></div><div className="rm-robot-updated"><OperationsIcon name="time" /><span><small>Lần nhận gần nhất</small><strong>{receivedAt ? new Date(receivedAt).toLocaleTimeString('vi-VN') : 'Đang chờ dữ liệu'}</strong></span></div></div>
     </div>
     {error && <p className="lo-notice lo-notice-warning" role="status">{error}</p>}
     <div className="rm-layout"><div className="rm-left">
       <RobotMap snapshot={snapshot} livePose={livePose} job={current} endpoints={catalogs.endpoints} fresh={fresh} revision={revision} auto={auto}
         stepDetail={<MissionProgress current={current} detail={detail} catalogs={catalogs} stale={dataFreshness(detailReceivedAt, now, !!detailError).stale} connected={!!connected} auto={auto} />} />
-    </div><aside className="rm-right"><RobotCamera key={robotId} robotId={robotId} placeholderIcon={<OperationsIcon name="camera" />} /><CurrentMission current={current} catalogs={catalogs} detail={detail} error={detailError} onOpen={onOpen} /></aside></div>
+    </div><aside className="rm-right"><RobotCamera key={robotId} robotId={robotId} placeholderIcon={<OperationsIcon name="camera" />} /><CurrentMission role={role} onCancel={onCancel} current={current} catalogs={catalogs} detail={detail} error={detailError} onOpen={onOpen} /></aside></div>
       <section className="rm-card rm-queue"><header><div className="rm-card-title"><span className="rm-card-icon"><OperationsIcon name="list" /></span><div><h3>Danh sách công việc</h3><small>Các lượt chạy của robot đang theo dõi</small></div></div><span className="rm-card-count">{tab === 'scheduled' ? upcoming.length : rows.length} công việc</span></header>
         <nav aria-label="Hàng đợi của robot">{[['running', 'Đang thực hiện', active.length], ['queue', 'Chờ thực hiện', waiting.length], ['scheduled', 'Theo lịch', upcoming.length]].map(([key, title, count]) => <button key={key} aria-pressed={tab === key} onClick={() => setTab(key)}>{title} <b>{count}</b></button>)}</nav>
         <p className="rm-caption">{tab === 'queue' ? 'Sắp theo ưu tiên và thời điểm vào hàng đợi. Máy chủ quyết định công việc đủ điều kiện chạy tiếp.' : tab === 'scheduled' ? 'Thời điểm kích hoạt kế tiếp từ lịch trên máy chủ.' : 'Công việc đang được robot tiếp nhận hoặc thực hiện.'}</p>
@@ -210,8 +209,10 @@ export default function RobotMonitor({ jobs, catalogs, auto, revision, onOpen })
   </div>;
 }
 
-const CurrentMission = memo(function CurrentMission({ current, catalogs, detail, error: detailError, onOpen }) {
+const CurrentMission = memo(function CurrentMission({ current, catalogs, detail, error: detailError, onOpen, onCancel, role }) {
   const info = current && jobPresentation(current, catalogs), step = detail && selectedStep(detail);
+  const canCancel = current && allowedJobActions(current, role, step).cancel;
+  const pendingCancel = current && !['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(current.status) && (current.cancelRequestedAt || current.cancelCommandId);
   return <section className="rm-card rm-current">
       <header><div className="rm-card-title"><span className="rm-card-icon"><OperationsIcon name="activity" /></span><h3>Nhiệm vụ hiện tại</h3></div>{current && <span className={`rm-pill is-${statusInfo(current.status).tone}`}>{statusInfo(current.status).label}</span>}</header>
       <div className="rm-mission-body" role="region" aria-label="Nội dung nhiệm vụ hiện tại" tabIndex={current ? 0 : undefined}>
@@ -220,6 +221,10 @@ const CurrentMission = memo(function CurrentMission({ current, catalogs, detail,
         {detailError && <p className="rm-caption" role="status">Chưa cập nhật được tiến trình mới; đang giữ lần ghi nhận gần nhất.</p>}{!detail && <p className="rm-caption">Đang tải tiến trình chi tiết…</p>}
       </> : <div className="rm-placeholder rm-mission-empty"><span><OperationsIcon name="robot" /></span><strong>Chưa có nhiệm vụ đang thực hiện.</strong><p>Theo dõi công việc mới của robot tại đây.</p></div>}
       </div>
-      {current && <button className="lo-button lo-primary" onClick={() => onOpen(current)}>Xem tiến trình và thao tác</button>}
+      {current && <div className="rm-current-actions">
+        <button className="lo-button lo-primary" onClick={() => onOpen(current)}>Xem tiến trình và thao tác</button>
+        {canCancel && <button className="lo-button lo-danger" disabled={!!detailError} onClick={() => onCancel(current)}><OperationsIcon name="cancel" />Hủy job</button>}
+        {pendingCancel && <span className="rm-cancel-pending" role="status">Đang chờ máy chủ và robot xác nhận hủy</span>}
+      </div>}
     </section>;
 });
