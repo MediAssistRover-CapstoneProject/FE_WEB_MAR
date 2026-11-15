@@ -38,7 +38,7 @@ await page.route('**/*', async route => {
     return route.fulfill({ status: 200, contentType: 'audio/wav', body: wav });
   }
   if (path === '/api/v1/admin/workflows') return json({ content: [], last: true });
-  if (path === '/api/v1/admin/knowledge/documents') return json([]);
+  if (path === '/api/v1/knowledge/documents') return json({ content: [{ id: 'doc-1', filename: 'hospital.pdf', status: 'COMPLETED', sizeBytes: 100, updatedAt: '2026-11-16T00:00:00Z' }], totalElements: 1 });
   return json({ content: [], last: true });
 });
 
@@ -158,6 +158,12 @@ try {
   await expect(page.getByRole('heading', { name: 'Kho dữ liệu AI', exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Quản lý FAQ bệnh viện' })).toHaveCount(0);
   assert.ok(!requests.some(item => item.path.includes('/assistant/faqs')), 'removed feature never loads its API');
+  await page.goto(base + '/admin/ai-test');
+  await expect(page.getByRole('heading', { name: 'Kiểm thử giọng nói và dữ liệu AI' })).toBeVisible();
+  await expect(page.getByText('1 / 1 tài liệu sẵn sàng', { exact: true })).toBeVisible();
+  await expect(panel.getByRole('combobox', { name: 'Giọng robot', exact: true })).toHaveValue('nova');
+  await expect(page.locator('iframe')).toHaveCount(0);
+  assert.ok(!requests.some(item => item.path.includes('/assistant/voice') || item.path.includes('/admin/knowledge/documents')));
   assert.deepEqual(errors, []);
   console.log('PASS robot speech settings API, exact save payload, WAV polling, cancellation, errors, retries, tab navigation, removed feature URLs and mobile layout. All APIs mocked.');
 } finally { await browser.close(); }

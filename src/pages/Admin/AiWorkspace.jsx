@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiRequest, API_BASE_URL } from '../../features/api/client.js';
+import { apiRequest } from '../../features/api/client.js';
 import { getSession } from '../../features/auth/session.js';
 import './aiWorkspace.css';
 import { KNOWLEDGE_DOCUMENTS as DOCS, documentStatuses as statuses, documentPending, loadKnowledgeDocuments, documentUploadBody } from '../../features/api/knowledgeDocuments.js';
 
-const VOICE = '/api/v1/admin/assistant/voice';
+import RobotSpeechPanel from '../../features/voice/RobotSpeechPanel.jsx';
 
 const isAdmin = () => getSession()?.account?.role === 'ADMIN' && getSession()?.mode !== 'demo';
 const Notice = ({error, message}) => <>{error && <p role="alert" className="be-error">{error}</p>}{message && <p role="status" className="be-success">{message}</p>}</>;
@@ -26,42 +26,7 @@ function useActions() {
 export function AiAdminPanel({section}) {
   if(!isAdmin()) return <p className="be-error">Chức năng này yêu cầu tài khoản ADMIN đang đăng nhập.</p>;
   const title = section==='ai-voice'?'Cấu hình giọng AI':'Nguồn trả lời của AI';
-  return <div className="ai-workspace"><header className="ai-heading"><div><h2>{title}</h2><p>Quản lý trực tiếp trên hệ thống bệnh viện.</p></div><Link to="/admin/ai-test" className="ai-link">Kiểm thử AI →</Link></header>{section==='ai-voice'?<VoiceEditor/>:<KnowledgeEditor/>}</div>;
-}
-function VoiceEditor() {
-  const [voice,setVoice]=useState(null), [voices,setVoices]=useState([]), a=useActions();
-  const player=useRef(null), url=useRef(null), preview=useRef(null);
-  const stop=()=>{preview.current?.abort();preview.current=null;window.speechSynthesis?.cancel();if(player.current){player.current.pause();player.current.removeAttribute('src');}if(url.current){URL.revokeObjectURL(url.current);url.current=null;}};
-  useEffect(()=>{
-    const c=new AbortController();apiRequest(VOICE,{signal:c.signal}).then(setVoice).catch(e=>{if(!c.signal.aborted)a.setError(e.message);});
-    const update=()=>setVoices(window.speechSynthesis?.getVoices()||[]);update();window.speechSynthesis?.addEventListener('voiceschanged',update);
-    return ()=>{c.abort();stop();window.speechSynthesis?.removeEventListener('voiceschanged',update);};
-  },[]);
-  const patch=values=>setVoice(s=>({...s,...values}));
-  const previewCloud=()=>a.run(async signal=>{
-    stop();const c=new AbortController();preview.current=c;signal.addEventListener('abort',()=>c.abort(),{once:true});
-    let blob;try{blob=await apiRequest(VOICE+'/preview',{method:'POST',body:voice,responseType:'blob',signal:c.signal});}catch(e){if(c.signal.aborted&&!signal.aborted)return;throw e;}
-    if(c.signal.aborted)return;url.current=URL.createObjectURL(blob);player.current.src=url.current;await player.current.play().catch(()=>{});a.setMessage('Mẫu giọng đã sẵn sàng. Có thể bấm phát để nghe lại.');
-  });
-  const previewBrowser=()=>{
-    stop();if(!window.speechSynthesis){a.setError('Trình duyệt không hỗ trợ giọng đọc.');return;}
-    const chosen=voices.find(v=>v.voiceURI===voice.browserVoiceUri);
-    if(voice.browserVoiceUri&&!chosen){a.setError('Giọng đã lưu không có trên máy này. Hãy chọn giọng khác.');return;}
-    const u=new SpeechSynthesisUtterance('Xin chào, tôi là MAR. Bạn cần hỗ trợ thông tin bệnh viện nào?');u.lang='vi-VN';u.rate=voice.rate;u.voice=chosen||voices.find(v=>/^vi([_-]|$)/i.test(v.lang))||null;
-    u.onerror=()=>a.setError('Không phát được giọng đọc trên máy.');speechSynthesis.speak(u);
-  };
-  return <section className="be-card"><Notice {...a}/>{!voice?<p>Đang tải cấu hình giọng nói…</p>:<>
-    <fieldset disabled={a.busy} className="ai-form"><div className="ai-fields">
-      <label>Kiosk sử dụng<select aria-label="Kiosk sử dụng" value={voice.kioskEngine||'BROWSER'} onChange={e=>patch({kioskEngine:e.target.value})}><option value="BROWSER">Giọng trên máy · phát nhanh</option><option value="CLOUD">Giọng AI · dùng cả trên laptop</option></select></label>
-      <label>Giọng AI<select aria-label="Giọng AI" value={voice.profile} onChange={e=>patch({profile:e.target.value,...(e.target.value==='CUSTOM'?{}:{cloudVoice:e.target.value==='MALE'?'cedar':'coral'})})}><option value="FEMALE">Nữ · Coral</option><option value="MALE">Nam · Cedar</option><option value="CUSTOM">Tùy chọn giọng khác</option></select></label>
-      <label>Kiểu giọng<select aria-label="Kiểu giọng" value={voice.cloudVoice} onChange={e=>patch({cloudVoice:e.target.value,profile:e.target.value==='cedar'?'MALE':e.target.value==='coral'?'FEMALE':'CUSTOM'})}>{['coral','cedar','marin','alloy','ash','ballad','echo','sage','shimmer','verse'].map(v=><option key={v}>{v}</option>)}</select></label>
-      <label>Cách thể hiện<select aria-label="Cách thể hiện" value={voice.style} onChange={e=>patch({style:e.target.value})}><option value="CALM">Điềm tĩnh, rõ ràng</option><option value="WARM">Thân thiện, gần gũi</option><option value="FORMAL">Trang trọng, chuyên nghiệp</option></select></label>
-      <label>Tốc độ nói · {Number(voice.rate).toFixed(2)}×<input type="range" min="0.75" max="1.5" step="0.05" value={voice.rate} onChange={e=>patch({rate:Number(e.target.value)})}/></label>
-      <label>Giọng kiosk có trên máy<select aria-label="Giọng kiosk có trên máy" disabled={voice.kioskEngine==='CLOUD'} value={voice.browserVoiceUri} onChange={e=>patch({browserVoiceUri:e.target.value})}><option value="">Tiếng Việt mặc định</option>{voice.browserVoiceUri&&!voices.some(v=>v.voiceURI===voice.browserVoiceUri)&&<option value={voice.browserVoiceUri}>Giọng đã lưu · không có trên máy này</option>}{[...voices].sort((a,b)=>Number(/^vi/i.test(b.lang))-Number(/^vi/i.test(a.lang))).map(v=><option value={v.voiceURI} key={v.voiceURI}>{v.name} · {v.lang}</option>)}</select></label>
-    </div><p className="ai-note">Lưu để áp dụng từ lượt nói tiếp theo. Giọng AI cần kết nối mạng; giọng trên máy phụ thuộc giọng đã cài. Phong cách chỉ áp dụng cho giọng AI.</p>
-    <div className="be-actions"><button onClick={previewBrowser}>Nghe thử giọng trên máy</button><button onClick={previewCloud}>Nghe thử AI</button><button className="primary" onClick={()=>a.run(async signal=>{const saved=await apiRequest(VOICE,{method:'PUT',body:voice,signal});setVoice(saved);a.setMessage('Đã lưu giọng nói. Áp dụng từ lượt nói tiếp theo.');})}>Lưu giọng nói</button><button onClick={()=>a.run(async signal=>{setVoice(await apiRequest(VOICE,{signal}));a.setMessage('Đã tải cấu hình mới nhất.');})}>Tải lại cấu hình</button></div></fieldset>
-    <div className="ai-audio"><audio ref={player} controls preload="none"/><button type="button" onClick={stop}>Dừng nghe</button></div>
-  </>}</section>;
+  return <div className="ai-workspace"><header className="ai-heading"><div><h2>{title}</h2><p>Quản lý trực tiếp trên hệ thống bệnh viện.</p></div><Link to="/admin/ai-test" className="ai-link">Kiểm thử AI →</Link></header>{section==='ai-voice'?<RobotSpeechPanel/>:<KnowledgeEditor/>}</div>;
 }
 function KnowledgeEditor() {
   const [docs,setDocs]=useState([]), [file,setFile]=useState(null), [fileKey,setFileKey]=useState(0);
@@ -118,15 +83,21 @@ export function AiTestPage() {
   return <TestWorkspace/>;
 }
 function TestWorkspace() {
-  const [info,setInfo]=useState(null),a=useActions();
-  const frame=useRef(null),[height,setHeight]=useState(760);
-  const refresh=()=>a.run(async signal=>{const [voice,docs]=await Promise.all([apiRequest(VOICE,{signal}),loadKnowledgeDocuments(signal)]);setInfo({voice,count:docs.filter(d=>d.status==='COMPLETED').length});});
-  useEffect(()=>{const c=new AbortController();Promise.all([apiRequest(VOICE,{signal:c.signal}),loadKnowledgeDocuments(c.signal)]).then(([voice,docs])=>{if(!c.signal.aborted)setInfo({voice,count:docs.filter(d=>d.status==='COMPLETED').length});}).catch(e=>{if(!c.signal.aborted)a.setError(e.message);});return()=>c.abort();},[]);
-  // Isolate the existing kiosk engine so leaving the page tears down mic/audio.
-  // All data requests still use the configured backend; no admin token enters the frame.
-  const base=API_BASE_URL||window.location.origin;
-  const srcDoc=`<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="${base}/assistant.css"><style>body{background:transparent;min-height:0}main{width:100%;margin:0}.card{box-shadow:none}.assistant-stage{display:flex;flex-direction:column;align-items:center;padding:20px}.voice-avatar{position:relative;inset:auto;width:100%;min-height:340px}#answer{white-space:pre-wrap;text-align:center}#mic{margin:16px}#sourceBadge.warning{color:#9a3412}#work{overflow-wrap:anywhere}</style></head><body><main><section class="card assistant-stage"><div id="voiceFace" class="voice-avatar"><div class="robot-face"><div class="robot-ear robot-ear-left"></div><div class="robot-ear robot-ear-right"></div><div class="robot-antenna"><span></span></div><div class="robot-screen"><div class="robot-eyes"><span class="robot-eye"></span><span class="robot-eye"></span></div><div class="robot-cheek robot-cheek-left"></div><div class="robot-cheek robot-cheek-right"></div><div class="robot-mouth"></div></div></div><strong id="faceStatus"></strong><small id="faceHint"></small></div><span id="sourceBadge" class="badge" hidden></span><p id="answer" aria-live="polite"></p><div id="actions"></div><button id="mic" disabled>🎙 Bật voice</button><button id="stopVoice" class="secondary">Dừng giọng nói</button><div id="work" role="status"></div><small id="sessionState"></small></section></main><script>window.MAR_TEST_MODE=true;window.MAR_API_BASE=${JSON.stringify(base).replace(/</g,'\\u003c')};<\/script><script src="${base}/kiosk-voice.js?v=automation-1"><\/script></body></html>`;
-  useEffect(()=>{if(!frame.current)return;let observer;const load=()=>{try{const doc=frame.current.contentDocument;observer?.disconnect();observer=new ResizeObserver(()=>setHeight(Math.max(620,doc.body.scrollHeight+30)));observer.observe(doc.body);}catch{}};const f=frame.current;f.addEventListener('load',load);return()=>{f.removeEventListener('load',load);observer?.disconnect();};},[]);
-  return <section className="be-workspace ai-workspace"><header className="ai-heading"><div><h2>Kiểm thử AI bệnh viện</h2><p>Thử bằng microphone và loa của laptop, với nguồn bệnh viện và cấu hình giọng hiện tại.</p></div><Link className="ai-link" to="/admin/voice-scripts?tab=ai-voice">Điều chỉnh giọng và dữ liệu →</Link></header><Notice {...a}/><div className="be-card ai-heading"><div>{info?<><strong>{info.voice.kioskEngine==='CLOUD'?`Giọng AI ${info.voice.cloudVoice}`:'Giọng trên máy'} · {info.voice.rate}×</strong><p>{info.count} tài liệu sẵn sàng · Cấu hình phiên bản {info.voice.revision}</p></>:<p>Đang tải cấu hình…</p>}</div><button disabled={a.busy} onClick={refresh}>Tải lại cấu hình kiểm thử</button></div>    <div className="be-card"><p>Bấm Bật voice, nói “hello” rồi đặt câu hỏi. Bấm mic để ngắt lời, Dừng giọng nói để tắt.</p><iframe ref={frame} title="Kiểm thử mic và giọng AI" allow="microphone; autoplay" srcDoc={srcDoc} style={{width:'100%',height,border:0}}/></div>
+  const [docs,setDocs]=useState(null),a=useActions();
+  const refresh=()=>a.run(async signal=>{
+    const rows=await loadKnowledgeDocuments(signal);
+    if(!signal.aborted)setDocs(rows);
+  });
+  useEffect(()=>{
+    const c=new AbortController();
+    loadKnowledgeDocuments(c.signal).then(rows=>{if(!c.signal.aborted)setDocs(rows);})
+      .catch(e=>{if(!c.signal.aborted)a.setError(e.message);});
+    return()=>c.abort();
+  },[]);
+  return <section className="be-workspace ai-workspace">
+    <header className="ai-heading"><div><h2>Kiểm thử giọng nói và dữ liệu AI</h2><p>Nghe thử giọng robot trên loa của máy và kiểm tra tài liệu đã xử lý.</p></div><Link className="ai-link" to="/admin/voice-scripts?tab=ai-knowledge">Quản lý dữ liệu AI →</Link></header>
+    <Notice {...a}/>
+    <div className="be-card ai-heading"><div>{docs?<p>{docs.filter(d=>d.status==='COMPLETED').length} / {docs.length} tài liệu sẵn sàng</p>:<p>{a.error?'Chưa tải được danh sách tài liệu.':'Đang tải danh sách tài liệu…'}</p>}<p>Trang này kiểm thử giọng đọc. Hội thoại bằng microphone và trả lời từ tài liệu cần được kiểm thử trên robot.</p></div><button disabled={a.busy} onClick={refresh}>Tải lại trạng thái tài liệu</button></div>
+    <RobotSpeechPanel/>
   </section>;
 }
