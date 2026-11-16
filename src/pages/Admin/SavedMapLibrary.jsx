@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { facilityApi, allFacilityPages } from '../../features/facility/facilityApi.js';
 import { getSession } from '../../features/auth/session.js';
+import { dispatchEndpoints } from '../../features/facility/mapPublishing.js';
 import FacilityGeometryPreview from './FacilityGeometryPreview.jsx';
 import DeleteMapDialog from './DeleteMapDialog.jsx';
 import './savedMapLibrary.css';
@@ -15,8 +16,12 @@ export default function SavedMapLibrary({onOpen,onDeleted,initialMapId=''}){
   const [selected,setSelected]=useState(initialMapId),[revision,setRevision]=useState(0);
   const [deleteTarget,setDeleteTarget]=useState(null),[notice,setNotice]=useState('');
   const [bulkMode,setBulkMode]=useState(false),[checkedIds,setCheckedIds]=useState([]);
+  const [activating,setActivating]=useState(false),[activationError,setActivationError]=useState('');
   const session=getSession(),canDelete=session?.account?.role==='ADMIN'&&session?.mode!=='demo';
+  const canActivate=canDelete,pending=loading||activating;
   const picker=useRef(null),summary=useRef(null),selectAll=useRef(null);
+  const activationLock=useRef(false),mounted=useRef(true);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   useEffect(()=>{
     if(selectAll.current)selectAll.current.indeterminate=checkedIds.length>0&&checkedIds.length<maps.length;
   },[checkedIds,maps,bulkMode]);
@@ -29,9 +34,32 @@ export default function SavedMapLibrary({onOpen,onDeleted,initialMapId=''}){
   },[revision]);
   const map=maps.find(m=>m.mapId===selected);
   const chooseMap=id=>{
+    if(activationLock.current)return;
+    setActivationError('');setNotice('');
     setSelected(id);
     picker.current.open=false;
     summary.current.focus();
+  };
+  const activateMap=async()=>{
+    if(activationLock.current||pending||bulkMode||error||!canActivate||!map||!['DRAFT','INACTIVE'].includes(map.status))return;
+    const target=map;
+    activationLock.current=true;setActivating(true);setActivationError('');setNotice('');
+    try{
+      const [metadata,endpoints]=await Promise.all([
+        facilityApi.getMapImageMetadata(target.mapId,{signal:AbortSignal.timeout(8000)}),
+        allFacilityPages(facilityApi.listEndpoints),
+      ]);
+      if(!mounted.current)return;
+      if(metadata?.map_id!==target.mapId||metadata.navigation_reload_safe!==true)throw Error('Chưa xác minh được khả năng nạp bản đồ dẫn đường. Mở bản đồ để kiểm tra và xử lý trước khi kích hoạt.');
+      if(!dispatchEndpoints(endpoints,target.mapId).length)throw Error('Bản đồ cần ít nhất một điểm đích đang hoạt động và có thể tiếp cận. Mở bản đồ để thiết lập điểm đích trước khi kích hoạt.');
+      const result=await facilityApi.activateMap(target.mapId);
+      if(result?.mapId!==target.mapId||result.floorId!==target.floorId||result.status!=='ACTIVE')throw Error('Máy chủ chưa xác nhận kích hoạt đúng bản đồ. Tải lại danh sách để kiểm tra trước khi thử lại.');
+      window.dispatchEvent(new Event('mediassist-facility-updated'));
+      if(!mounted.current)return;
+      setMaps(rows=>rows.map(item=>item.mapId===result.mapId?result:item.floorId===result.floorId&&item.status==='ACTIVE'?{...item,status:'INACTIVE'}:item));
+      setNotice(`Đã kích hoạt bản đồ “${result.mapName}”.`);
+    }catch(e){if(mounted.current)setActivationError('Không kích hoạt được bản đồ: '+e.message);}
+    finally{activationLock.current=false;if(mounted.current)setActivating(false);}
   };
   const mapDeleted=deleted=>{
     const deletedIds=new Set(deleted.map(item=>item.mapId));
@@ -54,13 +82,13 @@ export default function SavedMapLibrary({onOpen,onDeleted,initialMapId=''}){
         <span className="sml-picker-action"><span>Chọn map</span><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m5 7.5 5 5 5-5" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
       </summary>
       <div className="sml-picker-content">
-        <div className="sml-list-heading"><span>{bulkMode?'Đánh dấu các bản đồ muốn xóa khỏi danh sách sử dụng.':'Chọn một bản đồ để xem trước và cấu hình.'}</span><div className="ls-actions">{canDelete&&maps.length>0&&<button type="button" className={'ls-btn small '+(bulkMode?'':'danger')} disabled={loading||!!error} onClick={()=>{setBulkMode(value=>!value);setCheckedIds([]);}}>{bulkMode?'Hủy chọn':'Chọn để xóa'}</button>}<button type="button" className="ls-btn small" disabled={loading} onClick={()=>setRevision(v=>v+1)}>Tải lại danh sách map</button></div></div>
+        <div className="sml-list-heading"><span>{bulkMode?'Đánh dấu các bản đồ muốn xóa khỏi danh sách sử dụng.':'Chọn một bản đồ để xem trước và cấu hình.'}</span><div className="ls-actions">{canDelete&&maps.length>0&&<button type="button" className={'ls-btn small '+(bulkMode?'':'danger')} disabled={pending||!!error} onClick={()=>{setBulkMode(value=>!value);setCheckedIds([]);}}>{bulkMode?'Hủy chọn':'Chọn để xóa'}</button>}<button type="button" className="ls-btn small" disabled={pending} onClick={()=>{setActivationError('');setNotice('');setRevision(v=>v+1);}}>Tải lại danh sách map</button></div></div>
         {bulkMode&&<div className="sml-bulk-toolbar" role="group" aria-label="Chọn bản đồ để xóa"><label><input ref={selectAll} type="checkbox" checked={maps.length>0&&checkedIds.length===maps.length} disabled={loading||!!error||!maps.length} onChange={event=>setCheckedIds(event.target.checked?maps.map(m=>m.mapId):[])}/>Chọn tất cả</label><span role="status">Đã chọn {checkedIds.length}/{maps.length} bản đồ</span><button type="button" className="ls-btn small sml-delete-confirm" disabled={loading||!!error||!checkedIds.length} onClick={()=>{setNotice('');setDeleteTarget(maps.filter(m=>checkedIds.includes(m.mapId)));}}>Xóa đã chọn ({checkedIds.length})</button></div>}
         <div className="sml-map-list" aria-label="Danh sách map đã quét">
           {maps.map(m=>{
             const checked=checkedIds.includes(m.mapId);
             const content=<><span className="sml-option-top"><span className="sml-option-name">{m.mapName}</span>{bulkMode?<input type="checkbox" aria-label={`Chọn xóa ${m.mapName} · v${m.versionNo}`} checked={checked} disabled={loading||!!error} onChange={event=>setCheckedIds(ids=>event.target.checked?[...ids,m.mapId]:ids.filter(id=>id!==m.mapId))}/>:<span className="sml-radio" aria-hidden="true"/>}</span><span className="sml-option-meta">v{m.versionNo}<span>·</span>{number(m.widthM)} × {number(m.heightM)} m</span><Status value={m.status}/></>;
-            return bulkMode?<label className={'sml-map-option sml-map-check '+(checked?'is-checked':'')} key={m.mapId}>{content}</label>:<button type="button" className={'sml-map-option '+(m.mapId===selected?'is-selected':'')} key={m.mapId} disabled={loading} aria-pressed={m.mapId===selected} onClick={()=>chooseMap(m.mapId)}>{content}</button>;
+            return bulkMode?<label className={'sml-map-option sml-map-check '+(checked?'is-checked':'')} key={m.mapId}>{content}</label>:<button type="button" className={'sml-map-option '+(m.mapId===selected?'is-selected':'')} key={m.mapId} disabled={pending} aria-pressed={m.mapId===selected} onClick={()=>chooseMap(m.mapId)}>{content}</button>;
           })}
         </div>
       </div>
@@ -74,8 +102,10 @@ export default function SavedMapLibrary({onOpen,onDeleted,initialMapId=''}){
     {map&&<section className="sml-preview" aria-label="Xem trước bản đồ đã chọn">
       <header className="sml-preview-heading">
         <div className="sml-preview-title"><span className="sml-eyebrow">BẢN ĐỒ ĐANG CHỌN</span><div><h3>{map.mapName}</h3><Status value={map.status}/></div><p>Kiểm tra bản đồ trước khi thiết lập vùng và điểm đích.</p></div>
-        <div className="sml-preview-actions">{canDelete&&!bulkMode&&<button type="button" className="ls-btn danger" disabled={loading||!!error} onClick={()=>{setNotice('');setDeleteTarget([map]);}}>Xóa bản đồ</button>}<button type="button" className="ls-btn" disabled={loading||bulkMode} onClick={()=>onOpen(map.mapId,'presentation')}>Chỉnh giao diện map</button><button type="button" className="ls-btn primary" disabled={loading||bulkMode} onClick={()=>onOpen(map.mapId,'zone')}>Mở bản đồ <span aria-hidden="true">→</span></button></div>
+        <div className="sml-preview-actions">{canDelete&&!bulkMode&&<button type="button" className="ls-btn danger" disabled={pending||!!error} onClick={()=>{setNotice('');setDeleteTarget([map]);}}>Xóa bản đồ</button>}<button type="button" className="ls-btn" disabled={pending||bulkMode} onClick={()=>onOpen(map.mapId,'presentation')}>Chỉnh giao diện map</button>{canActivate&&<button type="button" className="ls-btn sml-activate" disabled={pending||bulkMode||!!error||!['DRAFT','INACTIVE'].includes(map.status)} onClick={activateMap}>{activating?'Đang kích hoạt…':map.status==='ACTIVE'?'Đã kích hoạt':'Kích hoạt bản đồ'}</button>}<button type="button" className="ls-btn primary" disabled={pending||bulkMode} onClick={()=>onOpen(map.mapId,'zone')}>Mở bản đồ <span aria-hidden="true">→</span></button></div>
       </header>
+      {canActivate&&['DRAFT','INACTIVE'].includes(map.status)&&<p className="sml-activation-hint">Kích hoạt để sử dụng bản đồ trong Điều phối và thiết lập robot. Bản đồ đang hoạt động cùng tầng sẽ được thay thế.</p>}
+      {activationError&&<div className="sml-message sml-message--error sml-activation-error" role="alert"><span>{activationError}</span><button type="button" className="ls-btn small" disabled={pending||bulkMode} onClick={()=>onOpen(map.mapId,'endpoint')}>Mở thiết lập bản đồ</button></div>}
       <dl className="sml-map-facts"><div><dt>Kích thước</dt><dd>{number(map.widthM)} × {number(map.heightM)} <span>m</span></dd></div><div><dt>Độ phân giải</dt><dd>{number(map.resolutionMPerPixel*100)} <span>cm/ô</span></dd></div><div><dt>Phiên bản</dt><dd>v{map.versionNo}</dd></div></dl>
       <div className="sml-canvas"><FacilityGeometryPreview key={map.mapId} map={map} zones={[]} endpoints={[]}/></div>
     </section>}
