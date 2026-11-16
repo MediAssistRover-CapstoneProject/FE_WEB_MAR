@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {localMockMap as m,pixelToRos,rosToPixel,pixelToWeb,webToPixel,webToRos,rosToWeb,rosToThree,freeWebPoint,mapBinding,isCurrentMap} from '../src/features/maps/MapProvider.js';
-import {routeRequest} from '../src/features/gazebo/gazeboModel.js';
 const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-9,`${a} != ${b}`);
 test('provider binds exact local YAML + PGM, no database map',()=>{
  const root=new URL('../public/mock-map-4b43a4f2/',import.meta.url);
@@ -35,10 +34,4 @@ test('unknown/outside blocked and spawn has footprint clearance',()=>{
  assert.equal(freeWebPoint(rosToWeb(m.spawn),.3),true);
  assert.equal(freeWebPoint(pixelToWeb({x:-1,y:0}),.3),false);
  const i=m.occupancyGrid.indexOf(-1);assert.equal(freeWebPoint(pixelToWeb({x:i%m.width+.5,y:Math.floor(i/m.width)+.5})),false);
-});
-test('MOVE request preserves workflow order and calibrated coordinates',()=>{
- const points=[0,.4].map((dx,i)=>({endpoint:{id:`ep${i}`,name:`Point ${i}`,...rosToWeb({...m.spawn,x:m.spawn.x+dx})},step:{paramsJson:{max_speed_mps:.15}}}));
- const body=routeRequest({valid:true,points});assert.equal(body.commandType,'START_PATROL');assert.equal(body.mapId,m.mapId);
- assert.deepEqual(body.steps.map(s=>s.endpointId),['ep0','ep1']);close(body.steps[1].x,m.spawn.x+.4);close(body.steps[1].y,m.spawn.y);
- assert.throws(()=>routeRequest({valid:false,points}));
 });

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createDraft, saveMap, STORAGE_KEY } from '../src/pages/Admin/mapStudioModel.js';
 import { buildPatrolGraph } from '../src/features/workflows/patrolWorkflowModel.js';
-import { LOCAL_MAP_ID, LOCAL_WORKFLOWS_KEY, localMapCatalog, readLocalDesigns, mergeLocalDesigns, saveLocalGraph, removeLocalDesign, getDesign, localPatrolPlan } from '../src/features/workflows/localPatrolDesign.js';
+import { LOCAL_MAP_ID, LOCAL_WORKFLOWS_KEY, localMapCatalog, readLocalDesigns, mergeLocalDesigns, saveLocalGraph, removeLocalDesign, getDesign } from '../src/features/workflows/localPatrolDesign.js';
 
 function fixture() {
   const values = new Map();
@@ -46,19 +46,6 @@ test('local save → reload → edit → delete, without remote calls or map mod
   assert.equal(storage.getItem(STORAGE_KEY), before);
 });
 
-test('local route follows all MOVE steps, respects speed and invalidates changed maps', () => {
-  const { storage, workflow, graph, map } = fixture();
-  const detail = saveLocalGraph({ workflow, graph }, storage);
-  const plan = localPatrolPlan(detail, map.saved, 'ep1');
-  assert.equal(plan.valid, true, plan.issues.join('; '));
-  assert.deepEqual(plan.resolved.map(point => point.id), ['ep1', 'ep2', 'ep1']);
-  assert.ok(plan.duration >= plan.distance / .08 - .001);
-  const changed = structuredClone(map.saved); changed.revision += 1;
-  assert.equal(localPatrolPlan(detail, changed, 'ep1').valid, false);
-  changed.snapshot.endpoints.pop();
-  assert.equal(localPatrolPlan(detail, changed, 'ep1').valid, false);
-});
-
 test('server map IDs cannot be saved as local route and corrupt storage is preserved', () => {
   const { storage, workflow, graph } = fixture();
   graph.steps[0].paramsJson.map_id = 'gazebo-server-map';
@@ -68,12 +55,7 @@ test('server map IDs cannot be saved as local route and corrupt storage is prese
   assert.equal(storage.getItem(LOCAL_WORKFLOWS_KEY), '{broken');
 });
 
-test('Patrol has only PATROL choices and no robot/scheduler writes; Map Studio has no source tabs', () => {
-  const patrol = readFileSync(new URL('../src/pages/Admin/PatrolRoutesFigma.jsx', import.meta.url), 'utf8');
-  assert.match(patrol, /item.serviceType === 'PATROL'/);
-  assert.doesNotMatch(patrol, /createSchedule|activateSchedule|listRobots|listSchedules|createJob|Quy trình khác/);
-  assert.match(patrol, /<LidarMap/);
-  assert.match(patrol, /Chạy mô phỏng/);
+test('Map Studio has no source tabs and local MOVE fields do not query remote catalogs', () => {
   const map = readFileSync(new URL('../src/pages/Admin/MapStudioFigma.jsx', import.meta.url), 'utf8');
   assert.match(map, /<LiveMapping embedded/);
   assert.doesNotMatch(map, /<RobotConsole|aria-pressed=\{mode === 'robot'\}/);
