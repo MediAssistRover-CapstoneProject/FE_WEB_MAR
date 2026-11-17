@@ -26,7 +26,7 @@ function useActions() {
 export function AiAdminPanel({section}) {
   if(!isAdmin()) return <p className="be-error">Chức năng này yêu cầu tài khoản ADMIN đang đăng nhập.</p>;
   const title = section==='ai-voice'?'Cấu hình giọng AI':'Nguồn trả lời của AI';
-  return <div className="ai-workspace"><header className="ai-heading"><div><h2>{title}</h2><p>Quản lý trực tiếp trên hệ thống bệnh viện.</p></div><Link to="/admin/ai-test" className="ai-link">Kiểm thử AI →</Link></header>{section==='ai-voice'?<RobotSpeechPanel/>:<KnowledgeEditor/>}</div>;
+  return <div className="ai-workspace"><header className="ai-heading"><div><h2>{title}</h2><p>Quản lý trực tiếp trên hệ thống bệnh viện.</p></div><Link to="/admin/voice-scripts?tab=robot-voice" className="ai-link">Nghe thử giọng robot →</Link></header>{section==='ai-voice'?<RobotSpeechPanel/>:<KnowledgeEditor/>}</div>;
 }
 function KnowledgeEditor() {
   const [docs,setDocs]=useState([]), [file,setFile]=useState(null), [fileKey,setFileKey]=useState(0);
@@ -76,28 +76,4 @@ function KnowledgeEditor() {
       {!shown.length&&<p>{loading?'Đang tải kho dữ liệu…':'Không có tài liệu phù hợp.'}</p>}
       {detail&&<details open><summary>{detail.filename}</summary><p>Trạng thái: {statuses[detail.status]||detail.status}</p>{detail.errorCode&&<p className="be-error">Mã lỗi: {detail.errorCode}</p>}<p>Cập nhật: {new Date(detail.updatedAt).toLocaleString('vi-VN')}</p><button onClick={()=>setDetail(null)}>Đóng</button></details>}
     </section></>;
-}
-
-export function AiTestPage() {
-  if(!isAdmin())return <p role="alert" className="be-error">Trang kiểm thử AI yêu cầu tài khoản ADMIN.</p>;
-  return <TestWorkspace/>;
-}
-function TestWorkspace() {
-  const [docs,setDocs]=useState(null),a=useActions();
-  const refresh=()=>a.run(async signal=>{
-    const rows=await loadKnowledgeDocuments(signal);
-    if(!signal.aborted)setDocs(rows);
-  });
-  useEffect(()=>{
-    const c=new AbortController();
-    loadKnowledgeDocuments(c.signal).then(rows=>{if(!c.signal.aborted)setDocs(rows);})
-      .catch(e=>{if(!c.signal.aborted)a.setError(e.message);});
-    return()=>c.abort();
-  },[]);
-  return <section className="be-workspace ai-workspace">
-    <header className="ai-heading"><div><h2>Kiểm thử giọng nói và dữ liệu AI</h2><p>Nghe thử giọng robot trên loa của máy và kiểm tra tài liệu đã xử lý.</p></div><Link className="ai-link" to="/admin/voice-scripts?tab=ai-knowledge">Quản lý dữ liệu AI →</Link></header>
-    <Notice {...a}/>
-    <div className="be-card ai-heading"><div>{docs?<p>{docs.filter(d=>d.status==='COMPLETED').length} / {docs.length} tài liệu sẵn sàng</p>:<p>{a.error?'Chưa tải được danh sách tài liệu.':'Đang tải danh sách tài liệu…'}</p>}<p>Trang này kiểm thử giọng đọc. Hội thoại bằng microphone và trả lời từ tài liệu cần được kiểm thử trên robot.</p></div><button disabled={a.busy} onClick={refresh}>Tải lại trạng thái tài liệu</button></div>
-    <RobotSpeechPanel/>
-  </section>;
 }

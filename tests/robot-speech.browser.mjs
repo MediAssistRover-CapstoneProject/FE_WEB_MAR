@@ -158,10 +158,20 @@ try {
   await expect(page.getByRole('heading', { name: 'Kho dữ liệu AI', exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Quản lý FAQ bệnh viện' })).toHaveCount(0);
   assert.ok(!requests.some(item => item.path.includes('/assistant/faqs')), 'removed feature never loads its API');
-  await page.goto(base + '/admin/ai-test');
-  await expect(page.getByRole('heading', { name: 'Kiểm thử giọng nói và dữ liệu AI' })).toBeVisible();
-  await expect(page.getByText('1 / 1 tài liệu sẵn sàng', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Nghe thử giọng robot →', exact: true }).click();
+  await expect(page).toHaveURL(base + '/admin/voice-scripts?tab=robot-voice');
   await expect(panel.getByRole('combobox', { name: 'Giọng robot', exact: true })).toHaveValue('nova');
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(page.locator('aside.sidebar').getByRole('button', { name: 'Kiểm thử AI', exact: true })).toHaveCount(0);
+  for (const oldPath of ['/admin/ai-test', '/admin/ai-test?tab=ai-knowledge', '/admin?screen=AI%20Test']) {
+    const beforeRedirect = requests.length;
+    await page.goto(base + oldPath);
+    await expect(page).toHaveURL(base + '/admin/voice-scripts');
+    await expect(panel.getByRole('combobox', { name: 'Giọng robot', exact: true })).toHaveValue('nova');
+    await expect(page.getByRole('heading', { name: 'Kiểm thử giọng nói và dữ liệu AI' })).toHaveCount(0);
+    await expect(page.locator('a[href*="/admin/ai-test"]')).toHaveCount(0);
+    assert.ok(!requests.slice(beforeRedirect).some(item => item.path === '/api/v1/knowledge/documents'), 'removed test page redirects directly to robot voice settings');
+  }
   await expect(page.locator('iframe')).toHaveCount(0);
   assert.ok(!requests.some(item => item.path.includes('/assistant/voice') || item.path.includes('/admin/knowledge/documents')));
   assert.deepEqual(errors, []);
