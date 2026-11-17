@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { readCatalog } from '../../../features/api/backendApi.js';
 import { request } from '../../../features/robotOperations/api.js';
@@ -6,6 +6,7 @@ import { loadSavedMap } from '../../../features/robotOperations/savedMap.js';
 import { imagePoint, matchingPlan, monitorPoseScope, monitorPoseView } from '../../../features/operations/monitorGeometry.js';
 import { matchingPresentation, presentationViewport } from '../../../features/operations/monitorPresentation.js';
 import MapPresentationCanvas from '../MapPresentationCanvas.jsx';
+import { polygonPoints } from '../FacilityGeometryPreview.jsx';
 import { allowedJobActions, dataFreshness, jobPresentation, newerJob, selectedStep, statusInfo } from '../../../features/operations/liveOperations.js';
 import { vi } from '../../../i18n/vi.js';
 import RobotCamera from '../robotOperations/RobotCamera.jsx';
@@ -16,16 +17,39 @@ import OperationsIcon from './OperationsIcon.jsx';
 import './robotMonitor.css';
 
 const dateTime = value => value ? new Date(value).toLocaleString('vi-VN') : 'Chưa ghi nhận';
+const LiveMap3D = lazy(() => import('./LiveMap3D.jsx'));
 
 function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto, stepDetail }) {
   const [maps, setMaps] = useState([]);
   const [catalogError, setCatalogError] = useState('');
   const [chosenMapId, setChosenMapId] = useState('');
+  const [viewMode, setViewMode] = useState('2d');
   const robotMapId = snapshot?.robot?.currentMapId;
   const activeMap = maps.find(map => map.mapId === chosenMapId)
     || maps.find(map => map.mapId === robotMapId)
     || (maps.length === 1 ? maps[0] : null);
   const mapId = activeMap?.mapId;
+  const assetHash = activeMap?.assetHash;
+  const mapVersion = activeMap?.versionNo;
+  const [zoneData, setZoneData] = useState(null);
+  const [showPoints, setShowPoints] = useState(true);
+  const [showZones, setShowZones] = useState(true);
+  useEffect(() => {
+    if (!mapId || viewMode !== '3d') return;
+    const controller = new AbortController();
+    let timer;
+    const load = async () => {
+      try {
+        const rows = await readCatalog('GET /api/v1/zones', { signal: controller.signal });
+        if (!controller.signal.aborted) setZoneData({ mapId, rows });
+      } catch {
+        if (!controller.signal.aborted) setZoneData({ mapId, error: true });
+      }
+      if (!controller.signal.aborted && auto) timer = setTimeout(load, 60000);
+    };
+    load();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [viewMode, mapId, assetHash, revision, auto]);
   useEffect(() => {
     const controller = new AbortController();
     let timer;
@@ -44,17 +68,19 @@ function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto, s
     load();
     return () => { controller.abort(); clearTimeout(timer); };
   }, [revision, auto]);
-  const [saved, setSaved] = useState(null), [error, setError] = useState('');
+  const [loaded, setSaved] = useState(null), [error, setError] = useState('');
+  const saved = loaded?.mapId === mapId && (!assetHash || loaded?.metadata.asset_hash === assetHash) ? loaded : null;
   const [presentation, setPresentation] = useState(null), [presentationNotice, setPresentationNotice] = useState('');
   const [retry, setRetry] = useState(0), [zoom, setZoom] = useState(1), [follow, setFollow] = useState(false);
   const remembered = useRef(null), followCenter = useRef(null);
   useEffect(() => { setZoom(1); remembered.current = null; followCenter.current = null; }, [mapId]);
   useEffect(() => {
-    setSaved(previous => previous?.mapId === mapId ? previous : null); setError('');
+    setSaved(previous => previous?.mapId === mapId && (!assetHash || previous.metadata.asset_hash === assetHash) ? previous : null); setError('');
     if (!mapId) return;
     const controller = new AbortController();
     loadSavedMap(mapId, request, controller.signal).then(({ blob, metadata }) => {
       if (controller.signal.aborted) return;
+      if (assetHash && metadata.asset_hash !== assetHash) throw new Error('Phiên bản ảnh bản đồ chưa khớp danh sách. Hãy tải lại trang.');
       const url = URL.createObjectURL(blob);
       setSaved(previous => {
         if (previous?.mapId === mapId && previous.metadata.asset_hash === metadata.asset_hash) { URL.revokeObjectURL(url); return previous; }
@@ -62,8 +88,8 @@ function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto, s
       });
     }).catch(cause => { if (!controller.signal.aborted) setError(cause.message); });
     return () => controller.abort();
-  }, [mapId, retry, revision]);
-  useEffect(() => { const url = saved?.url; return () => { if (url) URL.revokeObjectURL(url); }; }, [saved?.url]);
+  }, [mapId, assetHash, mapVersion, retry, revision]);
+  useEffect(() => { const url = loaded?.url; return () => { if (url) URL.revokeObjectURL(url); }; }, [loaded?.url]);
   useEffect(() => {
     setPresentation(previous => previous?.source?.mapId === mapId ? previous : null); setPresentationNotice('Đang kiểm tra giao diện bản đồ đã áp dụng…');
     if (!mapId) return;
@@ -91,6 +117,17 @@ function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto, s
     return () => { controller.abort(); clearTimeout(timer); window.removeEventListener('focus', onFocus); };
   }, [mapId, retry, revision, auto]);
   const meta = saved && saved.mapId === mapId ? saved.metadata : null;
+  const mapPoints = useMemo(() => showPoints && meta ? endpoints
+    .filter(item => item.mapId === mapId && item.active !== false)
+    .map(item => ({ point: imagePoint(item, meta), name: item.endpointName || item.endpointCode }))
+    .filter(item => item.point) : [], [endpoints, mapId, meta, showPoints]);
+  const mapZones = useMemo(() => showZones && meta && zoneData?.mapId === mapId ? (zoneData.rows || [])
+    .filter(item => item.mapId === mapId && item.active !== false)
+    .map(item => ({
+      type: item.zoneType,
+      points: polygonPoints(item.polygonJson).map(([xM, yM]) => imagePoint({ xM, yM }, meta)),
+    }))
+    .filter(item => item.points.length >= 3 && item.points.every(Boolean)) : [], [mapId, meta, showZones, zoneData]);
   const view = monitorPoseView(remembered.current, { snapshot, livePose, metadata: meta, job, fresh });
   remembered.current = view.memory;
   const pose = view.live ? view.pose : null;
@@ -123,13 +160,24 @@ function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto, s
   </g>;
   return <section className="rm-card rm-map">
     <header><div className="rm-card-title"><span className="rm-card-icon"><OperationsIcon name="map" /></span><div><h3>Bản đồ trực tiếp</h3><small>{activeMap ? activeMap.mapName + ' · Đang hoạt động · v' + activeMap.versionNo : 'Chưa chọn bản đồ đang hoạt động'}</small></div></div><div className="rm-tools">{maps.length > 1 && <select aria-label="Bản đồ đang hoạt động" value={mapId || ''} onChange={event => setChosenMapId(event.target.value)}><option value="">Chọn bản đồ</option>{maps.map(map => <option key={map.mapId} value={map.mapId}>{map.mapName}</option>)}</select>}
-      <button type="button" aria-pressed={follow} disabled={!position} onClick={() => { setFollow(!follow); setZoom(value => Math.max(value, 2)); }}>Theo robot</button>
+      <div className="rm-view-switch" role="group" aria-label="Chế độ bản đồ">
+        <button type="button" aria-pressed={viewMode === '2d'} onClick={() => setViewMode('2d')}>2D</button>
+        <button type="button" aria-pressed={viewMode === '3d'} onClick={() => setViewMode('3d')}>3D</button>
+      </div>
+      {viewMode === '3d' && <div className="rm-view-switch" role="group" aria-label="Lớp bản đồ 3D">
+        <button type="button" aria-pressed={showPoints} onClick={() => setShowPoints(value => !value)}>Điểm</button>
+        <button type="button" aria-pressed={showZones} onClick={() => setShowZones(value => !value)}>Vùng</button>
+      </div>}
+      {viewMode === '2d' && <><button type="button" aria-pressed={follow} disabled={!position} onClick={() => { setFollow(!follow); setZoom(value => Math.max(value, 2)); }}>Theo robot</button>
       <button type="button" aria-label="Thu nhỏ bản đồ" disabled={!saved || zoom <= 1} onClick={() => setZoom(value => Math.max(1, value - .5))}>−</button>
-      <button type="button" aria-label="Phóng to bản đồ" disabled={!saved || zoom >= 5} onClick={() => setZoom(value => Math.min(5, value + .5))}>+</button>
+      <button type="button" aria-label="Phóng to bản đồ" disabled={!saved || zoom >= 5} onClick={() => setZoom(value => Math.min(5, value + .5))}>+</button></>}
     </div></header>
     {stepDetail}
-    <div className="rm-map-canvas" data-map-view={published ? 'published' : 'original'}>
-      {saved && published ? <MapPresentationCanvas source={published.source} document={published.document} preview
+    <div className="rm-map-canvas" data-map-view={viewMode === '3d' ? '3d' : published ? 'published' : 'original'}>
+      {saved && viewMode === '3d' ? <Suspense fallback={<p role="status">Đang tải trình xem 3D…</p>}>
+        <LiveMap3D asset={saved} position={displayPosition} heading={displayPose?.yawRad - meta.origin_yaw_rad}
+          live={view.live} path={validPlan ? planPoints : null} destination={destination} endpoints={mapPoints} zones={mapZones} />
+      </Suspense> : saved && published ? <MapPresentationCanvas source={published.source} document={published.document} preview
         imageUrl={saved.url} opacity={published.document.features.length ? 0 : 1}
         viewBox={[presentationView.x, presentationView.y, presentationView.width, presentationView.height].join(' ')}
         role="img" aria-label="Bản đồ đã chỉnh sửa, vị trí robot và lộ trình từ máy chủ">
@@ -139,7 +187,10 @@ function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto, s
         {overlay}
       </svg> : <div className="rm-placeholder"><span>⌖</span><p>{error || catalogError || (mapId ? 'Đang tải ảnh bản đồ…' : maps.length > 1 ? 'Chọn bản đồ đang hoạt động để theo dõi.' : 'Chưa có bản đồ đang hoạt động trên máy chủ.')}</p>{error && <button onClick={() => setRetry(n => n + 1)}>Tải lại bản đồ</button>}</div>}
     </div>
-    {saved && <p className="rm-caption rm-presentation-status" role="status">{published ? 'Đang dùng giao diện bản đồ đã áp dụng.' : presentationNotice || 'Giao diện không khớp phiên bản map này. Đang hiển thị map gốc.'} {!published && mapId && <Link to={`/admin/map?mapId=${encodeURIComponent(mapId)}&stage=presentation`}>Mở chỉnh sửa và áp dụng bản đồ →</Link>}</p>}
+    {viewMode === '3d' && showZones && zoneData?.mapId === mapId && zoneData?.error &&
+      <p className="rm-caption" role="status">Chưa tải được vùng trên bản đồ. Hãy bấm Làm mới để thử lại.</p>}
+    {saved && viewMode === '3d' && <p className="rm-caption">Mặt bằng 3D từ ảnh gốc. Chiều cao vật cản minh họa 1,2 m. Kéo để xoay, cuộn để thu phóng.</p>}
+    {saved && viewMode === '2d' && <p className="rm-caption rm-presentation-status" role="status">{published ? 'Đang dùng giao diện bản đồ đã áp dụng.' : presentationNotice || 'Giao diện không khớp phiên bản map này. Đang hiển thị map gốc.'} {!published && mapId && <Link to={`/admin/map?mapId=${encodeURIComponent(mapId)}&stage=presentation`}>Mở chỉnh sửa và áp dụng bản đồ →</Link>}</p>}
     <div className="rm-legend"><span><i className="rm-blue" />Đường dự kiến</span><span>● Điểm đến</span></div>
     <p className="rm-caption">{position ? 'Vị trí robot đang cập nhật.' : displayPosition ? `Vị trí gần nhất lúc ${new Date(displayPose.capturedAt).toLocaleTimeString('vi-VN')} · ${Math.floor(view.ageMs / 1000)} giây trước; chưa có vị trí trực tiếp.` : 'Chưa có vị trí robot còn hiệu lực trên bản đồ này.'} {validPlan ? 'Đường dự kiến của bước hiện tại.' : 'Chờ cập nhật đường đi.'}</p>
   </section>;
