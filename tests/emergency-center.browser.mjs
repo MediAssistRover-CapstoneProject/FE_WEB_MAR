@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdir } from 'node:fs/promises';
 const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || '@playwright/test');
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_EXECUTABLE });
 const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:5175';
 const output = '.workstation-build/emergency-center'; await mkdir(output, { recursive: true });
@@ -14,7 +14,7 @@ async function fixture(account = { role: 'STAFF', accountId: id(50), fullName: '
   const errors = [], writes = [], reads = [];
   page.on('pageerror', error => errors.push(error.message));
   const statuses = ['OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'FALSE_ALARM'];
-  const state = { failList: false, failDetail: false, failCatalogs: false, slowId: null, rows: statuses.map((status, index) => ({ incidentId: id(index + 1), status, incidentType: index % 2 ? 'SUSPECTED_FALL' : 'SOS', severity: index % 2 ? 'WARNING' : 'CRITICAL', description: `Nội dung kiểm tra sự cố ${index + 1}.`, robotId: id(20), mapId: id(21), endpointId: id(22), xM: 0, yM: 0, occurredAt: '2026-11-03T03:00:00Z', acknowledgedByAccountId: index ? id(50) : null, acknowledgedAt: index ? '2026-11-03T03:02:00Z' : null, resolvedAt: index >= 3 ? '2026-11-03T03:10:00Z' : null, closedAt: index >= 4 ? '2026-11-03T03:15:00Z' : null, rowVersion: 1 })) };
+  const state = { failList: false, failDetail: false, failCatalogs: false, slowId: null, rows: statuses.map((status, index) => ({ incidentId: id(index + 1), status, incidentType: 'SOS', severity: index % 2 ? 'WARNING' : 'CRITICAL', description: `Nội dung kiểm tra sự cố ${index + 1}.`, robotId: id(20), mapId: id(21), endpointId: id(22), xM: 0, yM: 0, occurredAt: '2026-11-03T03:00:00Z', acknowledgedByAccountId: index ? id(50) : null, acknowledgedAt: index ? '2026-11-03T03:02:00Z' : null, resolvedAt: index >= 3 ? '2026-11-03T03:10:00Z' : null, closedAt: index >= 4 ? '2026-11-03T03:15:00Z' : null, rowVersion: 1 })) };
   const paged = (rows, url) => { const page = Number(url.searchParams.get('page') || 0), size = Number(url.searchParams.get('size') || 10); return { content: rows.slice(page * size, (page + 1) * size), totalElements: rows.length, totalPages: Math.ceil(rows.length / size), last: (page + 1) * size >= rows.length }; };
   const source = { mapId: id(21), assetHash: 'a'.repeat(64), widthM: 10, heightM: 6, widthPx: 200, heightPx: 120, resolutionMPerPixel: .05, originXM: -5, originYM: -3, originYawRad: 0, frameId: 'map' };
   const metadata = { map_id: id(21), asset_hash: source.assetHash, width_m: 10, height_m: 6, width_px: 200, height_px: 120, resolution_m_per_pixel: .05, origin_x_m: -5, origin_y_m: -3, origin_yaw_rad: 0, frame_id: 'map', pixel_center_to_map: [[.05, 0, -4.975], [0, -.05, 2.975], [0, 0, 1]] };
@@ -63,7 +63,7 @@ async function fixture(account = { role: 'STAFF', accountId: id(50), fullName: '
 }
 try {
   const admin = await fixture({ role: 'ADMIN', accountId: id(50), fullName: 'Quản trị viên kiểm thử' }); await admin.start();
-  assert.equal(await admin.page.locator('.ec-header h2').innerText(), 'Giám sát SOS');
+  assert.equal(await admin.page.locator('.ec-header h2').innerText(), 'SOS & cảnh báo té ngã');
   assert.equal(await admin.page.locator('.ec-incident').count(), 4, 'only nonterminal incidents appear in ongoing queue');
   await admin.page.getByText('Đang hỗ trợ qua cuộc gọi', { exact: true }).waitFor();
   assert.equal(admin.reads.some(read => /^\/api\/v1\/media\?/.test(read)), false, 'do not fetch global media library');
@@ -83,8 +83,8 @@ try {
   await admin.page.locator('.ec-tabs').getByRole('button', { name: /^Đang diễn ra/ }).click();
   await admin.page.locator('.ec-detail-header').waitFor();
 
-  await admin.page.getByRole('button', { name: 'Giám sát SOS', exact: true }).waitFor();
-  await admin.page.getByText('Chế độ giám sát · Staff tiếp nhận và cập nhật kết quả xử lý SOS.', { exact: true }).waitFor();
+  await admin.page.getByRole('button', { name: 'Trung tâm khẩn cấp', exact: true }).waitFor();
+  await admin.page.getByText('SOS bấm nút và AI nghi té ngã được theo dõi chung. Cảnh báo AI cần xác minh trước khi kết luận.', { exact: true }).waitFor();
   for (let index = 0; index < 6; index++) {
     if (index === 4) await admin.page.locator('.ec-tabs').getByRole('button', { name: 'Lịch sử', exact: true }).click();
     await admin.page.locator(`[data-incident-id="${id(index + 1)}"]`).click();
@@ -184,14 +184,14 @@ try {
 
   const g = await fixture({ role: 'STAFF', accountId: id(70), fullName: 'Nhân viên khác' }); await g.start();
   await g.page.locator(`[data-incident-id="${id(2)}"]`).click();
-  await g.page.getByText(/Sự cố do nhân viên khác tiếp nhận/).waitFor();
+  await g.page.getByText(/Sự cố đang do nhân viên khác phụ trách/).waitFor();
   assert.equal(await g.page.getByRole('button', { name: 'Bắt đầu xử lý', exact: true }).count(), 0);
   assert.equal(g.reads.some(read => read.startsWith('/api/v1/admin/staff')), false);
   assert.equal(g.writes.length, 0); assert.deepEqual(g.errors, []); await g.context.close();
 
   const h = await fixture(); h.state.rows = [];
   await h.page.goto(`${base}/admin/emergency-center`);
-  await h.page.getByText('Không có SOS đang diễn ra', { exact: true }).waitFor();
+  await h.page.getByText('Không có sự cố đang diễn ra', { exact: true }).waitFor();
   await h.page.getByText('Chọn một sự cố để xem vị trí, người phụ trách và tiến trình hỗ trợ.', { exact: true }).waitFor();
   assert.equal(h.writes.length, 0); assert.deepEqual(h.errors, []); await h.context.close();
 

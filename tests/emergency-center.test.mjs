@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { incidentActions, assertIncidentAction, incidentPresentation, incidentQuery, incidentTimeline, newerIncident, prioritizeIncidents, filterActiveIncidents, incidentOverdue, loadIncidentHistory } from '../src/features/operations/emergencyCenter.js';
+import { incidentActions, assertIncidentAction, incidentPresentation, incidentQuery, incidentTimeline, newerIncident, prioritizeIncidents, filterActiveIncidents, incidentOverdue, loadIncidentHistory, FALL_INCIDENT_TYPE, isFallIncident, canReviewIncident } from '../src/features/operations/emergencyCenter.js';
 
 test('incident actions follow the BE state machine, including false alarms', () => {
   const account = { role: 'STAFF', accountId: 'owner' };
@@ -101,4 +101,34 @@ test('history merges separate BE status streams into globally ordered pages and 
   const closed = await loadIncidentHistory(fetchPage, { status: 'CLOSED' }, 0);
   assert.equal(closed.totalElements, 26); assert.ok(closed.content.every(row => row.status === 'CLOSED'));
   await assert.rejects(() => loadIncidentHistory(async () => ({ content: null }), {}, 0), /không đúng định dạng/);
+});
+
+test('canonical fall incidents allow admin review while manual SOS keeps monitoring permissions', () => {
+  const admin = { role: 'ADMIN', accountId: 'admin' }, staff = { role: 'STAFF', accountId: 'duty' };
+  const incident = { incidentType: FALL_INCIDENT_TYPE, robotId: 'robot', sosRoutingStatus: 'ASSIGNED', sosResponderAccountId: 'duty', acknowledgedByAccountId: 'duty' };
+  assert.equal(isFallIncident(incident), true);
+  assert.equal(isFallIncident({ incidentType: 'SUSPECTED_FALL' }), true);
+  assert.equal(canReviewIncident(incident, admin), true);
+  assert.equal(canReviewIncident(incident, { ...staff, accountId: 'other' }), false);
+  for (const actor of [admin, staff]) {
+    assert.deepEqual(incidentActions({ ...incident, status: 'ACKNOWLEDGED' }, actor), ['confirm', 'false-alarm']);
+    assert.deepEqual(incidentActions({ ...incident, status: 'IN_PROGRESS' }, actor), ['resolve']);
+    assert.deepEqual(incidentActions({ ...incident, status: 'RESOLVED' }, actor), ['close']);
+  }
+  assert.deepEqual(incidentActions({ ...incident, incidentType: 'SOS', status: 'ACKNOWLEDGED' }, admin), []);
+  assert.equal(canReviewIncident({ ...incident, incidentType: 'SOS' }, admin), false);
+  assert.equal(incidentPresentation(incident).title, 'AI phát hiện nghi té ngã');
+  assert.equal(incidentQuery({ type: 'SUSPECTED_FALL' }).type, FALL_INCIDENT_TYPE);
+  assert.equal(incidentQuery({ type: FALL_INCIDENT_TYPE }).type, FALL_INCIDENT_TYPE);
+  const rows = [{ ...incident, incidentId: 'a', status: 'OPEN' }, { ...incident, incidentId: 'b', incidentType: 'SOS', status: 'OPEN' }];
+  assert.deepEqual(filterActiveIncidents(rows, { type: FALL_INCIDENT_TYPE }).map(row => row.incidentId), ['a']);
+});
+
+test('fall preflight refuses a changed source, robot or assigned responder even without row versions', () => {
+  const admin = { role: 'ADMIN', accountId: 'admin' };
+  const row = { incidentId: 'i', incidentType: FALL_INCIDENT_TYPE, status: 'ACKNOWLEDGED', robotId: 'r', sosResponderAccountId: 's' };
+  assert.doesNotThrow(() => assertIncidentAction('confirm', row, row, admin));
+  for (const update of [{ robotId: 'other' }, { incidentType: 'SOS' }, { sosResponderAccountId: 'other' }]) {
+    assert.throws(() => assertIncidentAction('confirm', row, { ...row, ...update }, admin), /đã thay đổi/);
+  }
 });

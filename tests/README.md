@@ -197,8 +197,7 @@ Các bài kiểm tra dùng bản đồ LiDAR mô phỏng và trình duyệt cô 
 ## Kiểm tra logic
 
 Trung tâm khẩn cấp dùng API thật ở runtime, không có dữ liệu mẫu trong trang.
-Admin xem trang “Giám sát SOS”, không có nút tiếp nhận/xử lý/đóng/báo động nhầm.
-Các thao tác xử lý trên FE dành cho staff; BE và cách phân staff nhận SOS chưa thay đổi.
+Trang hỗ trợ SOS bấm nút và AI nghi té ngã. Admin giám sát SOS bấm nút và có thể xác minh té ngã theo quyền backend; Staff xử lý sự cố được phân công. Xem API và quy trình camera tại [Trung tâm khẩn cấp](../docs/emergency-center.md).
 Kiểm thử độc lập (API giả lập, không thay đổi sự cố trong database):
 
 ```powershell
