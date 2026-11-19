@@ -3,6 +3,10 @@ import { apiRequest } from '../api/client.js';
 export const INCIDENT_ROOT = '/api/v1/emergency-incidents';
 const incidentPath = id => `${INCIDENT_ROOT}/${encodeURIComponent(id)}`;
 export const getIncident = (id, signal) => apiRequest(incidentPath(id), { signal });
+export const getIncidentRouting = (id, signal) => apiRequest(`${incidentPath(id)}/routing`, { signal });
+export const retryIncidentRouting = (id, rowVersion, signal) => apiRequest(`${incidentPath(id)}/retry-routing`, {
+  method: 'POST', body: { rowVersion }, signal, retry: false,
+});
 export function actOnIncident(id, action, { note, signal } = {}) {
   if (!['acknowledge', 'start', 'confirm', 'resolve', 'close', 'false-alarm'].includes(action)) throw Error('Thao tác sự cố không hợp lệ.');
   return apiRequest(`${incidentPath(id)}/${action}`, { method: 'POST', signal,

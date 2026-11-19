@@ -84,6 +84,23 @@ export const SOS_ROUTING_LABELS = {
   AMBIGUOUS_SHIFT: 'Ca trực bị trùng, cần kiểm tra',
 };
 export const hasIncidentResponder = incident => !!(incident.acknowledgedByAccountId || incident.sosResponderAccountId);
+export const canRetryIncidentRouting = (incident, account) => account?.role === 'ADMIN'
+  && ['SOS', FALL_INCIDENT_TYPE].includes(incident?.incidentType) && !!incident.sosRoutingStatus
+  && incident.status === 'OPEN' && !hasIncidentResponder(incident);
+
+export const SOS_ROUTING_REASONS = {
+  READY: 'Đã tìm được đúng một nhân viên đang trực và đã check-in. Có thể điều phối lại.',
+  MONITORING_ROOM_MISSING: 'Chưa cấu hình phòng tiếp nhận SOS. Chọn một phòng trên map đang publish và lưu loại phòng SOS.',
+  MONITORING_ROOM_INVALID: 'Cấu hình phòng SOS không hợp lệ. Chọn và lưu lại phòng tiếp nhận SOS.',
+  ROOM_MISSING: 'Phòng SOS đã cấu hình không còn tồn tại. Chọn lại phòng trên map đang publish.',
+  ROOM_INACTIVE: 'Phòng SOS đang bị tắt. Bật hoạt động hoặc chọn phòng SOS khác trên map đang publish.',
+  FLOOR_INACTIVE: 'Tầng của phòng SOS đang không hoạt động. Kiểm tra lại tầng và phòng tiếp nhận.',
+  DIFFERENT_HOSPITAL: 'Phòng SOS và bản đồ của sự cố thuộc hai cơ sở khác nhau. Cần kiểm tra cấu hình phòng tiếp nhận.',
+  NO_ENDPOINT_ON_ACTIVE_MAP: 'Phòng SOS chưa có điểm đang bật trên map đang publish. Nếu vừa đổi map, hãy gắn điểm cho phòng hoặc chọn lại phòng SOS trên map mới.',
+  NO_ENDPOINT_ON_INCIDENT_MAP: 'Phòng SOS không có điểm đang bật trên đúng map của sự cố, hoặc map đó đã ngừng hoạt động. Kiểm tra ID map và phòng tiếp nhận.',
+  NO_CHECKED_IN_STAFF: 'Chưa có nhân viên đủ điều kiện tại phòng SOS: cần ca đang hoạt động, còn giờ, đã check-in, chưa check-out và tài khoản Staff đang hoạt động.',
+  MULTIPLE_CHECKED_IN_STAFF: 'Có nhiều nhân viên đủ điều kiện tại phòng SOS. Kiểm tra phân công trùng trước khi điều phối lại.',
+};
 export const incidentOverdue = (incident, now = Date.now()) => incident.status === 'OPEN'
   && Number.isFinite(Date.parse(incident.occurredAt)) && now - Date.parse(incident.occurredAt) >= WAIT_WARNING_MINUTES * 60000;
 

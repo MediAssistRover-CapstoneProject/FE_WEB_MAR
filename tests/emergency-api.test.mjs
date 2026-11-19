@@ -1,12 +1,29 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { getIncident, actOnIncident, getIncidentLocation, getIncidentResponseRoute, getIncidentMediaSession } from '../src/features/operations/emergencyApi.js';
+import { getIncident, actOnIncident, getIncidentLocation, getIncidentResponseRoute, getIncidentMediaSession, getIncidentRouting, retryIncidentRouting } from '../src/features/operations/emergencyApi.js';
 
 const storage = new Map();
 globalThis.localStorage = globalThis.sessionStorage = { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) };
 storage.set('mediassist-rover.session', JSON.stringify({ account: { accountId: 'actor', role: 'ADMIN' }, tokens: { accessToken: 'fixture-only' } }));
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
+
+test('routing preview is read-only and retry sends the incident version to the exact incident', async () => {
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push({ path: new URL(url).pathname, ...options });
+    return new Response('{}', { headers: { 'Content-Type': 'application/json' } });
+  };
+  const signal = new AbortController().signal;
+  await getIncidentRouting('specific-id', signal);
+  await retryIncidentRouting('specific-id', 7, signal);
+  assert.equal(calls[0].path, '/api/v1/emergency-incidents/specific-id/routing');
+  assert.equal(calls[0].method, 'GET');
+  assert.equal(calls[1].path, '/api/v1/emergency-incidents/specific-id/retry-routing');
+  assert.equal(calls[1].method, 'POST');
+  assert.deepEqual(JSON.parse(calls[1].body), { rowVersion: 7 });
+  assert.equal(calls.every(call => call.signal === signal), true);
+});
 
 test('incident lifecycle uses authenticated BE endpoints, optional note body and cancellable reads', async () => {
   const calls = [], signal = new AbortController().signal;

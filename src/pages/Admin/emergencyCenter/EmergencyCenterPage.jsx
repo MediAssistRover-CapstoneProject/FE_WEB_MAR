@@ -9,6 +9,7 @@ import { activeFallReview } from '../../../features/media/incidentCamera.js';
 import { FALL_INCIDENT_TYPE, canReviewIncident, incidentSource, isFallIncident } from '../../../features/operations/emergencyCenter.js';
 import { getIncident, actOnIncident, getIncidentMediaSession, emergencyError } from '../../../features/operations/emergencyApi.js';
 import IncidentCamera from './IncidentCamera.jsx';
+import IncidentRouting from './IncidentRouting.jsx';
 import { IncidentMap, IncidentRobot } from './IncidentContext.jsx';
 import './emergencyCenter.css';
 
@@ -244,6 +245,7 @@ function IncidentDetail({ id, account, catalogs, tick, retained, onSaved }) {
     <IncidentEvidence incident={incident} />
     <div className="ec-detail-section-title"><span>02</span><h4>Điều phối hỗ trợ</h4></div>
     <div className="ec-info-grid"><section className="ec-info-card"><h4><Icon name="user" />Người phụ trách</h4><dl><div><dt>Nhân viên được điều phối</dt><dd>{info.responder || 'Chưa ghi nhận phân công'}</dd></div><div><dt>Đã tiếp nhận</dt><dd>{info.owner}</dd></div>{info.resolver && <div><dt>Xác nhận kết quả</dt><dd>{info.resolver}</dd></div>}</dl>{incident.sosRoutingStatus && <p className={`ec-routing ${incident.sosRoutingStatus === 'ASSIGNED' ? '' : 'is-warning'}`}>{SOS_ROUTING_LABELS[incident.sosRoutingStatus] || 'Chưa xác định kết quả điều phối'}</p>}</section><IncidentRobot incident={incident} info={info} tick={tick} /></div>
+    <IncidentRouting incident={incident} account={account} onChange={accept} onSaved={onSaved} />
     <div className="ec-detail-section-title"><span>03</span><h4>Tiến trình & kết quả</h4></div>
     <section className="ec-timeline"><h4>Tiến trình xử lý</h4><p>Các mốc thời gian do máy chủ ghi nhận.</p><ol>{incidentTimeline(incident).map((item, index) => <li className={`${item.done ? 'is-done' : ''} ${item.current ? 'is-current' : ''}`} key={`${item.label}-${index}`}><span className="ec-timeline-dot">{item.done ? <Icon name="check" /> : <Icon name="clock" />}</span><div><strong>{item.label}</strong><time>{item.at ? stamp(item.at) : 'Chưa ghi nhận thời điểm'}</time></div></li>)}</ol></section>
     <div className="ec-detail-footer"><p>Việc xử lý sự cố và việc robot thực thi được theo dõi riêng.</p><Link to="/admin/live-operations">Mở vận hành trực tiếp <Icon name="arrow" /></Link>{actions.includes('false-alarm') && <button className="ec-text-button ec-false-alarm" disabled={!!error} onClick={() => setDialog({ action: 'false-alarm', snapshot: incident })}>Đánh dấu báo động nhầm</button>}</div>

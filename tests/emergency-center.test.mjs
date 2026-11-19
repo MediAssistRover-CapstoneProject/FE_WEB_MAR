@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { incidentActions, assertIncidentAction, incidentPresentation, incidentQuery, incidentTimeline, newerIncident, prioritizeIncidents, filterActiveIncidents, incidentOverdue, loadIncidentHistory, FALL_INCIDENT_TYPE, isFallIncident, canReviewIncident } from '../src/features/operations/emergencyCenter.js';
+import { incidentActions, assertIncidentAction, incidentPresentation, incidentQuery, incidentTimeline, newerIncident, prioritizeIncidents, filterActiveIncidents, incidentOverdue, loadIncidentHistory, FALL_INCIDENT_TYPE, isFallIncident, canReviewIncident, canRetryIncidentRouting } from '../src/features/operations/emergencyCenter.js';
+
+test('only admin can retry an open routed incident with no responder or acknowledgement', () => {
+  const row = { incidentType: 'SOS', sosRoutingStatus: 'ROOM_UNAVAILABLE', status: 'OPEN' };
+  const admin = { role: 'ADMIN' };
+  assert.equal(canRetryIncidentRouting(row, admin), true);
+  assert.equal(canRetryIncidentRouting({ ...row, incidentType: FALL_INCIDENT_TYPE }, admin), true);
+  assert.equal(canRetryIncidentRouting(row, { role: 'STAFF' }), false);
+  for (const patch of [{ status: 'ACKNOWLEDGED' }, { status: 'CLOSED' }, { sosResponderAccountId: 'staff' }, { acknowledgedByAccountId: 'staff' }, { sosRoutingStatus: null }])
+    assert.equal(canRetryIncidentRouting({ ...row, ...patch }, admin), false);
+});
 
 test('incident actions follow the BE state machine, including false alarms', () => {
   const account = { role: 'STAFF', accountId: 'owner' };

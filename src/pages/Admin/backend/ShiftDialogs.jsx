@@ -49,7 +49,7 @@ export function ShiftForm({ draft, data, onClose, onSaved, onRefresh }) {
       const currentError = validateShift(body, data.shifts, original, Date.now());
       if (currentError) throw Error(currentError);
       const saved = await callBackend(original ? 'PUT /api/v1/admin/shifts/{shiftId}' : 'POST /api/v1/admin/shifts', { path: original ? { shiftId: original.shiftId } : {}, body });
-      onSaved(saved, original ? 'Đã cập nhật ca trực.' : 'Đã phân ca. Đến giờ, admin cần bắt đầu ca để staff được tính là đang trực.');
+      onSaved(saved, original ? 'Đã cập nhật ca trực.' : 'Đã phân ca. Đến giờ, nhân viên cần check-in trên ứng dụng để nhận việc và SOS.');
     } catch (cause) { setError(cause.message || 'Không lưu được ca trực.'); }
     finally { lock.current = false; setBusy(false); }
   };
@@ -57,10 +57,10 @@ export function ShiftForm({ draft, data, onClose, onSaved, onRefresh }) {
     <form onSubmit={submit}>
       <fieldset disabled={busy} className="ss-form-fields">
         <label>Nhân viên trực *<select required value={form.staffProfileId} onChange={e => field('staffProfileId', e.target.value)}><option value="">Chọn nhân viên</option>{staff.map(p => <option key={p.staffProfileId} value={p.staffProfileId}>{staffName(p)} · {p.staffCode}{p.active === false || p.account?.status && p.account.status !== 'ACTIVE' ? ' · Không hoạt động' : ''}</option>)}</select></label>
-        <label>Phòng phụ trách *<select required value={form.roomId} onChange={e => field('roomId', e.target.value)}><option value="">Chọn phòng</option>{rooms.map(r => <option key={r.roomId} value={r.roomId}>{roomName(r)}{r.active === false ? ' · Ngừng hoạt động' : ''}</option>)}</select></label>
+        <label>Phòng phụ trách *<select required value={form.roomId} onChange={e => field('roomId', e.target.value)}><option value="">Chọn phòng</option>{rooms.map(r => <option key={r.roomId} value={r.roomId}>{roomName(r)} · {r.roomCode}{r.roomType === 'SOS' ? ' · Tiếp nhận SOS' : ''}</option>)}</select></label>
         {original ? <div className="ss-assigned-period ss-wide"><span>Ca đã phân</span><strong>{original.shiftName}</strong><small>Giữ nguyên thời gian ca đã lưu, kể cả các ca cũ khác khung hiện tại.</small></div> : <label className="ss-wide">Ca trực *<select required value={form.periodStart} onChange={e => field('periodStart', e.target.value)}>{periods.map(p => <option key={p.startsAt} value={p.startsAt} disabled={p.end <= Date.now()}>{p.name} · {timeLabel(p.start)}–{timeLabel(p.end)}{dayKey(p.startsAt) !== dayKey(p.endsAt) ? ' (+1 ngày)' : ''}{p.end <= Date.now() ? ' · Đã qua giờ' : ''}</option>)}</select></label>}
         {period && <dl className="ss-fixed-times ss-wide" aria-label="Thời gian cố định của ca"><div><dt>Bắt đầu</dt><dd>{dateLabel(period.startsAt)}</dd></div><div><dt>Kết thúc</dt><dd>{dateLabel(period.endsAt)}</dd></div><span>Giờ cố định theo ca · UTC+7</span></dl>}
-        <p className="ss-inline-note ss-wide">{!original && period && Date.parse(period.startsAt) < Date.now() && Date.parse(period.endsAt) > Date.now() ? 'Ca đang diễn ra. Phân công bổ sung vẫn giữ nguyên khung ca; nhân viên chỉ được tính đang trực sau khi admin bắt đầu ca.' : 'Thời gian không chỉnh tại biểu mẫu phân công. Hệ thống kiểm tra trùng ca của nhân viên khi lưu.'}</p>
+        <p className="ss-inline-note ss-wide">{!original && period && Date.parse(period.startsAt) < Date.now() && Date.parse(period.endsAt) > Date.now() ? 'Ca đang diễn ra. Phân công bổ sung giữ nguyên khung ca; nhân viên cần check-in trên ứng dụng để được tính đang trực.' : 'Thời gian không chỉnh tại biểu mẫu phân công. Hệ thống kiểm tra trùng ca của nhân viên khi lưu.'}</p>
         <label className="ss-wide">Ghi chú bàn giao<textarea rows={3} maxLength={4000} value={form.note} onChange={e => field('note', e.target.value)} placeholder="Nội dung cần lưu ý cho người trực…" /></label>
         {!!original?.slots?.length && <details className="ss-advanced ss-wide"><summary>Khung giờ con đã lưu <span>{original.slots.length} khung</span></summary><p>Các khung giờ con được giữ nguyên khi điều chỉnh phân công.</p><ul>{original.slots.map(s => <li key={s.slotId || s.sequenceNo}>{dateLabel(s.startsAt)} → {dateLabel(s.endsAt)}</li>)}</ul></details>}
       </fieldset>
