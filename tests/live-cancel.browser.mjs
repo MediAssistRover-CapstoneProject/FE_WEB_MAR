@@ -7,11 +7,12 @@ const base = process.env.TEST_BASE_URL || 'http://localhost:5173';
 const id = n => `${String(n).padStart(8, '0')}-1111-4111-8111-111111111111`;
 await mkdir('.workstation-build/live-cancel', { recursive: true });
 
-async function fixture() {
+async function fixture(recovery = false) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   await context.addInitScript(() => localStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { username: 'admin', role: 'ADMIN' }, tokens: { accessToken: 'test-only' } })));
   const page = await context.newPage(); page.setDefaultTimeout(7000);
   const state = { job: { jobId: id(1), jobCode: 'JOB-CANCEL-TEST', robotId: id(2), workflowId: id(3), status: 'RUNNING', rowVersion: 1, beOrchestrated: true, schemaVersion: 3, queuedAt: new Date().toISOString() }, failCancel: false };
+  if (recovery) state.job.status = 'RECOVERY_REQUIRED';
   const writes = [], errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/api/v1/**', async route => {
@@ -22,21 +23,23 @@ async function fixture() {
       assert.equal(path, `/api/v1/jobs/${id(1)}/cancel`);
       if (state.failCancel) return reply({ message: 'Test server error' }, 503);
       state.job = { ...state.job, cancelRequestedAt: new Date().toISOString(), cancelCommandId: id(6), rowVersion: 2 };
+      if (recovery) state.job = { ...state.job, status: 'CANCELLED', stopStatus: 'PENDING', endedAt: new Date().toISOString() };
       return reply(state.job);
     }
     if (path === '/api/v1/auth/me') return reply({ username: 'admin', role: 'ADMIN' });
     if (path === '/api/v1/jobs') return reply({ content: [state.job], totalPages: 1, last: true });
     if (path === `/api/v1/jobs/${id(1)}`) return reply({ job: state.job, steps: [] });
     if (path.endsWith('/stream')) return reply({}, 503);
+    if (path.endsWith('/failure-handling')) return reply({ message: 'Optional failure API unavailable' }, 404);
     if (path === '/api/v1/robots') return reply({ content: [{ robotId: id(2), robotName: 'MAR-01', status: 'BUSY' }], last: true });
     if (path.endsWith('/snapshot')) return reply({ observedAt: new Date().toISOString(), robot: { robotId: id(2), status: 'BUSY' }, activeJobId: id(1), mqttConnected: true, heartbeatFresh: true });
     if (path === `/api/v1/robots/${id(2)}`) return reply({ robotId: id(2), status: 'BUSY' });
     if (path === '/api/v1/workflows/published') return reply({ content: [{ workflowId: id(3), workflowName: 'Dẫn đường' }], last: true });
     return reply({ content: [], totalPages: 1, last: true });
   });
-  await page.goto(`${base}/admin/live-operations`);
+  await page.goto(`${base}/admin/live-operations${recovery ? `?jobId=${id(1)}` : ''}`);
   try {
-    await page.locator('.rm-current-actions').getByRole('button', { name: 'Hủy job', exact: true }).waitFor();
+    await page.locator(recovery ? '.lo-failure-handling' : '.rm-current-actions').getByRole('button', { name: 'Hủy job', exact: true }).waitFor();
   } catch (error) {
     await page.screenshot({ path: '.workstation-build/live-cancel/failure.png', fullPage: true });
     console.error(JSON.stringify({ errors, body: (await page.locator('body').innerText()).slice(0, 2500) }));
@@ -77,5 +80,31 @@ try {
   await staleDialog.getByRole('alert').waitFor();
   assert.equal(g.writes.length, 0, 'fresh preflight blocks cancellation after terminal transition');
   assert.deepEqual(g.errors, []); await g.context.close();
-  console.log('PASS: cancel button, reason payload, error/retry, duplicate guard, pending status, stale preflight; all mutations mocked.');
+
+  const h = await fixture(true);
+  const panel = h.page.locator('.lo-failure-handling');
+  await panel.getByRole('alert').filter({ hasText: 'BE chưa cung cấp' }).waitFor();
+  assert.equal(await h.page.locator('.lo-detail').getByRole('button', { name: 'Hủy job', exact: true }).count(), 1);
+  await panel.getByRole('button', { name: 'Hủy job', exact: true }).click();
+  const recoveryDialog = h.page.getByRole('dialog'); await recoveryDialog.waitFor();
+  assert.equal(h.writes.length, 0);
+  await recoveryDialog.getByRole('textbox').fill('Đã kiểm tra robot, hủy công việc lỗi.');
+  await recoveryDialog.getByRole('checkbox').check();
+  h.state.failCancel = true;
+  await recoveryDialog.locator('button[type="submit"]').click();
+  await recoveryDialog.getByRole('alert').waitFor();
+  assert.equal(h.state.job.status, 'RECOVERY_REQUIRED');
+  h.state.failCancel = false;
+  await recoveryDialog.locator('button[type="submit"]').dblclick();
+  await recoveryDialog.waitFor({ state: 'hidden' });
+  await h.page.locator('.lo-detail-kicker').getByText('Đã hủy', { exact: true }).waitFor();
+  await h.page.getByRole('button', { name: 'Xem trong lịch sử', exact: true }).waitFor();
+  assert.equal(await h.page.locator('.lo-detail').getByRole('button', { name: 'Hủy job', exact: true }).count(), 0);
+  assert.equal(h.writes.length, 2);
+  assert.deepEqual(h.writes[1], { path: `/api/v1/jobs/${id(1)}/cancel`, body: { reason: 'Đã kiểm tra robot, hủy công việc lỗi.' } });
+  await h.page.getByRole('button', { name: 'Xem trong lịch sử', exact: true }).click();
+  await h.page.locator('.lo-job-item.is-selected').getByText('Đã hủy', { exact: true }).waitFor();
+  await h.page.screenshot({ path: '.workstation-build/live-cancel/recovery-cancelled.png', fullPage: true });
+  assert.deepEqual(h.errors, []); await h.context.close();
+  console.log('PASS: active/recovery cancel buttons, reason payload, failure API independence, error/retry, duplicate guard, pending/terminal status, history and stale preflight; all mutations mocked.');
 } finally { await browser.close(); }

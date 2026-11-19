@@ -42,7 +42,7 @@ export function allowedJobActions(job, role, step, now = Date.now()) {
   const operator = ['ADMIN', 'STAFF'].includes(role);
   const active = ACTIVE_STATUSES.includes(job?.status);
   return {
-    cancel: operator && active && !job.cancelRequestedAt && !job.cancelCommandId,
+    cancel: operator && (job?.status === 'RECOVERY_REQUIRED' || active && !job.cancelRequestedAt && !job.cancelCommandId),
     assignRobot: role === 'ADMIN' && job?.status === 'QUEUED' && !job.acceptedAt && !job.cancelRequestedAt && !job.cancelCommandId,
     assignStaff: role === 'ADMIN' && (active || job?.status === 'RECOVERY_REQUIRED'),
     recover: operator && job?.status === 'RECOVERY_REQUIRED',

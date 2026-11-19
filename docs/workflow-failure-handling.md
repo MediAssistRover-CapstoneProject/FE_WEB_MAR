@@ -43,6 +43,8 @@ Tất cả yêu cầu phiên Staff/Admin hiện hành và phạm vi Job. Staff �
 
 ## Giao diện
 
+- **Hủy job** trong khung xử lý gọi `POST /api/v1/jobs/{id}/cancel` với `{ "reason": "Lý do hủy" }`, dùng chung biểu mẫu xác nhận và kiểm tra trạng thái mới trước khi gửi. Nút vẫn xuất hiện khi API hồ sơ lỗi chưa được cung cấp hoặc đang lỗi, kể cả job `RECOVERY_REQUIRED` đã có yêu cầu hủy trước đó. Backend trên `main` trả `CANCELLED` ngay, theo dõi bằng chứng dừng riêng bằng `stopStatus` và giữ robot khi còn lệnh chưa xác nhận dừng hoặc cleanup mapping. Trạng thái job đã hủy không đồng nghĩa robot đã dừng. Xem thêm `BE_MAR/docs/JOB_CANCELLATION.md`. Kiểm thử: `node tests/live-cancel.browser.mjs`, `mvn "-Dmaven.test.skip=false" "-Dtest=ImmediateJobCancelTest" test`.
+
 - Cấu hình dùng chung trong designer, không yêu cầu thêm NOTIFY/WAIT vào từng nhánh lỗi.
 - Màn Cảnh báo mở đúng Job qua `jobId` trong URL; các nút thao tác chung trên cảnh báo lỗi được thay bằng lối vào xử lý tại Job.
 - Vận hành trực tiếp có khung **Xử lý lỗi công việc** với Tiếp nhận, ghi lý do/Chuyển Admin và lối vào đối soát. Nếu API lỗi hoặc dữ liệu cũ, khoá mutation; BE kiểm tra quyền và trạng thái lại khi nhận request.

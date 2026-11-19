@@ -16,7 +16,11 @@ test('cancel acceptance, queued assignment and recovery follow separate rules', 
   assert.equal(allowedJobActions({ status: 'QUEUED' }, 'ADMIN').assignRobot, true);
   assert.equal(allowedJobActions({ status: 'QUEUED' }, 'STAFF').assignRobot, false);
   assert.equal(allowedJobActions({ status: 'RECOVERY_REQUIRED' }, 'ADMIN').recover, true);
-  assert.equal(allowedJobActions({ status: 'RECOVERY_REQUIRED' }, 'ADMIN').cancel, false);
+  assert.equal(allowedJobActions({ status: 'RECOVERY_REQUIRED' }, 'ADMIN').cancel, true);
+  assert.equal(allowedJobActions({ status: 'RECOVERY_REQUIRED' }, 'STAFF').cancel, true);
+  assert.equal(allowedJobActions({ status: 'RECOVERY_REQUIRED', cancelRequestedAt: '2026-11-19T08:00:00Z' }, 'ADMIN').cancel, true);
+  assert.equal(allowedJobActions({ status: 'RECOVERY_REQUIRED', cancelCommandId: 'pending' }, 'ADMIN').cancel, true);
+  assert.equal(allowedJobActions({ status: 'RECOVERY_REQUIRED' }, 'DEVICE').cancel, false);
   assert.ok(Object.values(allowedJobActions({ status: 'RUNNING' }, 'DEVICE')).every(value => !value));
 });
 
