@@ -6,6 +6,7 @@ import { ROOM_TYPES, isSosRoom, roomTypePatch } from '../../../features/facility
 import { ENDPOINT_CATEGORIES } from '../../../features/facility/facilityContract.js';
 import { saveValidatedEndpoint } from '../../../features/facility/navigationPoint.js';
 import { endpointRoomPayload, newRoomForm, roomForm, roomPayload, roomTypeLabel } from '../../../features/facility/roomEditing.js';
+import { roomIsOperational } from '../../../features/facility/roomAvailability.js';
 import FacilityGeometryPreview from '../FacilityGeometryPreview.jsx';
 import EndpointFields, { EndpointLifecycle } from '../EndpointFields.jsx';
 import RoomTypeSelect from './RoomTypeSelect.jsx';
@@ -28,7 +29,7 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
   const [selectedId, setSelectedId] = useState(''), [mapId, setMapId] = useState('');
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [reload, setReload] = useState(0);
   const [loadError, setLoadError] = useState(''), [feedback, setFeedback] = useState(null);
-  const [search, setSearch] = useState(''), [floorFilter, setFloorFilter] = useState(''), [typeFilter, setTypeFilter] = useState(''), [stateFilter, setStateFilter] = useState('');
+  const [search, setSearch] = useState(''), [floorFilter, setFloorFilter] = useState(''), [typeFilter, setTypeFilter] = useState(''), [stateFilter, setStateFilter] = useState('active');
   const [form, setForm] = useState(null), [editing, setEditing] = useState(false);
   const [creating, setCreating] = useState(false), [catalogStale, setCatalogStale] = useState(false);
   const [pointId, setPointId] = useState(''), [pointForm, setPointForm] = useState(null), [drawing, setDrawing] = useState(false);
@@ -46,14 +47,15 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
   const locked = busy || loading || catalogStale || !canEdit;
   const pointLocked = locked || map?.status === 'ARCHIVED';
   const roomFloor = floors.find(floor => floor.floorId === room?.floorId);
+  const operational = item => roomIsOperational(item, maps, endpoints, floors);
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => { onDirtyChange?.(dirty || busy); }, [dirty, busy, onDirtyChange]);
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
   useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
   useEffect(() => {
-    if (!loading && !loadError) onCountChange?.({ total: rooms.length, active: rooms.filter(room => room.active).length });
-  }, [rooms, loading, loadError, onCountChange]);
+    if (!loading && !loadError) onCountChange?.({ total: rooms.length, active: rooms.filter(operational).length });
+  }, [rooms, maps, endpoints, floors, loading, loadError, onCountChange]);
   useEffect(() => {
     if (!dirty && !busy) return;
     const warn = event => { event.preventDefault(); event.returnValue = ''; };
@@ -76,7 +78,7 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
         if (controller.signal.aborted) return;
         setCatalog({ rooms, endpoints, maps, floors, groups, zones });
         setCreating(false); setCatalogStale(false);
-        setSelectedId(current => rooms.some(room => room.roomId === current) ? current : rooms[0]?.roomId || '');
+        setSelectedId(current => rooms.some(room => room.roomId === current) ? current : rooms.find(room => roomIsOperational(room, maps, endpoints, floors))?.roomId || rooms[0]?.roomId || '');
         setEditing(false); setLinkMode(''); setTargetId(''); setPointForm(null);
       })
       .catch(error => { if (!controller.signal.aborted) setLoadError(error.message || 'Không tải được danh mục phòng.'); })
@@ -84,10 +86,32 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
     return () => controller.abort();
   }, [reload, refreshKey, canEdit]);
 
+  useEffect(() => {
+    if (dirty || busy || loading) return;
+    const controller = new AbortController();
+    let pending = false;
+    const signature = values => JSON.stringify(values.map(map => [map.mapId, map.floorId, map.status]).sort());
+    const checkMaps = async () => {
+      if (pending || document.visibilityState !== 'visible') return;
+      pending = true;
+      try {
+        const latest = await allFacilityPages(params => api.listMaps({ ...params, ...(canEdit ? { includeDeleted: true } : {}) }, { signal: controller.signal }));
+        if (!controller.signal.aborted && signature(latest) !== signature(maps)) setReload(value => value + 1);
+      } catch { /* Keep the last complete catalog; the manual reload reports failures. */ }
+      finally { pending = false; }
+    };
+    const timer = setInterval(checkMaps, 15000);
+    window.addEventListener('focus', checkMaps);
+    document.addEventListener('visibilitychange', checkMaps);
+    return () => { controller.abort(); clearInterval(timer); window.removeEventListener('focus', checkMaps); document.removeEventListener('visibilitychange', checkMaps); };
+  }, [dirty, busy, loading, maps, canEdit]);
+
   useEffect(() => { if (!creating) setForm(room ? roomForm(room) : null); }, [room, creating]);
   useEffect(() => {
     const available = maps.filter(map => map.floorId === room?.floorId);
-    setMapId(current => available.some(map => map.mapId === current) ? current : available.find(map => map.status === 'ACTIVE')?.mapId || available[0]?.mapId || '');
+    const linkedMaps = available.filter(map => endpoints.some(point => point.mapId === map.mapId && point.roomId === selectedId));
+    const preferred = linkedMaps.length ? linkedMaps : available;
+    setMapId(current => preferred.some(map => map.mapId === current) ? current : preferred.find(map => map.status === 'ACTIVE')?.mapId || preferred[0]?.mapId || '');
     setPointId(''); setPointForm(null); setDrawing(false); setLinkMode(''); setTargetId('');
   }, [selectedId, room?.floorId, maps]);
   useEffect(() => {
@@ -215,8 +239,13 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
     const matches = !search || [room.roomName, room.roomCode, room.roomType, labelType(room.roomType), room.departmentCode,
       ...endpoints.filter(point => point.roomId === room.roomId).map(point => point.endpointName)].join(' ').toLocaleLowerCase('vi').includes(search.trim().toLocaleLowerCase('vi'));
     return matches && (!floorFilter || room.floorId === floorFilter) && (!typeFilter || room.roomType === typeFilter)
-      && (!stateFilter || (stateFilter === 'active' ? room.active : stateFilter === 'inactive' ? !room.active : stateFilter === 'private' ? !room.publicVisible : !endpoints.some(point => point.roomId === room.roomId)));
+      && (!stateFilter || (stateFilter === 'active' ? operational(room) : stateFilter === 'inactive' ? !operational(room) : stateFilter === 'private' ? !room.publicVisible : !endpoints.some(point => point.roomId === room.roomId)));
   });
+  const visibleIds = JSON.stringify(filtered.map(room => room.roomId));
+  useEffect(() => {
+    if (creating || dirty || busy || loading || filtered.some(room => room.roomId === selectedId)) return;
+    setSelectedId(filtered[0]?.roomId || '');
+  }, [visibleIds, selectedId, creating, dirty, busy, loading]);
   const changeFilter = (setter, value) => {
     if (!confirmLeave()) return;
     if (roomDirty) setForm(room ? roomForm(room) : null);
@@ -231,7 +260,7 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
       <label className="lo-search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg><input aria-label="Tìm kiếm phòng" placeholder="Tìm tên phòng, mã phòng, khoa hoặc tên điểm…" value={search} onChange={event => setSearch(event.target.value)} /></label>
       <select aria-label="Lọc tầng" value={floorFilter} disabled={busy} onChange={event => changeFilter(setFloorFilter, event.target.value)}><option value="">Tất cả tầng</option>{floors.map(floor => <option key={floor.floorId} value={floor.floorId}>{floor.floorName}</option>)}</select>
       <select aria-label="Lọc loại phòng" value={typeFilter} disabled={busy} onChange={event => changeFilter(setTypeFilter, event.target.value)}><option value="">Tất cả loại phòng</option>{[...new Set(rooms.map(room => room.roomType))].map(type => <option key={type} value={type}>{labelType(type)}</option>)}</select>
-      <select aria-label="Lọc trạng thái phòng" value={stateFilter} disabled={busy} onChange={event => changeFilter(setStateFilter, event.target.value)}><option value="">Tất cả trạng thái</option><option value="active">Đang hoạt động</option><option value="inactive">Ngừng hoạt động</option><option value="private">Chỉ dùng nội bộ</option><option value="unlinked">Chưa có điểm</option></select>
+      <select aria-label="Lọc trạng thái phòng" value={stateFilter} disabled={busy} onChange={event => changeFilter(setStateFilter, event.target.value)}><option value="">Tất cả trạng thái</option><option value="active">Đang hoạt động</option><option value="inactive">Không hoạt động</option><option value="private">Chỉ dùng nội bộ</option><option value="unlinked">Chưa có điểm</option></select>
       <button type="button" className="lo-button" disabled={busy || loading} onClick={refresh}>Tải lại phòng</button>
       {canEdit && <button type="button" className="lo-button lo-primary" disabled={locked} onClick={startCreate}>Thêm phòng</button>}
     </div>
@@ -239,13 +268,13 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
     {feedback && <div className={`lo-notice lo-notice-${feedback.error ? 'error' : 'success'} rw-feedback`} role={feedback.error ? 'alert' : 'status'}><p>{feedback.text}</p><button type="button" className="lo-text-button" onClick={() => setFeedback(null)}>Đóng</button></div>}
     {loading ? <div className="lo-loading" role="status"><span className="lo-spinner" />Đang tải phòng và điểm đến…</div> : !loadError && <div className="lo-layout rw-layout">
       <aside className="lo-job-list" aria-label="Danh sách phòng quản trị">
-        <header><strong>{filtered.length} phòng</strong><span>Bao gồm phòng ẩn và chưa có điểm</span></header>
+        <header><strong>{filtered.length} phòng</strong><span>{stateFilter === 'active' ? 'Phòng trên bản đồ đang hoạt động' : 'Trạng thái được cập nhật theo bản đồ'}</span></header>
         <div className="lo-job-items">
           {!filtered.length && <p className="lo-list-empty">Không có phòng phù hợp bộ lọc.</p>}
           {filtered.map(item => {
             const count = endpoints.filter(point => point.roomId === item.roomId).length;
             return <button type="button" key={item.roomId} disabled={busy} aria-pressed={selectedId === item.roomId} className={`lo-job-item ${selectedId === item.roomId ? 'is-selected' : ''}`} onClick={() => chooseRoom(item.roomId)}>
-              <div className="lo-job-item-top"><span className={`lo-badge ${item.active ? 'lo-success' : 'lo-failed'}`}><i />{item.active ? 'Hoạt động' : 'Ngừng hoạt động'}</span><span>{item.roomCode}</span></div>
+              <div className="lo-job-item-top"><span className={`lo-badge ${operational(item) ? 'lo-success' : 'lo-failed'}`}><i />{operational(item) ? 'Hoạt động' : 'Không hoạt động'}</span><span>{item.roomCode}</span></div>
               <strong>{item.roomName}</strong><span className="lo-job-target">{floors.find(floor => floor.floorId === item.floorId)?.floorName || 'Chưa xác định tầng'}</span>
               <div className="lo-job-item-bottom"><span>{labelType(item.roomType)}</span><span className={count ? '' : 'rw-missing'}>{count ? `${count} điểm` : 'Chưa có điểm'}</span></div>
               {!item.publicVisible && <small className="rw-private">Chỉ dùng nội bộ</small>}
@@ -254,9 +283,10 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
         </div>
       </aside>
       {(creating || room) && form ? <article className="lo-detail rw-detail" aria-label="Chi tiết phòng">
-        <header className="lo-detail-header">{creating ? <div><h3>Thêm phòng mới</h3><p>Phòng mới được cấp ID khi lưu thành công.</p></div> : <div><div className="lo-detail-kicker"><span className={`lo-badge ${room.active ? 'lo-success' : 'lo-failed'}`}><i />{room.active ? 'Đang hoạt động' : 'Ngừng hoạt động'}</span><span className="lo-badge lo-running">{room.publicVisible ? 'Công khai' : 'Nội bộ'}</span><span>{room.roomCode}</span></div><h3>{room.roomName}</h3><p>{roomFloor?.floorName || room.floorId}</p></div>}
+        <header className="lo-detail-header">{creating ? <div><h3>Thêm phòng mới</h3><p>Phòng mới được cấp ID khi lưu thành công.</p></div> : <div><div className="lo-detail-kicker"><span className={`lo-badge ${operational(room) ? 'lo-success' : 'lo-failed'}`}><i />{operational(room) ? 'Đang hoạt động' : 'Không hoạt động'}</span><span className="lo-badge lo-running">{room.publicVisible ? 'Công khai' : 'Nội bộ'}</span><span>{room.roomCode}</span></div><h3>{room.roomName}</h3><p>{roomFloor?.floorName || room.floorId}</p></div>}
           {!editing && canEdit && <button type="button" className="lo-button lo-primary" disabled={locked} onClick={() => setEditing(true)}>Chỉnh sửa phòng</button>}
         </header>
+        <p className="lo-muted">Phòng chỉ hoạt động khi được bật và có điểm trên bản đồ đang hoạt động.</p>
         {!canEdit && <p className="lo-muted">Chỉ quản trị viên được chỉnh sửa phòng và điểm đến.</p>}
         {editing ? <form aria-label={creating ? 'Tạo phòng mới' : 'Chỉnh sửa thông tin phòng'} onSubmit={saveRoom}>
           <fieldset disabled={locked} className="rw-fieldset"><legend>Thông tin phòng</legend><div className="rw-grid">

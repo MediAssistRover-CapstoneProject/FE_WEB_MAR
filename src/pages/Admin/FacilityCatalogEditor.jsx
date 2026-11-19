@@ -46,7 +46,7 @@ export default function FacilityCatalogEditor({stage, initialMapId = '', onMapCh
   const groups=catalog.groups.filter(g=>g.mapId===mapId).map(g=>groupFromApi(g,catalog.members));
   const localEndpoints=endpoints.map(e=>({id:e.endpointId,name:e.endpointName,enabled:e.active,accessible:e.accessible}));
   const fetchCatalog=async()=>{
-    const [maps,zones,endpoints,groups,members,rooms]=await Promise.all([api.listMaps,params=>api.listZones({...params,...(canManageZones?{includeDeleted:true}:{})}),api.listEndpoints,api.listEndpointGroups,api.listEndpointGroupMembers,api.listRooms].map(allFacilityPages));
+    const [maps,zones,endpoints,groups,members,rooms]=await Promise.all([api.listMaps,params=>api.listZones({...params,...(canManageZones?{includeDeleted:true}:{})}),api.listEndpoints,api.listEndpointGroups,api.listEndpointGroupMembers,params=>api.listRooms({...params,...(canManageZones?{includeDeleted:true}:{})})].map(allFacilityPages));
     return {maps,zones,endpoints,groups,members,rooms};
   };
   useEffect(()=>{let mounted=true;fetchCatalog().then(data=>{if(mounted){setCatalog(data);setMapId(data.maps.find(m=>m.mapId===mapSelection.current.initialMapId)?.mapId||data.maps.find(m=>m.status==='ACTIVE')?.mapId||data.maps[0]?.mapId||'');setReady(true);setStatus('');}}).catch(e=>{if(mounted)setStatus('Không tải được dữ liệu bản đồ: '+e.message);});return()=>{mounted=false;};},[]);

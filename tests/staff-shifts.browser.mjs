@@ -18,7 +18,7 @@ async function fixture(role = 'ADMIN', options = {}) {
   const row = (n, status, from, to, extra = {}) => ({ shiftId: id(n), shiftCode: `SHIFT-${n}`, shiftName: `Ca kiểm thử ${n}`, staffProfileId: id(20 + n), staffCode: `STAFF-${n}`, roomId: id(10), roomCode: 'P01', status, startsAt: instant(3, from), endsAt: instant(3, to), note: 'Ghi chú ban đầu', slots: [], updatedAt: '2026-11-02T00:00:00Z', ...extra });
   const state = { failList: false, failCatalogs: false, failWrite: false, ...options, rows: [row(1, 'PLANNED', 8, 12), row(2, 'ACTIVE', 9, 17, { roomId: id(11) }), row(3, 'PLANNED', 0, 6), row(4, 'COMPLETED', 0, 6, { roomId: id(11) }), row(5, 'CANCELLED', 6, 12), row(6, 'PLANNED', 22, 30), row(7, 'PLANNED', 8, 12, { startsAt: instant(4, 8), endsAt: instant(4, 12), slots: [{ slotId: id(70), sequenceNo: 1, startsAt: instant(4, 8), endsAt: instant(4, 12), status: 'AVAILABLE', note: 'Giữ khung giờ đã có' }] })] };
   const staff = Array.from({ length: 9 }, (_, n) => ({ staffProfileId: id(21 + n), staffCode: `STAFF-${n + 1}`, active: n !== 8, account: { fullName: `Nhân viên ${n + 1}`, status: 'ACTIVE' } }));
-  const rooms = [{ roomId: id(10), roomName: 'Phòng tiếp nhận', roomCode: 'P01', active: true }, { roomId: id(11), roomName: 'Phòng điều trị', roomCode: 'P02', active: true }];
+  const rooms = [{ roomId: id(10), floorId: 'floor', roomName: 'Phòng tiếp nhận', roomCode: 'P01', active: true }, { roomId: id(11), floorId: 'floor', roomName: 'Phòng điều trị', roomCode: 'P02', active: true }, { roomId: id(12), floorId: 'floor', roomName: 'Phòng map cũ', roomCode: 'OLD', active: true }];
   await page.route('**/api/v1/**', async route => {
     const request = route.request(), url = new URL(request.url()), path = url.pathname;
     const reply = (value, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) });
@@ -39,6 +39,9 @@ async function fixture(role = 'ADMIN', options = {}) {
     if (['/api/v1/admin/staff', '/api/v1/rooms'].includes(path) && state.failCatalogs) return reply({ message: 'Danh mục tạm gián đoạn' }, 503);
     if (path === '/api/v1/admin/staff') return list(staff);
     if (path === '/api/v1/rooms') return list(rooms);
+    if (path === '/api/v1/maps') return list([{ mapId: 'current', floorId: 'floor', status: 'ACTIVE' }, { mapId: 'old', floorId: 'floor', status: 'INACTIVE' }]);
+    if (path === '/api/v1/floors') return list([{ floorId: 'floor', active: true }]);
+    if (path === '/api/v1/endpoints') return list(rooms.map((room, i) => ({ endpointId: 'point-' + i, roomId: room.roomId, mapId: i === 2 ? 'old' : 'current', active: true })));
     return list([]);
   });
   const start = async () => { await page.goto(`${base}/admin/staff-shifts`); await page.locator('.ss-shift').first().waitFor(); await page.getByLabel('Tự đồng bộ mỗi 30 giây').uncheck(); if (role === 'ADMIN' && !state.failCatalogs) await page.getByRole('button', { name: 'Phân ca', exact: true }).waitFor({ state: 'visible' }); };
@@ -47,6 +50,7 @@ async function fixture(role = 'ADMIN', options = {}) {
 }
 try {
   const f = await fixture(); await f.start();
+  assert.equal(await f.page.getByLabel('Phòng phụ trách', { exact: true }).locator(`option[value="${id(12)}"]`).count(), 0, 'Old-map room is excluded from operational room filters');
   assert.equal(await f.page.locator('.ss-shift').count(), 6, 'each shift must appear once');
   assert.equal(await f.card(3).getByRole('button', { name: 'Bắt đầu trực' }).count(), 0, 'expired shifts cannot start');
   await f.card(1).getByRole('button', { name: 'Bắt đầu trực' }).waitFor();
@@ -95,6 +99,7 @@ try {
   // Editing assignment must not alter legacy times, name, or existing slots.
   await f.page.getByRole('button', { name: '2026-11-04, 1 ca trực', exact: true }).click();
   await f.card(7).getByRole('button', { name: 'Chỉnh sửa', exact: true }).click(); dialog = f.page.getByRole('dialog');
+  assert.equal(await dialog.getByLabel('Phòng phụ trách *', { exact: true }).locator(`option[value="${id(12)}"]`).count(), 0, 'Assignment cannot select a room from the inactive map');
   assert.equal(await dialog.locator('input[type="datetime-local"]').count(), 0);
   assert.equal(await dialog.getByLabel('Tên ca *').count(), 0);
   assert.match(await dialog.getByLabel('Thời gian cố định của ca').innerText(), /08:00/);

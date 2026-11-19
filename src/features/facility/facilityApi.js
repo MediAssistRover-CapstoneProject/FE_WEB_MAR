@@ -1,4 +1,5 @@
 import { apiRequest } from '../api/client.js';
+import { operationalRoomPage } from './operationalRooms.js';
 
 function query(path, params = {}) {
   const search = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== ''));
@@ -17,7 +18,7 @@ export const facilityApi = {
     return result;
   },
   listZones: (params, options) => catalog('zones', params, options),
-  listRooms: (params, options) => catalog('rooms', params, options),
+  listRooms: (params, options) => [true, 'true'].includes(params?.includeDeleted) ? catalog('rooms', params, options) : operationalRoomPage(params, options),
   createRoom: body => apiRequest('/api/v1/rooms', { method: 'POST', body, retry: false }),
   updateRoom: (id, body) => apiRequest(`/api/v1/rooms/${encodeURIComponent(id)}`, { method: 'PUT', body, retry: false }),
   listPublicRooms: (params, options) => apiRequest(query('/api/v1/public/rooms', params), { skipAuth: true, ...options }),

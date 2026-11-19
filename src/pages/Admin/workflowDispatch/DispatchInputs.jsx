@@ -1,5 +1,6 @@
 import { availableDestinations } from '../../../features/workflows/designer/designerModel.js';
 import { dispatchVariables } from '../../../features/workflows/dispatchModel.js';
+import { roomIsOperational } from '../../../features/facility/roomAvailability.js';
 import { Field, JsonField } from '../../Workflows/designer/DesignerFields.jsx';
 
 export default function DispatchInputs({ workflow, values, rooms, setRooms, catalog, errors, jsonErrors, onChange, disabled }) {
@@ -7,7 +8,7 @@ export default function DispatchInputs({ workflow, values, rooms, setRooms, cata
     const value = values[variable.key], mapId = values[variable.mapVariable];
     const points = availableDestinations(catalog, mapId, rooms[variable.key]);
     const map = catalog.maps.find(item => item.mapId === mapId);
-    const matchingRooms = catalog.rooms.filter(room => room.active && (!map?.floorId || room.floorId === map.floorId));
+    const matchingRooms = catalog.rooms.filter(room => roomIsOperational(room, map ? [map] : [], catalog.endpoints));
     const label = variable.label + (variable.required ? ' *' : '');
     const select = (options, placeholder, extraDisabled = false) => <select value={value === undefined ? '' : String(value)} disabled={disabled || extraDisabled} onChange={event => {
       const option = options.find(item => String(item.value) === event.target.value);

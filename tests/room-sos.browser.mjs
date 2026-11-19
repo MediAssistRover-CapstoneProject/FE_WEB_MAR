@@ -92,6 +92,7 @@ await context.route(url => url.pathname.startsWith('/api/'), async route => {
 
 const detail = page.getByRole('article', { name: 'Chi tiết phòng', exact: true });
 const edit = async name => {
+  await page.getByLabel('Lọc trạng thái phòng').selectOption('');
   await page.getByRole('complementary', { name: 'Danh sách phòng quản trị' }).getByRole('button', { name: new RegExp(name) }).click();
   await detail.getByRole('button', { name: 'Chỉnh sửa phòng', exact: true }).click();
   return detail.getByRole('form', { name: 'Chỉnh sửa thông tin phòng', exact: true });
@@ -188,6 +189,10 @@ try {
 
   await page.goto(base + '/admin/system-settings');
   const sosCard = page.getByRole('region', { name: 'Phòng tiếp nhận SOS', exact: true });
+  await expect(sosCard).toContainText('không còn khả dụng');
+  const configuredRoom = rooms.find(room => room.roomId === configured);
+  endpoints.push({ ...endpoints[0], endpointId: 'new-monitoring-point', roomId: configuredRoom.roomId });
+  await page.reload();
   await expect(sosCard).toContainText('Trực sau lỗi');
   await expect(sosCard.getByRole('combobox')).toHaveCount(0);
   floors[0].active = false; await page.reload(); await expect(sosCard).toContainText('không còn khả dụng');

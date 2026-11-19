@@ -1,6 +1,8 @@
 import { apiRequest } from '../api/client.js';
+import { createOperationalRoomReader } from '../facility/operationalRooms.js';
 
 export function createSystemSettingsApi(request = apiRequest) {
+  const rooms = createOperationalRoomReader(request);
   const all = async (path, signal) => {
     const rows = [];
     for (let page = 0; page < 1000; page++) {
@@ -13,7 +15,7 @@ export function createSystemSettingsApi(request = apiRequest) {
   };
   return {
     listSettings: signal => all('/api/v1/admin/system-settings', signal),
-    listRooms: signal => all('/api/v1/rooms', signal),
+    listRooms: signal => rooms({ signal }),
     listFloors: signal => all('/api/v1/floors', signal),
     listRobots: signal => all('/api/v1/robots', signal),
     saveSetting: (row, body) => request('/api/v1/admin/system-settings' + (row ? `/${encodeURIComponent(row.systemSettingId)}` : ''), { method: row ? 'PUT' : 'POST', body, retry: false }),

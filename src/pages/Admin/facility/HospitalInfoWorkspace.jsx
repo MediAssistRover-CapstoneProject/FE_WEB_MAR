@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { callBackend } from '../../../features/api/backendApi.js';
 import { allFacilityPages, facilityApi } from '../../../features/facility/facilityApi.js';
+import { roomIsOperational } from '../../../features/facility/roomAvailability.js';
 import { getSession } from '../../../features/auth/session.js';
 import RoomsWorkspace from './RoomsWorkspace.jsx';
 import '../liveOperations/liveOperations.css';
@@ -54,7 +55,7 @@ export default function HospitalInfoWorkspace() {
   const [roomSummary, setRoomSummary] = useState(null);
   const [roomSummaryError, setRoomSummaryError] = useState('');
   const pendingCount = roomSummaryError ? '—' : '…';
-  const roomCount = roomSummary?.total ?? pendingCount;
+  const roomCount = roomSummary?.active ?? pendingCount;
   const canManageRooms = getSession()?.account?.role === 'ADMIN';
   const [roomDirty, setRoomDirty] = useState(false);
   const [roomBusy, setRoomBusy] = useState(false);
@@ -126,15 +127,22 @@ export default function HospitalInfoWorkspace() {
     return () => controller.abort();
   }, [roomsRefresh]);
 
-  // The badge is visible on every tab. Load its data without mounting the room
-  // editor; while that editor is open, its successful loads and edits own counts.
+  // The badge always counts rooms on active maps. Older servers need the linked
+  // map/endpoint catalog; a manual room flag alone is not an operational count.
   useEffect(() => {
     if (tab === 'rooms') return;
     const controller = new AbortController();
     setRoomSummaryError('');
     allFacilityPages(params => facilityApi.listRooms({ ...params, ...(canManageRooms ? { includeDeleted: true } : {}) }, { signal: controller.signal }))
-      .then(rooms => {
-        if (!controller.signal.aborted) setRoomSummary({ total: rooms.length, active: rooms.filter(room => room.active).length });
+      .then(async rooms => {
+        let active;
+        if (rooms.every(room => typeof room.operational === 'boolean')) active = rooms.filter(room => room.operational).length;
+        else {
+          const [maps, endpoints, floors] = await Promise.all(['listMaps', 'listEndpoints', 'listFloors'].map(resource =>
+            allFacilityPages(params => facilityApi[resource]({ ...params, ...(canManageRooms ? { includeDeleted: true } : {}) }, { signal: controller.signal }))));
+          active = rooms.filter(room => roomIsOperational(room, maps, endpoints, floors)).length;
+        }
+        if (!controller.signal.aborted) setRoomSummary({ total: rooms.length, active });
       })
       .catch(error => { if (!controller.signal.aborted) setRoomSummaryError(error.message || 'Không tải được số lượng phòng.'); });
     return () => controller.abort();
@@ -149,7 +157,7 @@ export default function HospitalInfoWorkspace() {
   const metrics = [
     { label: 'Cơ sở bệnh viện', count: hospitals.length, tone: 'blue', icon: 'building' },
     { label: 'Số tầng hoạt động', count: floorsLoading ? '…' : floorsError ? '—' : floors.filter(f => f.active).length, tone: 'amber', icon: 'layers' },
-    { label: 'Phòng trong danh mục', count: roomCount, tone: 'green', icon: 'room' },
+    { label: 'Phòng đang hoạt động', count: roomCount, tone: 'green', icon: 'room' },
     { label: tab === 'rooms' ? 'Phòng hoạt động' : 'Trạng thái phát hành', count: tab === 'rooms' ? roomSummary?.active ?? pendingCount : 'Công khai', tone: 'green', icon: 'check' },
   ];
 
@@ -180,7 +188,7 @@ export default function HospitalInfoWorkspace() {
       {/* Sync Status */}
       <div className="lo-sync" role="status">
         <span className="lo-connection" />
-        {tab === 'rooms' ? 'Danh mục quản trị · Bao gồm phòng nội bộ, phòng ngừng hoạt động và phòng chưa có điểm' : 'Thông tin cơ sở y tế'}
+        {tab === 'rooms' ? 'Danh sách phòng theo bản đồ đang hoạt động' : 'Thông tin cơ sở y tế'}
       </div>
 
       {toast && (
@@ -234,7 +242,7 @@ export default function HospitalInfoWorkspace() {
                 type="button"
                 disabled={roomBusy}
                 aria-pressed={tab === 'rooms'}
-                title={roomSummaryError || (!roomSummary ? 'Đang tải số lượng phòng…' : undefined)}
+                title={roomSummaryError || (!roomSummary ? 'Đang tải số lượng phòng…' : 'Số phòng trên bản đồ đang hoạt động')}
                 className={tab === 'rooms' ? 'is-active' : ''}
                 onClick={() => selectTab('rooms')}
               >
@@ -243,7 +251,7 @@ export default function HospitalInfoWorkspace() {
               </button>
             </nav>
             <span className="lo-total">
-              {tab === 'hospital' ? `${hospitals.length} cơ sở` : tab === 'floors' ? `${floors.length} tầng` : `${roomCount} phòng`}
+              {tab === 'hospital' ? `${hospitals.length} cơ sở` : tab === 'floors' ? `${floors.length} tầng` : `${roomCount} phòng đang hoạt động`}
             </span>
           </div>
 

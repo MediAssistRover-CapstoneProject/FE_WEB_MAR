@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { callBackend } from '../../../features/api/backendApi.js';
+import { callBackend, readCatalog } from '../../../features/api/backendApi.js';
 import { dateLabel, dayKey, fixedShiftPeriods, shiftActions, shiftFingerprint, shiftState, timeLabel, validateShift } from '../../../features/operations/staffShifts.js';
 
 export const staffName = person => person?.account?.fullName || person?.fullName || person?.staffCode || 'Chưa có tên';
@@ -24,7 +24,10 @@ export function ShiftForm({ draft, data, onClose, onSaved, onRefresh }) {
   const lock = useRef(false);
   const field = (key, value) => setForm(previous => ({ ...previous, [key]: value }));
   const staff = data.staff.filter(p => p.active !== false && (!p.account?.status || p.account.status === 'ACTIVE') || p.staffProfileId === original?.staffProfileId);
-  const rooms = data.rooms.filter(r => r.active !== false || r.roomId === original?.roomId);
+  const rooms = data.rooms.filter(r => r.active !== false && r.operational !== false);
+  useEffect(() => {
+    if (form.roomId && !rooms.some(room => room.roomId === form.roomId)) field('roomId', '');
+  }, [data.rooms, form.roomId]);
   const submit = async event => {
     event.preventDefault(); if (lock.current) return;
     setError('');
@@ -37,6 +40,8 @@ export function ShiftForm({ draft, data, onClose, onSaved, onRefresh }) {
     if (invalid) { setError(invalid); return; }
     lock.current = true; setBusy(true);
     try {
+      const currentRooms = await readCatalog('GET /api/v1/rooms');
+      if (!currentRooms.some(room => room.roomId === body.roomId)) { onRefresh(); throw Error('Phòng không còn thuộc bản đồ đang hoạt động. Chọn lại phòng trước khi phân ca.'); }
       if (original) {
         const current = await callBackend('GET /api/v1/admin/shifts/{shiftId}', { path: { shiftId: original.shiftId } });
         if (current.status !== 'PLANNED' || shiftFingerprint(current) !== shiftFingerprint(original)) { onRefresh(); throw Error('Ca trực đã thay đổi. Đóng biểu mẫu và mở lại để xem dữ liệu mới nhất.'); }

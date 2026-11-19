@@ -1,11 +1,14 @@
 import { apiRequest } from './client.js';
 import { buildRequest } from './contract.js';
+import { operationalRoomPage, readOperationalRooms } from '../facility/operationalRooms.js';
 
 export async function callBackend(key, input = {}, options = {}) {
+  if (key === 'GET /api/v1/rooms' && ![true, 'true'].includes(input.query?.includeDeleted)) return operationalRoomPage(input.query, options);
   const { url, ...request } = buildRequest(key, input);
   return apiRequest(url, { ...request, ...options, headers: { ...request.headers, ...options.headers } });
 }
 export async function readCatalog(key, { signal, query = {} } = {}) {
+  if (key === 'GET /api/v1/rooms' && ![true, 'true'].includes(query.includeDeleted)) return readOperationalRooms({ signal, mapId: query.mapId });
   const rows = [];
   for (let page = 0; page < 1000; page++) {
     const result = await callBackend(key, { query: { ...query, page, size: 100 } }, { signal });

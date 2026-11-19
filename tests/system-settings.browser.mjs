@@ -28,7 +28,7 @@ await page.route('**/api/v1/**', async route => {
   assert.equal(request.headers().authorization, 'Bearer fixture');
   if (method === 'GET') {
     if (path === '/api/v1/admin/system-settings') return failSettings ? json({ message: 'Không tải được cấu hình thử nghiệm' }, 503) : list(settings);
-    if (path === '/api/v1/rooms') return list([{ roomId: id(7), roomName: 'Phòng trực trung tâm', active: true }, { roomId: id(8), roomName: 'Phòng đã đóng', active: false }]);
+    if (path === '/api/v1/rooms') return list([{ roomId: id(7), roomName: 'Phòng trực trung tâm', active: true, operational: true }, { roomId: id(8), roomName: 'Phòng đã đóng', active: false, operational: false }]);
     if (path === '/api/v1/robots') return list([{ robotId: id(6), robotName: 'MAR-01' }]);
     if (path === '/api/v1/admin/mqtt-rollout') { assert.equal(url.search, ''); return json(status); }
     if (path.endsWith('/retention/policies')) { assert.equal(url.search, ''); return json(policies()); }

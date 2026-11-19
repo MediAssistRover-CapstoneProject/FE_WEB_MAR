@@ -46,7 +46,7 @@ export default function ShiftCalendar({ role }) {
       setCatalogsReady(ready); setCatalogError(ready ? '' : 'Chưa tải đủ danh mục nhân viên/phòng. Bạn vẫn có thể xem ca; hãy tải lại trước khi phân hoặc sửa ca.');
     });
     return () => controller.abort();
-  }, [admin, revision]);
+  }, [admin, revision, tick]);
   useEffect(() => {
     const controller = new AbortController(); setRefreshing(true);
     readCatalog(admin ? 'GET /api/v1/admin/shifts' : 'GET /api/v1/staff/shifts', { signal: controller.signal }).then(shifts => {
@@ -57,6 +57,7 @@ export default function ShiftCalendar({ role }) {
     return () => controller.abort();
   }, [admin, revision, tick]);
   useEffect(() => setPage(0), [selected, roomId, search, status]);
+  useEffect(() => { if (roomId && !data.rooms.some(room => room.roomId === roomId)) setRoomId(''); }, [data.rooms, roomId]);
   const people = useMemo(() => new Map(data.staff.map(p => [p.staffProfileId, staffName(p)])), [data.staff]);
   const rooms = useMemo(() => new Map(data.rooms.map(r => [r.roomId, roomName(r)])), [data.rooms]);
   const scoped = useMemo(() => (data.shifts || []).filter(s => (!roomId || s.roomId === roomId) && (!search.trim() || [s.shiftName, s.shiftCode, s.staffCode, s.roomCode, people.get(s.staffProfileId), rooms.get(s.roomId)].join(' ').toLocaleLowerCase('vi').includes(search.trim().toLocaleLowerCase('vi')))), [data.shifts, roomId, search, people, rooms]);

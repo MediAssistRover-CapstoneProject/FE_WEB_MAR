@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
+import { roomIsOperational } from '../src/features/facility/roomAvailability.js';
 import { chromium, expect } from '@playwright/test';
 
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_EXECUTABLE || 'C:/Program Files/Google/Chrome/Application/chrome.exe' });
@@ -63,19 +64,20 @@ try {
   await expect(roomBadge).toHaveText('…');
   assert.ok(!reads.some(path => path.startsWith('/api/v1/endpoints')), 'Summary loads without opening the endpoint editor');
   releaseRooms(); roomReadGate = null;
-  await expect(roomBadge).toHaveText('101');
+  await expect(roomBadge).toHaveText('1');
   await page.getByRole('button', { name: /Danh sách tầng/ }).click();
-  await expect(roomBadge).toHaveText('101');
+  await expect(roomBadge).toHaveText('1');
   roomReadGate = new Promise(resolve => { releaseRooms = resolve; });
   await page.getByRole('button', { name: /Danh sách phòng/ }).click();
   await page.getByRole('status').filter({ hasText: 'Đang tải phòng và điểm đến' }).waitFor();
-  await expect(roomBadge).toHaveText('101');
+  await expect(roomBadge).toHaveText('1');
   releaseRooms(); roomReadGate = null;
   await detail.getByRole('heading', { name: 'Phòng khám Nội', exact: true }).waitFor();
   assert.deepEqual(errors, []); assert.equal(writes.length, 0);
   assert.ok(reads.some(path => path.includes('rooms?') && path.includes('page=1')));
   assert.ok(reads.some(path => path.includes('endpoints?') && path.includes('page=1')));
   assert.ok(reads.some(path => path.includes('rooms?') && path.includes('includeDeleted=true')));
+  await page.getByLabel('Lọc trạng thái phòng').selectOption('');
   await page.getByLabel('Lọc tầng', { exact: true }).selectOption('f1');
   assert.equal(await roomList.locator('.lo-job-item').count(), 2);
   await roomList.getByRole('button', { name: /Kho dược nội bộ/ }).waitFor();
@@ -84,6 +86,7 @@ try {
   await page.getByLabel('Lọc trạng thái phòng').selectOption('');
 
   // The real room and Map routes expose the same endpoint field definitions.
+  await roomList.getByRole('button', { name: /Phòng khám Nội/ }).click();
   await detail.getByRole('button', { name: 'Chỉnh sửa điểm', exact: true }).click();
   const fields = root => root.locator('.ep-fields').locator('input,select').evaluateAll(elements => elements.map(element => ({
     name: element.getAttribute('aria-label') || element.closest('label')?.textContent.trim(), type: element.type, required: element.required,
@@ -226,7 +229,7 @@ try {
   failRead = true;
   await page.getByRole('button', { name: 'Tải lại phòng', exact: true }).click();
   await page.getByRole('alert').filter({ hasText: 'Không tải được danh mục' }).waitFor();
-  await expect(roomBadge).toHaveText('101');
+  await expect(roomBadge).toHaveText(String(state.rooms.filter(room => roomIsOperational(room, state.maps, state.endpoints, state.floors)).length));
   assert.equal(await page.getByRole('button', { name: 'Chỉnh sửa phòng', exact: true }).count(), 0);
   failRead = false;
   await page.getByRole('button', { name: 'Thử lại', exact: true }).click();
