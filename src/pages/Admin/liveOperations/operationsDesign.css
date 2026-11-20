@@ -54,6 +54,15 @@
 .lo-page .rm-robot-telemetry small { margin: 0 0 7px; display: block; font-size: 10px; color: #6f89a6; white-space: nowrap; }
 .lo-page .rm-robot-telemetry strong { display: block; font-size: 11px; line-height: 1.5; font-weight: 500; white-space: nowrap; }
 .lo-page .rm-robot-bar.is-connected .rm-robot-telemetry > div:first-child svg { color: #228668; }
+.lo-page .rm-robot-battery { --battery-ink: #536b83; --battery-fill: #cbd5e1; --battery-border: #9bafc4; }
+.lo-page .rm-robot-battery.is-good { --battery-ink: #125238; --battery-fill: #9ee1bd; --battery-border: #51a77c; }
+.lo-page .rm-robot-battery.is-low { --battery-ink: #8d2727; --battery-fill: #f6a4a4; --battery-border: #db7575; }
+.lo-page .rm-battery-gauge { position: relative; display: block; width: 36px; height: 18px; margin-right: 4px; border: 1.5px solid var(--battery-border); border-radius: 4px; background: #fff; }
+.lo-page .rm-battery-gauge::after { content: ''; position: absolute; right: -4px; top: 4px; width: 2px; height: 7px; border-radius: 0 1px 1px 0; background: var(--battery-border); }
+.lo-page .rm-battery-track { position: absolute; inset: 1.5px; border-radius: 2px; overflow: hidden; background: #eff3f7; }
+.lo-page .rm-battery-fill { display: block; height: 100%; border-radius: inherit; background: var(--battery-fill); transition: width .3s ease; }
+.lo-page .rm-robot-battery .rm-battery-gauge strong { position: relative; display: flex; align-items: center; justify-content: center; height: 100%; color: var(--battery-ink); font-size: 9px; font-weight: 600; line-height: 1; white-space: nowrap; }
+.lo-page .rm-robot-battery .rm-battery-note { display: block; max-width: 115px; margin-top: 3px; font-size: 9px; line-height: 1.4; color: #6f89a6; }
 .lo-page .rm-layout { grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); grid-template-areas: 'map camera' 'map mission'; grid-template-rows: auto minmax(260px, 1fr); align-items: stretch; gap: 20px; }
 .lo-page .rm-left, .lo-page .rm-right { gap: 20px; }
 .lo-page .rm-left { grid-area: map; display: flex; }
@@ -90,6 +99,8 @@
 .lo-page .rm-step-status { font-size: 10px; }
 .lo-page .rm-legend { gap: 18px; padding: 12px 20px; font-size: 10px; color: #6f829a; background: #fcfdff; }
 .lo-page .rm-caption { color: #7a8ba1; font-size: 10px; padding: 11px 20px; line-height: 1.75; }
+.lo-page .rm-pose-caption { display: grid; grid-template-columns: minmax(0, 1fr); }
+.lo-page .rm-pose-caption > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lo-page .rm-presentation-status { border-top: 1px solid #edf1f6; padding-block: 9px; }
 .lo-page .rm-queue { max-height: none; overflow: hidden; }
 .lo-page .rm-queue nav { padding: 13px 18px 5px; gap: 5px; }

@@ -17,6 +17,7 @@ const steps = [
   { jobStepId: id(8), executionSequenceNo: 3, stepCodeSnapshot: 'HANDOVER', stepTypeSnapshot: 'INTERACT', status: 'PENDING' },
 ];
 let connected = true;
+let battery = { robotId, batteryPercent: 76, fresh: true, ageSec: 1, estimateStatus: 'ESTIMATED' }, batteryStatus = 200;
 const jobs = [job, ...[9, 10].map(n => ({ ...job, jobId: id(n), jobCode: `JOB-QUEUE-${n}`, robotId: null, status: 'QUEUED', priority: n, selectedJobStepId: null })),
   { ...job, jobId: id(11), status: 'RECOVERY_REQUIRED', robotId: id(50) }, { ...job, jobId: id(12), status: 'SUCCEEDED' }];
 const writes = [], errors = [];
@@ -46,6 +47,10 @@ await page.route('**/*', async route => {
   if (path.endsWith('/stream')) return reply({ message: 'Use mocked REST' }, 503);
   if (path === '/api/v1/auth/me') return reply({ username: 'design-test', role: 'ADMIN' });
   if (path === '/api/v1/robots') return list([robot]);
+  if (path === `/api/v1/robots/${robotId}/battery`) {
+    assert.equal(req.headers().authorization, 'Bearer fixture');
+    return reply(battery, batteryStatus);
+  }
   if (path.endsWith('/snapshot')) return reply({ observedAt: new Date().toISOString(), robot, mqttConnected: connected, heartbeatFresh: connected, dispatchReady: connected, activeJobId: jobId, selectedJobStepId: stepId,
     navigationSession: { sessionId: id(13), state: 'READY', mapId, initialization: { revision: 1 } },
     latestPose: { robotId, jobId, mapId, frameId: 'map', fresh: true, xM: 3.1, yM: 3.0, yawRad: 0, capturedAt: new Date().toISOString() },
@@ -69,7 +74,11 @@ try {
   await expect(page.locator('.lo-metrics')).toBeVisible();
   await expect(page.locator('.lo-explorer')).not.toHaveAttribute('open', '');
   await expect(page.locator('.lo-metric strong')).toHaveText(['3', '2', '1', '1']);
+  await expect(page.locator('.rm-robot-battery strong')).toHaveText('76%');
   const checkMonitorLayout = async width => {
+    const connection = await page.locator('.rm-robot-telemetry > div').first().boundingBox();
+    const batteryBounds = await page.locator('.rm-robot-battery').boundingBox();
+    assert.ok(batteryBounds.x >= connection.x + connection.width && Math.abs(batteryBounds.y + batteryBounds.height / 2 - connection.y - connection.height / 2) <= 1, 'battery sits beside the connection status');
     const map = await page.locator('.rm-map').boundingBox(), mission = await page.locator('.rm-current').boundingBox();
     const queue = await page.locator('.rm-queue').boundingBox(), layout = await page.locator('.rm-layout').boundingBox();
     assert.ok(Math.abs(queue.x - layout.x) <= 1 && Math.abs(queue.width - layout.width) <= 1, 'job queue spans the full monitor width');
@@ -100,7 +109,8 @@ try {
     if (width <= 1000) assert.ok(missionBounds.height <= 461, 'long content stays bounded when stacked');
     assert.ok(await body.evaluate(el => el.scrollHeight > el.clientHeight), 'long mission has its own scroll area');
     const headerY = (await mission.locator('header').boundingBox()).y;
-    const actionY = (await mission.getByRole('button').boundingBox()).y;
+    const action = mission.getByRole('button', { name: 'Xem tiến trình và thao tác', exact: true });
+    const actionY = (await action.boundingBox()).y;
     await body.evaluate(el => { el.scrollTop = 0; });
     await body.hover();
     const pageY = await page.evaluate(() => scrollY);
@@ -113,7 +123,7 @@ try {
       assert.equal(await page.evaluate(() => scrollY), pageY, `page stays still at the ${edge} edge (${width}px)`);
     }
     assert.equal((await mission.locator('header').boundingBox()).y, headerY, 'mission header stays visible');
-    assert.equal((await mission.getByRole('button').boundingBox()).y, actionY, 'mission action stays visible');
+    assert.equal((await action.boundingBox()).y, actionY, 'mission action stays visible');
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `long mission fits ${width}px`);
     await page.screenshot({ path: `${output}/long-mission-${width}.png`, fullPage: true });
   }
@@ -135,9 +145,39 @@ try {
   await expect(page.locator('.rm-mission-empty')).toBeVisible();
   await checkMonitorLayout(1536);
   await page.screenshot({ path: `${output}/empty-mission.png`, fullPage: true });
+
+  // Battery uses its dedicated endpoint, updates automatically and never treats missing values as 0%.
+  battery = { ...battery, batteryPercent: 18 };
+  await expect(page.locator('.rm-robot-battery strong')).toHaveText('18%', { timeout: 20000 });
+  await expect(page.locator('.rm-robot-battery')).toHaveClass(/is-low/);
+  await expect(page.locator('.rm-battery-note')).toHaveText('Pin yếu');
+  await page.screenshot({ path: `${output}/battery-low.png`, fullPage: true });
+  const refreshBattery = async (value, status = 200) => {
+    battery = value; batteryStatus = status;
+    await page.getByRole('button', { name: 'Làm mới', exact: true }).click();
+  };
+  await refreshBattery({ ...battery, batteryPercent: 0 });
+  await expect(page.locator('.rm-robot-battery strong')).toHaveText('0%');
+  await refreshBattery({ ...battery, batteryPercent: null });
+  await expect(page.locator('.rm-robot-battery strong')).toHaveText('--%');
+  await expect(page.locator('.rm-battery-note')).toHaveText('Chưa có dữ liệu');
+  await expect(page.locator('.rm-robot-battery')).not.toHaveClass(/is-low/);
+  await refreshBattery({ ...battery, batteryPercent: '76.4', fresh: false, estimateStatus: 'STALE' });
+  await expect(page.locator('.rm-robot-battery strong')).toHaveText('76%');
+  await expect(page.locator('.rm-battery-note')).toHaveText('Dữ liệu cũ');
+  await refreshBattery({ message: 'Battery temporarily unavailable' }, 503);
+  await expect(page.locator('.rm-robot-battery strong')).toHaveText('76%');
+  await expect(page.locator('.rm-battery-note')).toHaveText('Lần gần nhất · Lỗi cập nhật');
+  await refreshBattery({ robotId: id(99), batteryPercent: 99, fresh: true });
+  await expect(page.locator('.rm-robot-battery')).toHaveAttribute('title', 'Dữ liệu pin không khớp robot.');
+  battery = { robotId, batteryPercent: 76, fresh: true, ageSec: 59, estimateStatus: 'ESTIMATED' };
+  await page.getByRole('checkbox', { name: 'Tự cập nhật' }).uncheck();
+  await expect(page.locator('.rm-robot-battery strong')).toHaveText('76%');
+  await expect(page.locator('.rm-battery-note')).toHaveText('Dữ liệu cũ', { timeout: 4000 });
+  await expect(page.locator('.rm-robot-battery strong')).toHaveText('76%');
   assert.deepEqual(writes, []);
   assert.deepEqual(errors, []);
-  console.log('PASS: overview, metric navigation, responsive 390/1024/1536px, camera above mission, bounded 20-step mission with contained wheel scrolling and fixed header/action, honest disconnected state; all APIs mocked and no mutations.');
+  console.log('PASS: overview, responsive 390/1024/1536px, camera and mission layout, disconnected state; authenticated battery endpoint, polling, manual refresh, low/zero/null/stale/error/mismatched robot and paused freshness; all APIs mocked and no mutations.');
 } finally {
   await page.screenshot({ path: `${output}/last-state.png`, fullPage: true }).catch(() => {});
   await browser.close();

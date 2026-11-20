@@ -8,11 +8,11 @@ const robotId = id(1), mapId = id(2), jobId = id(3), sessionId = id(4), stepId =
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_EXECUTABLE || 'C:/Program Files/Google/Chrome/Application/chrome.exe' });
 const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } });
 const reads = new Map(), writes = [], errors = [];
-let failSnapshot = false, snapshotDelay = 0, detailDelay = 0;
+let failSnapshot = false, snapshotDelay = 0, detailDelay = 0, mqttConnected = true;
 let job = { jobId, jobCode: 'JOB-STREAM', robotId, status: 'RUNNING', rowVersion: 1, selectedJobStepId: stepId, schemaVersion: 3, beOrchestrated: true, queuedAt: new Date().toISOString() };
 let steps = [{ jobStepId: stepId, rowVersion: 1, stepTypeSnapshot: 'MOVE', stepCodeSnapshot: 'MOVE_A', status: 'RUNNING', executionSequenceNo: 1 }];
 const robot = { robotId, currentMapId: mapId, mapAssetHash: hash, robotCode: 'MAR-01', status: 'BUSY' };
-const snapshot = () => ({ observedAt: new Date().toISOString(), robot, mqttConnected: true, heartbeatFresh: true, activeJobId: jobId, selectedJobStepId: job.selectedJobStepId,
+const snapshot = () => ({ observedAt: new Date().toISOString(), robot, mqttConnected, heartbeatFresh: mqttConnected, heartbeatAgeSeconds: 1, activeJobId: jobId, selectedJobStepId: job.selectedJobStepId,
   navigationSession: { robotId, sessionId, mapId, mapAssetHash: hash, state: 'READY', expiresAt: new Date(Date.now() + 60000).toISOString(), initialization: { revision: 1 } }, latestPose: null });
 const detail = () => structuredClone({ job, steps, tasks: [] });
 const metadata = { map_id: mapId, asset_hash: hash, frame_id: 'map', width_px: 100, height_px: 100, width_m: 10, height_m: 10, resolution_m_per_pixel: .1, origin_x_m: 0, origin_y_m: 0, origin_yaw_rad: 0, pixel_center_to_map: [[.1, 0, .05], [0, -.1, 9.95], [0, 0, 1]] };
@@ -106,10 +106,52 @@ try {
   await expect(page.locator('.rm-position-stale')).toHaveCount(1);
   await expect(page.locator('.rm-map')).toContainText('Vị trí gần nhất lúc');
   await expect(svg).toHaveAttribute('viewBox', zoom);
-  await page.evaluate(() => { clearInterval(window.robotKeepalive); const stream = window.monitorStreams.findLast(item => item.path.includes('/robots/') && !item.closed); stream.closed = true; stream.controller.error(Error('stream lost')); });
-  await expect.poll(() => reads.get(robotSnapshotPath), { timeout: 10000 }).toBeGreaterThan(before);
+  // Pose updates remain live across a delayed state update and one failed REST
+  // fallback. The map image, zoom and layout must remain in place.
   failSnapshot = true;
-  await expect(page.locator('.rm-robot-bar')).toContainText('Chờ tín hiệu robot', { timeout: 10000 });
+  const mapY = (await page.locator('.rm-map').boundingBox()).y;
+  const imageReads = reads.get(`/api/v1/maps/${mapId}/image.png`);
+  const beforeGap = reads.get(robotSnapshotPath);
+  await page.evaluate(value => {
+    clearInterval(window.robotKeepalive);
+    let sequenceNo = 100;
+    window.poseKeepalive = setInterval(() => window.emitMonitor('robot-pose', {
+      ...value, sequenceNo: sequenceNo++, capturedAt: new Date().toISOString(), receivedAt: new Date().toISOString(),
+    }), 100);
+  }, pose(3, 100));
+  await page.waitForTimeout(6500);
+  await expect(page.locator('.rm-position')).toHaveCount(1);
+  await expect(page.locator('.rm-robot-bar')).toHaveClass(/is-connected/);
+  assert.equal((await page.locator('.rm-map').boundingBox()).y, mapY, 'transient API errors do not insert a banner that moves the map');
+  assert.equal(reads.get(`/api/v1/maps/${mapId}/image.png`), imageReads, 'state updates never reload the map image');
+  assert.ok(reads.get(robotSnapshotPath) - beforeGap <= 1, 'fallback does not poll every two seconds');
+  await expect(svg).toHaveAttribute('viewBox', zoom);
+  await expect(svg.locator('image')).toHaveAttribute('href', imageUrl);
+  await page.evaluate(() => clearInterval(window.poseKeepalive));
+  await emit('robot-state', snapshot());
+  await page.waitForTimeout(1100);
+  // A brief stream outage and failed REST request must not flash MQTT offline.
+  const beforeLoss = reads.get(robotSnapshotPath);
+  await page.evaluate(() => { clearInterval(window.robotKeepalive); const stream = window.monitorStreams.findLast(item => item.path.includes('/robots/') && !item.closed); stream.closed = true; stream.controller.error(Error('stream lost')); });
+  await expect.poll(() => reads.get(robotSnapshotPath), { timeout: 1500 }).toBeGreaterThan(beforeLoss);
+  await page.waitForTimeout(5500);
+  await expect(page.locator('.rm-robot-bar')).toHaveClass(/is-connected/);
+  failSnapshot = false; snapshotDelay = 2500;
+  const recovery = page.waitForResponse(response => new URL(response.url()).pathname === robotSnapshotPath && response.status() === 200);
+  await page.getByRole('button', { name: 'Làm mới', exact: true }).click();
+  await recovery;
+  await expect.poll(() => page.locator('.lo-notice').count()).toBe(0);
+  await expect(page.locator('.rm-robot-bar')).toHaveClass(/is-connected/);
+  snapshotDelay = 0;
+  // Explicit backend disconnection still appears immediately, then recovers.
+  mqttConnected = false;
+  await emit('robot-state', snapshot());
+  await expect(page.locator('.rm-robot-bar')).toHaveClass(/is-disconnected/);
+  mqttConnected = true;
+  await emit('robot-state', snapshot());
+  await expect(page.locator('.rm-robot-bar')).toHaveClass(/is-connected/);
+  failSnapshot = true;
+  await expect(page.locator('.rm-robot-bar')).toContainText('Đang kiểm tra kết nối', { timeout: 17000 });
   assert.equal(await page.evaluate(() => { window.monitorObserver.disconnect(); return window.monitorBlankFrames.length; }), 0);
   assert.equal(await page.evaluate(() => performance.getEntriesByType('navigation').length), 1);
   assert.deepEqual(writes, []); assert.deepEqual(errors, []);

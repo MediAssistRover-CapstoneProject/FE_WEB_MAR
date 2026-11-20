@@ -12,14 +12,16 @@ import { vi } from '../../../i18n/vi.js';
 import RobotCamera from '../robotOperations/RobotCamera.jsx';
 import { useJobFeed } from '../../../features/operations/useJobFeed.js';
 import { useRobotRealtime } from '../../../features/operations/useRobotRealtime.js';
+import { robotConnection } from '../../../features/operations/robotConnection.js';
 import MissionProgress from './MissionProgress.jsx';
 import OperationsIcon from './OperationsIcon.jsx';
+import RobotBattery from './RobotBattery.jsx';
 import './robotMonitor.css';
 
 const dateTime = value => value ? new Date(value).toLocaleString('vi-VN') : 'Chưa ghi nhận';
 const LiveMap3D = lazy(() => import('./LiveMap3D.jsx'));
 
-function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto, stepDetail }) {
+function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto, stepDetail, serverClockOffsetMs }) {
   const [maps, setMaps] = useState([]);
   const [catalogError, setCatalogError] = useState('');
   const [chosenMapId, setChosenMapId] = useState('');
@@ -128,7 +130,8 @@ function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto, s
       points: polygonPoints(item.polygonJson).map(([xM, yM]) => imagePoint({ xM, yM }, meta)),
     }))
     .filter(item => item.points.length >= 3 && item.points.every(Boolean)) : [], [mapId, meta, showZones, zoneData]);
-  const view = monitorPoseView(remembered.current, { snapshot, livePose, metadata: meta, job, fresh });
+  const clientNow = Date.now();
+  const view = monitorPoseView(remembered.current, { snapshot, livePose, metadata: meta, job, fresh, now: clientNow, serverNow: clientNow + (serverClockOffsetMs ?? 0) });
   remembered.current = view.memory;
   const pose = view.live ? view.pose : null;
   const displayPose = view.pose;
@@ -192,13 +195,16 @@ function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto, s
     {saved && viewMode === '3d' && <p className="rm-caption">Mặt bằng 3D từ ảnh gốc. Chiều cao vật cản minh họa 1,2 m. Kéo để xoay, cuộn để thu phóng.</p>}
     {saved && viewMode === '2d' && <p className="rm-caption rm-presentation-status" role="status">{published ? 'Đang dùng giao diện bản đồ đã áp dụng.' : presentationNotice || 'Giao diện không khớp phiên bản map này. Đang hiển thị map gốc.'} {!published && mapId && <Link to={`/admin/map?mapId=${encodeURIComponent(mapId)}&stage=presentation`}>Mở chỉnh sửa và áp dụng bản đồ →</Link>}</p>}
     <div className="rm-legend"><span><i className="rm-blue" />Đường dự kiến</span><span>● Điểm đến</span></div>
-    <p className="rm-caption">{position ? 'Vị trí robot đang cập nhật.' : displayPosition ? `Vị trí gần nhất lúc ${new Date(displayPose.capturedAt).toLocaleTimeString('vi-VN')} · ${Math.floor(view.ageMs / 1000)} giây trước; chưa có vị trí trực tiếp.` : 'Chưa có vị trí robot còn hiệu lực trên bản đồ này.'} {validPlan ? 'Đường dự kiến của bước hiện tại.' : 'Chờ cập nhật đường đi.'}</p>
+    <p className="rm-caption rm-pose-caption">
+      <span title={position ? 'Vị trí robot đang cập nhật.' : displayPosition ? 'Đang giữ vị trí ghi nhận gần nhất; chưa có vị trí trực tiếp.' : 'Chưa có vị trí robot còn hiệu lực trên bản đồ này.'}>{position ? 'Vị trí robot đang cập nhật.' : displayPosition ? `Vị trí gần nhất lúc ${new Date(displayPose.capturedAt).toLocaleTimeString('vi-VN')} · ${Math.floor(view.ageMs / 1000)} giây trước` : 'Chưa có vị trí robot trên bản đồ này.'}</span>
+      <span>{validPlan ? 'Đường dự kiến của bước hiện tại.' : 'Chờ cập nhật đường đi.'}</span>
+    </p>
   </section>;
 }
 
 export default function RobotMonitor({ jobs, catalogs, auto, revision, onOpen, onCancel, role }) {
   const robotId = catalogs.robots[0]?.robotId;
-  const { snapshot, livePose, error, receivedAt } = useRobotRealtime(robotId, auto, revision);
+  const { snapshot, livePose, error, receivedAt, serverClockOffsetMs } = useRobotRealtime(robotId, auto, revision);
   const [now, setNow] = useState(Date.now()), [tab, setTab] = useState('queue');
   const [schedules, setSchedules] = useState([]), [scheduleError, setScheduleError] = useState('');
 
@@ -230,23 +236,26 @@ export default function RobotMonitor({ jobs, catalogs, auto, revision, onOpen, o
   const current = detail?.job && detail.job.jobId === observedJob?.jobId ? newerJob(observedJob, detail.job) : observedJob;
   rememberedJob.current = current;
   const robot = snapshot?.robot || catalogs.robots[0];
-  const observedAge = Date.now() - Date.parse(snapshot?.observedAt);
-  const fresh = !error && receivedAt > 0 && Date.now() - receivedAt <= 5000
+  const clientNow = Date.now();
+  const observedAge = clientNow + (serverClockOffsetMs ?? 0) - Date.parse(snapshot?.observedAt);
+  const fresh = !error && receivedAt > 0 && clientNow - receivedAt <= 5000
     && (!snapshot?.observedAt || Number.isFinite(observedAge) && observedAge >= -1000 && observedAge <= 5000);
   const connected = fresh && snapshot?.mqttConnected && snapshot?.heartbeatFresh;
+  // The interval only triggers a repaint; its cached tick can predate a newly
+  // received snapshot and must not make that observation appear to be future data.
+  const connection = robotConnection({ snapshot, receivedAt, now: clientNow });
   const waiting = jobs.filter(job => job.status === 'QUEUED' && (!job.robotId || job.robotId === robotId))
     .sort((a, b) => (b.priority || 0) - (a.priority || 0) || Date.parse(a.queuedAt) - Date.parse(b.queuedAt));
   const upcoming = schedules.filter(item => item.status === 'ACTIVE' && (!item.robotId || item.robotId === robotId) && item.nextRunAt && Date.parse(item.nextRunAt) >= now)
     .sort((a, b) => Date.parse(a.nextRunAt) - Date.parse(b.nextRunAt));
   const rows = tab === 'running' ? active : waiting;
   return <div className="rm-monitor">
-    <div className={`rm-robot-bar ${connected ? 'is-connected' : 'is-disconnected'}`}>
-      <div className="rm-robot-identity"><span className="rm-robot-avatar"><OperationsIcon name="robot" /></span><div><small>ROBOT ĐANG THEO DÕI</small><div className="rm-robot-name"><strong>{[robot?.robotName, robot?.robotCode].find(value => value?.trim() && value.trim().toLowerCase() !== 'string') || 'Robot'}</strong><span className={'rm-pill ' + (connected ? 'is-good' : '')}>{connected ? vi(robot?.status) : 'Chưa có kết nối mới'}</span></div></div></div>
-      <div className="rm-robot-telemetry"><div><OperationsIcon name="signal" /><span><small>Kết nối</small><strong>{connected ? 'Đã kết nối' : 'Chờ tín hiệu robot'}</strong></span></div><div className="rm-robot-updated"><OperationsIcon name="time" /><span><small>Lần nhận gần nhất</small><strong>{receivedAt ? new Date(receivedAt).toLocaleTimeString('vi-VN') : 'Đang chờ dữ liệu'}</strong></span></div></div>
+    <div className={`rm-robot-bar is-${connection.phase}`}>
+      <div className="rm-robot-identity"><span className="rm-robot-avatar"><OperationsIcon name="robot" /></span><div><small>ROBOT ĐANG THEO DÕI</small><div className="rm-robot-name"><strong>{[robot?.robotName, robot?.robotCode].find(value => value?.trim() && value.trim().toLowerCase() !== 'string') || 'Robot'}</strong><span className={'rm-pill ' + (connection.connected ? 'is-good' : '')}>{connection.connected ? vi(robot?.status) : connection.phase === 'syncing' ? 'Đang đồng bộ' : 'Chưa có kết nối mới'}</span></div></div></div>
+      <div className="rm-robot-telemetry"><div title={connection.detail + (error ? ` ${error}` : '')}><OperationsIcon name="signal" /><span><small>Kết nối</small><strong>{connection.label}</strong></span></div><RobotBattery key={robotId} robotId={robotId} auto={auto} revision={revision} now={now} /><div className="rm-robot-updated"><OperationsIcon name="time" /><span><small>Lần nhận gần nhất</small><strong>{receivedAt ? new Date(receivedAt).toLocaleTimeString('vi-VN') : 'Đang chờ dữ liệu'}</strong></span></div></div>
     </div>
-    {error && <p className="lo-notice lo-notice-warning" role="status">{error}</p>}
     <div className="rm-layout"><div className="rm-left">
-      <RobotMap snapshot={snapshot} livePose={livePose} job={current} endpoints={catalogs.endpoints} fresh={fresh} revision={revision} auto={auto}
+      <RobotMap snapshot={snapshot} livePose={livePose} job={current} endpoints={catalogs.endpoints} fresh={connection.connected} revision={revision} auto={auto} serverClockOffsetMs={serverClockOffsetMs}
         stepDetail={<MissionProgress current={current} detail={detail} catalogs={catalogs} stale={dataFreshness(detailReceivedAt, now, !!detailError).stale} connected={!!connected} auto={auto} />} />
     </div><aside className="rm-right"><RobotCamera key={robotId} robotId={robotId} placeholderIcon={<OperationsIcon name="camera" />} /><CurrentMission role={role} onCancel={onCancel} current={current} catalogs={catalogs} detail={detail} error={detailError} onOpen={onOpen} /></aside></div>
       <section className="rm-card rm-queue"><header><div className="rm-card-title"><span className="rm-card-icon"><OperationsIcon name="list" /></span><div><h3>Danh sách công việc</h3><small>Các lượt chạy của robot đang theo dõi</small></div></div><span className="rm-card-count">{tab === 'scheduled' ? upcoming.length : rows.length} công việc</span></header>

@@ -27,20 +27,20 @@ export function monitorPoseScope(snapshot, metadata, job) {
   return JSON.stringify([setupContext(snapshot), metadata?.map_id, metadata?.asset_hash, metadata?.frame_id, job?.jobId]);
 }
 
-export function monitorPoseView(memory, { snapshot, livePose, metadata, job, fresh, now = Date.now() }) {
+export function monitorPoseView(memory, { snapshot, livePose, metadata, job, fresh, now = Date.now(), serverNow = now }) {
   const scope = monitorPoseScope(snapshot, metadata, job);
   if (memory?.scope !== scope) memory = null;
   const session = snapshot?.navigationSession;
   const closed = ['NONE', 'CLOSED', 'EXPIRED'].includes(session?.state)
-    || !!session?.expiresAt && !(Date.parse(session.expiresAt) > now);
+    || !!session?.expiresAt && !(Date.parse(session.expiresAt) > serverNow);
   if (closed || !metadata) return { memory: null, pose: null, live: false, ageMs: null };
   let live = null;
   if (fresh && snapshot?.mqttConnected && snapshot.heartbeatFresh && metadata?.map_id === snapshot.robot?.currentMapId
-    && (!snapshot.navigationSession?.expiresAt || Date.parse(snapshot.navigationSession.expiresAt) > now)
+    && (!snapshot.navigationSession?.expiresAt || Date.parse(snapshot.navigationSession.expiresAt) > serverNow)
     && snapshot.robot.mapAssetHash?.toLowerCase() === metadata.asset_hash?.toLowerCase()) {
     try { live = setupLivePose(livePose, snapshot, { mapId: metadata.map_id, metadata, geometry: mapGeometry(metadata) }, now); } catch { /* Await complete metadata. */ }
   }
-  const sqlCandidate = fresh && (!session?.state || session.state === 'READY') ? freshMonitorPose(snapshot, now) : null;
+  const sqlCandidate = fresh && (!session?.state || session.state === 'READY') ? freshMonitorPose(snapshot, serverNow) : null;
   const sql = sqlCandidate && (!sqlCandidate.robotId || sqlCandidate.robotId === snapshot.robot?.robotId)
     && sqlCandidate.mapId === metadata?.map_id && sqlCandidate.frameId === metadata?.frame_id
     && (!snapshot.robot.mapAssetHash || snapshot.robot.mapAssetHash.toLowerCase() === metadata.asset_hash?.toLowerCase()) ? sqlCandidate : null;
@@ -48,9 +48,9 @@ export function monitorPoseView(memory, { snapshot, livePose, metadata, job, fre
   const pose = candidate && (!memory || Date.parse(candidate.capturedAt) >= Date.parse(memory.capturedAt)) ? candidate : null;
   if (pose && imagePoint(pose, metadata) && (!pose.jobId || !job || pose.jobId === job.jobId)) {
     memory = { scope, pose, capturedAt: pose.capturedAt };
-    return { memory, pose, live: true, ageMs: Math.max(0, now - Date.parse(pose.capturedAt)) };
+    return { memory, pose, live: true, ageMs: Math.max(0, serverNow - Date.parse(pose.capturedAt)) };
   }
-  const ageMs = now - Date.parse(memory?.capturedAt);
+  const ageMs = serverNow - Date.parse(memory?.capturedAt);
   if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > 60000) return { memory: null, pose: null, live: false, ageMs: null };
   return { memory, pose: memory.pose, live: false, ageMs };
 }
