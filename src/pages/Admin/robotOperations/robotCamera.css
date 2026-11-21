@@ -3,3 +3,5 @@
 .rc-video>.rc-fallback>.ro-preview{flex:1;min-height:0;height:auto;aspect-ratio:auto;padding:0;border-radius:0;background:transparent;color:inherit}
 .rc-video>.rc-fallback>.ro-preview img{max-height:none}
 .rc-video>.rc-fallback>small{flex-shrink:0;padding:6px 12px;background:#101b29;color:#8da3bb;font-size:10px;line-height:1.5}
+.rc-video>.rc-ai-overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.rc-video>.rc-ai-overlay[hidden]{display:none}
+.rc-ai-controls{display:grid;gap:7px;padding:10px 15px;border-bottom:1px solid #e4ebf3;background:#f7fafc;color:#40556e}.rc-ai-controls>div{display:flex;flex-wrap:wrap;gap:8px 16px}.rc-ai-controls label{display:inline-flex;align-items:center;gap:6px;font-size:11px;cursor:pointer}.rc-ai-controls input{margin:0;accent-color:#13795b}.rc-ai-controls small{font-size:10px;line-height:1.5;color:#718198}.rc-ai-controls input:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}.rc-camera-card:fullscreen .rc-ai-controls{flex-shrink:0}

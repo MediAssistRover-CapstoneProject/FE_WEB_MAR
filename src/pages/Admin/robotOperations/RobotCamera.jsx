@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { getSession } from '../../../features/auth/session.js';
 import { acquireRobotCamera } from '../../../features/media/robotCameraClient.js';
+import { drawRobotAiOverlay } from '../../../features/media/robotAiOverlay.js';
 import './robotCamera.css';
 
 export default function RobotCamera({ robotId, variant = 'monitor', fallback = null, placeholderIcon = null }) {
-  const container = useRef(null), video = useRef(null), lease = useRef(null);
+  const container = useRef(null), video = useRef(null), canvas = useRef(null), lease = useRef(null);
   const [paused, setPaused] = useState(false), [playing, setPlaying] = useState(false), [stale, setStale] = useState(false), [playBlocked, setPlayBlocked] = useState(false);
+  const [overlayEnabled, setOverlayEnabled] = useState(true);
+  const [overlayStatus, setOverlayStatus] = useState('Chờ camera và kết quả nhận diện mới.');
   const [state, setState] = useState({ robotId, phase: 'connecting', track: null, message: 'Đang kết nối camera robot…' });
   const session = getSession(), account = session?.account;
   const authorized = session?.mode !== 'demo' && !!session?.tokens?.accessToken && !!account?.accountId && ['ADMIN', 'STAFF'].includes(account.role);
@@ -43,7 +46,17 @@ export default function RobotCamera({ robotId, variant = 'monitor', fallback = n
     };
   }, [current.track, paused]);
   const showFallback = authorized && !paused && !!robotId && !!fallback && ['unavailable', 'error'].includes(current.phase);
-  const live = !paused && playing && !stale && current.phase === 'live';
+  const live = authorized && !paused && playing && !stale && current.phase === 'live';
+  useEffect(() => {
+    if (!canvas.current || !video.current) return;
+    const draw = () => setOverlayStatus(drawRobotAiOverlay(canvas.current, video.current, current.overlay, {
+      live, enabled: overlayEnabled, pixelRatio: window.devicePixelRatio,
+    }));
+    draw();
+    if (!live) return;
+    const timer = setInterval(draw, 150);
+    return () => clearInterval(timer);
+  }, [current.overlay, live, overlayEnabled]);
   const message = !robotId ? 'Chọn robot để xem camera.' : paused ? 'Đã ngừng xem camera.'
     : !authorized ? 'Đăng nhập tài khoản có quyền để xem camera robot.'
     : stale ? 'Camera chưa có khung hình mới. Đang chờ robot gửi lại.'
@@ -52,8 +65,13 @@ export default function RobotCamera({ robotId, variant = 'monitor', fallback = n
     <header className="rc-heading"><h3>Camera robot</h3><span className={live ? 'rc-live' : 'rc-waiting'}>{paused ? 'Đã ngừng xem' : live ? 'Trực tiếp' : showFallback ? 'Ảnh dự phòng' : 'Đang chờ'}</span><button type="button" aria-label="Phóng lớn camera" onClick={() => container.current?.requestFullscreen?.().catch(() => {})}>⛶</button></header>
     <div className="rc-video">
       <video ref={video} autoPlay muted playsInline aria-label="Camera trực tiếp của robot" hidden={!current.track || paused || showFallback} />
+      <canvas ref={canvas} className="rc-ai-overlay" aria-hidden="true" hidden={!live || !overlayEnabled} />
       {showFallback ? <div className="rc-fallback">{fallback}</div> : !live && <div className="rc-placeholder" role="status"><span aria-hidden="true">{placeholderIcon || '▣'}</span><p>{message}</p>{playBlocked && <button onClick={() => video.current?.play().then(() => setPlayBlocked(false)).catch(() => setPlayBlocked(true))}>Phát camera</button>}</div>}
     </div>
+    {robotId && authorized && !paused && <div className="rc-ai-controls">
+      <div><label><input type="checkbox" checked={overlayEnabled} onChange={event => setOverlayEnabled(event.target.checked)} />Khung nhận diện người</label></div>
+      <small>{overlayStatus}</small>
+    </div>}
     <footer><small>{live ? 'Camera từ robot đang chọn' : message}</small><div>{robotId && authorized && <><button type="button" disabled={current.phase === 'connecting' && !paused} onClick={() => { if (paused) setPaused(false); else lease.current?.retry(); }}>{paused ? 'Mở camera' : 'Kết nối lại'}</button>{!paused && <button type="button" onClick={() => setPaused(true)}>Ngừng xem</button>}</>}</div></footer>
   </section>;
 }

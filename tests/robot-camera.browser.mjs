@@ -17,7 +17,7 @@ await page.addInitScript(accountId => {
   navigator.mediaDevices.getUserMedia = async () => { window.captureRequests++; throw Error('Local capture must never be requested'); };
 }, accountId);
 const sdk = `
-export const RoomEvent = Object.fromEntries(['TrackSubscribed','TrackUnsubscribed','TrackMuted','TrackUnmuted','Reconnecting','Reconnected','Disconnected'].map(x=>[x,x]));
+export const RoomEvent = Object.fromEntries(['TrackSubscribed','TrackUnsubscribed','TrackMuted','TrackUnmuted','Reconnecting','Reconnected','Disconnected','DataReceived'].map(x=>[x,x]));
 export const Track = {Kind:{Video:'video'},Source:{Camera:'camera'}};
 export const DisconnectReason = {DUPLICATE_IDENTITY:2};
 export class Room {
@@ -77,9 +77,47 @@ try {
   assert.equal(count('/join-token'), 1);
   assert.equal(await page.evaluate(() => window.captureRequests), 0);
   await mkdir('.workstation-build/robot-camera', { recursive: true });
+  const sendOverlay = async (patch = {}, sender = robotId, topic = 'mar.ai.overlay.v1') => page.evaluate(({ patch, sender, topic, sessionId }) => {
+    const packet = { v: 1, media_session_id: sessionId, seq: 1, width: 320, height: 240, status: 'OK',
+      detections: [
+        { bbox: [.1, .18, .25, .65], confidence: .95, state: 'PERSON', track_id: 1, distance_m: 1.8 },
+        { bbox: [.56, .52, .36, .22], confidence: .9, state: 'SUSPECTED_FALL', track_id: 2 },
+      ], ...patch };
+    window.fakeRooms.at(-1).emit('DataReceived', new TextEncoder().encode(JSON.stringify(packet)), { identity: 'robot-' + sender }, undefined, topic);
+  }, { patch, sender, topic, sessionId: sessions.find(session => session.robotId === robotId)?.sessionId });
+  const overlayHasPixels = () => page.locator('.rc-ai-overlay').first().evaluate(canvas =>
+    canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some(value => value !== 0));
+  await sendOverlay({}, otherRobot);
+  assert.equal(await overlayHasPixels(), false, 'another robot cannot draw boxes');
+  await sendOverlay({ media_session_id: id(9) });
+  assert.equal(await overlayHasPixels(), false, 'another session cannot draw boxes');
+  await sendOverlay();
+  await expect(page.locator('.rc-ai-controls').first()).toContainText('2 người');
+  assert.equal(await overlayHasPixels(), true);
   await page.screenshot({ path: '.workstation-build/robot-camera/live-camera.png', fullPage: true });
+  await page.getByLabel('Khung nhận diện người', { exact: true }).first().uncheck();
+  await expect(page.locator('.rc-ai-overlay').first()).toBeHidden();
+  await expect(page.locator('.rc-ai-overlay').nth(1)).toBeVisible();
+  await page.getByLabel('Khung nhận diện người', { exact: true }).first().check();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await sendOverlay({ seq: 2 });
+  await page.screenshot({ path: '.workstation-build/robot-camera/ai-overlay-mobile.png', fullPage: true });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+  await page.setViewportSize({ width: 1050, height: 800 });
+  await expect(page.locator('.rc-ai-controls').first()).toContainText('Đang chờ kết quả nhận diện mới', { timeout: 4500 });
+  assert.equal(await overlayHasPixels(), false, 'stale AI boxes disappear while video continues');
+  await expect(page.locator('.rc-live')).toHaveCount(2);
+  await sendOverlay({ seq: 3, status: 'PAUSED' });
+  await expect(page.locator('.rc-ai-controls').first()).toContainText('tạm nhường');
+  assert.equal(await overlayHasPixels(), false);
+  await sendOverlay({ seq: 4, width: 320, height: 180 });
+  await expect(page.locator('.rc-ai-controls').first()).toContainText('chưa khớp camera');
+  assert.equal(await overlayHasPixels(), false);
+  await sendOverlay({ seq: 5 });
+  await expect(page.locator('.rc-ai-controls').first()).toContainText('2 người');
   await page.evaluate(() => clearInterval(window.fakeRooms.at(-1).animation));
   await expect(page.locator('.rc-live')).toHaveCount(0, { timeout: 8000 });
+  await expect(page.locator('.rc-ai-overlay').first()).toBeHidden();
   await expect(page.locator('.rc-placeholder').first()).toContainText('chưa có khung hình mới');
   await page.evaluate(() => { const room = window.fakeRooms.at(-1); room.animation = setInterval(room.draw, 70); });
   await expect(page.locator('.rc-live')).toHaveCount(2);
@@ -132,7 +170,7 @@ try {
   assert.equal(await page.evaluate(() => window.captureRequests), 0);
   assert.deepEqual(errors, []);
   await page.evaluate(() => window.renderCamera(null));
-  console.log('PASS: automatic scoped MONITOR, authenticated join, actual video rendering, no local capture, shared StrictMode lifecycle, stale frames, pause/resume, robot switch, SOS protection and Pi reconnect. All APIs and media server mocked.');
+  console.log('PASS: scoped MONITOR, actual video, authenticated AI boxes, toggle/mobile, stale overlay expiry, paused AI, aspect mismatch, no local capture, shared StrictMode lifecycle, stale frames, pause/resume, robot switch, SOS protection and Pi reconnect. All APIs and media server mocked.');
 } catch (error) {
   console.error('Camera page errors:', errors, 'URL:', page.url(), 'Panel:', await page.locator('body').innerText().catch(() => 'unavailable'));
   throw error;

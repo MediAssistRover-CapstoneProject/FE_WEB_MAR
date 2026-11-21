@@ -1,3 +1,5 @@
+import { decodeRobotAiOverlay } from './robotAiOverlay.js';
+
 const openStates = new Set(['RINGING', 'CONNECTING', 'ACTIVE', 'RECONNECTING']);
 const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 export const openCameraSession = (session, now = Date.now()) => uuid.test(session?.sessionId || '') && openStates.has(session.state) && Date.parse(session.expiresAt) > now;
@@ -21,19 +23,23 @@ export class RobotCameraConnection {
   constructor({ robotId, account, request, loadSdk }) {
     Object.assign(this, { robotId, account, request, loadSdk });
     this.listeners = new Set(); this.abort = new AbortController();
-    this.state = { phase: 'connecting', message: 'Đang kết nối camera robot…', track: null };
+    this.state = { phase: 'connecting', message: 'Đang kết nối camera robot…', track: null, overlay: null };
+    this.overlaySequence = 0;
     this.stopped = false; this.connecting = false; this.session = null; this.owned = false;
   }
   subscribe(listener) { this.listeners.add(listener); listener(this.state); return () => this.listeners.delete(listener); }
   emit(patch) {
     if (this.stopped) return;
-    this.state = { ...this.state, ...patch }; this.listeners.forEach(listener => listener(this.state));
+    const clearOverlay = (patch.phase !== undefined && patch.phase !== 'live')
+      || (Object.hasOwn(patch, 'track') && patch.track !== this.state.track);
+    this.state = { ...this.state, ...patch, ...(clearOverlay ? { overlay: null } : {}) }; this.listeners.forEach(listener => listener(this.state));
   }
   call(path, options = {}) { return this.request(path, { signal: this.abort.signal, ...options }); }
   start() { return this.connect(); }
   schedule(fn, delay) { clearTimeout(this.timer); if (!this.stopped) this.timer = setTimeout(() => fn.call(this), delay); }
   async disconnect() {
     const room = this.room; this.room = null;
+    this.overlaySequence = 0;
     if (room) { room.removeAllListeners(); await Promise.resolve(room.disconnect()).catch(() => {}); }
   }
   async end(session, keepalive = false) {
@@ -98,6 +104,12 @@ export class RobotCameraConnection {
       if (this.stopped) return;
       const room = new sdk.Room({ adaptiveStream: true, dynacast: true }); this.room = room;
       const current = () => !this.stopped && this.room === room;
+      room.on(sdk.RoomEvent.DataReceived, (payload, participant, kind, topic) => {
+        if (!current() || this.state.phase !== 'live' || !this.state.track || this.state.track.isMuted) return;
+        const overlay = decodeRobotAiOverlay(payload, participant, topic, this.session, this.overlaySequence);
+        if (!overlay) return;
+        this.overlaySequence = overlay.seq; this.emit({ overlay });
+      });
       room.on(sdk.RoomEvent.TrackSubscribed, (track, publication, participant) => {
         if (current() && participant.identity === `robot-${this.robotId}` && track.kind === sdk.Track.Kind.Video
           && publication.source === sdk.Track.Source.Camera) this.emit({ phase: 'live', message: 'Đang nhận camera robot.', track });

@@ -5,7 +5,7 @@ import { RobotCameraConnection, openCameraSession } from '../src/features/media/
 const id = n => `${String(n).repeat(8)}-${String(n).repeat(4)}-4${String(n).repeat(3)}-8${String(n).repeat(3)}-${String(n).repeat(12)}`;
 const robotId = id(1), accountId = id(2), sessionId = id(3);
 const session = () => ({ sessionId, robotId, staffAccountId: accountId, mode: 'MONITOR', state: 'CONNECTING', expiresAt: new Date(Date.now() + 60000).toISOString() });
-const RoomEvent = Object.fromEntries(['TrackSubscribed', 'TrackUnsubscribed', 'TrackMuted', 'TrackUnmuted', 'Reconnecting', 'Reconnected', 'Disconnected'].map(name => [name, name]));
+const RoomEvent = Object.fromEntries(['TrackSubscribed', 'TrackUnsubscribed', 'TrackMuted', 'TrackUnmuted', 'Reconnecting', 'Reconnected', 'Disconnected', 'DataReceived'].map(name => [name, name]));
 function fixture({ sessions = [], role = 'ADMIN', enabled = true, credentials: patch = {}, create, fail } = {}) {
   const reads = [], writes = [], rooms = [];
   class Room {
@@ -102,4 +102,33 @@ test('another browser taking the same identity stops retries and is not ended on
   assert.equal(f.connection.state.phase, 'restricted');
   await f.connection.stop(); assert.equal(f.writes.length, 2);
   assert.equal(openCameraSession({ ...session(), expiresAt: new Date(Date.now() - 1).toISOString() }), false);
+});
+
+test('AI overlays are scoped to the live robot session and cleared on camera interruption', async () => {
+  const f = fixture();
+  try {
+    await f.connection.start();
+    const room = f.rooms[0], track = { kind: 'video' }, sender = { identity: `robot-${robotId}` };
+    const send = (seq, participant = sender, mediaSession = sessionId) => room.emit(RoomEvent.DataReceived,
+      new TextEncoder().encode(JSON.stringify({ v: 1, media_session_id: mediaSession, seq, width: 320, height: 240,
+        status: 'OK', detections: [{ bbox: [.1, .1, .3, .5], confidence: .9, state: 'PERSON', track_id: null }] })),
+      participant, undefined, 'mar.ai.overlay.v1');
+    send(1); assert.equal(f.connection.state.overlay, null, 'no boxes before video');
+    room.emit(RoomEvent.TrackSubscribed, track, { source: 'camera' }, sender);
+    send(1, { identity: `robot-${id(4)}` }); assert.equal(f.connection.state.overlay, null);
+    send(1, sender, id(9)); assert.equal(f.connection.state.overlay, null);
+    send(1); assert.equal(f.connection.state.overlay.seq, 1);
+    const accepted = f.connection.state.overlay;
+    send(1); assert.equal(f.connection.state.overlay, accepted, 'duplicate packets do not refresh receipt time');
+    room.emit(RoomEvent.Reconnecting); assert.equal(f.connection.state.overlay, null);
+    send(2); assert.equal(f.connection.state.overlay, null);
+    room.emit(RoomEvent.Reconnected); send(2); assert.equal(f.connection.state.overlay.seq, 2);
+    room.emit(RoomEvent.TrackMuted, { track }); assert.equal(f.connection.state.overlay, null);
+    send(3); assert.equal(f.connection.state.overlay, null);
+    room.emit(RoomEvent.TrackUnmuted, { track }); send(3); assert.equal(f.connection.state.overlay.seq, 3);
+    room.emit(RoomEvent.TrackUnsubscribed, track); assert.equal(f.connection.state.overlay, null);
+    const callback = room.events.get(RoomEvent.DataReceived);
+    await f.connection.stop(); callback(new Uint8Array(), sender, undefined, 'mar.ai.overlay.v1');
+    assert.equal(f.connection.state.overlay, null);
+  } finally { await f.connection.stop(); }
 });

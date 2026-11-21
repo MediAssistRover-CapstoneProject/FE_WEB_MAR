@@ -34,6 +34,14 @@ FE dùng API của `BE_MAR/src/main/resources/static/mapping.html`. Không cần
 
 Request MOVE/tuyến dùng lại Idempotency-Key khi kết quả gửi chưa rõ; việc đọc lại trạng thái không tự tạo lệnh chạy mới. Bằng chứng dừng/phục hồi phải do BE/Pi xác nhận, FE không tự đổi trạng thái vật lý.
 
+## Khung nhận diện trên camera robot
+
+Camera robot trong Giám sát robot và Quét bản đồ nhận khung AI qua LiveKit, dùng cùng hợp đồng `mar.ai.overlay.v1` với `media-call.html`. Khung xanh là người, vàng là đang quan sát, đỏ là nghi té ngã/nghi nằm trên sàn. Nhãn có mã theo dõi và khoảng cách nếu robot cung cấp; phần trăm chỉ là độ tin cậy nhận diện người, không phải xác suất té ngã.
+
+Có thể bật/tắt khung nhận diện; khung được căn theo vùng ảnh thật kể cả khi có viền đen hoặc phóng toàn màn hình. Chỉ nhận gói đúng robot, phiên camera và thứ tự; khung tự xóa khi quá 3 giây không có kết quả mới, camera tạm dừng hoặc mất kết nối. Pi cần đang phát dữ liệu nhận diện cho phiên LiveKit này. Nếu chưa có dữ liệu AI, video vẫn hoạt động và giao diện hiển thị trạng thái chờ.
+
+Kiểm tra bằng `node --test tests/robot-ai-overlay.test.mjs tests/robot-camera.test.mjs` và `node tests/robot-camera.browser.mjs` (Vite tại `http://127.0.0.1:5187`, hoặc đặt `TEST_BASE_URL`). Browser test giả lập video/API và dữ liệu AI; cần kiểm tra thêm trên Pi thật.
+
 ## Giới hạn cần kiểm chứng trên robot
 
 - Profile ACK là xác nhận đã nhận cấu hình, chưa chứng minh robot thực thi vùng cấm/giới hạn tốc độ. Mã Pi trong workspace cần được đối chiếu với bản đã triển khai và kiểm thử thực thi zone.
