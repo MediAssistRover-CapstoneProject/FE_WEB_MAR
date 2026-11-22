@@ -16,6 +16,7 @@ import { robotConnection } from '../../../features/operations/robotConnection.js
 import MissionProgress from './MissionProgress.jsx';
 import OperationsIcon from './OperationsIcon.jsx';
 import RobotBattery from './RobotBattery.jsx';
+import MapRobotMarker from '../../../components/MapRobotMarker.jsx';
 import './robotMonitor.css';
 
 const dateTime = value => value ? new Date(value).toLocaleString('vi-VN') : 'Chưa ghi nhận';
@@ -158,7 +159,8 @@ function RobotMap({ snapshot, livePose, job, endpoints, fresh, revision, auto, s
     {validPlan && <polyline className="rm-plan" points={planPoints.map(point => point.x + ',' + point.y).join(' ')} fill="none" stroke="#2563eb" strokeWidth={radius * .35} strokeDasharray={radius + ' ' + radius * .6} />}
     {destination && <g className="rm-destination" transform={`translate(${destination.x} ${destination.y})`}><circle r={radius} fill="#f59e0b" stroke="white" strokeWidth={radius * .2} /><title>Điểm đến</title></g>}
     {displayPosition && <g className={view.live ? "rm-position" : "rm-position-stale"} transform={`translate(${displayPosition.x} ${displayPosition.y}) rotate(${-(displayPose.yawRad - meta.origin_yaw_rad) * 180 / Math.PI})`}>
-      <title>{view.live ? "Vị trí robot hiện tại" : "Vị trí ghi nhận gần nhất · không còn trực tiếp"}</title><circle r={radius * 1.3} fill={view.live ? "#2563eb" : "#94a3b8"} stroke="white" strokeWidth={radius * .2} /><path d={`M ${radius * 2.2} 0 L 0 ${-radius * .7} L 0 ${radius * .7} Z`} fill="white" />
+      <title>{view.live ? "Vị trí robot hiện tại" : "Vị trí ghi nhận gần nhất · không còn trực tiếp"}</title>
+      <MapRobotMarker length={radius * 2.8} live={view.live} />
     </g>}
   </g>;
   return <section className="rm-card rm-map">

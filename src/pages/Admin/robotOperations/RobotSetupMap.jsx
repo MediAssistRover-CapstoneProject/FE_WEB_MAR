@@ -4,6 +4,7 @@ import { endpointHeading, snapMapPoint } from '../../../features/facility/mapCoo
 import { setupContext, setupLivePose } from '../../../features/robotOperations/robotSetup.js';
 import { presentationViewport } from '../../../features/operations/monitorPresentation.js';
 import MapPresentationCanvas from '../MapPresentationCanvas.jsx';
+import MapRobotMarker from '../../../components/MapRobotMarker.jsx';
 
 const number = value => Number(value).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
 
@@ -37,8 +38,10 @@ export default memo(function RobotSetupMap({ asset, presentation, presentationNo
     return { xM: p.x, yM: -p.y };
   };
   const marker = (point, color, label, key) => point && <g key={key} className="rsu-pose-marker" data-pose={key} transform={`translate(${point.xM} ${-point.yM})`} pointerEvents="none">
-    <circle r={unit * 1.8} fill={color} opacity=".13" />
-    <g transform={`rotate(${-point.yawRad * 180 / Math.PI})`}><circle r={unit * .65} fill={color} stroke="white" strokeWidth={unit * .2} /><path d={`M ${unit * .5} 0 H ${unit * 2.6} M ${unit * 1.6} ${-unit * .8} L ${unit * 2.6} 0 L ${unit * 1.6} ${unit * .8}`} fill="none" stroke={color} strokeWidth={unit * .4} strokeLinecap="round" strokeLinejoin="round" /></g>
+    {key === 'seed' ? <>
+      <circle r={unit * 1.8} fill={color} opacity=".13" />
+      <g transform={`rotate(${-point.yawRad * 180 / Math.PI})`}><circle r={unit * .65} fill={color} stroke="white" strokeWidth={unit * .2} /><path d={`M ${unit * .5} 0 H ${unit * 2.6} M ${unit * 1.6} ${-unit * .8} L ${unit * 2.6} 0 L ${unit * 1.6} ${unit * .8}`} fill="none" stroke={color} strokeWidth={unit * .4} strokeLinecap="round" strokeLinejoin="round" /></g>
+    </> : <g transform={`rotate(${-point.yawRad * 180 / Math.PI})`}><MapRobotMarker length={unit * 3.2} live={key === 'verified'} /></g>}
     <title>{label}</title>
   </g>;
   const release = () => { drag.current = null; };

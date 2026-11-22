@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RobotCameraConnection, openCameraSession } from '../src/features/media/robotCamera.js';
+import { RobotCameraConnection, openCameraSession, cameraError } from '../src/features/media/robotCamera.js';
 
 const id = n => `${String(n).repeat(8)}-${String(n).repeat(4)}-4${String(n).repeat(3)}-8${String(n).repeat(3)}-${String(n).repeat(12)}`;
 const robotId = id(1), accountId = id(2), sessionId = id(3);
+const viewerUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const session = () => ({ sessionId, robotId, staffAccountId: accountId, mode: 'MONITOR', state: 'CONNECTING', expiresAt: new Date(Date.now() + 60000).toISOString() });
 const RoomEvent = Object.fromEntries(['TrackSubscribed', 'TrackUnsubscribed', 'TrackMuted', 'TrackUnmuted', 'Reconnecting', 'Reconnected', 'Disconnected', 'DataReceived'].map(name => [name, name]));
-function fixture({ sessions = [], role = 'ADMIN', enabled = true, credentials: patch = {}, create, fail } = {}) {
+function fixture({ sessions = [], role = 'ADMIN', enabled = true, credentials: patch = {}, create, fail, detail } = {}) {
   const reads = [], writes = [], rooms = [];
   class Room {
     constructor() { this.events = new Map(); rooms.push(this); }
@@ -22,20 +23,27 @@ function fixture({ sessions = [], role = 'ADMIN', enabled = true, credentials: p
     if (fail?.(path, options)) throw Object.assign(Error('MEDIA_DEVICE_NOT_CONNECTED'), { status: 400 });
     if (path === '/api/v1/media/configuration') return { enabled };
     if (path === '/api/v1/media-sessions') return options.method === 'POST' ? create ? create() : session() : sessions;
-    if (path.endsWith('/join-token')) return { url: 'wss://camera.example.test', room: `mar-${sessionId}`, identity: `staff-${accountId}`, token: 'secret-token', expiresAt: session().expiresAt, session: session(), ...patch };
+    if (path.endsWith('/observer-token')) {
+      // Match the deployed ViewerJoin schema, so an empty body cannot pass.
+      if (!viewerUuid.test(options.body?.viewerId || '')) {
+        throw Object.assign(Error('Dữ liệu không hợp lệ'), { status: 400, body: { violations: [{ field: 'viewerId', message: 'must not be null' }] } });
+      }
+      return { url: 'wss://camera.example.test', room: `mar-${sessionId}`, identity: `observer-${accountId}-${options.body.viewerId}`, token: 'secret-token', expiresAt: session().expiresAt, session: sessions[0] || session(), ...patch };
+    }
     if (path.endsWith('/end')) return {};
-    return session();
+    if (path === `/api/v1/media-sessions/${sessionId}`) return detail ? detail() : sessions[0] || session();
+    throw Error(`Unexpected camera request: ${path}`);
   };
   const connection = new RobotCameraConnection({ robotId, account: { accountId, role }, request, loadSdk: async () => sdk });
   return { connection, reads, writes, rooms, sdk };
 }
 
-test('MONITOR creates once, joins only its robot camera and closes its own session', async () => {
+test('MONITOR creates once, observes only its robot camera and closes its own session', async () => {
   const f = fixture();
   try {
     await f.connection.start();
     assert.deepEqual(f.writes.map(value => [value.path, value.body]), [
-      ['/api/v1/media-sessions', { robotId, mode: 'MONITOR' }], [`/api/v1/media-sessions/${sessionId}/join-token`, {}],
+      ['/api/v1/media-sessions', { robotId, mode: 'MONITOR' }], [`/api/v1/media-sessions/${sessionId}/observer-token`, { viewerId: f.connection.viewerId }],
     ]);
     const room = f.rooms[0], track = { kind: 'video' };
     room.emit(RoomEvent.TrackSubscribed, track, { source: 'camera' }, { identity: `robot-${id(4)}` });
@@ -54,12 +62,44 @@ test('MONITOR creates once, joins only its robot camera and closes its own sessi
   assert.equal(f.rooms[0].disconnected, true);
 });
 
-test('existing own MONITOR can be resumed, and another viewer or ASSIST is never accepted or ended', async () => {
-  for (const existing of [session(), { ...session(), staffAccountId: id(5) }, { ...session(), mode: 'ASSIST', incidentId: id(6) }]) {
-    const f = fixture({ sessions: [existing] });
-    await f.connection.start(); await f.connection.stop();
-    assert.deepEqual(f.writes.map(value => value.path), existing.mode === 'MONITOR' && existing.staffAccountId === accountId ? [`/api/v1/media-sessions/${sessionId}/join-token`] : []);
+test('ADMIN and STAFF observe existing MONITOR and ASSIST sessions without accepting or ending them', async () => {
+  for (const role of ['ADMIN', 'STAFF']) {
+    for (const existing of [session(), { ...session(), staffAccountId: id(5) },
+      { ...session(), staffAccountId: id(5), mode: 'ASSIST', incidentId: id(6) },
+      { ...session(), staffAccountId: null, mode: 'ASSIST', state: 'RINGING', incidentId: id(6) }]) {
+      const f = fixture({ sessions: [existing], role });
+      try {
+        await f.connection.start();
+        assert.equal(f.rooms.length, 1);
+        assert.deepEqual(f.rooms[0].connected, { url: 'wss://camera.example.test', token: 'secret-token' });
+        await f.connection.poll();
+        assert.equal(f.rooms[0].disconnected, undefined, 'polling keeps an observed session connected');
+      } finally { await f.connection.stop(); }
+      assert.deepEqual(f.writes.map(value => [value.path, value.body]), [[`/api/v1/media-sessions/${sessionId}/observer-token`, { viewerId: f.connection.viewerId }]]);
+    }
   }
+});
+
+test('observer UUID remains stable on reconnect and differs between independent viewers', async () => {
+  const first = fixture({ sessions: [session()] }), second = fixture({ sessions: [session()] });
+  try {
+    await first.connection.start();
+    await first.connection.retry();
+    await second.connection.start();
+    const joins = first.writes.filter(value => value.path.endsWith('/observer-token'));
+    assert.equal(joins.length, 2);
+    assert.match(joins[0].body.viewerId, viewerUuid);
+    assert.equal(joins[1].body.viewerId, joins[0].body.viewerId, 'reconnecting keeps the same viewer identity');
+    assert.notEqual(second.writes[0].body.viewerId, joins[0].body.viewerId, 'another viewer does not replace this participant');
+    assert.equal(first.rooms.length, 2);
+    assert.equal(second.rooms.length, 1);
+  } finally { await Promise.all([first.connection.stop(), second.connection.stop()]); }
+});
+
+test('viewer validation and startup errors explain why the camera cannot connect', () => {
+  assert.match(cameraError({ status: 400, body: { violations: [{ field: 'viewerId' }] } }), /mã người xem/);
+  assert.match(cameraError(Error('MEDIA_CAMERA_CONNECTING')), /khởi động camera/);
+  assert.match(cameraError(Error('MEDIA_OBSERVER_CREDENTIALS_INVALID')), /thông tin kết nối/);
 });
 
 test('disabled media and disconnected Pi wait without repeated creates in the same attempt', async () => {
@@ -76,12 +116,48 @@ test('staff cannot automatically open a general monitor session', async () => {
 });
 
 test('wrong session, wrong room and insecure credentials never connect to media', async () => {
-  for (const credentials of [{ session: { ...session(), robotId: id(4) } }, { session: { ...session(), mode: 'ASSIST' } },
-    { identity: 'staff-other' }, { room: 'another-room' }, { url: 'ws://camera.example.test' }, { expiresAt: 'invalid' }]) {
+  for (const credentials of [{ session: { ...session(), robotId: id(4) } }, { session: { ...session(), sessionId: id(4) } },
+    { session: { ...session(), state: 'ENDED' } }, { session: null }, { identity: '' }, { identity: null },
+    { token: '' }, { token: {} }, { room: 'another-room' }, { url: 'ws://camera.example.test' },
+    { expiresAt: 'invalid' }, { expiresAt: new Date(Date.now() - 1000).toISOString() }]) {
     const f = fixture({ sessions: [session()], credentials });
     await f.connection.start(); await f.connection.stop(); assert.equal(f.rooms.length, 0);
     assert.equal(f.writes.some(write => write.path.endsWith('/end')), false);
   }
+});
+
+test('an observed session ending or changing robot/session disconnects without ending it', async () => {
+  const existing = { ...session(), staffAccountId: id(5), mode: 'ASSIST', incidentId: id(6) };
+  for (const patch of [{ state: 'ENDED' }, { robotId: id(4) }, { sessionId: id(4) }]) {
+    const f = fixture({ sessions: [existing], detail: () => ({ ...existing, ...patch }) });
+    try {
+      await f.connection.start();
+      await f.connection.poll();
+      assert.equal(f.rooms[0].disconnected, true);
+      assert.equal(f.connection.state.phase, 'waiting');
+      assert.equal(f.connection.session, null);
+    } finally { await f.connection.stop(); }
+    assert.deepEqual(f.writes.map(value => value.path), [`/api/v1/media-sessions/${sessionId}/observer-token`]);
+  }
+});
+
+test('observer access denied stays restricted and never falls back to join or accept', async () => {
+  const f = fixture({ sessions: [session()], credentials: {} });
+  f.connection.request = async (path, options = {}) => {
+    if (path.endsWith('/observer-token')) {
+      f.writes.push({ path, ...options });
+      throw Object.assign(Error('Forbidden'), { status: 403 });
+    }
+    if (path === '/api/v1/media/configuration') return { enabled: true };
+    if (path === '/api/v1/media-sessions') return [session()];
+    throw Error(`Unexpected camera request: ${path}`);
+  };
+  await f.connection.start();
+  assert.equal(f.connection.state.phase, 'restricted');
+  assert.equal(f.connection.timer, undefined);
+  await f.connection.stop();
+  assert.equal(f.rooms.length, 0);
+  assert.deepEqual(f.writes.map(value => value.path), [`/api/v1/media-sessions/${sessionId}/observer-token`]);
 });
 
 test('a create response arriving after unmount is cleaned up without joining', async () => {

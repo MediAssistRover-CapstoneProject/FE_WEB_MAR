@@ -8,7 +8,7 @@ const accountId = id(2), robotId = id(1), otherRobot = id(4);
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_EXECUTABLE || 'C:/Program Files/Google/Chrome/Application/chrome.exe' });
 const page = await browser.newPage({ viewport: { width: 1050, height: 800 } });
 let sessions = [], serial = 4, enabled = true, deviceOnline = true;
-const writes = [], errors = [];
+const writes = [], reads = [], errors = [];
 page.on('pageerror', error => errors.push(error.message));
 await page.addInitScript(accountId => {
   localStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { accountId, username: 'camera-test', role: 'ADMIN' }, tokens: { accessToken: 'fixture' } }));
@@ -43,6 +43,7 @@ await page.route('**/*', async route => {
   const json = (body, status = 200) => route.fulfill({ json: body, status });
   const body = request.method() === 'POST' ? request.postDataJSON() : null;
   if (body) writes.push({ path, body });
+  else reads.push(path);
   if (path === '/api/v1/media/configuration') return json({ enabled });
   if (path === '/api/v1/media-sessions' && !body) return json(sessions);
   if (path === '/api/v1/media-sessions') {
@@ -52,7 +53,13 @@ await page.route('**/*', async route => {
     sessions.push(session); return json(session);
   }
   const session = sessions.find(value => path.includes(value.sessionId));
-  if (path.endsWith('/join-token')) return json({ url: 'wss://camera.example.test', token: 'fixture-' + session.robotId, room: 'mar-' + session.sessionId, identity: 'staff-' + accountId, session, expiresAt: session.expiresAt });
+  if (path.endsWith('/observer-token')) {
+    assert.equal(request.headers()['content-type'], 'application/json');
+    assert.deepEqual(Object.keys(body), ['viewerId']);
+    assert.match(body.viewerId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    return json({ url: 'wss://camera.example.test', token: 'fixture-' + session.robotId, room: 'mar-' + session.sessionId, identity: 'observer-' + accountId + '-' + body.viewerId, session, expiresAt: session.expiresAt });
+  }
+  assert.ok(!path.endsWith('/join-token') && !path.endsWith('/accept'), 'observer never joins as the assigned staff');
   if (path.endsWith('/end')) { assert.equal(body.reason, 'MONITOR_VIEW_CLOSED'); sessions = sessions.filter(value => value !== session); return json({ ...session, state: 'ENDED' }); }
   assert.ok(session, `Only media endpoints may be called: ${path}`); return json(session);
 });
@@ -74,7 +81,7 @@ try {
   }, { robotId });
   await expect(page.locator('.rc-live')).toHaveCount(2);
   assert.equal(count('/media-sessions'), 1, 'StrictMode and two panels share one MONITOR create');
-  assert.equal(count('/join-token'), 1);
+  assert.equal(count('/observer-token'), 1);
   assert.equal(await page.evaluate(() => window.captureRequests), 0);
   await mkdir('.workstation-build/robot-camera', { recursive: true });
   const sendOverlay = async (patch = {}, sender = robotId, topic = 'mar.ai.overlay.v1') => page.evaluate(({ patch, sender, topic, sessionId }) => {
@@ -136,11 +143,16 @@ try {
   await page.evaluate(() => window.renderCamera(null));
   await expect.poll(() => count('/end')).toBe(3);
   const beforeSos = writes.length;
-  sessions = [{ sessionId: id(8), robotId, staffAccountId: accountId, incidentId: id(9), mode: 'ASSIST', state: 'RINGING', expiresAt: new Date(Date.now() + 60000).toISOString() }];
+  sessions = [{ sessionId: id(8), robotId, staffAccountId: otherRobot, incidentId: id(9), mode: 'ASSIST', state: 'ACTIVE', expiresAt: new Date(Date.now() + 60000).toISOString() }];
   await page.evaluate(id => window.renderCamera(id), robotId);
-  await expect(page.locator('.rc-placeholder')).toContainText('hỗ trợ/SOS');
-  assert.equal(writes.length, beforeSos, 'camera never accepts or ends an SOS call');
+  await expect(page.locator('.rc-live')).toHaveCount(1);
+  assert.deepEqual(writes.slice(beforeSos).map(value => value.path), [`/api/v1/media-sessions/${id(8)}/observer-token`]);
+  // The status refresh must keep observing a session owned by another responder.
+  await expect.poll(() => reads.includes(`/api/v1/media-sessions/${id(8)}`), { timeout: 7000 }).toBe(true);
+  await expect(page.locator('.rc-live')).toHaveCount(1);
   await page.evaluate(() => window.renderCamera(null));
+  await expect.poll(() => page.evaluate(() => window.fakeRooms.at(-1).disconnected)).toBe(true);
+  assert.equal(count('/end'), 3, 'closing the observer leaves the SOS session active');
   sessions = []; deviceOnline = false;
   await page.waitForTimeout(400);
   await page.evaluate(id => window.renderCamera(id), robotId);
@@ -170,7 +182,7 @@ try {
   assert.equal(await page.evaluate(() => window.captureRequests), 0);
   assert.deepEqual(errors, []);
   await page.evaluate(() => window.renderCamera(null));
-  console.log('PASS: scoped MONITOR, actual video, authenticated AI boxes, toggle/mobile, stale overlay expiry, paused AI, aspect mismatch, no local capture, shared StrictMode lifecycle, stale frames, pause/resume, robot switch, SOS protection and Pi reconnect. All APIs and media server mocked.');
+  console.log('PASS: observer token headers, MONITOR and another responder\'s SOS video, authenticated AI boxes, toggle/mobile, stale overlays, no local capture, shared StrictMode lifecycle, pause/resume, robot switch, SOS cleanup protection and Pi reconnect. All APIs and media server mocked.');
 } catch (error) {
   console.error('Camera page errors:', errors, 'URL:', page.url(), 'Panel:', await page.locator('body').innerText().catch(() => 'unavailable'));
   throw error;

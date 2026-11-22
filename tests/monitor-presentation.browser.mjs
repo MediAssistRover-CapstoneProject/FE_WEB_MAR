@@ -35,7 +35,7 @@ await page.route('**/api/v1/**', async route => {
   if (path.endsWith('/image-metadata')) return reply(metadata);
   if (path.endsWith('/image.png')) return route.fulfill({ contentType: 'image/png', body: png });
   if (path === '/api/v1/robots') return list([robot]);
-  if (path.endsWith('/snapshot')) return reply({ robot, mqttConnected: true, heartbeatFresh: true, activeJobId: job.jobId,
+  if (path.endsWith('/snapshot')) return reply({ observedAt: new Date().toISOString(), robot, mqttConnected: true, heartbeatFresh: true, activeJobId: job.jobId,
     selectedJobStepId: id(4), navigationSession: { sessionId: id(6) },
     latestPose: { ...localToWorld({ x: 4, y: 2 }, source), mapId: id(1), jobId: job.jobId, yawRad: .4,
       frameId: 'map', fresh: true, capturedAt: new Date().toISOString(), locationId: id(7) },

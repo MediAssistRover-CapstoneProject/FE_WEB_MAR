@@ -5,6 +5,7 @@ import { navigationGroups } from '../navigation.js';
 import { getSession } from '../../auth/session.js';
 import { screenTitles } from '../../api/workspaceCatalog.js';
 import { pathForScreen } from '../screenRoutes.js';
+import BrandMark from '../../../components/BrandMark.jsx';
 import './AdminSidebar.css';
 
 const adminOnly = new Set(['Robot Setup', 'Workflows', 'Workflow Dispatch', 'Users & Roles', 'System Settings', 'Audit Logs', 'Analytics', 'History & Replay']);
@@ -60,7 +61,7 @@ export default function AdminSidebar({ active, onSelect, onLogout }) {
     <button type="button" className="sidebar-mobile-toggle" aria-label="Mở menu" aria-controls="admin-navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}><SidebarIcon name="menu"/></button>
     {mobileOpen && <button type="button" className="sidebar-backdrop" aria-label="Đóng menu" onClick={() => setMobileOpen(false)} />}
     <aside id="admin-navigation" className={`sidebar mediassist-sidebar${mobileOpen ? ' is-open' : ''}`}>
-      <div className="brand"><div className="sidebar-brand-mark"><SidebarIcon name="Robot"/></div><div className="sidebar-brand-copy"><strong>{vi('MediAssistRover')}</strong><span>{vi('ADMIN CONTROL CENTER')}</span></div>
+      <div className="brand"><div className="sidebar-brand-mark"><BrandMark /></div><div className="sidebar-brand-copy"><strong>{vi('MediAssistRover')}</strong><span>{vi('ADMIN CONTROL CENTER')}</span></div>
         <button type="button" className="sidebar-mobile-close" aria-label="Đóng menu" onClick={() => setMobileOpen(false)}><SidebarIcon name="close"/></button>
       </div>
       <div className="sidebar-nav-caption">Điều hướng</div>

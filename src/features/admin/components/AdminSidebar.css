@@ -47,14 +47,9 @@
 .sidebar.mediassist-sidebar .sidebar-brand-mark {
   display: grid;
   place-items: center;
-  flex: 0 0 34px;
-  height: 36px;
-  border-radius: 11px;
-  color: #fff;
-  background: #2878f0;
-  box-shadow: 0 3px 8px #2878f01a;
+  flex: 0 0 42px;
+  height: 42px;
 }
-.sidebar.mediassist-sidebar .sidebar-brand-mark .sidebar-icon { width: 22px; height: 22px; }
 .sidebar.mediassist-sidebar .sidebar-brand-copy { min-width: 0; }
 .sidebar.mediassist-sidebar .sidebar-brand-copy strong {
   display: block;

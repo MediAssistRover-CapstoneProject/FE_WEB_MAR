@@ -45,7 +45,13 @@ await page.route('**/api/v1/**', async route => {
   if (path === '/api/v1/maps') return rows([{ mapId, mapName: 'Stream map', status: 'ACTIVE', versionNo: 1 }]);
   if (path === '/api/v1/jobs') return rows([job]);
   if (path === `/api/v1/jobs/${jobId}`) { const value = detail(); if (detailDelay) await new Promise(done => setTimeout(done, detailDelay)); return json(value); }
-  if (path.endsWith('/snapshot')) { const value = snapshot(); if (snapshotDelay) await new Promise(done => setTimeout(done, snapshotDelay)); return failSnapshot ? route.abort() : json(value); }
+  if (path.endsWith('/snapshot')) {
+    const startedAt = Date.now(), value = snapshot();
+    if (snapshotDelay) await new Promise(done => setTimeout(done, snapshotDelay));
+    // The artificial delay represents a round trip around the server sample.
+    value.observedAt = new Date((startedAt + Date.now()) / 2).toISOString();
+    return failSnapshot ? route.abort() : json(value);
+  }
   if (path.endsWith('/image-metadata')) return json(metadata);
   if (path.endsWith('/image.png')) return route.fulfill({ contentType: 'image/png', body: png });
   if (path.endsWith('/presentation/published')) return json({ source: { mapId, assetHash: hash, widthM: 10, heightM: 10, widthPx: 100, heightPx: 100, frameId: 'map', resolutionMPerPixel: .1, originXM: 0, originYM: 0, originYawRad: 0 }, document: { schemaVersion: 1, backgroundColor: '#fff', rotationDegrees: 0, features: [] } });

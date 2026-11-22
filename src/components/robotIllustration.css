@@ -1,0 +1,6 @@
+.robot-illustration{position:relative;aspect-ratio:912/644;isolation:isolate;overflow:visible;flex-shrink:0}
+.robot-illustration-image{display:block;width:100%;height:100%;object-fit:contain}
+.robot-lidar-scan{position:absolute;z-index:2;left:52.96%;top:3.15%;width:48%;height:auto;aspect-ratio:1;overflow:visible;transform:translate(-50%,-50%) scaleY(.28);filter:drop-shadow(0 0 6px #1687ed66);pointer-events:none}
+.robot-lidar-rotor{transform-box:view-box;transform-origin:center;animation:robot-lidar-spin 3s linear infinite}
+@keyframes robot-lidar-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.robot-lidar-rotor{animation:none}}

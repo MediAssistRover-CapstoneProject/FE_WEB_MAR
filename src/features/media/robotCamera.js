@@ -6,6 +6,9 @@ export const openCameraSession = (session, now = Date.now()) => uuid.test(sessio
 export const ownMonitorSession = (session, robotId, accountId) => session?.robotId === robotId && session.mode === 'MONITOR' && !session.incidentId && session.staffAccountId === accountId;
 
 export function cameraError(error) {
+  if (error?.status === 400 && error.body?.violations?.some(value => value.field === 'viewerId')) {
+    return 'Yêu cầu xem camera thiếu mã người xem hợp lệ. Hãy tải lại trang.';
+  }
   return ({
     MEDIA_DISABLED: 'Máy chủ chưa bật dịch vụ camera trực tiếp.',
     MEDIA_DEVICE_NOT_CONNECTED: 'Robot chưa kết nối dịch vụ camera. Trang sẽ tự kiểm tra lại.',
@@ -13,15 +16,20 @@ export function cameraError(error) {
     MEDIA_SERVER_UNAVAILABLE: 'Chưa kết nối được máy chủ camera. Trang sẽ tự thử lại.',
     MEDIA_CONFIGURATION_INVALID: 'Cấu hình dịch vụ camera trên máy chủ chưa đầy đủ.',
     MEDIA_EXTERNAL_WSS_ORIGIN_REQUIRED: 'Máy chủ chưa cấu hình địa chỉ camera bảo mật.',
+    MEDIA_CAMERA_CONNECTING: 'Robot đang khởi động camera. Trang sẽ tự kết nối lại.',
+    MEDIA_OBSERVER_CREDENTIALS_INVALID: 'Máy chủ trả về thông tin kết nối camera không hợp lệ.',
   })[error?.message] || (error?.status === 403 ? 'Tài khoản chưa có quyền xem phiên camera này.'
     : error?.status === 401 ? 'Phiên đăng nhập đã hết hạn.' : 'Chưa kết nối được camera. Trang sẽ tự thử lại.');
 }
 
-// No local tracks are created: MONITOR only subscribes to this robot's video.
+// No local tracks are created: observers only display this robot's video.
 // Dependencies are injected so lifecycle and API scope can be tested without a robot.
 export class RobotCameraConnection {
   constructor({ robotId, account, request, loadSdk }) {
     Object.assign(this, { robotId, account, request, loadSdk });
+    // The API requires a UUID for this viewer, retained across reconnects.
+    // Different tabs/connections get different LiveKit observer identities.
+    this.viewerId = crypto.randomUUID();
     this.listeners = new Set(); this.abort = new AbortController();
     this.state = { phase: 'connecting', message: 'Đang kết nối camera robot…', track: null, overlay: null };
     this.overlaySequence = 0;
@@ -74,10 +82,6 @@ export class RobotCameraConnection {
       if (!Array.isArray(sessions)) throw Error('Invalid media session list');
       let session = sessions.find(value => value.robotId === this.robotId && openCameraSession(value));
       this.owned = this.owned && session?.sessionId === this.session?.sessionId;
-      if (session && !ownMonitorSession(session, this.robotId, this.account.accountId)) {
-        this.emit({ phase: 'busy', message: session.mode === 'ASSIST' ? 'Robot đang có phiên hỗ trợ/SOS. Camera được ưu tiên cho người đang hỗ trợ.' : 'Camera đang được tài khoản khác sử dụng.' });
-        this.schedule(this.connect, 10000); return;
-      }
       if (!session) {
         if (this.account.role !== 'ADMIN') {
           this.emit({ phase: 'restricted', message: 'Cần quản trị viên mở phiên xem camera. Phiên hỗ trợ được quản lý trong phần SOS.' }); return;
@@ -91,15 +95,17 @@ export class RobotCameraConnection {
         if (this.stopped) return;
       }
       this.session = session;
-      // Accept is deliberately not called here: accepting ASSIST can stop jobs.
-      const credentials = await this.call(`/api/v1/media-sessions/${session.sessionId}/join-token`, { method: 'POST', body: {}, retry: false });
+      // Observe existing MONITOR/ASSIST sessions without accepting or taking over.
+      const credentials = await this.call(`/api/v1/media-sessions/${session.sessionId}/observer-token`, { method: 'POST', body: { viewerId: this.viewerId }, retry: false });
       if (this.stopped) return;
       const url = new URL(credentials?.url);
-      if (!ownMonitorSession(credentials?.session, this.robotId, this.account.accountId)
+      if (credentials?.session?.robotId !== this.robotId
         || credentials.session.sessionId !== session.sessionId || !openCameraSession(credentials.session)
-        || credentials.room !== `mar-${session.sessionId}` || credentials.identity !== `staff-${this.account.accountId}`
+        || credentials.room !== `mar-${session.sessionId}` || typeof credentials.identity !== 'string' || !credentials.identity.trim()
         || url.protocol !== 'wss:' || url.username || url.password || url.search || url.hash
-        || !credentials.token || !Number.isFinite(Date.parse(credentials.expiresAt)) || Date.parse(credentials.expiresAt) <= Date.now()) throw Error('Invalid camera credentials');
+        || typeof credentials.token !== 'string' || !credentials.token.trim()
+        || !Number.isFinite(Date.parse(credentials.expiresAt)) || Date.parse(credentials.expiresAt) <= Date.now()) throw Error('MEDIA_OBSERVER_CREDENTIALS_INVALID');
+      this.session = credentials.session;
       const sdk = await this.loadSdk();
       if (this.stopped) return;
       const room = new sdk.Room({ adaptiveStream: true, dynacast: true }); this.room = room;
@@ -154,7 +160,7 @@ export class RobotCameraConnection {
       }
       const session = await this.call(`/api/v1/media-sessions/${this.session.sessionId}`);
       if (this.stopped) return;
-      if (!ownMonitorSession(session, this.robotId, this.account.accountId) || !openCameraSession(session)) {
+      if (session?.robotId !== this.robotId || session.sessionId !== this.session.sessionId || !openCameraSession(session)) {
         this.owned = false; this.session = null;
         await this.disconnect();
         this.emit({ phase: 'waiting', track: null, message: 'Phiên camera đã kết thúc. Đang kiểm tra phiên mới.' });

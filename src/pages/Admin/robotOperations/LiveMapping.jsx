@@ -9,6 +9,7 @@ import MappingMapPanel from './MappingMapPanel.jsx';
 import { autonomyBlock, MappingAutonomy, prepareMappingWorkflow } from '../../../features/robotOperations/mappingOperations.js';
 import MappingRecoveryPanel from './MappingRecoveryPanel.jsx';
 import RobotCamera from './RobotCamera.jsx';
+import MapRobotMarker from '../../../components/MapRobotMarker.jsx';
 import './scanWorkspace.css';
 
 function ScanIcon({ name = 'scan' }) {
@@ -66,7 +67,7 @@ function SnapshotImage({ jobId, kind, enabled }) {
     return () => { controller.abort(); clearTimeout(timer); if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [jobId, kind, enabled]);
   const position = kind === 'map' && frame ? mapPose(frame.state, frame.revision, now) : null;
-  return <><div className={'ro-preview ' + (kind === 'map' ? 'map' : '')}>{frame ? <div className="ro-map-frame" key={frame.url}><img src={frame.url} alt={kind === 'map' ? 'Bản đồ đang quét từ robot' : 'Ảnh camera robot qua MQTT'} />{position?.x !== undefined && <svg className="ro-pose-overlay" viewBox={`0 0 ${position.width} ${position.height}`} role="img" aria-label="Vị trí và hướng robot trên bản đồ"><g transform={`translate(${position.x} ${position.y}) rotate(${position.angle})`}><circle r={position.radius} fill="#0879ee" fillOpacity=".7" stroke="white" strokeWidth="1"/><path d={`M ${position.radius * 1.8} 0 L ${position.radius * .3} ${-position.radius * .55} L ${position.radius * .3} ${position.radius * .55} Z`} fill="#ff7900" stroke="white" strokeWidth=".6"/></g></svg>}</div> : <div className="ro-preview-empty"><ScanIcon /><strong>{kind === 'map' ? 'Không gian quét của bạn' : 'Camera robot'}</strong><p>{enabled ? message : 'Chọn robot và tạo phiên quét để bắt đầu.'}</p>{kind === 'map' && <span>Bản đồ sẽ xuất hiện khi robot gửi dữ liệu LiDAR.</span>}</div>}</div>{kind === 'map' && <div className="ro-pose-status"><strong>● Robot</strong><span>{position?.message || 'Chờ bản đồ và tọa độ từ robot.'}</span><small>Chấm xanh: vị trí · Mũi tên cam: hướng phía trước</small></div>}<small>{frame?.captured ? `Ảnh chụp lúc ${new Date(frame.captured).toLocaleString('vi-VN')}` : message}</small></>;
+  return <><div className={'ro-preview ' + (kind === 'map' ? 'map' : '')}>{frame ? <div className="ro-map-frame" key={frame.url}><img src={frame.url} alt={kind === 'map' ? 'Bản đồ đang quét từ robot' : 'Ảnh camera robot qua MQTT'} />{position?.x !== undefined && <svg className="ro-pose-overlay" viewBox={`0 0 ${position.width} ${position.height}`} role="img" aria-label="Vị trí và hướng robot trên bản đồ"><g transform={`translate(${position.x} ${position.y}) rotate(${position.angle})`}><MapRobotMarker length={position.radius * 2.8} /></g></svg>}</div> : <div className="ro-preview-empty"><ScanIcon /><strong>{kind === 'map' ? 'Không gian quét của bạn' : 'Camera robot'}</strong><p>{enabled ? message : 'Chọn robot và tạo phiên quét để bắt đầu.'}</p>{kind === 'map' && <span>Bản đồ sẽ xuất hiện khi robot gửi dữ liệu LiDAR.</span>}</div>}</div>{kind === 'map' && <div className="ro-pose-status"><strong>● Robot</strong><span>{position?.message || 'Chờ bản đồ và tọa độ từ robot.'}</span><small>Thân xe trắng: vị trí · Đèn xanh: hướng phía trước</small></div>}<small>{frame?.captured ? `Ảnh chụp lúc ${new Date(frame.captured).toLocaleString('vi-VN')}` : message}</small></>;
 }
 
 
