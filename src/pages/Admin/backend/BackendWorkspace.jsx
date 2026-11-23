@@ -1,3 +1,4 @@
+import { confirmAction } from '../../../components/appDialog.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getSession, clearSession } from '../../../features/auth/session.js';
@@ -80,8 +81,8 @@ function ResourceWorkspace({ section }) {
       }, { replace: true });
     }
   }, [queryTab, available, section, setSearchParams]);
-  const selectTab = id => {
-    if (id !== tab && speechDirty && !window.confirm('Bỏ các thay đổi giọng nói chưa lưu để chuyển tab?')) return;
+  const selectTab = async id => {
+    if (id !== tab && speechDirty && !await confirmAction('Bỏ các thay đổi giọng nói chưa lưu để chuyển tab?')) return;
     setTab(id);
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);

@@ -1,3 +1,4 @@
+import { confirmAction } from '../../../components/appDialog.js';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { callBackend } from '../../../features/api/backendApi.js';
@@ -75,9 +76,9 @@ export default function HospitalInfoWorkspace() {
     }
   }, [queryTab, setSearchParams]);
 
-  const selectTab = next => {
+  const selectTab = async next => {
     if (next === tab || roomBusy) return;
-    if (roomDirty && !window.confirm('Bạn có thay đổi phòng hoặc điểm chưa lưu. Bỏ thay đổi và chuyển tab?')) return;
+    if (roomDirty && !await confirmAction('Bạn có thay đổi phòng hoặc điểm chưa lưu. Bỏ thay đổi và chuyển tab?')) return;
     setTab(next);
     setSearch('');
     setSearchParams(prev => {
@@ -173,9 +174,9 @@ export default function HospitalInfoWorkspace() {
           </div>
         </div>
         <div className="lo-header-actions">
-          <button className="lo-button" disabled={roomBusy} onClick={() => {
+          <button className="lo-button" disabled={roomBusy} onClick={async () => {
             if (tab === 'rooms') {
-              if (!roomDirty || window.confirm('Bỏ thay đổi chưa lưu và tải lại danh mục phòng?')) setRoomsRefresh(value => value + 1);
+              if (!roomDirty || await confirmAction('Bỏ thay đổi chưa lưu và tải lại danh mục phòng?')) setRoomsRefresh(value => value + 1);
               return;
             }
             setRoomsRefresh(value => value + 1);

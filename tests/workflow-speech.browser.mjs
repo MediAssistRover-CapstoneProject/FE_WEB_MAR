@@ -93,8 +93,9 @@ try {
   await expect(page.getByRole('button', { name: 'Lưu và áp dụng', exact: true })).toBeEnabled();
   await page.getByLabel('Tìm bước hoặc lời nói').fill('');
   await page.screenshot({ path: '.workstation-build/workflow-speech/editing.png', fullPage: true });
-  page.once('dialog', dialog => dialog.dismiss());
+  const confirmation1 = page.getByRole('dialog', { name: 'Xác nhận thao tác' }).waitFor().then(async () => {  await page.getByRole('dialog', { name: 'Xác nhận thao tác' }).getByRole('button', { name: 'Hủy', exact: true }).click(); });
   await page.getByRole('button', { name: 'Giọng robot', exact: true }).click();
+  await confirmation1;
   await expect(workspace).toBeVisible();
   fail = true;
   await page.getByRole('button', { name: 'Lưu và áp dụng', exact: true }).click();

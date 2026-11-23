@@ -72,8 +72,9 @@ try {
   await expect(panel.locator('.rv-stage-profile strong')).toHaveText('coral');
   await expect(preview).toBeDisabled();
   await expect(panel).toContainText('Lưu thay đổi giọng robot trước khi nghe thử.');
-  page.once('dialog', dialog => dialog.dismiss());
+  const confirmation1 = page.getByRole('dialog', { name: 'Xác nhận thao tác' }).waitFor().then(async () => {  await page.getByRole('dialog', { name: 'Xác nhận thao tác' }).getByRole('button', { name: 'Hủy', exact: true }).click(); });
   await page.getByRole('button', { name: 'Lời nói workflow', exact: true }).click();
+  await confirmation1;
   await expect(panel).toBeVisible();
   await save.click();
   await expect(panel).toContainText('Đã lưu giọng robot.');

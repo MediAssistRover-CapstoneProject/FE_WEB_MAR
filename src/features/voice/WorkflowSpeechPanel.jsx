@@ -1,5 +1,6 @@
+import { confirmAction } from '../../components/appDialog.js';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getSession } from '../auth/session.js';
 import { API_BASE_URL } from '../api/client.js';
 import { workflowApi } from '../workflows/workflowApi.js';
@@ -35,6 +36,7 @@ export default function WorkflowSpeechPanel({ onDirtyChange }) {
 }
 
 function SpeechWorkspace({ onDirtyChange }) {
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const workflowId = params.get('workflowId') || '';
   const [catalog, setCatalog] = useState([]);
@@ -118,8 +120,8 @@ function SpeechWorkspace({ onDirtyChange }) {
     window.speechSynthesis?.cancel();
     setPlaying('');
   }
-  function selectWorkflow(id) {
-    if (savingRef.current || dirty && !window.confirm('Bỏ các thay đổi chưa lưu để chuyển workflow?')) return;
+  async function selectWorkflow(id) {
+    if (savingRef.current || dirty && !await confirmAction('Bỏ các thay đổi chưa lưu để chuyển workflow?')) return;
     setParams(previous => {
       const next = new URLSearchParams(previous);
       if (id) next.set('workflowId', id);
@@ -210,8 +212,8 @@ function SpeechWorkspace({ onDirtyChange }) {
   return <section className="ai-workspace workflow-speech" aria-label="Lời nói workflow">
     <header className="ws-heading"><div className="ws-heading-copy"><span className="ws-heading-icon"><SpeechIcon name="speech" /></span><div>
       <span className="ws-eyebrow">NỘI DUNG TƯƠNG TÁC</span><h2>Lời nói workflow</h2><p>Chỉnh nội dung và nghe thử lời robot đọc trong từng bước.</p></div></div>
-      <button className="ws-button ws-refresh" disabled={saving || loading || catalogLoading} onClick={() => {
-        if (!dirty || window.confirm('Bỏ các thay đổi chưa lưu và tải lại từ máy chủ?')) setRevision(value => value + 1);
+      <button className="ws-button ws-refresh" disabled={saving || loading || catalogLoading} onClick={async () => {
+        if (!dirty || await confirmAction('Bỏ các thay đổi chưa lưu và tải lại từ máy chủ?')) setRevision(value => value + 1);
       }}><SpeechIcon name="refresh" />Tải lại</button>
     </header>
     <div className="be-card ws-picker"><div className="ws-card-heading"><div className="ws-card-title"><span className="ws-small-icon"><SpeechIcon name="workflow" /></span><div><h3>Chọn workflow</h3><p>Tìm quy trình bạn muốn chỉnh lời nói.</p></div></div>
@@ -232,8 +234,10 @@ function SpeechWorkspace({ onDirtyChange }) {
     {!workflowId && !loading && <div className="be-card ws-empty"><span className="ws-empty-icon"><SpeechIcon name="speech" /></span><h3>Lời nói theo từng bước</h3><p>Chọn workflow để xem và chỉnh lời nói của robot.</p><span className="ws-empty-hint">Chỉnh nội dung · Nghe thử · Lưu và áp dụng</span></div>}
     {workflow && <>
       <div className="ws-workflow-heading"><div className="ws-workflow-copy"><div className="ws-workflow-meta"><span className="ws-workflow-code">{workflow.workflowCode}</span><span className={`ws-badge ws-status-${workflow.status?.toLowerCase()}`}>{workflowStatusLabel(workflow.status)}</span><span className="ws-version">Phiên bản {workflow.versionNo}</span></div><h3>{workflow.workflowName}</h3></div>
-        <div className="ws-workflow-actions"><div className="ws-workflow-count"><strong>{steps.length}</strong><span>bước phát lời nói</span></div><Link className="ws-button" to={`/workflow?workflowId=${workflow.workflowId}`} onClick={event => {
-          if (saving || dirty && !window.confirm('Bỏ các thay đổi chưa lưu để mở trình thiết kế workflow?')) event.preventDefault();
+        <div className="ws-workflow-actions"><div className="ws-workflow-count"><strong>{steps.length}</strong><span>bước phát lời nói</span></div><Link className="ws-button" to={`/workflow?workflowId=${workflow.workflowId}`} onClick={async event => {
+          event.preventDefault();
+          if (saving || dirty && !await confirmAction('Bỏ các thay đổi chưa lưu để mở trình thiết kế workflow?')) return;
+          navigate(`/workflow?workflowId=${workflow.workflowId}`);
         }}>Mở workflow<SpeechIcon name="arrow" /></Link></div>
       </div>
       <div className="ws-list-toolbar"><div><h3>Các bước phát lời nói <span>{shown.length}</span></h3><p>Theo thứ tự thực hiện trong workflow.</p></div><label className="ws-search"><span>Tìm bước hoặc lời nói</span><span className="ws-search-control"><SpeechIcon name="search" /><input type="search" value={stepSearch} onChange={e => setStepSearch(e.target.value)} placeholder="Tìm bước hoặc nội dung lời nói…" /></span></label></div>

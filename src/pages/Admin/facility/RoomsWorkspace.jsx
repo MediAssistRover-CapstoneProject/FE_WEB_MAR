@@ -1,5 +1,6 @@
+import { confirmAction } from '../../../components/appDialog.js';
 import { cloneElement, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { allFacilityPages, facilityApi as api } from '../../../features/facility/facilityApi.js';
 import { getSession } from '../../../features/auth/session.js';
 import { ROOM_TYPES, isSosRoom, roomTypePatch } from '../../../features/facility/roomDefaults.js';
@@ -24,6 +25,7 @@ function Field({ label, children, wide = false }) {
 }
 
 export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyChange, refreshKey = 0 }) {
+  const navigate = useNavigate();
   const canEdit = getSession()?.account?.role === 'ADMIN';
   const [catalog, setCatalog] = useState(emptyCatalog);
   const [selectedId, setSelectedId] = useState(''), [mapId, setMapId] = useState('');
@@ -62,7 +64,13 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
     const guardLink = event => {
       const anchor = event.target.closest?.('a[href]');
       if (!anchor || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || anchor.target === '_blank') return;
-      if (busy || !window.confirm('Bạn có thay đổi chưa lưu. Bỏ thay đổi và rời trang?')) { event.preventDefault(); event.stopPropagation(); }
+      event.preventDefault(); event.stopPropagation();
+      if (busy) return;
+      const destination = new URL(anchor.href, window.location.href);
+      if (destination.origin !== window.location.origin) return;
+      void confirmAction('Bạn có thay đổi chưa lưu. Bỏ thay đổi và rời trang?').then(accepted => {
+        if (accepted) navigate(destination.pathname + destination.search + destination.hash);
+      });
     };
     window.addEventListener('beforeunload', warn);
     document.addEventListener('click', guardLink, true);
@@ -119,18 +127,18 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
     setPointId(current => points.some(point => point.endpointId === current) ? current : points[0]?.endpointId || '');
   }, [endpoints, selectedId, mapId]);
 
-  const confirmLeave = () => !busy && (!dirty || window.confirm('Bạn có thay đổi chưa lưu. Bỏ thay đổi và tiếp tục?'));
+  const confirmLeave = async () => !busy && (!dirty || await confirmAction('Bạn có thay đổi chưa lưu. Bỏ thay đổi và tiếp tục?'));
   const resetPoint = () => { setPointForm(null); setDrawing(false); setLinkMode(''); setTargetId(''); };
-  const chooseRoom = id => {
-    if ((!creating && id === selectedId) || !confirmLeave()) return;
+  const chooseRoom = async id => {
+    if ((!creating && id === selectedId) || !await confirmLeave()) return;
     setCreating(false); setSelectedId(id); setEditing(false); resetPoint(); setFeedback(null);
   };
-  const startCreate = () => {
-    if (locked || !confirmLeave()) return;
+  const startCreate = async () => {
+    if (locked || !await confirmLeave()) return;
     setForm(newRoomForm(rooms, floors.find(floor => floor.floorId === floorFilter && floor.active)?.floorId || floors.find(floor => floor.active)?.floorId || ''));
     setCreating(true); setEditing(true); resetPoint(); setFeedback(null);
   };
-  const refresh = () => { if (confirmLeave()) setReload(value => value + 1); };
+  const refresh = async () => { if (await confirmLeave()) setReload(value => value + 1); };
   const updateRoom = value => {
     setCatalog(current => ({ ...current, rooms: current.rooms.some(room => room.roomId === value.roomId)
       ? current.rooms.map(room => room.roomId === value.roomId ? value : room) : [...current.rooms, value] }));
@@ -197,8 +205,8 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
       setFeedback({ text: active ? 'Đã kích hoạt lại điểm đích.' : 'Đã ngừng sử dụng điểm đích.' });
     });
   };
-  const startLink = mode => {
-    if (pointDirty && !window.confirm('Bỏ thay đổi chưa lưu của điểm để đổi liên kết?')) return;
+  const startLink = async mode => {
+    if (pointDirty && !await confirmAction('Bỏ thay đổi chưa lưu của điểm để đổi liên kết?')) return;
     resetPoint(); setLinkMode(mode); setFeedback(null);
   };
   const saveLink = event => {
@@ -225,8 +233,8 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
       resetPoint(); setPointId(result.endpointId); setFeedback({ text: 'Đã cập nhật liên kết điểm đến.' });
     });
   };
-  const detachPoint = () => {
-    if (!point || !window.confirm(`Bỏ liên kết “${point.endpointName}” khỏi phòng? Điểm vẫn được giữ trên bản đồ.`)) return;
+  const detachPoint = async () => {
+    if (!point || !await confirmAction(`Bỏ liên kết “${point.endpointName}” khỏi phòng? Điểm vẫn được giữ trên bản đồ.`)) return;
     write(async () => {
       const result = await api.updateEndpoint(point.endpointId, endpointRoomPayload(point, null));
       if (result?.endpointId !== point.endpointId || result.mapId !== mapId || result.roomId) throw Error('Máy chủ chưa xác nhận bỏ liên kết. Tải lại để kiểm tra.');
@@ -246,8 +254,8 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
     if (creating || dirty || busy || loading || filtered.some(room => room.roomId === selectedId)) return;
     setSelectedId(filtered[0]?.roomId || '');
   }, [visibleIds, selectedId, creating, dirty, busy, loading]);
-  const changeFilter = (setter, value) => {
-    if (!confirmLeave()) return;
+  const changeFilter = async (setter, value) => {
+    if (!await confirmLeave()) return;
     if (roomDirty) setForm(room ? roomForm(room) : null);
     setCreating(false);
     setEditing(false); resetPoint(); setter(value);
@@ -300,16 +308,16 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
             {!creating && <Field label="Mã phòng"><input required maxLength={64} value={form.roomCode} onChange={event => set('roomCode', event.target.value)} /></Field>}
             <Field label="Nhóm điểm mặc định"><select value={form.defaultEndpointGroupId} onChange={event => set('defaultEndpointGroupId', event.target.value)}><option value="">Không dùng nhóm mặc định</option>{groups.filter(group => maps.some(map => map.mapId === group.mapId && map.floorId === form.floorId)).map(group => <option key={group.endpointGroupId} value={group.endpointGroupId}>{group.groupName}{!group.active ? ' · Ngừng hoạt động' : ''}</option>)}</select></Field>
           </div><p className="lo-muted">Mã phòng phải duy nhất trong hệ thống. Nhóm điểm mặc định được cấu hình riêng với các điểm liên kết bên dưới.</p></details>
-          <div className="rw-save"><span>{roomDirty ? 'Có thay đổi chưa lưu' : 'Thông tin đã được lưu'}</span><button type="button" className="lo-button" onClick={() => { if (!roomDirty || window.confirm('Bỏ các thay đổi thông tin phòng?')) { setCreating(false); setForm(room ? roomForm(room) : null); setEditing(false); } }}>Hủy chỉnh sửa</button><button type="submit" className="lo-button lo-primary" disabled={!roomDirty}>{busy ? 'Đang lưu…' : creating ? 'Lưu phòng mới' : 'Lưu thông tin phòng'}</button></div>
+          <div className="rw-save"><span>{roomDirty ? 'Có thay đổi chưa lưu' : 'Thông tin đã được lưu'}</span><button type="button" className="lo-button" onClick={async () => { if (!roomDirty || await confirmAction('Bỏ các thay đổi thông tin phòng?')) { setCreating(false); setForm(room ? roomForm(room) : null); setEditing(false); } }}>Hủy chỉnh sửa</button><button type="submit" className="lo-button lo-primary" disabled={!roomDirty}>{busy ? 'Đang lưu…' : creating ? 'Lưu phòng mới' : 'Lưu thông tin phòng'}</button></div>
           </fieldset>
         </form> : <><dl className="lo-job-facts rw-facts"><div><dt>Loại phòng</dt><dd>{labelType(room.roomType)}</dd></div><div><dt>Khoa phụ trách</dt><dd>{room.departmentCode || 'Chưa cập nhật'}</dd></div></dl><div className="rw-description"><strong>Mô tả</strong><p>{room.description || 'Chưa có mô tả cho phòng này.'}</p></div></>}
 
         {!creating && <section className="rw-points" aria-label="Điểm đến robot của phòng">
           <header className="rw-section-heading"><div><h4>Điểm đến robot</h4><p>Đổi tên, vị trí hoặc chọn điểm khác cho phòng.</p></div><span className="lo-badge lo-running">{linked.length} điểm trên map</span></header>
-          <Field label="Bản đồ của phòng"><select value={mapId} disabled={busy} onChange={event => { if ((!pointDirty && !targetId) || window.confirm('Bỏ thay đổi điểm chưa lưu để chuyển bản đồ?')) { resetPoint(); setMapId(event.target.value); } }}>{!roomMaps.length && <option value="">Tầng này chưa có bản đồ</option>}{roomMaps.map(map => <option key={map.mapId} value={map.mapId}>{map.mapName} · v{map.versionNo} · {mapState[map.status] || map.status}</option>)}</select></Field>
+          <Field label="Bản đồ của phòng"><select value={mapId} disabled={busy} onChange={async event => { const value = event.target.value; if ((!pointDirty && !targetId) || await confirmAction('Bỏ thay đổi điểm chưa lưu để chuyển bản đồ?')) { resetPoint(); setMapId(value); } }}>{!roomMaps.length && <option value="">Tầng này chưa có bản đồ</option>}{roomMaps.map(map => <option key={map.mapId} value={map.mapId}>{map.mapName} · v{map.versionNo} · {mapState[map.status] || map.status}</option>)}</select></Field>
           {map?.status === 'ARCHIVED' && <p className="lo-muted">Bản đồ đã lưu trữ, chỉ có thể xem điểm.</p>}
           {linked.length > 0 ? <>
-            <Field label="Điểm liên kết"><select value={pointId} disabled={busy || !!linkMode} onChange={event => { if (!pointDirty || window.confirm('Bỏ thay đổi chưa lưu để chọn điểm khác?')) { resetPoint(); setPointId(event.target.value); } }}>{linked.map(point => <option key={point.endpointId} value={point.endpointId}>{point.endpointName} · {point.endpointCode}{!point.active ? ' · Ngừng hoạt động' : !point.accessible ? ' · Không thể tiếp cận' : ''}</option>)}</select></Field>
+            <Field label="Điểm liên kết"><select value={pointId} disabled={busy || !!linkMode} onChange={async event => { const value = event.target.value; if (!pointDirty || await confirmAction('Bỏ thay đổi chưa lưu để chọn điểm khác?')) { resetPoint(); setPointId(value); } }}>{linked.map(point => <option key={point.endpointId} value={point.endpointId}>{point.endpointName} · {point.endpointCode}{!point.active ? ' · Ngừng hoạt động' : !point.accessible ? ' · Không thể tiếp cận' : ''}</option>)}</select></Field>
             {point && !pointForm && <div className="rw-point-card"><div><strong>{point.endpointName}</strong><span>{point.endpointCode} · {ENDPOINT_CATEGORIES[point.endpointType] || point.endpointType}</span></div><dl><div><dt>Vị trí</dt><dd>X {point.xM} · Y {point.yM} m</dd></div><div><dt>Hướng</dt><dd>{(Number(point.yawRad) * 180 / Math.PI).toFixed(1)}°</dd></div><div><dt>Hiển thị</dt><dd>{point.publicVisible ? 'Công khai' : 'Nội bộ'}</dd></div><div><dt>Trạng thái</dt><dd>{!point.active ? 'Ngừng sử dụng' : !point.accessible ? 'Không thể tiếp cận' : 'Có thể tiếp cận'}</dd></div></dl></div>}
           </> : <div className="rw-no-point"><strong>Chưa có điểm trên bản đồ này</strong><p>Gắn một endpoint để thiết lập vị trí robot đến phòng.</p></div>}
           {canEdit && !pointForm && !linkMode && <div className="rw-actions"><button type="button" className="lo-button lo-primary" disabled={pointLocked || !map} onClick={() => startLink('attach')}>+ Gắn thêm điểm</button>{point && <><button type="button" className="lo-button" disabled={pointLocked} onClick={() => { setPointForm({ ...point }); setFeedback(null); }}>Chỉnh sửa điểm</button><button type="button" className="lo-button" disabled={pointLocked} onClick={() => startLink('replace')}>Đổi sang điểm khác</button><button type="button" className="lo-text-button rw-danger" disabled={pointLocked} onClick={detachPoint}>Bỏ liên kết</button></>}</div>}
@@ -320,7 +328,7 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
             <form aria-label="Chỉnh sửa điểm đến" onSubmit={savePoint}><fieldset className="rw-fieldset" disabled={pointLocked}><legend>Chỉnh điểm đích</legend>
               <EndpointFields endpoint={pointForm} setEndpoint={setPointForm} mapId={mapId} zones={zones} rooms={rooms.filter(room => room.floorId === map?.floorId)} fixedRoom={room} />
               <button type="button" className="lo-button" onClick={() => setDrawing(value => !value)}>{drawing ? 'Hủy đặt điểm' : 'Đặt lại vị trí / hướng'}</button>
-              <div className="rw-save"><span>{pointDirty ? 'Điểm có thay đổi chưa lưu' : 'Điểm chưa thay đổi'}</span><button type="button" className="lo-button" onClick={() => { if (!pointDirty || window.confirm('Bỏ thay đổi của điểm?')) resetPoint(); }}>Bỏ thay đổi</button><button type="submit" className="lo-button lo-primary" disabled={!pointDirty}>{busy ? 'Đang lưu…' : 'Lưu thay đổi'}</button></div>
+              <div className="rw-save"><span>{pointDirty ? 'Điểm có thay đổi chưa lưu' : 'Điểm chưa thay đổi'}</span><button type="button" className="lo-button" onClick={async () => { if (!pointDirty || await confirmAction('Bỏ thay đổi của điểm?')) resetPoint(); }}>Bỏ thay đổi</button><button type="submit" className="lo-button lo-primary" disabled={!pointDirty}>{busy ? 'Đang lưu…' : 'Lưu thay đổi'}</button></div>
             </fieldset></form>
           </div>}
           {map && <details className="rw-map-preview" open={drawing || undefined}><summary>Xem vị trí trên bản đồ</summary><FacilityGeometryPreview map={map} zones={zones} endpoints={endpoints.filter(point => point.roomId === selectedId)} endpointEdit={pointForm || point} showInactiveEndpoints drawing={drawing && !pointLocked} allowDraftMove={!!pointForm && !pointLocked} onPoint={value => { if (pointForm) setPointForm(current => ({ ...current, ...value })); }} onPlacementEnd={() => setDrawing(false)} /><Link className="lo-text-button" to={`/admin/map?mapId=${encodeURIComponent(mapId)}`}>Mở Map Studio →</Link></details>}

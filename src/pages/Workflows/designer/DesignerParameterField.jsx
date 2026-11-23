@@ -1,3 +1,4 @@
+import { promptValue } from '../../../components/appDialog.js';
 import { copy, effectiveParams, inputRef } from '../../../features/workflows/designer/designerModel.js';
 import { variableFitsField } from '../../../features/workflows/designer/stepCatalog.js';
 import { Field, ConditionFields } from './DesignerFields.jsx';
@@ -6,10 +7,10 @@ import StructuredEditor from './StructuredEditors.jsx';
 
 export default function ParameterField({ field, value, document, node, onSet, change, readOnly, catalog, onError, jsonChange }) {
   const set = next => onSet(next, typeof next?.$ref === 'string' ? 'reference' : 'fixed');
-  const addVariable = () => {
+  const addVariable = async () => {
     const service = field.key === 'service_request_id';
     const proposed = field.key === 'endpoint_id' ? `destination_${document.variables.length}_endpoint_id` : field.key;
-    const key = service ? 'service_request_id' : window.prompt('Khóa biến mới (chữ, số và dấu _):', proposed);
+    const key = service ? 'service_request_id' : await promptValue('Khóa biến mới (chữ, số và dấu _):', proposed);
     if (!key) return;
     const existing = document.variables.find(v => v.key === key);
     if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(key) || existing && (!service || !variableFitsField(existing, field))) { onError('Khóa biến đã tồn tại hoặc không đúng kiểu. Dùng một khóa khác hoặc sửa kiểu biến.'); return; }

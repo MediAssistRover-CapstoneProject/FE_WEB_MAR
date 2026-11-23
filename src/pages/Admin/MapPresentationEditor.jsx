@@ -1,3 +1,4 @@
+import { confirmAction } from '../../components/appDialog.js';
 import { useEffect, useRef, useState } from 'react';
 import { apiRequest } from '../../features/api/client.js';
 import { getSession } from '../../features/auth/session.js';
@@ -340,7 +341,7 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
       setNotice(name === 'publish' ? 'Đã áp dụng bản đồ và đồng bộ phòng, điểm đích vào database.' : name === 'unpublish' ? 'Đã bỏ áp dụng bản vẽ, giữ lại bản nháp.' : 'Đã lưu bản nháp trên máy chủ.');
     } catch (e) { setError(e.message); } finally { actionLock.current = false; setBusy(false); }
   };
-  const discardReload = () => { if (!dirty || window.confirm('Bỏ các chỉnh sửa chưa lưu và tải lại?')) setReload(v => v + 1); };
+  const discardReload = async () => { if (!dirty || await confirmAction('Bỏ các chỉnh sửa chưa lưu và tải lại?')) setReload(v => v + 1); };
   const pointerCancel = () => {
     if (drag.current?.before) { current.current = drag.current.before; setDocument(drag.current.before); }
     drag.current = null; setPoints([]); doorEdge.current = null; lastPointer.current = null; clearDrawingHints();
@@ -359,9 +360,9 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
     }
     change({ ...document, features: [...document.features, clone] }); setSelectedId(clone.id);
   };
-  const removeSelected = () => {
+  const removeSelected = async () => {
     if (!selected || busy || preview) return;
-    if (selected.type === 'ROOM' && selected.roomId && !window.confirm('Khi Áp dụng bản đồ, phòng này sẽ ngừng hoạt động nếu không còn dùng trên map khác; các điểm đến của phòng trên map này cũng ngừng sử dụng. Lịch sử được giữ lại. Bạn vẫn có thể hoàn tác trước khi áp dụng. Xóa phòng khỏi bản vẽ?')) return;
+    if (selected.type === 'ROOM' && selected.roomId && !await confirmAction('Khi Áp dụng bản đồ, phòng này sẽ ngừng hoạt động nếu không còn dùng trên map khác; các điểm đến của phòng trên map này cũng ngừng sử dụng. Lịch sử được giữ lại. Bạn vẫn có thể hoàn tác trước khi áp dụng. Xóa phòng khỏi bản vẽ?')) return;
     change({ ...document, features: document.features.filter(feature => feature.id !== selected.id) }); setSelectedId('');
   };
   useEffect(() => {
@@ -378,7 +379,7 @@ export default function MapPresentationEditor({ mapId, onOpenLibrary, onDirtyCha
   }, [entry, loading]);
   useEffect(() => {
     const keydown = event => {
-      if (!entry || !document || busy || entry.sourceChanged) return;
+      if (!entry || !document || busy || entry.sourceChanged || event.target.closest?.('dialog')) return;
       const editing = event.target instanceof HTMLElement && (event.target.matches('input,select,textarea') || event.target.isContentEditable);
       const activatingControl = event.target instanceof HTMLElement && event.target.matches('button,summary,a');
       const modifier = event.ctrlKey || event.metaKey, key = event.key.toLowerCase();

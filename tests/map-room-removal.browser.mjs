@@ -62,11 +62,13 @@ await mkdir('.workstation-build/map-room-removal', { recursive: true });
 try {
   await page.goto(base + '/admin/map?mapId=m1&stage=presentation');
   await layers.filter({ hasText: 'Phòng 05' }).click();
-  page.once('dialog', dialog => { assert.match(dialog.message(), /ngừng hoạt động/); return dialog.dismiss(); });
+  const confirmation1 = page.getByRole('dialog', { name: 'Xác nhận thao tác' }).waitFor().then(async () => { assert.match(await page.getByRole('dialog').innerText(), /ngừng hoạt động/); await page.getByRole('dialog', { name: 'Xác nhận thao tác' }).getByRole('button', { name: 'Hủy', exact: true }).click(); });
   await page.getByRole('button', { name: /^Xóa/ }).click();
+  await confirmation1;
   await expect(layers.filter({ hasText: 'Phòng 05' })).toHaveCount(1);
-  page.once('dialog', dialog => dialog.accept());
+  const confirmation2 = page.getByRole('dialog', { name: 'Xác nhận thao tác' }).waitFor().then(async () => {  await page.getByRole('dialog', { name: 'Xác nhận thao tác' }).getByRole('button', { name: 'Xác nhận', exact: true }).click(); });
   await page.getByRole('button', { name: /^Xóa/ }).click();
+  await confirmation2;
   await expect(retirementNote).toContainText('Phòng 05');
   assert.equal(writes.length, 0); assert.equal(rooms[0].active, true); assert.equal(configured, 'r5');
   await page.getByRole('button', { name: '↶ Hoàn tác', exact: true }).click();
@@ -95,8 +97,9 @@ try {
   await page.screenshot({ path: '.workstation-build/map-room-removal/catalog.png', fullPage: true });
   await page.goto(base + '/admin/map?mapId=m1&stage=presentation');
   await layers.filter({ hasText: 'Phòng dùng chung' }).click();
-  page.once('dialog', dialog => dialog.accept());
+  const confirmation3 = page.getByRole('dialog', { name: 'Xác nhận thao tác' }).waitFor().then(async () => {  await page.getByRole('dialog', { name: 'Xác nhận thao tác' }).getByRole('button', { name: 'Xác nhận', exact: true }).click(); });
   await page.getByRole('button', { name: /^Xóa/ }).click();
+  await confirmation3;
   await apply.click();
   await expect(page.getByRole('status')).toContainText('Đã áp dụng bản đồ');
   assert.equal(entry.published.features.length, 0, 'Removing the last room is publishable');

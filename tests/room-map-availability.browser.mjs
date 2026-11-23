@@ -80,8 +80,9 @@ try {
   await detail.getByLabel('Tên phòng', { exact: true }).fill('Tên chưa lưu');
   await activate('a');
   await expect(detail.getByLabel('Tên phòng', { exact: true })).toHaveValue('Tên chưa lưu');
-  page.once('dialog', dialog => dialog.accept());
+  const confirmation1 = page.getByRole('dialog', { name: 'Xác nhận thao tác' }).waitFor().then(async () => {  await page.getByRole('dialog', { name: 'Xác nhận thao tác' }).getByRole('button', { name: 'Xác nhận', exact: true }).click(); });
   await detail.getByRole('button', { name: 'Hủy chỉnh sửa', exact: true }).click();
+  await confirmation1;
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await page.getByLabel('Lọc trạng thái phòng').selectOption('active');
   await expect(list).toContainText('Phòng map cũ');

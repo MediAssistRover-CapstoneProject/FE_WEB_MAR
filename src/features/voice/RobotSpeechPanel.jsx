@@ -1,3 +1,4 @@
+import { confirmAction } from '../../components/appDialog.js';
 import { useEffect, useRef, useState } from 'react';
 import { robotSpeechApi, robotVoices, speechFailure, speechProfileError } from './robotSpeechApi.js';
 import './robotSpeech.css';
@@ -114,8 +115,8 @@ export default function RobotSpeechPanel({ onDirtyChange }) {
     <header className="rv-heading"><div className="rv-heading-copy"><span className="rv-heading-icon"><VoiceIcon name="wave" /></span><div>
       <span className="rv-eyebrow">CẤU HÌNH ÂM THANH</span><h2>Giọng nói của robot</h2>
       <p>Một giọng nói nhất quán cho mọi tương tác của robot.</p></div></div>
-      <button className="rv-button rv-refresh" disabled={!!busy} onClick={() => {
-        if (dirty && !window.confirm('Bỏ các thay đổi giọng robot chưa lưu và tải lại?')) return;
+      <button className="rv-button rv-refresh" disabled={!!busy} onClick={async () => {
+        if (dirty && !await confirmAction('Bỏ các thay đổi giọng robot chưa lưu và tải lại?')) return;
         stop(); run('load', load);
       }}><VoiceIcon name="refresh" />Tải lại cấu hình</button>
     </header>

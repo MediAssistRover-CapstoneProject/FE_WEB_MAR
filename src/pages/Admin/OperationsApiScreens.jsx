@@ -1,3 +1,4 @@
+import { confirmAction } from '../../components/appDialog.js';
 import { vi } from '../../i18n/vi.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { injectStyles } from '../../styles/injectStyles.js';
@@ -33,7 +34,7 @@ export function LiveOperationsApiScreen() {
   useEffect(() => { load(); }, [load]);
   const active = data.jobs.filter((job) => isActiveJob(job.status));
   const queued = data.jobs.filter((job) => /queued|pending|created/i.test(job.status || '')).length;
-  const cancel = async (job) => { if (!window.confirm(`Hủy công việc ${job.jobCode || 'đang chọn'}?`)) return; try { await operationsApi.cancelJob(job.jobId, 'Cancelled from Live Operations'); setMessage('Job cancelled.'); load(); } catch (error) { setMessage(error.message || 'Unable to cancel job.'); } };
+  const cancel = async (job) => { if (!await confirmAction(`Hủy công việc ${job.jobCode || 'đang chọn'}?`)) return; try { await operationsApi.cancelJob(job.jobId, 'Cancelled from Live Operations'); setMessage('Job cancelled.'); load(); } catch (error) { setMessage(error.message || 'Unable to cancel job.'); } };
   return <section className="api-ops" aria-label={vi("Live operations")}>
     <header className="api-ops-header"><div><p className="api-ops-kicker">{vi("Job operations")}</p><h2>{vi("Live Operations")}</h2><p>{vi("Live jobs, service requests and robot assignments from the operations API.")}</p></div><button onClick={load} disabled={loading}>{vi(loading ? 'Refreshing…' : 'Refresh')}</button></header>
     {vi(message && <p className={message.includes('Unable') || message.includes('Cannot') ? 'api-ops-error' : 'api-ops-note'}>{vi(message)}</p>)}

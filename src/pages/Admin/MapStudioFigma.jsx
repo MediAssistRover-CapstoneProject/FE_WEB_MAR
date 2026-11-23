@@ -1,3 +1,4 @@
+import { confirmAction } from '../../components/appDialog.js';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { vi } from '../../i18n/vi.js';
@@ -23,9 +24,9 @@ export default function MapStudioFigma({initialStage='scan'}) {
   const [showLibrary,setShowLibrary]=useState(()=>!mapId&&stage==='scan'&&new URLSearchParams(window.location.search).get('stage')!=='scan');
   const [copyNotice,setCopyNotice]=useState('');
   const [presentationDirty,setPresentationDirty]=useState(false);
-  const canLeave=()=>!presentationDirty||window.confirm('Bản đồ còn chỉnh sửa chưa lưu. Bỏ thay đổi và rời trang chỉnh sửa?');
-  const openLibrary=()=>{if(canLeave())setShowLibrary(true);};
-  const switchStage=target=>{if(target===stage||canLeave()){setStage(target);navigate('/admin/map?'+new URLSearchParams({...(mapId?{mapId}:{}),stage:target}),{replace:true});}};
+  const canLeave=async()=>!presentationDirty||await confirmAction('Bản đồ còn chỉnh sửa chưa lưu. Bỏ thay đổi và rời trang chỉnh sửa?');
+  const openLibrary=async()=>{if(await canLeave())setShowLibrary(true);};
+  const switchStage=async target=>{if(target===stage||await canLeave()){setStage(target);navigate('/admin/map?'+new URLSearchParams({...(mapId?{mapId}:{}),stage:target}),{replace:true});}};
   const index=workflow.findIndex(([id])=>id===stage);
   const openMap=(id,target)=>{
     setMapId(id);

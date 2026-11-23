@@ -111,11 +111,13 @@ try {
   await form.getByLabel('Khoa phụ trách').selectOption('CARDIOLOGY');
   await form.getByLabel('Mô tả phòng').fill('Nhận hàng tại cửa chính.');
   await form.getByLabel('Công khai cho người dùng tra cứu').uncheck();
-  page.once('dialog', dialog => dialog.dismiss());
+  const confirmation1 = page.getByRole('dialog', { name: 'Xác nhận thao tác' }).waitFor().then(async () => {  await page.getByRole('dialog', { name: 'Xác nhận thao tác' }).getByRole('button', { name: 'Hủy', exact: true }).click(); });
   await roomList.getByRole('button', { name: /Kho dược nội bộ/ }).click();
+  await confirmation1;
   assert.equal(await form.getByLabel('Tên phòng', { exact: true }).inputValue(), 'Phòng Nội tổng hợp');
-  page.once('dialog', dialog => dialog.dismiss());
+  const confirmation2 = page.getByRole('dialog', { name: 'Xác nhận thao tác' }).waitFor().then(async () => {  await page.getByRole('dialog', { name: 'Xác nhận thao tác' }).getByRole('button', { name: 'Hủy', exact: true }).click(); });
   await page.getByRole('button', { name: /Danh sách tầng/ }).click();
+  await confirmation2;
   assert.equal(await form.isVisible(), true);
   rejectRoom = true;
   await form.getByRole('button', { name: 'Lưu thông tin phòng' }).click();
@@ -183,8 +185,9 @@ try {
   assert.equal(state.endpoints.find(point => point.endpointId === 'p2').roomId, 'r1');
   rejectDetach = false;
   await detail.getByRole('button', { name: 'Bỏ liên kết', exact: true }).waitFor();
-  page.once('dialog', dialog => dialog.accept());
+  const confirmation3 = page.getByRole('dialog', { name: 'Xác nhận thao tác' }).waitFor().then(async () => {  await page.getByRole('dialog', { name: 'Xác nhận thao tác' }).getByRole('button', { name: 'Xác nhận', exact: true }).click(); });
   await detail.getByRole('button', { name: 'Bỏ liên kết', exact: true }).click();
+  await confirmation3;
   await page.getByRole('status').filter({ hasText: 'Đã bỏ liên kết' }).waitFor();
   assert.equal(state.endpoints.find(point => point.endpointId === 'p4').roomId, null);
 
