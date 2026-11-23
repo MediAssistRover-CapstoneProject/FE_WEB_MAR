@@ -42,7 +42,10 @@ async function fixture(role = 'ADMIN', options = {}) {
       const row = state.rows.find(row => path.includes(row.staffProfileId) || path.includes(row.account.accountId));
       if (!row) return reply({ message: 'Missing fixture member' }, 404);
       if (req.method() === 'PUT') { for (const key of ['fullName', 'email', 'phone']) row.account[key] = body[key]; for (const key of ['staffCode', 'departmentCode', 'jobTitle', 'contactExtension', 'url']) row[key] = body[key]; return reply(row); }
-      if (req.method() === 'DELETE') { row.active = false; row.account.status = 'INACTIVE'; return reply(null, 204); }
+      if (req.method() === 'DELETE') {
+        if (!body?.reason || body.reason.trim().length < 5) return reply({ message: 'Invalid JSON or enum value' }, 400);
+        row.active = false; row.account.status = 'INACTIVE'; return reply(row);
+      }
       if (path.endsWith('/reset-password')) { row.account.mustChangePassword = true; return reply(null, 204); }
       row.account.status = path.endsWith('/unlock') ? 'ACTIVE' : 'LOCKED'; return reply(row.account);
     }
@@ -115,7 +118,11 @@ try {
   assert.equal(f.uploads.length, 1, 'stale edit must not upload its selected image');
   await dialog.getByRole('button', { name: 'Đóng biểu mẫu' }).click();
   await detail.getByRole('button', { name: 'Ngừng hoạt động nhân viên', exact: true }).click(); dialog = f.page.getByRole('dialog');
-  assert.equal(await dialog.getByText('Hệ thống hiện chưa hỗ trợ kích hoạt lại', { exact: false }).count(), 0); await dialog.getByRole('checkbox').check(); await dialog.getByRole('button', { name: 'Ngừng hoạt động nhân viên', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
+  assert.equal(await dialog.getByText('Hệ thống hiện chưa hỗ trợ kích hoạt lại', { exact: false }).count(), 0);
+  await dialog.getByRole('checkbox').check();
+  await dialog.getByLabel('Lý do ngừng hoạt động *').fill('Nhân viên chuyển công tác');
+  await dialog.getByRole('button', { name: 'Ngừng hoạt động nhân viên', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
+  assert.deepEqual(f.writes.at(-1).body, { reason: 'Nhân viên chuyển công tác' });
   assert.equal(f.writes.at(-1).method, 'DELETE'); assert.equal(f.writes.at(-1).path, `/api/v1/admin/staff/${id(1)}`);
   await f.page.getByRole('button', { name: 'Thêm nhân viên', exact: true }).click(); dialog = f.page.getByRole('dialog');
   assert.equal(await dialog.getByRole('heading', { name: 'Tạo tài khoản nhân viên', exact: true }).count(), 1);
