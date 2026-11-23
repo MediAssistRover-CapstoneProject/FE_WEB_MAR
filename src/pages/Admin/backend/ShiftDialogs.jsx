@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { callBackend, readCatalog } from '../../../features/api/backendApi.js';
-import { dateLabel, dayKey, fixedShiftPeriods, shiftActions, shiftFingerprint, shiftState, timeLabel, validateShift } from '../../../features/operations/staffShifts.js';
+import { dateLabel, dayKey, fixedShiftPeriods, shiftActions, shiftAttendance, shiftFingerprint, shiftState, timeLabel, validateShift } from '../../../features/operations/staffShifts.js';
 
 export const staffName = person => person?.account?.fullName || person?.fullName || person?.staffCode || 'Chưa có tên';
 export const roomName = room => room?.roomName || room?.roomCode || 'Chưa có tên phòng';
@@ -95,7 +95,7 @@ export function ShiftTransition({ action, onClose, onSaved, onRefresh }) {
   };
   return <Modal title={title} busy={busy} onClose={onClose}>
     <div className="ss-action-summary"><strong>{shift.shiftName}</strong><span>{dateLabel(shift.startsAt)} → {dateLabel(shift.endsAt)}</span></div>
-    <p className="ss-action-description">{target === 'ACTIVE' ? 'Staff sẽ được tính là đang trực trong thời gian và phòng đã phân.' : target === 'COMPLETED' ? early ? 'Bạn đang kết thúc ca trước giờ. Cần ghi rõ lý do và bảo đảm có người tiếp nhận phần trực còn lại.' : 'Ca chuyển sang hoàn tất. Staff không còn được tính là đang trực theo ca này.' : 'Ca sẽ ngừng hiệu lực và được giữ trong lịch sử. Kiểm tra lại phần giờ còn thiếu người sau khi hủy.'}</p>
+    <p className="ss-action-description">{target === 'ACTIVE' ? 'Ca được kích hoạt. Staff cần check-in trên ứng dụng trong giờ được phân để được tính đang trực.' : target === 'COMPLETED' ? early ? 'Bạn đang kết thúc ca trước giờ. Cần ghi rõ lý do và bảo đảm có người tiếp nhận phần trực còn lại.' : 'Ca chuyển sang hoàn tất. Staff không còn được tính là đang trực theo ca này. Thao tác này không thay cho check-out của staff.' : 'Ca sẽ ngừng hiệu lực và được giữ trong lịch sử. Kiểm tra lại phần giờ còn thiếu người sau khi hủy.'}</p>
     <form onSubmit={submit}><label className="ss-form-label">{required ? 'Lý do *' : 'Ghi chú'}<textarea rows={3} maxLength={4000} value={note} disabled={busy} onChange={e => setNote(e.target.value)} /></label>
       {error && <p role="alert" className="ss-notice ss-notice-error">{error}</p>}
       <footer className="ss-dialog-footer"><button type="button" disabled={busy} onClick={onClose}>Quay lại</button><button type="submit" disabled={busy} className={target === 'CANCELLED' ? 'ss-danger' : 'ss-primary'}>{busy ? 'Đang cập nhật…' : title}</button></footer>
@@ -105,10 +105,10 @@ export function ShiftTransition({ action, onClose, onSaved, onRefresh }) {
 
 export function ShiftDetails({ shift, data, now, onClose }) {
   const person = data.staff.find(p => p.staffProfileId === shift.staffProfileId), room = data.rooms.find(r => r.roomId === shift.roomId);
-  const state = shiftState(shift, now);
+  const state = shiftState(shift, now), attendance = shiftAttendance(shift);
   return <Modal title="Chi tiết ca trực" subtitle={shift.shiftName} onClose={onClose}>
-    <span className={`ss-badge ss-${state.tone}`}>{state.label}</span>
-    <dl className="ss-facts"><div><dt>Người trực</dt><dd>{person ? staffName(person) : shift.staffCode}</dd></div><div><dt>Phòng phụ trách</dt><dd>{room ? roomName(room) : shift.roomCode}</dd></div><div><dt>Bắt đầu</dt><dd>{dateLabel(shift.startsAt)}</dd></div><div><dt>Kết thúc</dt><dd>{dateLabel(shift.endsAt)}</dd></div></dl>
+    <div className="ss-detail-status"><span className={`ss-badge ss-${state.tone}`}>{state.label}</span><span className={`ss-badge ss-${attendance.tone}`}>{attendance.label}</span></div>
+    <dl className="ss-facts"><div><dt>Người trực</dt><dd>{person ? staffName(person) : shift.staffCode}</dd></div><div><dt>Phòng phụ trách</dt><dd>{room ? roomName(room) : shift.roomCode}</dd></div><div><dt>Bắt đầu</dt><dd>{dateLabel(shift.startsAt)}</dd></div><div><dt>Kết thúc</dt><dd>{dateLabel(shift.endsAt)}</dd></div><div><dt>Check-in</dt><dd>{shift.checkedInAt ? dateLabel(shift.checkedInAt) : 'Chưa ghi nhận'}</dd></div><div><dt>Check-out</dt><dd>{shift.checkedOutAt ? dateLabel(shift.checkedOutAt) : 'Chưa ghi nhận'}</dd></div></dl>
     <section className="ss-detail-note"><h3>Ghi chú bàn giao</h3><p>{shift.note || 'Chưa có ghi chú.'}</p></section>
     <details className="ss-advanced"><summary>Mã tra cứu và khung giờ con</summary><p>Mã ca: {shift.shiftCode}</p>{shift.slots?.length ? <ul>{shift.slots.map(s => <li key={s.slotId}>{dateLabel(s.startsAt)} → {dateLabel(s.endsAt)} · {{ AVAILABLE: 'Sẵn sàng', BLOCKED: 'Tạm khóa', CLOSED: 'Đã đóng' }[s.status] || s.status}{s.note && ` · ${s.note}`}</li>)}</ul> : <p>Ca này không có khung giờ con.</p>}</details>
     <footer className="ss-dialog-footer"><button type="button" onClick={onClose}>Đóng</button></footer>

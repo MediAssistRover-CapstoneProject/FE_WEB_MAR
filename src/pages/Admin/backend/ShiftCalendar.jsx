@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { readCatalog } from '../../../features/api/backendApi.js';
-import { DAY_MS, SHIFT_STATUSES, dayKey, dayStart, displayBlocks, effectiveShift, fixedShiftPeriods, roomCoverage, shiftActions, shiftState, shiftsOnDay, timeLabel } from '../../../features/operations/staffShifts.js';
+import { DAY_MS, SHIFT_STATUSES, dateLabel, dayKey, dayStart, displayBlocks, effectiveShift, fixedShiftPeriods, roomCoverage, shiftActions, shiftAttendance, shiftState, shiftStatus, shiftsOnDay, timeLabel } from '../../../features/operations/staffShifts.js';
 import { ShiftDetails, ShiftForm, ShiftTransition, roomName, staffName } from './ShiftDialogs.jsx';
 import './shiftCalendar.css';
 
@@ -35,7 +35,14 @@ export default function ShiftCalendar({ role }) {
   const [draft, setDraft] = useState(null), [detailId, setDetailId] = useState(null), [action, setAction] = useState(null);
   const today = dayKey(now), refresh = () => setRevision(n => n + 1);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 15000); return () => clearInterval(timer); }, []);
-  useEffect(() => { if (!auto) return; const timer = setInterval(() => { if (document.visibilityState === 'visible') setTick(n => n + 1); }, 30000); return () => clearInterval(timer); }, [auto]);
+  useEffect(() => {
+    if (!auto) return;
+    const synchronize = () => { if (document.visibilityState === 'visible') { setNow(Date.now()); setTick(n => n + 1); } };
+    const timer = setInterval(synchronize, 30000);
+    window.addEventListener('focus', synchronize);
+    document.addEventListener('visibilitychange', synchronize);
+    return () => { clearInterval(timer); window.removeEventListener('focus', synchronize); document.removeEventListener('visibilitychange', synchronize); };
+  }, [auto]);
   useEffect(() => {
     if (!admin) return;
     const controller = new AbortController();
@@ -51,7 +58,7 @@ export default function ShiftCalendar({ role }) {
     const controller = new AbortController(); setRefreshing(true);
     readCatalog(admin ? 'GET /api/v1/admin/shifts' : 'GET /api/v1/staff/shifts', { signal: controller.signal }).then(shifts => {
       if (controller.signal.aborted) return;
-      setData(previous => ({ ...previous, shifts })); setError(''); setLoadedAt(Date.now());
+      setData(previous => ({ ...previous, shifts })); setError(''); setLoadedAt(Date.now()); setNow(Date.now());
     }).catch(cause => { if (!controller.signal.aborted) setError(cause.message || 'Không tải được lịch trực.'); })
       .finally(() => { if (!controller.signal.aborted) setRefreshing(false); });
     return () => controller.abort();
@@ -62,7 +69,7 @@ export default function ShiftCalendar({ role }) {
   const rooms = useMemo(() => new Map(data.rooms.map(r => [r.roomId, roomName(r)])), [data.rooms]);
   const scoped = useMemo(() => (data.shifts || []).filter(s => (!roomId || s.roomId === roomId) && (!search.trim() || [s.shiftName, s.shiftCode, s.staffCode, s.roomCode, people.get(s.staffProfileId), rooms.get(s.roomId)].join(' ').toLocaleLowerCase('vi').includes(search.trim().toLocaleLowerCase('vi')))), [data.shifts, roomId, search, people, rooms]);
   const daily = shiftsOnDay(scoped, selected).sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt) || String(a.shiftId).localeCompare(String(b.shiftId)));
-  const filtered = daily.filter(s => !status || (status === 'ATTENTION' ? shiftState(s, now).tone === 'warning' : s.status === status));
+  const filtered = daily.filter(s => !status || (status === 'ATTENTION' ? shiftState(s, now).tone === 'warning' : shiftStatus(s) === status));
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)), safePage = Math.min(page, totalPages - 1), visible = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
   const blocks = displayBlocks(selected, hours), activeRooms = data.rooms.filter(r => r.active !== false && (!roomId || r.roomId === roomId));
   const [year, monthNumber] = month.split('-').map(Number), offset = (dateAt(year, monthNumber - 1, 1).getUTCDay() + 6) % 7, days = dateAt(year, monthNumber, 0).getUTCDate();
@@ -90,7 +97,7 @@ export default function ShiftCalendar({ role }) {
     {notice && <div className="ss-notice ss-notice-success" role="status"><span>{notice}</span><button aria-label="Ẩn thông báo" onClick={() => setNotice('')}>×</button></div>}
     <div className="ss-metrics" aria-label="Tóm tắt ngày đang chọn">{[
       { label: 'Ca trong ngày', value: daily.filter(s => s.status !== 'CANCELLED').length, icon: 'calendar', tone: 'blue' },
-      { label: selected === today ? 'Đang trực lúc này' : 'Ca đang kích hoạt', value: daily.filter(s => selected === today ? effectiveShift(s, now) : s.status === 'ACTIVE').length, icon: 'user', tone: 'green' },
+      { label: selected === today ? 'Đang trực lúc này' : 'Ca đang kích hoạt', value: daily.filter(s => selected === today ? effectiveShift(s, now) : shiftStatus(s) === 'ACTIVE').length, icon: 'user', tone: 'green' },
       { label: 'Đã lên lịch', value: daily.filter(s => s.status === 'PLANNED').length, icon: 'clock', tone: 'violet' },
       { label: 'Cần kiểm tra', value: daily.filter(s => shiftState(s, now).tone === 'warning').length, icon: 'alert', tone: 'amber' },
     ].map(metric => <div className={`ss-metric ss-metric-${metric.tone}`} key={metric.label}><span><Icon name={metric.icon} /></span><div><strong>{data.shifts === null ? '—' : metric.value}</strong><p>{metric.label}</p></div></div>)}</div>
@@ -102,7 +109,7 @@ export default function ShiftCalendar({ role }) {
           return <button key={day} aria-label={`${day}, ${data.shifts === null ? 'chưa tải' : `${count} ca trực`}`} aria-pressed={selected === day} aria-current={day === today ? 'date' : undefined} onClick={() => setSelected(day)}><b>{index + 1}</b><small>{data.shifts !== null && count ? `${count} ca` : '\u00a0'}</small></button>;
         })}</div><button className="ss-today" onClick={() => { setSelected(today); setMonth(today.slice(0, 7)); }}>Về hôm nay</button>
         <p className="ss-small">Số ca theo phòng và từ khóa đang lọc, không gồm ca đã hủy.</p>
-      </section><section className="ss-sidebar-note"><Icon name="clock" /><div><strong>Giờ Việt Nam · UTC+7</strong><p>Ca chỉ có hiệu lực khi đã bắt đầu và đang trong khoảng giờ được phân.</p><label className="ss-auto"><input type="checkbox" checked={auto} onChange={e => setAuto(e.target.checked)} />Tự đồng bộ mỗi 30 giây</label><small>{loadedAt ? `Đồng bộ lúc ${timeLabel(loadedAt)}${error ? ' · Dữ liệu có thể đã cũ' : ''}` : 'Chưa nhận dữ liệu'}</small></div></section></aside>
+      </section><section className="ss-sidebar-note"><Icon name="clock" /><div><strong>Giờ Việt Nam · UTC+7</strong><p>Đang trực: ca đã kích hoạt, trong giờ được phân, staff đã check-in và chưa check-out. Ca tự hoàn tất khi staff check-out thành công.</p><label className="ss-auto"><input type="checkbox" checked={auto} onChange={e => setAuto(e.target.checked)} />Tự đồng bộ mỗi 30 giây</label><small>{loadedAt ? `Đồng bộ lúc ${timeLabel(loadedAt)}${error ? ' · Dữ liệu có thể đã cũ' : ''}` : 'Chưa nhận dữ liệu'}</small></div></section></aside>
       <main className="ss-panel ss-day" aria-label="Chi tiết ngày trực">
         <div className="ss-day-head"><div><span className="ss-eyebrow">LỊCH TRONG NGÀY</span><h3>{dayTitle(selected)}</h3></div><span className={`ss-badge ${selected === today ? 'ss-blue' : 'ss-muted'}`}>{selected === today ? 'Hôm nay' : selected < today ? 'Lịch sử' : 'Sắp tới'}</span></div>
         <div className="ss-filters"><label><span>Tìm kiếm</span><input type="search" value={search} placeholder="Tên ca, nhân viên, mã phòng…" onChange={e => setSearch(e.target.value)} /></label>{admin && <label><span>Phòng phụ trách</span><select value={roomId} onChange={e => setRoomId(e.target.value)}><option value="">Tất cả phòng</option>{data.rooms.map(r => <option value={r.roomId} key={r.roomId}>{roomName(r)}{r.active === false ? ' · Ngừng hoạt động' : ''}</option>)}</select></label>}<label><span>Trạng thái</span><select value={status} onChange={e => setStatus(e.target.value)}><option value="">Tất cả trạng thái</option>{Object.entries(SHIFT_STATUSES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}<option value="ATTENTION">Cần kiểm tra</option></select></label></div>
@@ -114,12 +121,13 @@ export default function ShiftCalendar({ role }) {
         }}><button role="tab" id="ss-list-tab" tabIndex={tab === 'list' ? 0 : -1} aria-controls="ss-list-panel" aria-selected={tab === 'list'} onClick={() => setTab('list')}>Danh sách ca <span>{filtered.length}</span></button>{admin && <button role="tab" id="ss-coverage-tab" tabIndex={tab === 'coverage' ? 0 : -1} aria-controls="ss-coverage-panel" aria-selected={tab === 'coverage'} onClick={() => setTab('coverage')}>Độ phủ phòng</button>}</div>
         {tab === 'list' ? <div role="tabpanel" id="ss-list-panel" aria-labelledby="ss-list-tab">
           {data.shifts === null ? <div className="ss-empty" role="status"><Icon /><h4>{error ? 'Chưa tải được lịch trực' : 'Đang tải lịch trực…'}</h4></div> : !filtered.length ? <div className="ss-empty"><Icon /><h4>{daily.length ? 'Không có ca phù hợp bộ lọc' : 'Chưa có ca trực phù hợp trong ngày'}</h4><p>{admin ? 'Chọn ngày, phòng khác hoặc phân ca mới cho nhân viên.' : 'Liên hệ quản trị viên nếu cần bổ sung lịch trực.'}</p>{(search || roomId || status) && <button onClick={() => { setSearch(''); setRoomId(''); setStatus(''); }}>Xóa bộ lọc</button>}</div> : <div className="ss-shift-list">{visible.map(shift => {
-            const state = shiftState(shift, now), allowed = shiftActions(shift, now), overnight = dayKey(shift.startsAt) !== dayKey(shift.endsAt);
+            const state = shiftState(shift, now), attendance = shiftAttendance(shift), allowed = shiftActions(shift, now), overnight = dayKey(shift.startsAt) !== dayKey(shift.endsAt);
             const startDay = dayKey(shift.startsAt).split('-').reverse().slice(0, 2).join('/'), endDay = dayKey(shift.endsAt).split('-').reverse().slice(0, 2).join('/');
             return <article className={`ss-shift ss-border-${state.tone}`} key={shift.shiftId} data-shift-id={shift.shiftId}>
               <div className="ss-shift-heading"><div><span className="ss-shift-time"><Icon name="clock" />{timeLabel(shift.startsAt)}–{timeLabel(shift.endsAt)}{overnight && <small>{startDay} → {endDay}</small>}</span><h4>{shift.shiftName}</h4></div><span className={`ss-badge ss-${state.tone}`}>{state.label}</span></div>
               <div className="ss-shift-meta"><span><Icon name="user" />{people.get(shift.staffProfileId) || shift.staffCode}</span><span><Icon name="room" />{rooms.get(shift.roomId) || shift.roomCode}</span></div>
-              {state.tone === 'warning' && <p className="ss-shift-warning"><Icon name="alert" />{shift.status === 'ACTIVE' ? 'Kiểm tra thời gian hiệu lực và cập nhật ca trực.' : Date.parse(shift.endsAt) <= now ? 'Ca đã quá giờ nhưng chưa bắt đầu. Kiểm tra lại lịch và ghi rõ lý do nếu hủy ca.' : 'Ca chưa có hiệu lực. Admin cần bắt đầu ca để staff được tính là đang trực.'}</p>}
+              <div className="ss-shift-attendance" aria-label="Điểm danh ca trực"><span className={`ss-badge ss-${attendance.tone}`}>{attendance.label}</span><span>Check-in: {shift.checkedInAt ? <time dateTime={shift.checkedInAt}>{dateLabel(shift.checkedInAt)}</time> : 'Chưa ghi nhận'}</span><span>Check-out: {shift.checkedOutAt ? <time dateTime={shift.checkedOutAt}>{dateLabel(shift.checkedOutAt)}</time> : 'Chưa ghi nhận'}</span></div>
+              {state.tone === 'warning' && <p className="ss-shift-warning"><Icon name="alert" />{shift.status === 'ACTIVE' ? 'Kiểm tra thời gian hiệu lực, điểm danh và cập nhật ca trực.' : Date.parse(shift.endsAt) <= now ? 'Ca đã quá giờ nhưng chưa bắt đầu. Kiểm tra lại lịch và ghi rõ lý do nếu hủy ca.' : 'Ca chưa có hiệu lực. Staff cần check-in trên ứng dụng trong giờ được phân để được tính đang trực.'}</p>}
               <footer className="ss-shift-footer"><button className="ss-text-button" onClick={() => setDetailId(shift.shiftId)}>Xem chi tiết →</button>{admin && <div className="ss-shift-actions">{allowed.edit && <button disabled={!catalogsReady || !!error} onClick={() => setDraft({ row: shift })}>Chỉnh sửa</button>}{allowed.start && <button className="ss-start" disabled={!!error} onClick={() => setAction({ shift, target: 'ACTIVE' })}>Bắt đầu trực</button>}{allowed.complete && <button className="ss-primary" disabled={!!error} onClick={() => setAction({ shift, target: 'COMPLETED' })}>Kết thúc ca</button>}{allowed.cancel && <button className="ss-text-button ss-danger-text" disabled={!!error} onClick={() => setAction({ shift, target: 'CANCELLED' })}>Hủy ca</button>}</div>}</footer>
             </article>;
           })}</div>}

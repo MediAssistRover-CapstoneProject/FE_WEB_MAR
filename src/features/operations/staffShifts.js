@@ -1,26 +1,36 @@
 export const SHIFT_ZONE = 'Asia/Ho_Chi_Minh';
 export const DAY_MS = 86400000;
 export const HOUR_MS = 3600000;
-export const SHIFT_STATUSES = { PLANNED: 'Đã lên lịch', ACTIVE: 'Đang trực', COMPLETED: 'Hoàn tất', CANCELLED: 'Đã hủy' };
+export const SHIFT_STATUSES = { PLANNED: 'Đã lên lịch', ACTIVE: 'Đã kích hoạt', COMPLETED: 'Hoàn tất', CANCELLED: 'Đã hủy' };
 export const dayKey = value => new Intl.DateTimeFormat('sv-SE', { timeZone: SHIFT_ZONE }).format(new Date(value));
 export const dayStart = day => Date.parse(`${day}T00:00:00+07:00`);
 export const timeLabel = value => new Intl.DateTimeFormat('vi-VN', { timeZone: SHIFT_ZONE, hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 export const dateLabel = value => new Intl.DateTimeFormat('vi-VN', { timeZone: SHIFT_ZONE, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 export const overlaps = (a, b, start, end) => Date.parse(a) < end && Date.parse(b) > start;
 export const shiftsOnDay = (shifts, day) => shifts.filter(s => overlaps(s.startsAt, s.endsAt, dayStart(day), dayStart(day) + DAY_MS));
-export const effectiveShift = (shift, now) => shift.status === 'ACTIVE' && Date.parse(shift.startsAt) <= now && Date.parse(shift.endsAt) > now;
+// Older responses can retain ACTIVE after checkout; attendance still ends the shift.
+export const shiftStatus = shift => shift.status === 'ACTIVE' && shift.checkedOutAt ? 'COMPLETED' : shift.status;
+export const effectiveShift = (shift, now) => shift.status === 'ACTIVE' && Date.parse(shift.checkedInAt) <= now && !shift.checkedOutAt && Date.parse(shift.startsAt) <= now && Date.parse(shift.endsAt) > now;
+
+export function shiftAttendance(shift) {
+  if (shift.checkedOutAt) return { label: 'Đã check-out', tone: 'violet' };
+  if (shift.checkedInAt) return { label: 'Đã check-in', tone: 'green' };
+  return { label: 'Chưa check-in', tone: 'muted' };
+}
 
 export function shiftState(shift, now) {
-  if (shift.status === 'PLANNED' && Date.parse(shift.endsAt) <= now) return { label: 'Quá giờ · chưa bắt đầu', tone: 'warning' };
-  if (shift.status === 'PLANNED' && Date.parse(shift.startsAt) <= now) return { label: 'Đến giờ · chưa bắt đầu', tone: 'warning' };
-  if (shift.status === 'ACTIVE' && Date.parse(shift.endsAt) <= now) return { label: 'Hết giờ · cần kết thúc', tone: 'warning' };
-  if (shift.status === 'ACTIVE' && Date.parse(shift.startsAt) > now) return { label: 'Đã kích hoạt · chưa đến giờ', tone: 'warning' };
-  return { label: SHIFT_STATUSES[shift.status] || shift.status, tone: { PLANNED: 'blue', ACTIVE: 'green', COMPLETED: 'violet', CANCELLED: 'muted' }[shift.status] || 'muted' };
+  const status = shiftStatus(shift);
+  if (status === 'PLANNED' && Date.parse(shift.endsAt) <= now) return { label: 'Quá giờ · chưa bắt đầu', tone: 'warning' };
+  if (status === 'PLANNED' && Date.parse(shift.startsAt) <= now) return { label: 'Đến giờ · chưa bắt đầu', tone: 'warning' };
+  if (status === 'ACTIVE' && Date.parse(shift.endsAt) <= now) return { label: 'Hết giờ · cần kết thúc', tone: 'warning' };
+  if (status === 'ACTIVE' && Date.parse(shift.startsAt) > now) return { label: 'Đã kích hoạt · chưa đến giờ', tone: 'warning' };
+  return { label: SHIFT_STATUSES[status] || status, tone: { PLANNED: 'blue', ACTIVE: 'green', COMPLETED: 'violet', CANCELLED: 'muted' }[status] || 'muted' };
 }
 
 export function shiftActions(shift, now) {
-  if (shift.status === 'PLANNED') return { edit: Date.parse(shift.endsAt) > now, start: Date.parse(shift.startsAt) <= now && Date.parse(shift.endsAt) > now, cancel: true, complete: false };
-  return { edit: false, start: false, cancel: shift.status === 'ACTIVE', complete: shift.status === 'ACTIVE' && Date.parse(shift.startsAt) <= now };
+  const status = shiftStatus(shift);
+  if (status === 'PLANNED') return { edit: Date.parse(shift.endsAt) > now, start: Date.parse(shift.startsAt) <= now && Date.parse(shift.endsAt) > now, cancel: true, complete: false };
+  return { edit: false, start: false, cancel: status === 'ACTIVE', complete: status === 'ACTIVE' && Date.parse(shift.startsAt) <= now };
 }
 
 export function displayBlocks(day, hours = 6) {
@@ -45,12 +55,12 @@ export function isFixedShiftPeriod(shift) {
 
 // Union intervals: multiple staff covering the same room must not inflate coverage.
 export function roomCoverage(shifts, roomId, start, end, now = Date.now()) {
-  const periods = shifts.filter(s => s.roomId === roomId && ['PLANNED', 'ACTIVE', 'COMPLETED'].includes(s.status) && overlaps(s.startsAt, s.endsAt, start, end))
+  const periods = shifts.filter(s => s.roomId === roomId && ['PLANNED', 'ACTIVE', 'COMPLETED'].includes(shiftStatus(s)) && overlaps(s.startsAt, s.endsAt, start, end))
     .map(s => {
-      const from = Date.parse(s.startsAt), to = Date.parse(s.endsAt), updated = Date.parse(s.updatedAt);
-      // Terminal shifts have no further edits in the current API; updatedAt is
-      // the transition time. Ignore invalid legacy timestamps outside the shift.
-      const completedEnd = s.status === 'COMPLETED' ? Math.min(to, now, Number.isFinite(updated) && updated >= from ? updated : to) : to;
+      const from = Date.parse(s.startsAt), to = Date.parse(s.endsAt), updated = Date.parse(s.updatedAt), checkedOut = Date.parse(s.checkedOutAt);
+      // Prefer actual checkout; admin-ended shifts use the transition timestamp.
+      const completedAt = Number.isFinite(checkedOut) && checkedOut >= from ? checkedOut : Number.isFinite(updated) && updated >= from ? updated : to;
+      const completedEnd = shiftStatus(s) === 'COMPLETED' ? Math.min(to, now, completedAt) : to;
       return [Math.max(start, from), Math.min(end, completedEnd)];
     }).filter(([from, to]) => from < to).sort((a, b) => a[0] - b[0]);
   let cursor = start;
@@ -65,7 +75,7 @@ export function roomCoverage(shifts, roomId, start, end, now = Date.now()) {
 }
 
 export function shiftFingerprint(shift) {
-  return JSON.stringify([shift.shiftId, shift.updatedAt, shift.status, shift.staffProfileId, shift.roomId, shift.shiftName, shift.startsAt, shift.endsAt, shift.note, shift.slots]);
+  return JSON.stringify([shift.shiftId, shift.updatedAt, shift.status, shift.staffProfileId, shift.roomId, shift.shiftName, shift.startsAt, shift.endsAt, shift.checkedInAt, shift.checkedOutAt, shift.note, shift.slots]);
 }
 
 export function validateShift(body, shifts, original, now) {

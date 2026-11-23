@@ -155,6 +155,52 @@ try {
   }
   assert.deepEqual(f.errors, []); await f.context.close();
 
+  // Legacy responses may still say ACTIVE, but checkout already ends the shift.
+  const attendance = await fixture();
+  const attended = attendance.state.rows.find(r => r.shiftId === id(2));
+  Object.assign(attended, { checkedInAt: instant(3, 9), checkedOutAt: null, endsAt: instant(3, 10) });
+  await attendance.page.clock.setFixedTime(new Date('2026-11-03T02:59:00Z'));
+  await attendance.start();
+  const onDuty = attendance.page.locator('.ss-metric').filter({ hasText: 'Đang trực lúc này' }).locator('strong');
+  assert.equal(await onDuty.innerText(), '1');
+  await attendance.card(2).getByText('Đã check-in', { exact: true }).waitFor();
+  await attendance.page.getByLabel('Tự đồng bộ mỗi 30 giây').check();
+  const beforeFocus = attendance.reads.filter(path => path === '/api/v1/admin/shifts').length;
+  attended.checkedOutAt = instant(3, 10 + 1 / 60);
+  await attendance.page.clock.setFixedTime(new Date('2026-11-03T03:01:00Z'));
+  await attendance.page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await attendance.card(2).getByText('Đã check-out', { exact: true }).waitFor();
+  await attendance.card(2).getByText('Hoàn tất', { exact: true }).waitFor();
+  assert.ok(attendance.reads.filter(path => path === '/api/v1/admin/shifts').length > beforeFocus, 'Returning to the page reloads staff attendance');
+  assert.equal(await onDuty.innerText(), '0');
+  assert.equal(attended.status, 'ACTIVE', 'Rendering does not mutate legacy API data');
+  assert.equal(attendance.writes.length, 0, 'Sync is read-only');
+  assert.equal(await attendance.card(2).getByRole('button', { name: 'Kết thúc ca', exact: true }).count(), 0, 'Checkout needs no second completion action');
+  assert.equal(await attendance.card(2).getByRole('button', { name: 'Hủy ca', exact: true }).count(), 0);
+  const statusFilter = attendance.page.getByRole('combobox', { name: /^Trạng thái/ });
+  await statusFilter.selectOption('COMPLETED');
+  await attendance.card(2).waitFor();
+  await statusFilter.selectOption('ACTIVE');
+  await attendance.card(2).waitFor({ state: 'hidden' });
+  await statusFilter.selectOption('');
+  await attendance.card(2).locator('time').filter({ hasText: '10:01' }).waitFor();
+  await attendance.card(2).getByRole('button', { name: 'Xem chi tiết →', exact: true }).click();
+  const attendanceDialog = attendance.page.getByRole('dialog');
+  await attendanceDialog.getByText('Đã check-out', { exact: true }).waitFor();
+  await attendanceDialog.getByText('Hoàn tất', { exact: true }).waitFor();
+  assert.match(await attendanceDialog.locator('.ss-facts>div').filter({ has: attendance.page.locator('dt', { hasText: 'Check-out' }) }).innerText(), /10:01/);
+  await attendanceDialog.getByRole('button', { name: 'Đóng', exact: true }).click();
+  // Refresh also works when a hidden tab becomes visible again.
+  Object.assign(attended, { status: 'COMPLETED', checkedOutAt: instant(3, 10 + 2 / 60) });
+  await attendance.page.clock.setFixedTime(new Date('2026-11-03T03:02:00Z'));
+  await attendance.page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await attendance.card(2).locator('time').filter({ hasText: '10:02' }).waitFor();
+  await attendance.card(2).getByText('Hoàn tất', { exact: true }).waitFor();
+  await attendance.page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await attendance.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Attendance timestamps fit on mobile');
+  assert.deepEqual(attendance.errors, []);
+  await attendance.context.close();
+
   const staff = await fixture('STAFF'); await staff.start();
   assert.equal(await staff.page.getByRole('button', { name: 'Phân ca', exact: true }).count(), 0);
   assert.equal(await staff.page.locator('.ss-shift-actions').count(), 0);
@@ -167,5 +213,5 @@ try {
   await degraded.page.getByText('Chưa tải đủ danh mục nhân viên/phòng.', { exact: false }).waitFor();
   assert.equal(await degraded.page.locator('.ss-shift').count(), 6); assert.equal(await degraded.page.getByRole('button', { name: 'Phân ca', exact: true }).isDisabled(), true);
   assert.deepEqual(degraded.errors, []); await degraded.context.close();
-  console.log('Staff shifts: lifecycle, stale actions, coverage, timezone, slot preservation, create/edit, roles, failures and responsive UI passed.');
+  console.log('Staff shifts: lifecycle, attendance sync, stale actions, coverage, timezone, slot preservation, create/edit, roles, failures and responsive UI passed.');
 } finally { await browser.close(); }
