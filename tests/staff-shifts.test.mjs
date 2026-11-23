@@ -107,10 +107,13 @@ test('editing assignment preserves legacy times and names exactly', () => {
   assert.match(validateShift(shift(8, 13), [], shift(8, 12), now), /giữ nguyên/);
   assert.match(validateShift(shift(8, 12, { shiftName: 'Ca khác' }), [], shift(8, 12), now), /giữ nguyên/);
 });
-test('staff overlap is blocked, adjacent or cancelled shifts do not block', () => {
+test('staff overlap is blocked by planned or active shifts, not ended shifts', () => {
   assert.match(validateShift(shift(12, 18), [shift(14, 20, { shiftId: 'b' })], null, now), /trùng giờ/);
+  assert.match(validateShift(shift(12, 18), [shift(14, 20, { shiftId: 'b', status: 'ACTIVE' })], null, now), /trùng giờ/);
   assert.equal(validateShift(shift(12, 18), [shift(18, 24, { shiftId: 'b' })], null, now), '');
   assert.equal(validateShift(shift(12, 18), [shift(14, 20, { shiftId: 'b', status: 'CANCELLED' })], null, now), '');
+  assert.equal(validateShift(shift(12, 18), [shift(14, 20, { shiftId: 'b', status: 'COMPLETED' })], null, now), '');
+  assert.equal(validateShift(shift(12, 18), [shift(14, 20, { shiftId: 'b', status: 'ACTIVE', checkedOutAt: new Date(now).toISOString() })], null, now), '');
 });
 test('slots must remain inside fixed shifts, with unique sequence and no overlap', () => {
   const row = shift(12, 18), slot = { sequenceNo: 1, status: 'AVAILABLE', startsAt: row.startsAt, endsAt: row.endsAt };

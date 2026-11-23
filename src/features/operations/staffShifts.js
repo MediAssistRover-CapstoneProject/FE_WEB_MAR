@@ -85,7 +85,7 @@ export function validateShift(body, shifts, original, now) {
   if (end <= now) return 'Không thể lưu ca đã kết thúc. Hãy chọn lại thời gian.';
   if (!original && !isFixedShiftPeriod(body)) return 'Ca phân mới phải đúng khung giờ cố định. Hãy chọn lại ca trực.';
   if (original && (start !== Date.parse(original.startsAt) || end !== Date.parse(original.endsAt) || body.shiftName !== original.shiftName)) return 'Khi điều chỉnh phân công, tên ca và giờ trực phải giữ nguyên theo ca đã lưu.';
-  if (shifts.some(s => s.shiftId !== original?.shiftId && s.staffProfileId === body.staffProfileId && s.status !== 'CANCELLED' && overlaps(s.startsAt, s.endsAt, start, end))) return 'Nhân viên đã có ca trùng giờ. Hãy chọn người hoặc thời gian khác.';
+  if (shifts.some(s => s.shiftId !== original?.shiftId && s.staffProfileId === body.staffProfileId && ['PLANNED', 'ACTIVE'].includes(shiftStatus(s)) && overlaps(s.startsAt, s.endsAt, start, end))) return 'Nhân viên đã có ca trùng giờ. Hãy chọn người hoặc thời gian khác.';
   const slots = [...body.slots].sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
   const sequences = new Set();
   let previousEnd = start;
