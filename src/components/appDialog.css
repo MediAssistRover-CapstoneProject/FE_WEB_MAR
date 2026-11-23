@@ -1,0 +1,10 @@
+.mar-app-dialog { width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; border: 1px solid #dbe5f2; border-radius: 20px; padding: 0; background: #fff; color: #18344f; box-shadow: 0 24px 80px #102a4350; font: 16px/1.6 system-ui, sans-serif; }
+.mar-app-dialog::backdrop { background: #122a4770; backdrop-filter: blur(3px); }
+.mar-app-dialog form { margin: 0; padding: 28px; }
+.mar-app-dialog h2 { font-size: 22px; margin: 0 0 12px; }
+.mar-app-dialog p { margin: 0 0 24px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mar-app-dialog input { box-sizing: border-box; width: 100%; padding: 12px; border: 1px solid #b6c9e3; border-radius: 10px; font: inherit; margin-bottom: 20px; }
+.mar-app-dialog footer { display: flex; justify-content: flex-end; gap: 12px; }
+.mar-app-dialog button { border: 1px solid #cbd9ec; border-radius: 10px; padding: 10px 20px; background: #fff; color: #294c75; cursor: pointer; font: inherit; font-weight: 600; }
+.mar-app-dialog button.mar-app-dialog-primary { background: #2865d5; border-color: #2865d5; color: #fff; }
+.mar-app-dialog :focus-visible { outline: 3px solid #8cbaff; outline-offset: 3px; }

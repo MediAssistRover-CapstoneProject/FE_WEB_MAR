@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import { chromium } from '@playwright/test';
+const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
+try {
+  const page = await browser.newPage();
+  const errors = [], native = [];
+  page.on('pageerror', e => errors.push(e.message));
+  page.on('dialog', async d => { native.push(d.type()); await d.dismiss(); });
+  await page.goto('http://127.0.0.1:5187/tests/popup.fixture.html');
+  await page.waitForFunction(() => window.popup);
+  await page.locator('#origin').focus();
+  await page.evaluate(() => { window.result = undefined; popup.confirmAction('Bỏ thay đổi chưa lưu?').then(v => window.result = v); });
+  await page.getByRole('dialog').waitFor();
+  await page.getByRole('button', { name: 'Hủy', exact: true }).click();
+  assert.equal(await page.evaluate(() => window.result), false);
+  assert.equal(await page.locator('#origin').evaluate(e => e === document.activeElement), true);
+  await page.evaluate(() => { window.result = undefined; popup.confirmAction('Đồng ý?').then(v => window.result = v); });
+  await page.getByRole('button', { name: 'Xác nhận', exact: true }).click();
+  assert.equal(await page.evaluate(() => window.result), true);
+  await page.evaluate(() => { window.result = undefined; popup.promptValue('Tên biến', 'destination').then(v => window.result = v); });
+  await page.getByRole('textbox').fill('patient_endpoint');
+  await page.getByRole('textbox').press('Enter');
+  assert.equal(await page.evaluate(() => window.result), 'patient_endpoint');
+  await page.evaluate(() => { window.result = undefined; popup.confirmAction('Hủy bằng Escape').then(v => window.result = v); });
+  assert.equal(await page.evaluate(() => popup.confirmAction('Trùng thao tác')), false);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.evaluate(() => window.result), false);
+  await page.setViewportSize({ width: 375, height: 700 });
+  await page.evaluate(() => { popup.confirmAction('Thông báo trên điện thoại'); });
+  const dialog = page.getByRole('dialog');
+  assert.ok(await dialog.evaluate(e => e.getBoundingClientRect().width <= 375));
+  await page.screenshot({ path: 'popup-mobile.png' });
+  await page.keyboard.press('Escape');
+  assert.deepEqual(errors, []); assert.deepEqual(native, []);
+  console.log('Popup regression passed: cancel, confirm, input, Escape, focus restoration, duplicate suppression and mobile layout; no native dialogs.');
+} finally { await browser.close(); }
