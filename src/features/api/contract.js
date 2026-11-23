@@ -1,8 +1,13 @@
 import snapshot from './backendContract.json' with { type: 'json' };
-import { requestOverrides } from './contractOverrides.js';
+import { operationOverrides, requestOverrides } from './contractOverrides.js';
 
 export const backendSource = snapshot.source;
-export const operations = Object.fromEntries(Object.entries(snapshot.operations).map(([key, op]) => [key, { ...op, key }]));
+const syncedOperations = { ...snapshot.operations };
+for (const [key, override] of Object.entries(operationOverrides)) {
+  const captured = snapshot.operations[key];
+  syncedOperations[key] = { ...captured, ...override, parameters: [...(captured?.parameters || []), ...(override.parameters || [])] };
+}
+export const operations = Object.fromEntries(Object.entries(syncedOperations).map(([key, op]) => [key, { ...op, key }]));
 export function schemaOf(schema = {}) {
   if (schema.$ref) return schemaOf(snapshot.schemas[schema.$ref.split('/').at(-1)] || {});
   if (schema.allOf) return schema.allOf.reduce((result, s) => {

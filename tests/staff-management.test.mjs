@@ -4,10 +4,15 @@ import { filterStaff, passwordError, sortStaff, staffActions, staffDisplayName, 
 const member = (overrides = {}) => ({ staffProfileId: 'profile', staffCode: 'NV01', departmentCode: 'NOI', jobTitle: 'Điều dưỡng', active: true, account: { accountId: 'staff-account', fullName: 'Đặng Thị Ánh', username: 'staff', email: 'staff@example.test', role: 'STAFF', status: 'ACTIVE' }, ...overrides });
 test('account actions follow status, staff profile and actor role boundaries', () => {
   const active = member();
-  assert.deepEqual(staffActions(active, 'admin'), { edit: true, lock: true, unlock: false, reset: true, deactivate: true });
+  assert.deepEqual(staffActions(active, 'admin'), { edit: true, lock: true, unlock: false, reset: true, deactivate: true, restore: false });
   const locked = member({ account: { ...active.account, status: 'LOCKED' } });
   assert.equal(staffActions(locked, 'admin').lock, false); assert.equal(staffActions(locked, 'admin').unlock, true);
-  for (const row of [member({ active: false }), member({ account: { ...active.account, status: 'INACTIVE' } }), member({ account: { ...active.account, role: 'ADMIN' } })]) assert.ok(Object.values(staffActions(row, 'admin')).every(v => !v));
+  for (const row of [member({ active: false }), member({ account: { ...active.account, status: 'INACTIVE' } })]) {
+    const { restore, ...other } = staffActions(row, 'admin');
+    assert.equal(restore, true); assert.ok(Object.values(other).every(v => !v));
+  }
+  assert.ok(Object.values(staffActions(member({ account: { ...active.account, role: 'ADMIN' } }), 'admin')).every(v => !v));
+  assert.equal(staffActions(member({ active: false, account: { ...active.account, status: 'LOCKED' } }), 'admin').restore, false);
   assert.ok(Object.values(staffActions(active, 'staff-account')).every(v => !v));
 });
 test('inactive profile takes precedence over account status', () => {

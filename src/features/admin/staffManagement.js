@@ -11,13 +11,15 @@ export function staffStatus(member) {
 
 export function staffActions(member, actorId) {
   const account = member?.account;
-  const allowed = !!account?.accountId && account.role === 'STAFF' && account.accountId !== actorId && member.active === true;
+  const manageable = !!account?.accountId && account.role === 'STAFF' && account.accountId !== actorId;
+  const allowed = manageable && member.active === true;
   return {
     edit: allowed && ['ACTIVE', 'LOCKED'].includes(account.status),
     lock: allowed && account.status === 'ACTIVE',
     unlock: allowed && account.status === 'LOCKED',
     reset: allowed && ['ACTIVE', 'LOCKED'].includes(account.status),
     deactivate: allowed && ['ACTIVE', 'LOCKED'].includes(account.status),
+    restore: manageable && staffStatus(member).key === 'INACTIVE' && ['ACTIVE', 'INACTIVE'].includes(account.status),
   };
 }
 

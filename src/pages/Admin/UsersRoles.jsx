@@ -43,7 +43,7 @@ function StaffManagement({ actorId }) {
   const refresh = () => setRevision(v => v + 1);
   useEffect(() => {
     const controller = new AbortController(); setLoading(true);
-    readCatalog('GET /api/v1/admin/staff', { signal: controller.signal }).then(rows => {
+    readCatalog('GET /api/v1/admin/staff', { signal: controller.signal, query: { includeDeleted: true } }).then(rows => {
       if (controller.signal.aborted) return;
       const sorted = sortStaff(rows); setMembers(sorted); setLoadedAt(new Date().toISOString()); setError('');
       setSelectedId(previous => sorted.some(row => row.staffProfileId === previous) ? previous : sorted[0]?.staffProfileId || null);
@@ -56,7 +56,7 @@ function StaffManagement({ actorId }) {
   useEffect(() => { if (!visible.some(member => member.staffProfileId === selectedId)) setSelectedId(visible[0]?.staffProfileId || null); }, [visibleIds, selectedId]);
   useEffect(() => {
     const controller = new AbortController(); setDetailError(''); setDetail(null); setDetailLoading(!!selectedId);
-    if (selectedId) callBackend('GET /api/v1/admin/staff/{id}', { path: { id: selectedId } }, { signal: controller.signal }).then(member => {
+    if (selectedId) callBackend('GET /api/v1/admin/staff/{id}', { path: { id: selectedId }, query: { includeDeleted: true } }, { signal: controller.signal }).then(member => {
       if (!controller.signal.aborted) {
         setDetail({ id: selectedId, member });
         setMembers(previous => previous && sortStaff(previous.map(row => row.staffProfileId === member.staffProfileId ? member : row)));
@@ -71,7 +71,11 @@ function StaffManagement({ actorId }) {
     setDialog(null); setNotice(message);
     const next = sortStaff([...(members || []).filter(row => row.staffProfileId !== member.staffProfileId), member]);
     setMembers(next); setSelectedId(member.staffProfileId); setDetail({ id: member.staffProfileId, member });
-    if (created) { setFilters(EMPTY_FILTERS); setPage(Math.floor(next.findIndex(row => row.staffProfileId === member.staffProfileId) / PAGE_SIZE)); }
+    // Keep the updated profile visible even if its new state no longer matches the filter.
+    const nextFilters = created ? EMPTY_FILTERS : { ...filters, status: '' };
+    const nextFiltered = filterStaff(next, nextFilters);
+    setFilters(nextFilters);
+    setPage(Math.max(0, Math.floor(nextFiltered.findIndex(row => row.staffProfileId === member.staffProfileId) / PAGE_SIZE)));
     refresh();
   };
   const canManage = !loading && !error && !detailLoading && !detailError;
@@ -112,7 +116,7 @@ function StaffDetails({ member, actorId, disabled, onEdit, onAction }) {
   return <><div className="um-profile"><StaffAvatar member={member} large /><h4>{staffDisplayName(member)}</h4><p>@{a.username || '—'}</p><Badge member={member} /></div>
     <dl className="um-facts">{[['Mã nhân viên', member.staffCode], ['Email', a.email], ['Điện thoại', a.phone], ['Mã khoa', member.departmentCode], ['Chức danh', member.jobTitle]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || '—'}</dd></div>)}</dl>
     <div className="um-account-info"><h4>Thông tin đăng nhập</h4><dl><div><dt>Đăng nhập gần nhất</dt><dd>{stamp(a.lastLoginAt)}</dd></div><div><dt>Ngày tạo tài khoản</dt><dd>{stamp(a.createdAt)}</dd></div></dl>{a.mustChangePassword && <p className="um-change-password-note">Nhân viên cần đổi mật khẩu trong lần đăng nhập tiếp theo.</p>}</div>
-    {staffStatus(member).key === 'INACTIVE' ? <p className="um-inactive-note">Nhân viên đã ngừng hoạt động.</p> : <div className="um-profile-actions">{allowed.edit && <button disabled={disabled} className="um-primary" onClick={onEdit}>Chỉnh sửa hồ sơ</button>}<div>{allowed.lock && <button disabled={disabled} onClick={() => onAction('lock')}>Khóa tài khoản</button>}{allowed.unlock && <button disabled={disabled} className="um-unlock" onClick={() => onAction('unlock')}>Mở khóa tài khoản</button>}{allowed.reset && <button disabled={disabled} onClick={() => onAction('reset')}>Đặt lại mật khẩu</button>}</div>{allowed.deactivate && <button disabled={disabled} className="um-text-button um-danger-text" onClick={() => onAction('deactivate')}>Ngừng hoạt động nhân viên</button>}</div>}
+    {staffStatus(member).key === 'INACTIVE' ? <div className="um-profile-actions"><p className="um-inactive-note">Nhân viên đã ngừng hoạt động. Hồ sơ và lịch sử vẫn được giữ lại.</p>{allowed.restore && <button disabled={disabled} className="um-primary" onClick={() => onAction('restore')}>Kích hoạt lại nhân viên</button>}{a.status === 'LOCKED' && <p>Tài khoản đang khóa. Cần mở khóa trước khi kích hoạt lại.</p>}</div> : <div className="um-profile-actions">{allowed.edit && <button disabled={disabled} className="um-primary" onClick={onEdit}>Chỉnh sửa hồ sơ</button>}<div>{allowed.lock && <button disabled={disabled} onClick={() => onAction('lock')}>Khóa tài khoản</button>}{allowed.unlock && <button disabled={disabled} className="um-unlock" onClick={() => onAction('unlock')}>Mở khóa tài khoản</button>}{allowed.reset && <button disabled={disabled} onClick={() => onAction('reset')}>Đặt lại mật khẩu</button>}</div>{allowed.deactivate && <button disabled={disabled} className="um-text-button um-danger-text" onClick={() => onAction('deactivate')}>Ngừng hoạt động nhân viên</button>}</div>}
     <details className="um-technical"><summary>Mã tra cứu</summary><dl><div><dt>Mã tài khoản</dt><dd>{a.accountCode || '—'}</dd></div><div><dt>ID tài khoản</dt><dd>{a.accountId || '—'}</dd></div><div><dt>ID hồ sơ</dt><dd>{member.staffProfileId}</dd></div></dl></details>
   </>;
 }

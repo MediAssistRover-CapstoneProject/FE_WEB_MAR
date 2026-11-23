@@ -102,6 +102,7 @@ const actionCopy = {
   unlock: ['Mở khóa tài khoản', 'Cho phép nhân viên đăng nhập lại. Nhân viên cần đăng nhập bằng mật khẩu hiện tại.'],
   reset: ['Đặt lại mật khẩu', 'Các phiên hiện tại bị thu hồi. Nhân viên phải đăng nhập bằng mật khẩu tạm thời mới và đổi mật khẩu. Trạng thái khóa tài khoản được giữ nguyên.'],
   deactivate: ['Ngừng hoạt động nhân viên', 'Nhân viên sẽ mất quyền đăng nhập và làm việc theo hồ sơ này. Lịch sử được giữ lại. Hãy kiểm tra việc bàn giao ca trực và công việc trước khi xác nhận.'],
+  restore: ['Kích hoạt lại nhân viên', 'Cho phép nhân viên đăng nhập và làm việc trở lại. Giữ nguyên tài khoản, hồ sơ và lịch sử; nhân viên cần đăng nhập lại.'],
 };
 
 export function StaffActionDialog({ action, actorId, onClose, onSaved, onRefresh }) {
@@ -114,17 +115,19 @@ export function StaffActionDialog({ action, actorId, onClose, onSaved, onRefresh
     setError('');
     try {
       if (!confirmed) throw Error('Vui lòng xác nhận thao tác với tài khoản này.');
-      if (kind === 'deactivate' && (reason.trim().length < 5 || reason.trim().length > 500)) throw Error('Nhập lý do ngừng hoạt động từ 5 đến 500 ký tự.');
+      const lifecycle = kind === 'deactivate' || kind === 'restore';
+      if (lifecycle && (reason.trim().length < 5 || reason.trim().length > 500)) throw Error('Nhập lý do từ 5 đến 500 ký tự.');
       if (kind === 'reset') { const invalid = passwordError(password); if (invalid) throw Error(invalid); }
       if (!staffActions(member, actorId)[kind]) throw Error('Thao tác không phù hợp với trạng thái nhân viên.');
       lock.current = true; setBusy(true);
-      const current = await callBackend('GET /api/v1/admin/staff/{id}', { path: { id: member.staffProfileId } });
+      const current = await callBackend('GET /api/v1/admin/staff/{id}', { path: { id: member.staffProfileId }, query: { includeDeleted: true } });
       if (staffFingerprint(current) !== staffFingerprint(member) || !staffActions(current, actorId)[kind]) { onRefresh(); throw Error('Tài khoản đã thay đổi. Đóng hộp thoại và kiểm tra lại trạng thái mới nhất.'); }
       let saved;
-      if (kind === 'deactivate') {
-        saved = await callBackend('DELETE /api/v1/admin/staff/{id}', { path: { id: member.staffProfileId }, body: { reason: reason.trim() } });
-        if (!saved) saved = await callBackend('GET /api/v1/admin/staff/{id}', { path: { id: member.staffProfileId } });
-        if (saved?.staffProfileId !== member.staffProfileId || saved.active !== false || saved.account?.status !== 'INACTIVE') {
+      if (lifecycle) {
+        const key = kind === 'restore' ? 'POST /api/v1/admin/staff/{id}/restore' : 'DELETE /api/v1/admin/staff/{id}';
+        saved = await callBackend(key, { path: { id: member.staffProfileId }, body: prepareBody(key, { reason: reason.trim() }) });
+        if (!saved) saved = await callBackend('GET /api/v1/admin/staff/{id}', { path: { id: member.staffProfileId }, query: { includeDeleted: true } });
+        if (saved?.staffProfileId !== member.staffProfileId || saved.active !== (kind === 'restore') || saved.account?.status !== (kind === 'restore' ? 'ACTIVE' : 'INACTIVE')) {
           onRefresh();
           throw Error('Chưa xác nhận được trạng thái nhân viên sau thao tác. Tải lại danh sách để kiểm tra.');
         }
@@ -141,7 +144,7 @@ export function StaffActionDialog({ action, actorId, onClose, onSaved, onRefresh
     <div className="um-target"><strong>{staffDisplayName(member)}</strong><span>@{member.account.username} · {member.staffCode}</span></div>
     <form onSubmit={submit}><fieldset className="um-form" disabled={busy}>
       {kind === 'reset' && <PasswordField label="Mật khẩu tạm thời mới *" value={password} onChange={setPassword} wide />}
-      {kind === 'deactivate' && <label className="um-field um-wide"><span>Lý do ngừng hoạt động *</span><textarea required minLength={5} maxLength={500} rows={3} value={reason} onChange={event => setReason(event.target.value)} placeholder="Nhập lý do để lưu vào nhật ký hệ thống" /></label>}
+      {['deactivate', 'restore'].includes(kind) && <label className="um-field um-wide"><span>{kind === 'restore' ? 'Lý do kích hoạt lại *' : 'Lý do ngừng hoạt động *'}</span><textarea required minLength={5} maxLength={500} rows={3} value={reason} onChange={event => setReason(event.target.value)} placeholder="Nhập lý do để lưu vào nhật ký hệ thống" /></label>}
       <label className="um-confirm um-wide"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />Tôi xác nhận {title.toLocaleLowerCase('vi')} cho @{member.account.username}.</label>
     </fieldset>{error && <p className="um-notice um-error" role="alert">{error}</p>}
       <footer className="um-dialog-footer"><button type="button" disabled={busy} onClick={onClose}>Quay lại</button><button type="submit" disabled={busy} className={kind === 'deactivate' || kind === 'lock' ? 'um-danger' : 'um-primary'}>{busy ? 'Đang xử lý…' : title}</button></footer>

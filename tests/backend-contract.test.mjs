@@ -6,7 +6,7 @@ import { resources, resourceFor, managedOperations } from '../src/features/api/w
 const id = '11111111-1111-4111-8111-111111111111';
 
 test('supported human APIs have a workspace or dedicated flow; removed screens and device APIs stay separate', () => {
-  assert.equal(Object.keys(operations).length, 199);
+  assert.equal(Object.keys(operations).length, 200); // Includes the staff restore lifecycle endpoint.
   assert.equal(snapshot.excluded.length, 37);
   for (const op of Object.values(operations)) {
     if (/^\/api\/v1\/admin\/monitoring\/(crowd-density|heatmaps)(\/|$)/.test(op.path)) {

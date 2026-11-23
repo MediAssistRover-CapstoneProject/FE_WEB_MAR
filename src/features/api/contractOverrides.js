@@ -20,8 +20,21 @@ const shiftRequired = ['staffProfileId', 'roomId', 'shiftName', 'startsAt', 'end
 const item = object({ itemCode: str(80), itemName: str(160), itemCategory: str(64), quantity: integer(1), unit: str(32), sensitive: bool, handlingInstruction: str(4000), itemNote: str(4000) }, ['itemCode', 'itemName', 'itemCategory', 'quantity', 'unit']);
 const confirm = object({ verificationId: uuid, jobStepId: uuid, items: { type: 'array', minItems: 1, items: object({ itemCode: str(80), quantity: integer(1) }, ['itemCode', 'quantity']) }, compartmentClosed: { ...bool, const: true }, compartmentLocked: { ...bool, const: true }, note: str(1000) }, ['verificationId', 'jobStepId', 'items', 'compartmentClosed', 'compartmentLocked']);
 const setting = { settingValue: { ...json, minProperties: 1 }, dataType: enumeration('STRING', 'NUMBER', 'BOOLEAN', 'OBJECT', 'ARRAY'), category: str(64), description: str(4000), publicSetting: bool };
+const lifecycle = object({ reason: str(500, { minLength: 5 }) }, ['reason']);
+
+// Lifecycle endpoints and query parameters added after the captured OpenAPI snapshot.
+export const operationOverrides = {
+  'GET /api/v1/admin/staff': { parameters: [{ name: 'includeDeleted', in: 'query', required: false, schema: bool }] },
+  'GET /api/v1/admin/staff/{id}': { parameters: [{ name: 'includeDeleted', in: 'query', required: false, schema: bool }] },
+  'POST /api/v1/admin/staff/{id}/restore': {
+    method: 'POST', path: '/api/v1/admin/staff/{id}/restore', roles: ['ADMIN'], public: false,
+    parameters: [{ name: 'id', in: 'path', required: true, schema: uuid }],
+  },
+};
 
 export const requestOverrides = {
+  'DELETE /api/v1/admin/staff/{id}': lifecycle,
+  'POST /api/v1/admin/staff/{id}/restore': lifecycle,
   'POST /api/v1/jobs/{jobId}/operations/{jobStepId}/reconcile': object({ commandId: uuid, operationKey: str(150, { minLength: 1 }), transportSessionId: uuid, evidence: enumeration('PI_STOP_CONFIRMED', 'STAFF_INSPECTED_STOP', 'COMMAND_NOT_ACCEPTED'), confirmedStopped: { ...bool, const: true }, outcome: enumeration('RESUME_AS_FAILED', 'CONFIRM_CANCELLED'), note: str(2000, { minLength: 1 }) }, ['commandId', 'operationKey', 'transportSessionId', 'evidence', 'confirmedStopped', 'outcome', 'note']),
   'POST /api/v1/mapping-jobs': object({ workflowId: uuid, robotId: uuid, floorId: uuid, mapName: str(160) }, ['workflowId', 'robotId', 'floorId', 'mapName']),
   'POST /api/v1/admin/staff': object({ username: str(100, { minLength: 4, pattern: '^[a-zA-Z0-9._-]+$' }), temporaryPassword: str(72, { minLength: 8, format: 'password' }), ...staff }, ['username', 'temporaryPassword', 'fullName', 'email', 'staffCode']),

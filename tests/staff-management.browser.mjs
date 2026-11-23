@@ -46,6 +46,10 @@ async function fixture(role = 'ADMIN', options = {}) {
         if (!body?.reason || body.reason.trim().length < 5) return reply({ message: 'Invalid JSON or enum value' }, 400);
         row.active = false; row.account.status = 'INACTIVE'; return reply(row);
       }
+      if (path.endsWith('/restore')) {
+        if (!body?.reason || body.reason.trim().length < 5) return reply({ message: 'Invalid JSON or enum value' }, 400);
+        row.active = true; row.account.status = 'ACTIVE'; return reply(row);
+      }
       if (path.endsWith('/reset-password')) { row.account.mustChangePassword = true; return reply(null, 204); }
       row.account.status = path.endsWith('/unlock') ? 'ACTIVE' : 'LOCKED'; return reply(row.account);
     }
@@ -53,11 +57,11 @@ async function fixture(role = 'ADMIN', options = {}) {
     if (path === '/api/v1/auth/me') return reply(account);
     if (path === '/api/v1/admin/staff') {
       if (state.failList) return reply({ message: 'Danh sách nhân viên tạm gián đoạn' }, 503);
-      const page = Number(url.searchParams.get('page') || 0), size = Number(url.searchParams.get('size') || 20), rows = [...state.rows].sort((a, b) => a.staffCode.localeCompare(b.staffCode));
+      const page = Number(url.searchParams.get('page') || 0), size = Number(url.searchParams.get('size') || 20), rows = state.rows.filter(row => row.active || url.searchParams.get('includeDeleted') === 'true').sort((a, b) => a.staffCode.localeCompare(b.staffCode));
       return reply({ content: rows.slice(page * size, (page + 1) * size), totalPages: Math.ceil(rows.length / size), totalElements: rows.length, last: (page + 1) * size >= rows.length });
     }
     const row = state.rows.find(row => path === `/api/v1/admin/staff/${row.staffProfileId}`);
-    if (row) return state.failDetail ? reply({ message: 'Không tải được hồ sơ kiểm thử' }, 503) : reply(row);
+    if (row) return state.failDetail ? reply({ message: 'Không tải được hồ sơ kiểm thử' }, 503) : !row.active && url.searchParams.get('includeDeleted') !== 'true' ? reply({ message: 'Staff not found' }, 404) : reply(row);
     return reply({ content: [], totalPages: 0, totalElements: 0, last: true });
   });
   const start = async () => { await page.goto(`${base}/admin/users-roles`); if (role === 'ADMIN') { await page.locator('.um-table').waitFor(); await page.locator('.um-profile').waitFor(); } };
@@ -82,8 +86,9 @@ try {
   await f.select(2); await detail.getByRole('button', { name: 'Mở khóa tài khoản', exact: true }).waitFor();
   assert.equal(await detail.getByRole('button', { name: 'Khóa tài khoản', exact: true }).count(), 0);
   await f.select(3); await detail.getByText('Nhân viên đã ngừng hoạt động.', { exact: false }).waitFor();
-  assert.equal(await detail.locator('.um-profile-actions button').count(), 0);
-  await f.select(4); assert.equal(await detail.locator('.um-profile-actions button').count(), 0, 'inactive profile cannot unlock active account');
+  await detail.getByRole('button', { name: 'Kích hoạt lại nhân viên', exact: true }).waitFor();
+  await f.select(4); await detail.getByRole('button', { name: 'Kích hoạt lại nhân viên', exact: true }).waitFor();
+  assert.equal(await detail.getByRole('button', { name: 'Mở khóa tài khoản', exact: true }).count(), 0, 'inactive profile cannot unlock active account');
   await f.select(1); await detail.getByRole('button', { name: 'Khóa tài khoản', exact: true }).click();
   let dialog = f.page.getByRole('dialog');
   await dialog.getByRole('button', { name: 'Khóa tài khoản', exact: true }).click(); await dialog.getByRole('alert').waitFor(); assert.equal(f.writes.length, 0);
@@ -124,6 +129,32 @@ try {
   await dialog.getByRole('button', { name: 'Ngừng hoạt động nhân viên', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
   assert.deepEqual(f.writes.at(-1).body, { reason: 'Nhân viên chuyển công tác' });
   assert.equal(f.writes.at(-1).method, 'DELETE'); assert.equal(f.writes.at(-1).path, `/api/v1/admin/staff/${id(1)}`);
+  await f.page.reload();
+  await f.row(1).waitFor();
+  await detail.getByRole('button', { name: 'Kích hoạt lại nhân viên', exact: true }).waitFor();
+  await f.page.getByLabel('Trạng thái', { exact: true }).selectOption('INACTIVE');
+  await f.row(1).waitFor();
+  await detail.getByRole('button', { name: 'Kích hoạt lại nhân viên', exact: true }).click();
+  dialog = f.page.getByRole('dialog');
+  await dialog.getByLabel('Lý do kích hoạt lại *').fill('Nhân viên trở lại làm việc');
+  await dialog.getByRole('checkbox').check();
+  f.state.failWrite = true;
+  const beforeRestore = f.writes.length;
+  await dialog.getByRole('button', { name: 'Kích hoạt lại nhân viên', exact: true }).click();
+  await dialog.getByRole('alert').waitFor();
+  assert.equal(f.state.rows[0].active, false, 'failed restore must leave the profile inactive');
+  f.state.failWrite = false;
+  await dialog.getByRole('button', { name: 'Kích hoạt lại nhân viên', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.ok(f.writes.length > beforeRestore);
+  assert.equal(f.writes.at(-1).path, `/api/v1/admin/staff/${id(1)}/restore`);
+  assert.deepEqual(f.writes.at(-1).body, { reason: 'Nhân viên trở lại làm việc' });
+  await f.row(1).waitFor();
+  assert.equal(await f.page.getByLabel('Trạng thái', { exact: true }).inputValue(), '', 'restored staff stays visible after inactive filter is cleared');
+  await detail.getByRole('button', { name: 'Ngừng hoạt động nhân viên', exact: true }).waitFor();
+  await f.page.reload();
+  await f.row(1).waitFor();
+  await detail.getByRole('button', { name: 'Ngừng hoạt động nhân viên', exact: true }).waitFor();
   await f.page.getByRole('button', { name: 'Thêm nhân viên', exact: true }).click(); dialog = f.page.getByRole('dialog');
   assert.equal(await dialog.getByRole('heading', { name: 'Tạo tài khoản nhân viên', exact: true }).count(), 1);
   assert.ok(!(await dialog.locator('.um-dialog-header').innerText()).includes('Đặng Thị Ánh'), 'new form must not inherit selected staff identity');
@@ -138,7 +169,7 @@ try {
   assert.equal(f.uploads.length, 1, 'invalid file must not be uploaded');
   await dialog.getByLabel('Ảnh nhân viên', { exact: true }).setInputFiles(imageFile);
   await dialog.getByRole('button', { name: 'Bỏ ảnh đã chọn', exact: true }).click();
-  assert.equal(await dialog.getByRole('img', { name: 'Ảnh nhân viên xem trước' }).count(), 0);
+  await dialog.getByRole('img', { name: 'Ảnh nhân viên xem trước' }).waitFor({ state: 'hidden' });
   await dialog.getByLabel('Ảnh nhân viên', { exact: true }).setInputFiles(imageFile);
   await f.page.screenshot({ path: `${output}/create-dialog.png`, fullPage: true });
   f.state.failUpload = true; const writesBeforeUpload = f.writes.length;
