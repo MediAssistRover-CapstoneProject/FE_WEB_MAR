@@ -29,7 +29,8 @@ export const HOLD_LABELS = {
 
 export const isPatrolWorkflow = workflow => workflow?.serviceType === 'PATROL';
 export const isManagedPatrol = workflow => isPatrolWorkflow(workflow) && String(workflow.workflowCode ?? '').startsWith('WF_PATROL_');
-export const jobStatus = job => PATROL_STATUS[job?.status] ?? { label: job?.status || 'Chưa xác định', tone: 'neutral' };
+export const jobStopPending = job => ['PENDING', 'RECOVERY_REQUIRED'].includes(job?.stopStatus) || Boolean(job?.cancelRequestedAt && OPEN_PATROL_STATUSES.has(job.status) && !['CONFIRMED', 'NOT_REQUIRED'].includes(job.stopStatus));
+export const jobStatus = job => jobStopPending(job) ? { label: job.stopStatus === 'RECOVERY_REQUIRED' ? 'Cần xác nhận dừng' : 'Đang chờ kết thúc an toàn', tone: job.stopStatus === 'RECOVERY_REQUIRED' ? 'red' : 'amber' } : PATROL_STATUS[job?.status] ?? { label: job?.status || 'Chưa xác định', tone: 'neutral' };
 
 export function patrolRoute(detail, endpoints = []) {
   const workflow = detail?.workflow ?? detail ?? null;
@@ -118,14 +119,20 @@ export function patrolReadiness(robot, snapshot, route, { jobs = [], now = Date.
   if (route?.issues?.length) reasons.push(...route.issues);
   if (!robot) reasons.push('Chọn robot thực hiện tuần tra.');
   else {
-    if (robot.status !== 'IDLE') reasons.push('Robot chưa ở trạng thái nghỉ.');
-    if (robot.currentMapId !== route?.mapId) reasons.push('Robot chưa sử dụng bản đồ của tuyến.');
+    const currentRobot = snapshot?.robot?.robotId === robot.robotId ? snapshot.robot : robot;
+    if (currentRobot.status !== 'IDLE') reasons.push('Robot chưa ở trạng thái nghỉ.');
+    if (currentRobot.currentMapId !== route?.mapId) reasons.push('Robot chưa sử dụng bản đồ của tuyến.');
     if (!snapshot || snapshot.robot?.robotId !== robot.robotId) reasons.push('Chưa có trạng thái kết nối mới của robot.');
     else {
       const observedAt = Date.parse(snapshot.observedAt);
       if (!Number.isFinite(observedAt) || now - observedAt > 20000) reasons.push('Trạng thái robot đã cũ; hãy tải lại.');
       if (!snapshot.mqttConnected || !snapshot.heartbeatFresh || !snapshot.dispatchReady) reasons.push('Kết nối robot chưa sẵn sàng.');
-      if (snapshot.activeJobId || snapshot.suspendedPatrolJobIds?.length || jobs.some(job => job.robotId === robot.robotId && OPEN_PATROL_STATUSES.has(job.status))) reasons.push('Robot đang có nhiệm vụ chưa kết thúc.');
+      if (Object.hasOwn(snapshot, 'navigationSession')) {
+        const navigation = snapshot.navigationSession;
+        if (navigation?.state !== 'READY') reasons.push('Phiên điều hướng chưa sẵn sàng; mở điều hướng và định vị robot trước khi tuần tra.');
+        else if (navigation.mapId !== route?.mapId || (navigation.mapAssetHash && currentRobot.mapAssetHash && navigation.mapAssetHash.toLowerCase() !== currentRobot.mapAssetHash.toLowerCase())) reasons.push('Phiên điều hướng chưa khớp bản đồ của tuyến.');
+      }
+      if (snapshot.activeJobId || snapshot.suspendedPatrolJobIds?.length || jobs.some(job => job.robotId === robot.robotId && (OPEN_PATROL_STATUSES.has(job.status) || jobStopPending(job)))) reasons.push('Robot đang có nhiệm vụ chưa kết thúc.');
     }
   }
   return { blocked: reasons.length > 0, reasons: [...new Set(reasons)], note: 'Máy chủ sẽ kiểm tra bản đồ, định vị và cấu hình quan sát trước khi giao nhiệm vụ.' };

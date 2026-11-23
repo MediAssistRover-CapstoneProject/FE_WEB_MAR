@@ -42,7 +42,7 @@
 .lo-page .rm-robot-bar { position: relative; display: flex; justify-content: space-between; gap: 22px; padding: 23px 26px; min-height: 105px; color: #173b63; border: 1px solid #d5e4ff; border-radius: 17px; background: linear-gradient(110deg, #edf4ff, #fff); box-shadow: 0 5px 20px #183f6404; overflow: hidden; }
 .lo-page .rm-robot-identity { display: flex; align-items: center; gap: 15px; min-width: 0; }
 .lo-page .rm-robot-avatar { display: grid; place-items: center; width: 55px; height: 55px; flex-shrink: 0; color: #4279c4; background: #ffffffd9; border: 1px solid #d8e6fa; border-radius: 16px; }
-.lo-page .rm-robot-avatar svg { width: 31px; height: 31px; }
+.lo-page .rm-robot-avatar .brand-mark-image { width: 45px; height: 45px; }
 .lo-page .rm-robot-identity small { color: #6d88a8; font-size: 9px; letter-spacing: 1.3px; margin: 0 0 7px; display: block; }
 .lo-page .rm-robot-name { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .lo-page .rm-robot-name > strong { font-size: 24px; font-weight: 650; letter-spacing: -.4px; overflow-wrap: anywhere; }

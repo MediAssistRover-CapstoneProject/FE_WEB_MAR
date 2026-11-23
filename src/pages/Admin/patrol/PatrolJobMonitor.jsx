@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { patrolApi } from '../../../features/patrol/patrolApi.js';
-import { HOLD_LABELS, OPEN_PATROL_STATUSES, jobStatus, patrolHoldSummary } from '../../../features/patrol/patrolModel.js';
+import { HOLD_LABELS, OPEN_PATROL_STATUSES, jobStatus, jobStopPending, patrolHoldSummary } from '../../../features/patrol/patrolModel.js';
 import { Button, Empty, Icon, Modal } from './PatrolUi.jsx';
+import BrandMark from '../../../components/BrandMark.jsx';
 
 const phaseLabels = {
   MOVE: 'Di chuyển đến điểm',
@@ -33,11 +34,12 @@ const blockedLabels = {
 function controlState(detail) {
   const job = detail?.job;
   const holds = patrolHoldSummary(detail?.patrol);
-  const cancelling = Boolean(job?.cancelRequestedAt);
+  const cancelling = jobStopPending(job);
+  const controlRequested = cancelling || Boolean(job?.cancelRequestedAt);
   return {
-    suspend: !cancelling && ['QUEUED', 'ACCEPTED', 'RUNNING'].includes(job?.status),
-    resume: !cancelling && job?.status === 'SUSPENDED' && (holds.manual || !holds.external),
-    cancel: !cancelling && OPEN_PATROL_STATUSES.has(job?.status),
+    suspend: !controlRequested && ['QUEUED', 'ACCEPTED', 'RUNNING'].includes(job?.status),
+    resume: !controlRequested && job?.status === 'SUSPENDED' && (holds.manual || !holds.external),
+    cancel: !controlRequested && OPEN_PATROL_STATUSES.has(job?.status),
     cancelling,
   };
 }
@@ -59,11 +61,11 @@ export default function PatrolJobMonitor({ detail, catalog = {}, writable = fals
   const controls = controlState(detail);
   const endpointLabel = point?.endpointName || point?.endpointCode || (patrol?.targetEndpointId ? `Điểm ${shortId(patrol.targetEndpointId)}` : 'Chưa có dữ liệu');
   const roundLabel = patrol ? patrol.continuous ? `Vòng ${patrol.round} · Liên tục` : `Vòng ${patrol.round} / ${patrol.repeatCount}` : 'Chưa có dữ liệu';
-  const phase = controls.cancelling ? 'Chờ dừng an toàn' : job.status === 'SUSPENDING' ? 'Chờ xác nhận dừng' : job.status === 'SUSPENDED' ? holds.external ? 'Chờ việc ưu tiên kết thúc' : 'Đang tạm dừng' : phaseLabels[patrol?.phase] || (patrol?.phase ? 'Đang thực hiện bước tuần tra' : job.status === 'QUEUED' ? 'Đang chờ robot nhận' : 'Chưa có bước thực thi');
+  const phase = controls.cancelling ? 'Chờ dừng an toàn' : !OPEN_PATROL_STATUSES.has(job.status) ? 'Lượt đã kết thúc' : job.status === 'SUSPENDING' ? 'Chờ xác nhận dừng' : job.status === 'SUSPENDED' ? holds.external ? 'Chờ việc ưu tiên kết thúc' : 'Đang tạm dừng' : phaseLabels[patrol?.phase] || (patrol?.phase ? 'Đang thực hiện bước tuần tra' : job.status === 'QUEUED' ? 'Đang chờ robot nhận' : 'Chưa có bước thực thi');
   return <section className="pt-monitor" aria-label="Chi tiết lượt tuần tra">
     <div className="pt-monitor-head">
-      <div className="pt-monitor-identity"><span className="pt-monitor-robot"><Icon name="robot"/></span><div><strong>{robot?.robotName || robot?.robotCode || (job.robotId ? `Robot ${shortId(job.robotId)}` : 'Chưa giao robot')}</strong><span className="pt-job-code">{job.jobCode || shortId(job.jobId)}</span></div></div>
-      <span className={`pt-badge pt-badge-${status.tone}`}>{controls.cancelling ? 'Đang chờ kết thúc an toàn' : status.label}</span>
+      <div className="pt-monitor-identity"><span className="pt-monitor-robot"><BrandMark /></span><div><strong>{robot?.robotName || robot?.robotCode || (job.robotId ? `Robot ${shortId(job.robotId)}` : 'Chưa giao robot')}</strong><span className="pt-job-code">{job.jobCode || shortId(job.jobId)}</span></div></div>
+      <span className={`pt-badge pt-badge-${status.tone}`}>{status.label}</span>
     </div>
     <dl className="pt-monitor-grid">
       <div className="pt-monitor-cell"><dt>Vòng tuần tra</dt><dd>{roundLabel}</dd></div>
@@ -74,7 +76,7 @@ export default function PatrolJobMonitor({ detail, catalog = {}, writable = fals
     {patrol?.holds?.length > 0 && <div className="pt-monitor-holds"><span className="pt-eyebrow">Lý do tạm dừng</span><div className="pt-hold-list">{patrol.holds.map((hold, index) => <span className="pt-hold-chip" key={`${hold.source}-${hold.sourceId || index}`}><Icon name={hold.source === 'MANUAL' ? 'pause' : 'shield'}/>{HOLD_LABELS[hold.source] || 'Công việc ưu tiên khác'}</span>)}</div></div>}
     {job.status === 'SUSPENDING' && <p className="pt-monitor-note"><Icon name="info"/>Đã yêu cầu tạm dừng. Đang chờ robot xác nhận dừng an toàn.</p>}
     {job.status === 'SUSPENDED' && <div className="pt-monitor-note"><Icon name="info"/><div>{holds.external && <p>Robot đang nhường công việc ưu tiên. Tuần tra tự tiếp tục khi các công việc này kết thúc và robot đủ điều kiện.</p>}{holds.manual && <p>Cần bỏ tạm dừng thủ công bằng nút Tiếp tục.</p>}{patrol?.resumeBlockedReason && <p title={patrol.resumeBlockedReason}>{blockedLabels[patrol.resumeBlockedReason] || 'Robot chưa đủ điều kiện tiếp tục. Hãy kiểm tra trạng thái vận hành.'}</p>}{!holds.manual && !holds.external && <p>{patrol?.resumeRequested ? 'Đã yêu cầu tiếp tục. Máy chủ đang kiểm tra điều kiện của robot.' : 'Có thể yêu cầu tiếp tục lượt tuần tra hiện tại.'}</p>}</div></div>}
-    {controls.cancelling && <p className="pt-monitor-note"><Icon name="info"/>Đã gửi yêu cầu kết thúc. Đang chờ xác nhận an toàn từ robot.</p>}
+    {controls.cancelling && <p className="pt-monitor-note"><Icon name="info"/>{job.stopStatus === 'RECOVERY_REQUIRED' ? 'Chưa xác nhận robot đã dừng. Kiểm tra robot tại trang vận hành trước khi giao lượt mới.' : 'Đã gửi yêu cầu kết thúc. Đang chờ xác nhận an toàn từ robot.'}</p>}
     {job.status === 'RECOVERY_REQUIRED' && <p className="pt-alert pt-alert-error" role="status">Robot cần được kiểm tra tại trang vận hành trước khi tiếp tục nhiệm vụ.</p>}
     {(job.failureReason || job.errorCode) && <p className="pt-alert pt-alert-error" role="status">{job.failureReason || job.errorCode}</p>}
     {!patrol && <p className="pt-monitor-note"><Icon name="info"/>Máy chủ chưa cung cấp trạng thái vòng và tạm dừng cho nhiệm vụ này.</p>}

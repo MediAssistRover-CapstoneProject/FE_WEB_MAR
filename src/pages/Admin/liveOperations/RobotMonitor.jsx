@@ -17,6 +17,7 @@ import MissionProgress from './MissionProgress.jsx';
 import OperationsIcon from './OperationsIcon.jsx';
 import RobotBattery from './RobotBattery.jsx';
 import MapRobotMarker from '../../../components/MapRobotMarker.jsx';
+import BrandMark from '../../../components/BrandMark.jsx';
 import './robotMonitor.css';
 
 const dateTime = value => value ? new Date(value).toLocaleString('vi-VN') : 'Chưa ghi nhận';
@@ -253,7 +254,7 @@ export default function RobotMonitor({ jobs, catalogs, auto, revision, onOpen, o
   const rows = tab === 'running' ? active : waiting;
   return <div className="rm-monitor">
     <div className={`rm-robot-bar is-${connection.phase}`}>
-      <div className="rm-robot-identity"><span className="rm-robot-avatar"><OperationsIcon name="robot" /></span><div><small>ROBOT ĐANG THEO DÕI</small><div className="rm-robot-name"><strong>{[robot?.robotName, robot?.robotCode].find(value => value?.trim() && value.trim().toLowerCase() !== 'string') || 'Robot'}</strong><span className={'rm-pill ' + (connection.connected ? 'is-good' : '')}>{connection.connected ? vi(robot?.status) : connection.phase === 'syncing' ? 'Đang đồng bộ' : 'Chưa có kết nối mới'}</span></div></div></div>
+      <div className="rm-robot-identity"><span className="rm-robot-avatar"><BrandMark /></span><div><small>ROBOT ĐANG THEO DÕI</small><div className="rm-robot-name"><strong>{[robot?.robotName, robot?.robotCode].find(value => value?.trim() && value.trim().toLowerCase() !== 'string') || 'Robot'}</strong><span className={'rm-pill ' + (connection.connected ? 'is-good' : '')}>{connection.connected ? vi(robot?.status) : connection.phase === 'syncing' ? 'Đang đồng bộ' : 'Chưa có kết nối mới'}</span></div></div></div>
       <div className="rm-robot-telemetry"><div title={connection.detail + (error ? ` ${error}` : '')}><OperationsIcon name="signal" /><span><small>Kết nối</small><strong>{connection.label}</strong></span></div><RobotBattery key={robotId} robotId={robotId} auto={auto} revision={revision} now={now} /><div className="rm-robot-updated"><OperationsIcon name="time" /><span><small>Lần nhận gần nhất</small><strong>{receivedAt ? new Date(receivedAt).toLocaleTimeString('vi-VN') : 'Đang chờ dữ liệu'}</strong></span></div></div>
     </div>
     <div className="rm-layout"><div className="rm-left">

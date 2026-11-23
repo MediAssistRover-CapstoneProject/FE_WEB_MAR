@@ -12,22 +12,26 @@ const post = (path, body, options) => apiRequest(path, { ...options, method: 'PO
 // recovery: the operator must first inspect the server's current state.
 export const patrolApi = {
   listWorkflows: (params, options) => apiRequest(query('/api/v1/admin/workflows', params), options),
-  getWorkflow: (id, options) => apiRequest(`/api/v1/admin/workflows/${resource(id)}`, options),
+  getWorkflow: (id, options) => apiRequest(query(`/api/v1/admin/workflows/${resource(id)}`, { includeDeleted: true }), options),
   previewWorkflow: (body, options) => post('/api/v1/admin/patrol-workflows/preview', body, options),
   createWorkflow: (body, options) => post('/api/v1/admin/patrol-workflows', body, options),
   listJobs: (params, options) => apiRequest(query('/api/v1/jobs', params), options),
-  getJob: (id, options) => apiRequest(`/api/v1/jobs/${resource(id)}`, options),
+  getJob: (id, options) => apiRequest(query(`/api/v1/jobs/${resource(id)}`, { includeDeleted: true }), options),
+  listJobEvents: (id, params, options) => apiRequest(query(`/api/v1/jobs/${resource(id)}/events`, params), options),
   suspendJob: (id, reason, options) => post(`/api/v1/jobs/${resource(id)}/suspend`, { reason }, options),
   resumeJob: (id, reason, options) => post(`/api/v1/jobs/${resource(id)}/resume`, { reason }, options),
   cancelJob: (id, reason, options) => post(`/api/v1/jobs/${resource(id)}/cancel`, { reason }, options),
   listRobots: (params, options) => apiRequest(query('/api/v1/robots', params), options),
   getRobotSnapshot: (id, options) => apiRequest(`/api/v1/robots/${resource(id)}/snapshot`, options),
   listSchedules: (params, options) => apiRequest(query('/api/v1/schedules', params), options),
-  getSchedule: (id, options) => apiRequest(`/api/v1/schedules/${resource(id)}`, options),
+  // ONCE schedules become RETIRED after their scheduler occurrence, even if no
+  // job was admitted. Retain those records when observing/recovering dispatch.
+  getSchedule: (id, options) => apiRequest(query(`/api/v1/schedules/${resource(id)}`, { includeDeleted: true }), options),
   createSchedule: (body, options) => post('/api/v1/schedules', body, options),
   activateSchedule: (id, options) => post(`/api/v1/schedules/${resource(id)}/activate`, undefined, options),
+  pauseSchedule: (id, options) => post(`/api/v1/schedules/${resource(id)}/pause`, undefined, options),
   async findSchedule(code, options) {
-    return (await allPatrolPages(params => patrolApi.listSchedules(params, options))).find(item => item.scheduleCode === code) ?? null;
+    return (await allPatrolPages(params => patrolApi.listSchedules({ ...params, includeDeleted: true }, options))).find(item => item.scheduleCode === code) ?? null;
   },
 };
 

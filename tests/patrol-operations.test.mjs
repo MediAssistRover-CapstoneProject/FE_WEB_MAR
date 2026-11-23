@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { allPatrolPages, patrolApi } from '../src/features/patrol/patrolApi.js';
 import { newPatrolDispatch, patrolDraftErrors, patrolHoldSummary, patrolReadiness, patrolRoute } from '../src/features/patrol/patrolModel.js';
+import { resumeDispatch } from '../src/features/workflows/dispatchModel.js';
 
 const workflow = { workflowId: 'wf-1', workflowCode: 'WF_PATROL_A', workflowName: 'Tầng 1', serviceType: 'PATROL', status: 'PUBLISHED', acceptsNewJobs: true, startStepId: 'move-b', defaultInputsJson: { map_id: 'map-1', patrol_repeat_count: 0 } };
 const endpoints = [
@@ -67,6 +68,20 @@ test('stale snapshots and an existing suspended patrol block a new dispatch', ()
   assert.equal(patrolReadiness(robot, snapshot, route, { now, jobs: [{ robotId: robot.robotId, status: 'SUSPENDED' }] }).blocked, true);
 });
 
+test('fresh snapshot robot state replaces a stale catalog entry and navigation must match the route', () => {
+  const route = patrolRoute({ workflow, steps, transitions }, endpoints);
+  const now = Date.parse('2026-11-16T10:00:00Z');
+  const catalogRobot = { robotId: 'robot-1', currentMapId: 'old-map', status: 'BUSY' };
+  const liveRobot = { ...catalogRobot, currentMapId: 'map-1', status: 'IDLE', mapAssetHash: 'ABC123' };
+  const snapshot = { robot: liveRobot, observedAt: new Date(now).toISOString(), mqttConnected: true, heartbeatFresh: true, dispatchReady: true,
+    navigationSession: { state: 'READY', mapId: 'map-1', mapAssetHash: 'abc123' } };
+  assert.equal(patrolReadiness(catalogRobot, snapshot, route, { now }).blocked, false);
+  for (const navigationSession of [null, { state: 'NONE' }, { state: 'LOCALIZING', mapId: 'map-1' }, { state: 'READY', mapId: 'old-map' }, { state: 'READY', mapId: 'map-1', mapAssetHash: 'changed' }]) {
+    assert.equal(patrolReadiness(catalogRobot, { ...snapshot, navigationSession }, route, { now }).blocked, true, JSON.stringify(navigationSession));
+  }
+  assert.equal(patrolReadiness(liveRobot, { ...snapshot, robot: { ...liveRobot, status: 'BUSY' } }, route, { now }).blocked, true, 'A catalog IDLE robot cannot override a live BUSY state');
+});
+
 test('dispatch preserves the published route and binds one explicit robot with low priority', () => {
   const attempt = newPatrolDispatch(workflow, 'robot-1', 'unique', new Date('2026-11-16T10:00:00Z'));
   assert.deepEqual(attempt.body.inputTemplateJson, {});
@@ -93,6 +108,57 @@ test('catalog loading keeps records after the first page and rejects malformed r
   const result = await allPatrolPages(async ({ page }) => ({ content: [{ id: page }], last: page === 1, totalPages: 2 }));
   assert.deepEqual(result, [{ id: 0 }, { id: 1 }]);
   await assert.rejects(allPatrolPages(async () => ({ data: [] })), /không đúng định dạng/);
+});
+
+test('dispatch recovery includes retired schedules and never recreates a processed one-time occurrence', async () => {
+  const savedFetch = globalThis.fetch;
+  const requests = [];
+  const schedule = { scheduleId: 'schedule-1', scheduleCode: 'PATROL_recovery', status: 'RETIRED' };
+  globalThis.localStorage = { getItem: () => null };
+  globalThis.sessionStorage = { getItem: () => null };
+  globalThis.fetch = async (url, options) => {
+    const path = new URL(url, 'http://localhost'); requests.push({ path, options });
+    assert.equal(options.method || 'GET', 'GET');
+    assert.equal(path.searchParams.get('includeDeleted'), 'true');
+    const response = path.pathname.endsWith('/schedules') ? { content: [schedule], totalPages: 1, last: true } : schedule;
+    return new Response(JSON.stringify(response), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  try {
+    const found = await patrolApi.findSchedule(schedule.scheduleCode);
+    assert.equal(found.scheduleId, schedule.scheduleId);
+    const result = await resumeDispatch({ code: schedule.scheduleCode, scheduleId: schedule.scheduleId, body: {} }, {
+      get: patrolApi.getSchedule,
+      create: () => assert.fail('A processed occurrence must not create another schedule'),
+      activate: () => assert.fail('A retired occurrence must not be activated again'),
+    }, () => {});
+    assert.equal(result.status, 'RETIRED');
+    assert.equal(requests.length, 2);
+    assert.ok(requests[1].path.pathname.endsWith('/schedules/schedule-1'));
+  } finally {
+    globalThis.fetch = savedFetch; delete globalThis.localStorage; delete globalThis.sessionStorage;
+  }
+});
+
+test('schedule pause and job event reads use their distinct backend resources', async () => {
+  const savedFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.localStorage = { getItem: () => null };
+  globalThis.sessionStorage = { getItem: () => null };
+  globalThis.fetch = async (url, options) => {
+    requests.push({ path: new URL(url, 'http://localhost'), options });
+    return new Response(JSON.stringify({ content: [], last: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  try {
+    await patrolApi.pauseSchedule('schedule/1');
+    await patrolApi.listJobEvents('job/1', { page: 0, size: 100 });
+    assert.ok(requests[0].path.pathname.endsWith('/schedules/schedule%2F1/pause'));
+    assert.equal(requests[0].options.method, 'POST');
+    assert.equal(requests[0].options.body, undefined);
+    assert.ok(requests[1].path.pathname.endsWith('/jobs/job%2F1/events'));
+    assert.equal(requests[1].path.searchParams.get('size'), '100');
+  } finally {
+    globalThis.fetch = savedFetch; delete globalThis.localStorage; delete globalThis.sessionStorage;
+  }
 });
 
 test('a rejected job control command is sent once without authentication replay', async () => {
