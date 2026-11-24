@@ -42,5 +42,15 @@ export function endpointPayload(form,map,zones,rooms) {
   return {mapId:map.mapId,zoneId:form.zoneId||null,roomId:form.roomId||null,endpointCode:text(form.endpointCode,'Mã điểm',64),endpointName:text(form.endpointName,'Tên điểm',160),endpointType:form.endpointType,
     xM:number(form.xM,'X (m)'),yM:number(form.yM,'Y (m)'),yawRad,active:!!form.active,accessible:!!form.accessible,publicVisible:!!form.publicVisible,description:form.description||''};
 }
-export function groupFromApi(group,members){return {id:group.endpointGroupId,code:group.groupCode,name:group.groupName,selectionPolicy:group.selectionPolicy,allowFallback:group.allowFallback,active:group.active,description:group.description||'',members:members.filter(m=>m.endpointGroupId===group.endpointGroupId).map(m=>({endpointId:m.endpointId,sequenceNo:m.sequenceNo,active:m.active}))};}
-export function groupPayload(group,mapId){if(!['PRIORITY','NEAREST_REACHABLE'].includes(group.selectionPolicy))throw Error('Chính sách này chỉ dùng trong mô phỏng, chưa thuộc hợp đồng API nhóm điểm.');return {mapId,groupCode:group.code,groupName:group.name,selectionPolicy:group.selectionPolicy,allowFallback:group.allowFallback,description:group.description||'',active:group.active};}
+export function groupFromApi(group,members){return {id:group.endpointGroupId,code:group.groupCode,name:group.groupName,selectionPolicy:group.selectionPolicy,allowFallback:group.allowFallback,active:group.active,description:group.description||'',roomId:group.roomId||null,fallbackRadiusM:group.fallbackRadiusM??0.75,members:members.filter(m=>m.endpointGroupId===group.endpointGroupId).map(m=>({endpointId:m.endpointId,sequenceNo:m.sequenceNo,active:m.active}))};}
+export function groupPayload(group,mapId){
+  if(!['PRIORITY','NEAREST_REACHABLE'].includes(group.selectionPolicy))throw Error('Chính sách này chỉ dùng trong mô phỏng, chưa thuộc hợp đồng API nhóm điểm.');
+  const result={mapId,groupCode:group.code,groupName:group.name,selectionPolicy:group.selectionPolicy,allowFallback:group.allowFallback,description:group.description||'',active:group.active};
+  if(group.roomId){
+    const radius=number(group.fallbackRadiusM??0.75,'Bán kính điểm dự phòng');
+    if(radius<0.1||radius>2)throw Error('Bán kính điểm dự phòng phải từ 0,1 đến 2 m.');
+    if(group.selectionPolicy!=='PRIORITY'||!group.allowFallback)throw Error('Nhóm theo phòng cần ưu tiên điểm chính và bật điểm dự phòng.');
+    Object.assign(result,{roomId:group.roomId,fallbackRadiusM:radius});
+  }
+  return result;
+}

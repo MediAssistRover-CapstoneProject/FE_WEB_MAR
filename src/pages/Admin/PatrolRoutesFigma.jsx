@@ -3,18 +3,18 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { getSession } from '../../features/auth/session.js';
 import { API_BASE_URL } from '../../features/api/client.js';
 import { allPatrolPages, patrolApi, patrolDispatchApi } from '../../features/patrol/patrolApi.js';
-import { OPEN_PATROL_STATUSES, isPatrolWorkflow, jobStatus, jobStopPending, newPatrolDispatch, patrolReadiness, patrolRoute } from '../../features/patrol/patrolModel.js';
+import { OPEN_PATROL_STATUSES, isPatrolWorkflow, jobStatus, jobStopPending, newPatrolDispatch, patrolReadiness, patrolRoute, patrolTemplateCount } from '../../features/patrol/patrolModel.js';
 import { allFacilityPages, facilityApi } from '../../features/facility/facilityApi.js';
 import { resumeDispatch } from '../../features/workflows/dispatchModel.js';
 import CreatePatrolRoute from './patrol/CreatePatrolRoute.jsx';
 import { JobAction } from './patrol/PatrolJobMonitor.jsx';
 import PatrolQueuePanel from './patrol/PatrolQueuePanel.jsx';
-import { DispatchPanel, RouteLibrary, RouteMapPanel } from './patrol/PatrolPlanningPanels.jsx';
+import { DispatchPanel, PatrolSchedules, RouteLibrary, RouteMapPanel } from './patrol/PatrolPlanningPanels.jsx';
 import { Button, Empty, Icon, Modal } from './patrol/PatrolUi.jsx';
 import './patrol/patrolWorkspace.css';
 import './patrol/patrolRedesign.css';
 
-const blankCatalog = { workflows: [], robots: [], maps: [], endpoints: [], zones: [] };
+const blankCatalog = { workflows: [], templates: [], robots: [], maps: [], endpoints: [], zones: [], groups: [], members: [], rooms: [] };
 const robotName = robot => robot?.robotName || robot?.robotCode || 'Chưa phân công';
 const roundLabel = route => route?.continuous ? 'Lặp liên tục' : `${route?.repeatCount ?? 1} vòng`;
 function restoreAttempt(key) {
@@ -53,6 +53,7 @@ function PatrolWorkspace({ session }) {
   const [creating, setCreating] = useState(false), [revision, setRevision] = useState(0);
   const [catalog, setCatalog] = useState(blankCatalog), [loading, setLoading] = useState(true), [catalogError, setCatalogError] = useState('');
   const [search, setSearch] = useState(''), [mapFilter, setMapFilter] = useState(''), [notice, setNotice] = useState('');
+  const [createdJobId, setCreatedJobId] = useState('');
   const workflowId = params.get('workflowId') || '';
   const writable = session.mode !== 'demo';
   const refresh = () => setRevision(value => value + 1);
@@ -66,30 +67,31 @@ function PatrolWorkspace({ session }) {
   useEffect(() => {
     const controller = new AbortController(); const options = { signal: controller.signal };
     setLoading(true); setCatalogError('');
-    Promise.all([allPatrolPages((query, config) => patrolApi.listWorkflows({ ...query, includeDeleted: true }, config), options), allPatrolPages(patrolApi.listRobots, options), allFacilityPages(query => facilityApi.listMaps(query, options)), allFacilityPages(query => facilityApi.listEndpoints(query, options)), allFacilityPages(query => facilityApi.listZones(query, options))])
-      .then(([workflows, robots, maps, endpoints, zones]) => {
+    Promise.all([allPatrolPages((query, config) => patrolApi.listWorkflows({ ...query, includeDeleted: true }, config), options), allPatrolPages(patrolApi.listRobots, options), allFacilityPages(query => facilityApi.listMaps(query, options)), allFacilityPages(query => facilityApi.listEndpoints(query, options)), allFacilityPages(query => facilityApi.listZones(query, options)), patrolApi.listTemplates(options), allFacilityPages(query => facilityApi.listEndpointGroups(query, options)), allFacilityPages(query => facilityApi.listEndpointGroupMembers(query, options)), allFacilityPages(query => facilityApi.listRooms({ ...query, includeDeleted: true }, options))])
+      .then(([workflows, robots, maps, endpoints, zones, templates, groups, members, rooms]) => {
         if (controller.signal.aborted) return;
-        setCatalog({ workflows: workflows.filter(isPatrolWorkflow).sort((a, b) => Number(b.status === 'PUBLISHED') - Number(a.status === 'PUBLISHED') || (a.workflowName || '').localeCompare(b.workflowName || '', 'vi')), robots, maps, endpoints, zones });
+        if (!Array.isArray(templates)) throw new Error('Danh sách mẫu tuần tra chưa đúng định dạng.');
+        setCatalog({ workflows: workflows.filter(isPatrolWorkflow).sort((a, b) => Number(b.status === 'PUBLISHED') - Number(a.status === 'PUBLISHED') || (a.workflowName || '').localeCompare(b.workflowName || '', 'vi')), robots, maps, endpoints, zones, templates, groups, members, rooms });
       }).catch(cause => { if (!controller.signal.aborted) setCatalogError(cause.message); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [revision]);
-  useEffect(() => { if (!workflowId && !mapFilter && catalog.workflows.length) selectRoute(catalog.workflows[0].workflowId); }, [catalog.workflows, workflowId, mapFilter]);
+  useEffect(() => { const first = catalog.workflows.find(workflow => workflow.status !== 'ARCHIVED'); if (!workflowId && !mapFilter && first) selectRoute(first.workflowId); }, [catalog.workflows, workflowId, mapFilter]);
   const changeMap = id => {
     setMapFilter(id);
-    if (id && catalog.workflows.find(item => item.workflowId === workflowId)?.defaultInputsJson?.map_id !== id) selectRoute(catalog.workflows.find(item => item.defaultInputsJson?.map_id === id)?.workflowId || '');
+    if (id && !patrolTemplateCount(catalog.workflows.find(item => item.workflowId === workflowId)) && catalog.workflows.find(item => item.workflowId === workflowId)?.defaultInputsJson?.map_id !== id) selectRoute(catalog.workflows.find(item => item.defaultInputsJson?.map_id === id)?.workflowId || '');
   };
-  const visibleRoutes = catalog.workflows.filter(workflow => (!mapFilter || workflow.defaultInputsJson?.map_id === mapFilter) && `${workflow.workflowName} ${workflow.workflowCode}`.toLocaleLowerCase('vi').includes(search.trim().toLocaleLowerCase('vi')));
+  const visibleRoutes = catalog.workflows.filter(workflow => workflow.status !== 'ARCHIVED' && (!mapFilter || patrolTemplateCount(workflow) || workflow.defaultInputsJson?.map_id === mapFilter) && `${workflow.workflowName} ${workflow.workflowCode}`.toLocaleLowerCase('vi').includes(search.trim().toLocaleLowerCase('vi')));
   return <section className="pt-page pt-command-center">
-    <header className="pt-page-heading"><div><div className="pt-eyebrow">VẬN HÀNH ROBOT</div><h2>Trung tâm tuần tra</h2><p>Chọn tuyến trên bản đồ, giao robot và theo dõi từng lượt thực hiện.</p></div><div className="pt-actions"><a className="pt-btn pt-queue-jump" href="#patrol-queue"><Icon name="clock"/>Hàng đợi</a><Button icon="refresh" onClick={refresh} disabled={loading}>Làm mới</Button><Button icon="plus" tone="primary" onClick={() => setCreating(true)} disabled={!writable || loading || !!catalogError}>Tạo tuyến tuần tra</Button></div></header>
+    <header className="pt-page-heading"><div><div className="pt-eyebrow">VẬN HÀNH ROBOT</div><h2>Trung tâm tuần tra</h2><p>Chọn mẫu, bản đồ và điểm ghé khi giao robot hoặc lập lịch tuần tra.</p></div><div className="pt-actions"><a className="pt-btn pt-queue-jump" href="#patrol-queue"><Icon name="clock"/>Hàng đợi</a><Button icon="refresh" onClick={refresh} disabled={loading}>Làm mới</Button><Button icon="plus" tone="primary" onClick={() => setCreating(3)} disabled={!writable || loading || !!catalogError}>Tạo lượt tuần tra</Button></div></header>
     {!writable && <p className="pt-notice">Bạn đang ở chế độ xem thử. Đăng nhập tài khoản quản trị để tạo tuyến và điều khiển robot.</p>}
     {catalogError && <div className="pt-alert" role="alert"><strong>Chưa tải được dữ liệu tuần tra.</strong><span>{catalogError}</span><Button icon="refresh" onClick={refresh}>Thử lại</Button></div>}
     {notice && <div className="pt-success" role="status"><Icon name="check"/><span>{notice}</span><Button className="pt-icon-btn" icon="close" aria-label="Ẩn thông báo" onClick={() => setNotice('')}/></div>}
-    <PatrolOperations catalog={catalog} loading={loading} catalogError={catalogError} workflowId={workflowId} selectRoute={selectRoute} visibleRoutes={visibleRoutes} mapFilter={mapFilter} changeMap={changeMap} search={search} setSearch={setSearch} revision={revision} refresh={refresh} writable={writable} session={session} setNotice={setNotice} onCreate={() => setCreating(true)}/>
-    {creating && <CreatePatrolRoute catalog={catalog} onClose={() => { setCreating(false); refresh(); }} onCreated={id => { setCreating(false); setMapFilter(''); selectRoute(id); refresh(); setNotice('Đã tạo và phát hành tuyến tuần tra. Chọn robot để điều phối.'); }}/ >}
+    <PatrolOperations catalog={catalog} loading={loading} catalogError={catalogError} workflowId={workflowId} selectRoute={selectRoute} visibleRoutes={visibleRoutes} mapFilter={mapFilter} changeMap={changeMap} search={search} setSearch={setSearch} revision={revision} refresh={refresh} writable={writable} session={session} setNotice={setNotice} onCreate={count => setCreating(count || 3)} createdJobId={createdJobId}/>
+    {creating && <CreatePatrolRoute catalog={catalog} initialCount={creating} storageKey={`mediassist.patrol.template-run.v1:${API_BASE_URL}:${session.account.accountId}`} onClose={() => { setCreating(false); refresh(); }} onCreated={result => { setCreating(false); setMapFilter(''); selectRoute(result.workflowId); setCreatedJobId(result.jobId || ''); refresh(); setNotice(result.message); }}/ >}
   </section>;
 }
 
-function PatrolOperations({ catalog, loading, catalogError, workflowId, selectRoute, visibleRoutes, mapFilter, changeMap, search, setSearch, revision, refresh, writable, session, setNotice, onCreate }) {
+function PatrolOperations({ catalog, loading, catalogError, workflowId, selectRoute, visibleRoutes, mapFilter, changeMap, search, setSearch, revision, refresh, writable, session, setNotice, onCreate, createdJobId }) {
   const storageKey = `mediassist.patrol.dispatch.v1:${API_BASE_URL}:${session.account.accountId}`;
   const [attempt, setAttempt] = useState(() => restoreAttempt(storageKey));
   const [robotId, setRobotId] = useState(() => restoreAttempt(storageKey)?.body.robotId || '');
@@ -113,7 +115,8 @@ function PatrolOperations({ catalog, loading, catalogError, workflowId, selectRo
   }, [workflowKey, revision], 30000);
   const detailPoll = usePoll(signal => workflowId ? patrolApi.getWorkflow(workflowId, { signal }) : Promise.resolve(null), [workflowId, revision], 30000);
   const detail = detailPoll.data?.workflow?.workflowId === workflowId ? detailPoll.data : null;
-  const route = useMemo(() => patrolRoute(detail, catalog.endpoints), [detail, catalog.endpoints]);
+  const route = useMemo(() => patrolRoute(detail, catalog.endpoints, undefined, catalog), [detail, catalog]);
+  const schedulesPoll = usePoll(async signal => (await allPatrolPages(patrolApi.listSchedules, { signal })).filter(schedule => workflowIds.has(schedule.workflowId)), [workflowKey, revision], 15000);
   const map = catalog.maps.find(item => item.mapId === route.mapId);
   const monitoredPoll = usePoll(signal => monitoredId ? patrolApi.getJob(monitoredId, { signal }) : Promise.resolve(null), [monitoredId, revision]);
   const monitored = monitoredPoll.data?.job?.jobId === monitoredId ? monitoredPoll.data : null;
@@ -134,6 +137,7 @@ function PatrolOperations({ catalog, loading, catalogError, workflowId, selectRo
   }, [attempt?.scheduleId, revision]);
   const saveAttempt = value => { if (value) sessionStorage.setItem(storageKey, JSON.stringify(value)); else sessionStorage.removeItem(storageKey); attemptRef.current = value; setAttempt(value); };
   useEffect(() => { if (!monitoredId && jobs.length) setMonitoredId(jobs[0].jobId); }, [jobs, monitoredId]);
+  useEffect(() => { if (createdJobId) setMonitoredId(createdJobId); }, [createdJobId]);
   useEffect(() => {
     if (!attempt?.scheduleId) return;
     const job = jobs.find(item => item.scheduleId === attempt.scheduleId) || dispatchedJobPoll.data;
@@ -165,10 +169,11 @@ function PatrolOperations({ catalog, loading, catalogError, workflowId, selectRo
     <RouteLibrary catalog={catalog} loading={loading} error={catalogError} workflows={visibleRoutes} workflowId={workflowId} selectRoute={selectRoute} mapFilter={mapFilter} changeMap={changeMap} search={search} setSearch={setSearch} writable={writable} onCreate={onCreate}/>
     <div className="pt-workspace pt-planning-workspace">
       <RouteMapPanel workflowId={workflowId} detail={detail} route={route} map={map} catalog={catalog} error={detailPoll.error} loading={!detail} snapshot={snapshotPoll.error && snapshot ? { ...snapshot, heartbeatFresh: false } : snapshot} robot={snapshot?.robot || robot} targetEndpointId={targetEndpointId} onRefresh={refresh}/>
-      <DispatchPanel catalog={catalog} route={route} map={map} robotId={robotId} onRobotChange={id => { setRobotId(id); setActionError(''); }} robot={robot} snapshot={snapshot} blocked={blocked} reasons={reasons} busy={busy} pending={!!attempt} onReview={() => setReview(true)} updatedAt={robotId ? snapshotPoll.updatedAt : null}/>
+      <DispatchPanel catalog={catalog} route={route} map={map} robotId={robotId} onRobotChange={id => { setRobotId(id); setActionError(''); }} robot={robot} snapshot={snapshot} blocked={blocked} reasons={reasons} busy={busy} pending={!!attempt} onReview={() => setReview(true)} onConfigure={() => onCreate(route.checkpointCount)} writable={writable} updatedAt={robotId ? snapshotPoll.updatedAt : null}/>
     </div>
     {attempt && <div className="pt-pending" role="status"><span className="pt-pending-icon"><Icon name="clock"/></span><div><strong>{observedAttempt?.status === 'RETIRED' ? 'Lượt gửi đã được xử lý' : 'Đang xác nhận lượt gửi'}</strong><p>{attempt.workflowName} · {robotName(catalog.robots.find(item => item.robotId === attempt.body.robotId))}</p><p>{observedAttempt?.status === 'RETIRED' ? 'Chưa xác nhận được nhiệm vụ tương ứng. Lượt có thể bị bỏ qua nếu robot chưa đủ điều kiện; kiểm tra hàng đợi trước khi gửi lượt mới.' : 'Đang chờ hệ thống tạo nhiệm vụ. Chưa xác nhận robot đã bắt đầu.'}</p>{(attemptPoll.error || dispatchedJobPoll.error) && <p>{attemptPoll.error || dispatchedJobPoll.error}</p>}</div><div className="pt-actions"><Button icon="refresh" disabled={busy || !writable} onClick={dispatch}>Kiểm tra lượt gửi</Button>{observedAttempt?.status === 'RETIRED' && <Button disabled={busy} onClick={() => saveAttempt(null)}>Đóng lượt theo dõi</Button>}</div></div>}
     {actionError && <p className="pt-alert" role="alert">{actionError}</p>}
+    <PatrolSchedules schedules={schedulesPoll.data || []} catalog={catalog} error={schedulesPoll.error} writable={writable} onRefresh={refresh}/>
     <PatrolQueuePanel jobs={jobs} historyJobs={historyPoll.data || []} loading={!jobsPoll.updatedAt && !jobsPoll.error} error={jobsPoll.error} historyLoading={!historyPoll.updatedAt && !historyPoll.error} historyError={historyPoll.error} updatedAt={jobsPoll.updatedAt} catalog={catalog} selectedId={monitoredId} detail={monitored} detailError={detailError} writable={controlFresh} onSelect={setMonitoredId} onAction={kind => setJobAction({ kind, detail: monitored })} onRefresh={refresh}/>
     <p className="pt-history-note">Lịch sử hiển thị tối đa 100 lượt trong 7 ngày gần nhất. <Link to="/admin/live-operations">Mở vận hành trực tiếp</Link></p>
     {review && <Modal title="Bắt đầu tuần tra?" subtitle="Kiểm tra bản đồ và robot trước khi đưa lượt vào hàng đợi." onClose={() => setReview(false)} busy={busy}><div className="pt-form-body"><dl className="pt-review-list"><div><dt>Tuyến tuần tra</dt><dd>{route.workflow?.workflowName}</dd></div><div><dt>Robot thực hiện</dt><dd>{robotName(robot)}</dd></div><div><dt>Bản đồ</dt><dd>{map?.mapName}</dd></div><div><dt>Hành trình</dt><dd>{route.checkpoints.length} điểm · {roundLabel(route)}</dd></div></dl><p className="pt-notice">Robot ưu tiên SOS và nhiệm vụ khẩn cấp. Lượt chỉ được tính đang chạy sau khi robot nhận và thực hiện.</p>{blocked && <p className="pt-alert" role="status">Điều kiện robot hoặc tuyến đã thay đổi. Quay lại để kiểm tra trạng thái mới nhất.</p>}</div><footer className="pt-dialog-footer"><Button disabled={busy} onClick={() => setReview(false)}>Quay lại</Button><Button icon="play" tone="primary" disabled={busy || blocked} onClick={dispatch}>{busy ? 'Đang gửi…' : 'Xác nhận bắt đầu'}</Button></footer></Modal>}

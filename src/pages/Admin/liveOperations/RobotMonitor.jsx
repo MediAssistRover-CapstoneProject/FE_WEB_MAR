@@ -1,3 +1,4 @@
+import PatrolCheckpointProgress from '../../../components/PatrolCheckpointProgress.jsx';
 import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { readCatalog } from '../../../features/api/backendApi.js';
@@ -280,7 +281,7 @@ const CurrentMission = memo(function CurrentMission({ current, catalogs, detail,
       <header><div className="rm-card-title"><span className="rm-card-icon"><OperationsIcon name="activity" /></span><h3>Nhiệm vụ hiện tại</h3></div>{current && <span className={`rm-pill is-${statusInfo(current.status).tone}`}>{statusInfo(current.status).label}</span>}</header>
       <div className="rm-mission-body" role="region" aria-label="Nội dung nhiệm vụ hiện tại" tabIndex={current ? 0 : undefined}>
       {current ? <><strong className="rm-mission-title">{info.title}</strong><p>{info.target || 'Chưa có điểm đến'}</p><small>{current.jobCode}</small>
-        <ol>{(detail?.steps || []).slice().sort((a, b) => a.executionSequenceNo - b.executionSequenceNo).map(item => <li key={item.jobStepId} className={item.status === 'SUCCEEDED' ? 'is-done' : item.jobStepId === step?.jobStepId ? 'is-current' : ''}><strong>{vi(item.stepTypeSnapshot)}</strong><small>{statusInfo(item.status).label}</small></li>)}</ol>
+        {Array.isArray(detail?.job?.inputJson?.checkpoints) ? <PatrolCheckpointProgress detail={detail} catalog={catalogs} /> : (<ol>{(detail?.steps || []).slice().sort((a, b) => a.executionSequenceNo - b.executionSequenceNo).map(item => <li key={item.jobStepId} className={item.status === 'SUCCEEDED' ? 'is-done' : item.jobStepId === step?.jobStepId ? 'is-current' : ''}><strong>{vi(item.stepTypeSnapshot)}</strong><small>{statusInfo(item.status).label}</small></li>)}</ol>)}
         {detailError && <p className="rm-caption" role="status">Chưa cập nhật được tiến trình mới; đang giữ lần ghi nhận gần nhất.</p>}{!detail && <p className="rm-caption">Đang tải tiến trình chi tiết…</p>}
       </> : <div className="rm-placeholder rm-mission-empty"><span><OperationsIcon name="robot" /></span><strong>Chưa có nhiệm vụ đang thực hiện.</strong><p>Theo dõi công việc mới của robot tại đây.</p></div>}
       </div>

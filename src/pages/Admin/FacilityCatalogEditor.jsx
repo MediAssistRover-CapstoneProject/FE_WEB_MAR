@@ -44,7 +44,7 @@ export default function FacilityCatalogEditor({stage, initialMapId = '', onMapCh
   },[mapId,checkRevision]);
   const map=catalog.maps.find(m=>m.mapId===mapId),zones=catalog.zones.filter(z=>z.mapId===mapId),endpoints=catalog.endpoints.filter(e=>e.mapId===mapId),rooms=catalog.rooms.filter(r=>r.floorId===map?.floorId);
   const groups=catalog.groups.filter(g=>g.mapId===mapId).map(g=>groupFromApi(g,catalog.members));
-  const localEndpoints=endpoints.map(e=>({id:e.endpointId,name:e.endpointName,enabled:e.active,accessible:e.accessible}));
+  const localEndpoints=endpoints.map(e=>({id:e.endpointId,name:e.endpointName,roomId:e.roomId,mapId:e.mapId,enabled:e.active,accessible:e.accessible}));
   const fetchCatalog=async()=>{
     const [maps,zones,endpoints,groups,members,rooms]=await Promise.all([api.listMaps,params=>api.listZones({...params,...(canManageZones?{includeDeleted:true}:{})}),api.listEndpoints,api.listEndpointGroups,api.listEndpointGroupMembers,params=>api.listRooms({...params,...(canManageZones?{includeDeleted:true}:{})})].map(allFacilityPages));
     return {maps,zones,endpoints,groups,members,rooms};
@@ -156,7 +156,8 @@ export default function FacilityCatalogEditor({stage, initialMapId = '', onMapCh
         write(async()=>{const result=await(draft.zoneId?api.updateZone(draft.zoneId,payload):api.createZone(payload));upsert('zones','zoneId',result);setZone(zoneForm(result));setDrawing(false);}).catch(()=>{});
       }}/>}
       {stage==='endpoint'&&<><WorkspaceTabs label="Quản lý điểm đích" active={endpointTab} onSelect={setEndpointTab} items={[{id:'point',label:'Điểm đích'},{id:'group',label:'Nhóm điểm đích'}]}/>
-        {endpointTab==='group'?<EndpointGroupEditor key={mapId} remote busy={busy||map.status==='ARCHIVED'} groups={groups} endpoints={localEndpoints}
+        {endpointTab==='group'?<EndpointGroupEditor key={mapId} remote busy={busy||map.status==='ARCHIVED'} groups={groups} endpoints={localEndpoints} rooms={rooms} mapId={mapId}
+          onCreatePair={body=>write(async()=>{const result=await api.createRoomEndpointPair(body);const fresh=await fetchCatalog();setCatalog(fresh);return groupFromApi(result,fresh.members);},'Đã tạo điểm chính và điểm dự phòng cùng phòng.')}
           onSave={g=>write(async()=>{const result=await(g.id?api.updateEndpointGroup(g.id,groupPayload(g,mapId)):api.createEndpointGroup(groupPayload(g,mapId)));upsert('groups','endpointGroupId',result);return groupFromApi(result,catalog.members);})}
           onMember={(g,m,existing)=>write(async()=>{const body={endpointGroupId:g.id,...m};const result=await(existing?api.updateEndpointGroupMember(g.id,m.endpointId,body):api.createEndpointGroupMember(body));setCatalog(c=>({...c,members:[...c.members.filter(row=>!(row.endpointGroupId===g.id&&row.endpointId===m.endpointId)),result]}));})}
           onRemove={(g,m)=>write(async()=>{await api.removeEndpointGroupMember(g.id,m.endpointId);setCatalog(c=>({...c,members:c.members.map(row=>row.endpointGroupId===g.id&&row.endpointId===m.endpointId?{...row,active:false}:row)}));})}/>

@@ -29,11 +29,109 @@ export const HOLD_LABELS = {
 
 export const isPatrolWorkflow = workflow => workflow?.serviceType === 'PATROL';
 export const isManagedPatrol = workflow => isPatrolWorkflow(workflow) && String(workflow.workflowCode ?? '').startsWith('WF_PATROL_');
+export function patrolTemplateCount(workflow) {
+  const template = workflow?.inputUiJson?.patrol_template;
+  return template?.version === 1 && Number.isInteger(template.checkpointCount) && template.checkpointCount >= 3 && template.checkpointCount <= 11 ? template.checkpointCount : null;
+}
+export const endpointAvailable = (endpoint, mapId) => endpoint?.mapId === mapId && endpoint.active === true && endpoint.accessible === true && endpoint.yawRad != null && Number.isFinite(Number(endpoint.yawRad));
+
+// Group order is the server's primary/fallback order, never a second checkpoint.
+export function patrolGroupMembers(group, catalog = {}) {
+  if (!group) return [];
+  const members = (catalog.members || group?.members || []).filter(member => (!member.endpointGroupId || member.endpointGroupId === group?.endpointGroupId) && member.active === true).sort((a, b) => a.sequenceNo - b.sequenceNo);
+  return members.map(member => ({ ...member, endpoint: catalog.endpoints?.find(endpoint => endpoint.endpointId === member.endpointId) }));
+}
+export function availablePatrolGroups(catalog = {}, mapId) {
+  return (catalog.groups || []).filter(group => {
+    const room = catalog.rooms?.find(item => item.roomId === group.roomId);
+    const members = patrolGroupMembers(group, catalog);
+    return group.active === true && group.mapId === mapId && group.selectionPolicy === 'PRIORITY' && group.allowFallback === true && room?.active === true && Number(group.fallbackRadiusM) >= .1 && Number(group.fallbackRadiusM) <= 2 && members.length === 2 && members[0].endpointId !== members[1].endpointId && members.every((member, index) => member.sequenceNo === index + 1 && member.mapId === mapId && endpointAvailable(member.endpoint, mapId) && member.endpoint.roomId === group.roomId);
+  });
+}
+export function patrolCheckpointLabel(point, catalog = {}) {
+  const group = point.group || catalog.groups?.find(item => item.endpointGroupId === (point.endpointGroupId || point.endpoint_group_id));
+  if (group) {
+    const names = patrolGroupMembers(group, catalog).map(member => member.endpoint?.endpointName || member.endpoint?.endpointCode || 'Điểm không khả dụng');
+    return `${group.groupName || group.groupCode || 'Nhóm điểm'}${names.length ? ` · ${names.join(' → ')}` : ''}`;
+  }
+  const endpoint = point.endpoint || catalog.endpoints?.find(item => item.endpointId === (point.endpointId || point.endpoint_id));
+  return endpoint?.endpointName || endpoint?.endpointCode || (point.endpointGroupId || point.endpoint_group_id ? 'Nhóm không còn khả dụng' : 'Chưa chọn điểm đến');
+}
+export function patrolTemplateInputs(draft) {
+  return { map_id: draft.mapId, checkpoints: draft.checkpoints.map(point => point.targetType === 'group' || point.endpointGroupId ? { endpoint_group_id: point.endpointGroupId } : { endpoint_id: point.endpointId }), patrol_repeat_count: Number(draft.repeatCount), max_speed_mps: Number(draft.maxSpeedMps) };
+}
+
+export function patrolJobCheckpoints(detail, catalog = {}) {
+  const bindings = detail?.job?.inputJson?.checkpoints;
+  if (!Array.isArray(bindings)) return [];
+  const steps = [...(detail.steps || [])].sort((a, b) => (a.executionSequenceNo || 0) - (b.executionSequenceNo || 0));
+  const selected = steps.find(step => step.jobStepId === detail.job.selectedJobStepId) || steps.find(step => step.stepId === detail.patrol?.selectedStepId && ['RUNNING', 'READY', 'DISPATCHED', 'WAITING'].includes(step.status));
+  return bindings.map((point, index) => {
+    const number = index + 1;
+    const technical = steps.filter(step => new RegExp(`^(?:CHECKPOINT|MOVE|SENSE|GROUP)_${number}(?:_|$)`).test(step.stepCodeSnapshot || ''));
+    const current = !['SUCCEEDED','FAILED','CANCELLED'].includes(detail.job.status) && selected && technical.includes(selected);
+    const visited = technical.filter(step => step.selectedAt || step.startedAt || step.endedAt || !['PENDING','NOT_VISITED'].includes(step.status));
+    const latest = visited.at(-1);
+    const phase = current ? selected.stepTypeSnapshot === 'EXECUTE_SENSING' ? 'Đang quan sát' : selected.stepTypeSnapshot === 'MOVE' ? 'Đang di chuyển' : 'Đang chọn điểm khả dụng' : latest?.errorCode || latest?.status === 'FAILED' ? 'Cần kiểm tra' : latest?.stepTypeSnapshot === 'EXECUTE_SENSING' && latest.status === 'SUCCEEDED' ? 'Đã quan sát' : 'Chờ thực hiện';
+    const concrete = [...technical].reverse().find(step => step.stepTypeSnapshot === 'MOVE' && step.resolvedInputsJson?.endpoint_id)?.resolvedInputsJson?.endpoint_id;
+    const snapshot = detail.job.contextJson?.patrol_checkpoint_snapshot?.checkpoints?.[index];
+    const frozenLabel = snapshot?.target_mode === 'ENDPOINT_GROUP' ? snapshot.endpoint_group_name : snapshot?.endpoint?.endpoint_name || snapshot?.endpoint?.endpoint_code;
+    return { ...point, index: number, label: frozenLabel || patrolCheckpointLabel(point, catalog), phase, current, technical, concreteEndpointId: concrete };
+  });
+}
+export function patrolTemplateErrors(draft, catalog = {}) {
+  const errors = [];
+  if (!catalog.maps?.some(map => map.mapId === draft.mapId && map.status === 'ACTIVE')) errors.push('Chọn một bản đồ đang hoạt động.');
+  const count = Number(draft.checkpointCount);
+  if (!Number.isInteger(count) || count < 3 || count > 11 || draft.checkpoints?.length !== count) errors.push('Chọn đúng số điểm của mẫu, từ 3 đến 11 điểm.');
+  const groups = availablePatrolGroups(catalog, draft.mapId);
+  (draft.checkpoints || []).forEach((point, index) => {
+    if (point.targetType === 'group' || point.endpointGroupId) {
+      if (point.endpointId || !groups.some(group => group.endpointGroupId === point.endpointGroupId)) errors.push(`Điểm ${index + 1}: chọn nhóm cùng bản đồ có điểm chính và dự phòng trong cùng phòng.`);
+    } else if (!endpointAvailable(catalog.endpoints?.find(endpoint => endpoint.endpointId === point.endpointId), draft.mapId)) errors.push(`Điểm ${index + 1}: chọn điểm khả dụng, có hướng và thuộc bản đồ đã chọn.`);
+  });
+  if (draft.repeatCount == null || String(draft.repeatCount).trim() === '' || !Number.isInteger(Number(draft.repeatCount)) || Number(draft.repeatCount) < 0 || Number(draft.repeatCount) > 1000) errors.push('Số vòng phải từ 1 đến 1000; chọn 0 để lặp liên tục.');
+  if (draft.maxSpeedMps == null || String(draft.maxSpeedMps).trim() === '' || !Number.isFinite(Number(draft.maxSpeedMps)) || Number(draft.maxSpeedMps) < .05 || Number(draft.maxSpeedMps) > .35) errors.push('Tốc độ phải từ 0,05 đến 0,35 m/s.');
+  return errors;
+}
+
+// New template runs may queue behind another job. Scheduling has no live guard;
+// direct admission binds the current localized session and is rechecked by BE.
+export function patrolTemplateReadiness(robot, snapshot, mapId, now = Date.now()) {
+  const reasons = [];
+  if (!robot) reasons.push('Chọn robot thực hiện tuần tra.');
+  else {
+    const current = snapshot?.robot?.robotId === robot.robotId ? snapshot.robot : robot;
+    if (!['IDLE', 'BUSY'].includes(current.status)) reasons.push('Robot cần trực tuyến ở trạng thái nghỉ hoặc đang làm nhiệm vụ để nhận hàng đợi.');
+    if (current.currentMapId !== mapId) reasons.push('Robot chưa sử dụng bản đồ đã chọn.');
+    if (!snapshot || snapshot.robot?.robotId !== robot.robotId) reasons.push('Chưa có trạng thái kết nối mới của robot.');
+    else {
+      const observedAt = Date.parse(snapshot.observedAt);
+      if (!Number.isFinite(observedAt) || now - observedAt > 20000 || observedAt > now + 5000) reasons.push('Trạng thái robot đã cũ; hãy chờ cập nhật.');
+      if (!snapshot.mqttConnected || !snapshot.heartbeatFresh) reasons.push('Kết nối robot chưa sẵn sàng.');
+      if (current.status === 'IDLE' && !snapshot.dispatchReady) reasons.push('Robot chưa đủ điều kiện nhận nhiệm vụ.');
+      const navigation = snapshot.navigationSession;
+      if (navigation?.state !== 'READY' || !navigation.sessionId) reasons.push('Mở điều hướng và định vị robot trên bản đồ trước khi đưa vào hàng đợi.');
+      else if (navigation.mapId !== mapId || (navigation.mapAssetHash && current.mapAssetHash && navigation.mapAssetHash.toLowerCase() !== current.mapAssetHash.toLowerCase())) reasons.push('Phiên điều hướng chưa khớp bản đồ đã chọn.');
+    }
+  }
+  return { blocked: reasons.length > 0, reasons: [...new Set(reasons)] };
+}
 export const jobStopPending = job => ['PENDING', 'RECOVERY_REQUIRED'].includes(job?.stopStatus) || Boolean(job?.cancelRequestedAt && OPEN_PATROL_STATUSES.has(job.status) && !['CONFIRMED', 'NOT_REQUIRED'].includes(job.stopStatus));
 export const jobStatus = job => jobStopPending(job) ? { label: job.stopStatus === 'RECOVERY_REQUIRED' ? 'Cần xác nhận dừng' : 'Đang chờ kết thúc an toàn', tone: job.stopStatus === 'RECOVERY_REQUIRED' ? 'red' : 'amber' } : PATROL_STATUS[job?.status] ?? { label: job?.status || 'Chưa xác định', tone: 'neutral' };
 
-export function patrolRoute(detail, endpoints = []) {
+export function patrolRoute(detail, endpoints = [], inputs, catalog = {}) {
   const workflow = detail?.workflow ?? detail ?? null;
+  const checkpointCount = patrolTemplateCount(workflow);
+  if (checkpointCount) {
+    const values = inputs ?? workflow.defaultInputsJson ?? {};
+    const bound = Array.isArray(values.checkpoints);
+    const checkpoints = (values.checkpoints || Array.from({ length: checkpointCount }, () => ({}))).map((point, index) => ({ index: index + 1, endpointId: point.endpoint_id, endpointGroupId: point.endpoint_group_id, endpoint: endpoints.find(endpoint => endpoint.endpointId === point.endpoint_id) || null, group: catalog.groups?.find(group => group.endpointGroupId === point.endpoint_group_id), mapId: values.map_id, sensingType: 'PATROL_FALL', windowSec: 3, fallDetection: true, maxSpeedMps: values.max_speed_mps ?? .25 }));
+    const repeatCount = values.patrol_repeat_count ?? 1;
+    const draft = { checkpointCount, mapId: values.map_id, checkpoints: checkpoints.map(point => ({ ...point, targetType: point.endpointGroupId ? 'group' : 'endpoint' })), repeatCount, maxSpeedMps: values.max_speed_mps ?? .25 };
+    const issues = bound ? patrolTemplateErrors(draft, { ...catalog, endpoints }) : [];
+    return { workflow, mapId: values.map_id || null, repeatCount, continuous: repeatCount === 0, checkpoints, issues, checkpointCount, template: true, needsConfiguration: !bound, managed: true, published: workflow.status === 'PUBLISHED' && workflow.acceptsNewJobs === true };
+  }
   const { steps, issues } = detail?.steps ? orderedPatrolSteps(detail) : { steps: [], issues: [] };
   const checkpoints = steps.flatMap((step, index) => {
     if (step.stepTypeCode !== 'MOVE') return [];

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { patrolApi } from '../../../features/patrol/patrolApi.js';
-import { HOLD_LABELS, OPEN_PATROL_STATUSES, jobStatus, jobStopPending, patrolHoldSummary } from '../../../features/patrol/patrolModel.js';
+import { HOLD_LABELS, OPEN_PATROL_STATUSES, jobStatus, jobStopPending, patrolHoldSummary, patrolJobCheckpoints } from '../../../features/patrol/patrolModel.js';
 import { Button, Empty, Icon, Modal } from './PatrolUi.jsx';
 import BrandMark from '../../../components/BrandMark.jsx';
 
@@ -59,6 +59,8 @@ export default function PatrolJobMonitor({ detail, catalog = {}, writable = fals
   const status = jobStatus(job);
   const holds = patrolHoldSummary(patrol);
   const controls = controlState(detail);
+  const checkpoints = patrolJobCheckpoints(detail, catalog);
+  const activeCheckpoint = checkpoints.find(checkpoint => checkpoint.current);
   const endpointLabel = point?.endpointName || point?.endpointCode || (patrol?.targetEndpointId ? `Điểm ${shortId(patrol.targetEndpointId)}` : 'Chưa có dữ liệu');
   const roundLabel = patrol ? patrol.continuous ? `Vòng ${patrol.round} · Liên tục` : `Vòng ${patrol.round} / ${patrol.repeatCount}` : 'Chưa có dữ liệu';
   const phase = controls.cancelling ? 'Chờ dừng an toàn' : !OPEN_PATROL_STATUSES.has(job.status) ? 'Lượt đã kết thúc' : job.status === 'SUSPENDING' ? 'Chờ xác nhận dừng' : job.status === 'SUSPENDED' ? holds.external ? 'Chờ việc ưu tiên kết thúc' : 'Đang tạm dừng' : phaseLabels[patrol?.phase] || (patrol?.phase ? 'Đang thực hiện bước tuần tra' : job.status === 'QUEUED' ? 'Đang chờ robot nhận' : 'Chưa có bước thực thi');
@@ -69,10 +71,11 @@ export default function PatrolJobMonitor({ detail, catalog = {}, writable = fals
     </div>
     <dl className="pt-monitor-grid">
       <div className="pt-monitor-cell"><dt>Vòng tuần tra</dt><dd>{roundLabel}</dd></div>
-      <div className="pt-monitor-cell"><dt>Điểm đang xử lý</dt><dd>{endpointLabel}</dd></div>
+      <div className="pt-monitor-cell"><dt>Điểm đang xử lý</dt><dd>{activeCheckpoint ? `Điểm ${activeCheckpoint.index} · ${activeCheckpoint.label}` : endpointLabel}</dd></div>
       <div className="pt-monitor-cell"><dt>Hoạt động</dt><dd title={patrol?.phase || undefined}>{phase}</dd></div>
       <div className="pt-monitor-cell"><dt>Bắt đầu</dt><dd>{timeLabel(job.startedAt)}</dd></div>
     </dl>
+    {!!checkpoints.length && <div className="pt-job-checkpoints"><h4>Điểm ghé của nhiệm vụ</h4><ol>{checkpoints.map(checkpoint => <li key={checkpoint.index} className={checkpoint.current ? 'is-current' : ''}><div><strong>Điểm {checkpoint.index} · {checkpoint.label}</strong><span>{checkpoint.phase}{checkpoint.concreteEndpointId && checkpoint.endpoint_group_id ? ` → ${catalog.endpoints?.find(endpoint => endpoint.endpointId === checkpoint.concreteEndpointId)?.endpointName || 'Điểm đã chọn'}` : ''}</span></div>{checkpoint.technical.length > 0 && <details><summary>Chi tiết kỹ thuật ({checkpoint.technical.length} lượt bước)</summary><ol>{checkpoint.technical.map(step => <li key={step.jobStepId || step.executionSequenceNo}><code>{step.stepCodeSnapshot}</code> · {step.stepTypeSnapshot} · {step.status}{step.errorCode ? ` · ${step.errorCode}` : ''}</li>)}</ol></details>}</li>)}</ol></div>}
     {patrol?.holds?.length > 0 && <div className="pt-monitor-holds"><span className="pt-eyebrow">Lý do tạm dừng</span><div className="pt-hold-list">{patrol.holds.map((hold, index) => <span className="pt-hold-chip" key={`${hold.source}-${hold.sourceId || index}`}><Icon name={hold.source === 'MANUAL' ? 'pause' : 'shield'}/>{HOLD_LABELS[hold.source] || 'Công việc ưu tiên khác'}</span>)}</div></div>}
     {job.status === 'SUSPENDING' && <p className="pt-monitor-note"><Icon name="info"/>Đã yêu cầu tạm dừng. Đang chờ robot xác nhận dừng an toàn.</p>}
     {job.status === 'SUSPENDED' && <div className="pt-monitor-note"><Icon name="info"/><div>{holds.external && <p>Robot đang nhường công việc ưu tiên. Tuần tra tự tiếp tục khi các công việc này kết thúc và robot đủ điều kiện.</p>}{holds.manual && <p>Cần bỏ tạm dừng thủ công bằng nút Tiếp tục.</p>}{patrol?.resumeBlockedReason && <p title={patrol.resumeBlockedReason}>{blockedLabels[patrol.resumeBlockedReason] || 'Robot chưa đủ điều kiện tiếp tục. Hãy kiểm tra trạng thái vận hành.'}</p>}{!holds.manual && !holds.external && <p>{patrol?.resumeRequested ? 'Đã yêu cầu tiếp tục. Máy chủ đang kiểm tra điều kiện của robot.' : 'Có thể yêu cầu tiếp tục lượt tuần tra hiện tại.'}</p>}</div></div>}
