@@ -1,6 +1,6 @@
 import { confirmAction } from '../../components/appDialog.js';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { vi } from '../../i18n/vi.js';
 import WorkspaceTabs from '../../components/WorkspaceTabs.jsx';
 import LiveMapping from './robotOperations/LiveMapping.jsx';
@@ -17,13 +17,22 @@ function Button({children,tone='',...props}) {
 
 export default function MapStudioFigma({initialStage='scan'}) {
   const navigate=useNavigate();
-  const stageParam=new URLSearchParams(window.location.search).get('stage');
+  const [params, setParams] = useSearchParams();
+  const stageParam=params.get('stage');
   const requestedStage=stageParam||initialStage;
   const [mapId,setMapId]=useState(()=>new URLSearchParams(window.location.search).get('mapId')||'');
   const [stage,setStage]=useState(()=>mapId?(workflow.some(([id])=>id===stageParam)?stageParam:'endpoint'):workflow.some(([id])=>id===requestedStage)?requestedStage:'scan');
   const [showLibrary,setShowLibrary]=useState(()=>!mapId&&stage==='scan'&&new URLSearchParams(window.location.search).get('stage')!=='scan');
   const [copyNotice,setCopyNotice]=useState('');
   const [presentationDirty,setPresentationDirty]=useState(false);
+  const selectEndpointTab = tab => {
+    const next = new URLSearchParams(params);
+    next.set('mapId', mapId);
+    next.set('stage', 'endpoint');
+    if (tab === 'group') next.set('endpointTab', 'group');
+    else next.delete('endpointTab');
+    setParams(next, { replace: true });
+  };
   const canLeave=async()=>!presentationDirty||await confirmAction('Bản đồ còn chỉnh sửa chưa lưu. Bỏ thay đổi và rời trang chỉnh sửa?');
   const openLibrary=async()=>{if(await canLeave())setShowLibrary(true);};
   const switchStage=async target=>{if(target===stage||await canLeave()){setStage(target);navigate('/admin/map?'+new URLSearchParams({...(mapId?{mapId}:{}),stage:target}),{replace:true});}};
@@ -72,6 +81,8 @@ export default function MapStudioFigma({initialStage='scan'}) {
     {stage==='scan'
       ? <LiveMapping embedded onMapSaved={id=>openMap(id,'zone')}/>
       : stage==='presentation' ? <MapPresentationEditor key={mapId} mapId={mapId} onOpenLibrary={openLibrary} onDirtyChange={setPresentationDirty}/>
-      : <FacilityCatalogEditor key={mapId||'catalog'} stage={stage} initialMapId={mapId} onMapChange={setMapId} onOpenLibrary={()=>setShowLibrary(true)} onMapCopied={id=>{setCopyNotice('Đã mở bản đồ tương thích dẫn đường. BE giữ nguyên bản gốc và sao chép điểm đích; kiểm tra lại vùng, nhóm điểm và liên kết phòng trên bản này trước khi kích hoạt.');openMap(id,'zone');}}/>}
+      : <FacilityCatalogEditor key={mapId||'catalog'} stage={stage} initialMapId={mapId} onMapChange={setMapId}
+        endpointTab={params.get('endpointTab') === 'group' ? 'group' : 'point'} onEndpointTabChange={selectEndpointTab}
+        onOpenLibrary={()=>setShowLibrary(true)} onMapCopied={id=>{setCopyNotice('Đã mở bản đồ tương thích dẫn đường. BE giữ nguyên bản gốc và sao chép điểm đích; kiểm tra lại vùng, nhóm điểm và liên kết phòng trên bản này trước khi kích hoạt.');openMap(id,'zone');}}/>}
   </section>;
 }

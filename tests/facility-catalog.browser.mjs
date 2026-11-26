@@ -10,7 +10,7 @@ const map={mapId:'map-a',floorId:'f1',mapName:'Bản đồ BE thử nghiệm',ma
 const endpoint=(id,mapId)=>({endpointId:id,mapId,endpointCode:id,endpointName:id==='end-a'?'Điểm quầy A':'Điểm bản đồ khác',endpointType:'WAYPOINT',xM:2,yM:3,yawRad:0,active:true,accessible:true,publicVisible:false});
 const existingZone={zoneId:'zone-existing',mapId:'map-a',zoneCode:'zone_001',zoneName:'Vùng đã cấu hình',zoneType:'SPEED',polygonJson:{points:[[-3,-1],[-2,-1],[-2,0],[-3,0]]},speedLimitMps:.3,capacityLimit:20,calibratedAreaM2:6,cameraSourceRef:'cam-existing',cameraRoiJson:{roi:[0,0,1,1]},active:false,publicVisible:true,description:'Ghi chú cũ'};
 const state={maps:[map],zones:[existingZone],rooms:[],endpoints:[endpoint('end-a','map-a'),endpoint('end-other','map-other')],'endpoint-groups':[],'endpoint-group-members':[]};
-let rejectNext=false,rejectPoint=false,failPointNetwork=false,reloadSafe=true,uncertainCopy=false,rejectEndpointState=false,zoneStateResponse='',zoneSequence=0;
+let rejectPoint=false,failPointNetwork=false,reloadSafe=true,uncertainCopy=false,rejectEndpointState=false,zoneStateResponse='',zoneSequence=0;
 await page.route(url=>url.pathname.startsWith('/api/'),async route=>{
  const req=route.request(),url=new URL(req.url()),parts=url.pathname.split('/').filter(Boolean),resource=parts[2],method=req.method();
  const reply=(data,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
@@ -32,14 +32,6 @@ await page.route(url=>url.pathname.startsWith('/api/'),async route=>{
   return reply({mapId:copy.mapId,status:copy.status,assetHash:'test-hash'});
  }
  if(resource==='maps'&&parts[4]==='activate'){state.maps=state.maps.map(m=>({...m,status:'ACTIVE'}));return reply(state.maps[0]);}
- if(rejectNext){rejectNext=false;return reply({message:'Sequence number already exists in this group'},409);}
- if(resource==='endpoint-groups'){
-  const result={...body,endpointGroupId:parts[3]||'group-a'};state[resource]=[result];return reply(result,method==='POST'?201:200);
- }
- if(resource==='endpoint-group-members'){
-  if(method==='DELETE'){state[resource]=state[resource].map(m=>({...m,active:false}));return route.fulfill({status:204});}
-  const result={...body,mapId:'map-a'};state[resource]=[result];return reply(result,method==='POST'?201:200);
- }
  if(resource==='zones'&&['activate','deactivate'].includes(parts[4])){
   assert.equal(method,'POST');assert.deepEqual(Object.keys(body),['reason']);assert.ok(body.reason.length>=5&&body.reason.length<=500);
   if(zoneStateResponse==='error')return reply({message:'Zone state temporarily unavailable'},503);
@@ -58,8 +50,7 @@ await page.route(url=>url.pathname.startsWith('/api/'),async route=>{
  throw Error('Unexpected write: '+url.pathname);
 });
 await mkdir('.workstation-build/facility',{recursive:true});
-// The catalog is deliberately no longer a Map Studio mode. Exercise the retained
-// API component in an isolated test page, not by adding a production menu back.
+// Exercise the embedded catalog independently of the Map Studio route.
 await page.route('**/__test/facility-catalog',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><html lang="vi"><head><meta name="viewport" content="width=device-width,initial-scale=1"/></head><body><div id="root"></div><script type="module" src="/tests/fixtures/facility-catalog.jsx"></script></body></html>`}));
 try{
  await page.goto((process.env.TEST_URL||'http://127.0.0.1:5175')+'/__test/facility-catalog');
@@ -67,20 +58,8 @@ try{
  assert.equal(writes.length,0);assert.ok(reads.some(p=>p.includes('endpoints?page=1')));
  await page.getByRole('button',{name:'3. Điểm đích',exact:true}).click();
  await page.getByRole('button',{name:'Nhóm điểm đích',exact:true}).click();
- const group=page.getByRole('region',{name:'Quản lý nhóm điểm đích'});
- await group.getByLabel('Mã nhóm',{exact:true}).fill('PICKUP');await group.getByLabel('Tên nhóm',{exact:true}).fill('Các quầy nhận');
- await group.getByRole('button',{name:'Tạo nhóm',exact:true}).click();
- await group.getByLabel('Điểm thành viên',{exact:true}).selectOption('end-a');
- assert.equal(await group.getByLabel('Điểm thành viên',{exact:true}).locator('option').count(),2);
- await group.getByRole('button',{name:'Lưu thành viên',exact:true}).click();
- await group.getByText('1. Điểm quầy A',{exact:true}).waitFor();
- assert.equal(writes[0].body.mapId,'map-a');assert.equal(writes[1].body.endpointGroupId,'group-a');assert.equal(writes[1].body.sequenceNo,1);
- await group.getByRole('button',{name:'Chỉnh thành viên',exact:true}).click();await group.getByLabel('Thứ tự ưu tiên',{exact:true}).fill('2');rejectNext=true;
- await group.getByRole('button',{name:'Lưu thành viên',exact:true}).click();await page.getByRole('status').filter({hasText:'HTTP 409'}).waitFor();
- assert.equal(await group.getByText('1. Điểm quầy A',{exact:true}).count(),1);
- await group.getByRole('button',{name:'Lưu thành viên',exact:true}).click();await group.getByText('2. Điểm quầy A',{exact:true}).waitFor();
- await group.getByRole('button',{name:'Tắt thành viên',exact:true}).click();await page.waitForFunction(()=>document.querySelector('[aria-label="Quản lý nhóm điểm đích"] .ls-task small')?.textContent.includes('Tắt'));
- assert.equal(writes.at(-1).method,'DELETE');
+ // Full group and member management is exercised on /admin/map by endpoint-group-workspace.browser.mjs.
+ await page.getByRole('region',{name:'Quản lý nhóm điểm đích'}).waitFor();
  await page.getByRole('button',{name:'2. Vùng',exact:true}).click();
  const inactiveShape=()=>page.locator('[data-zone-id="zone-existing"]');
  assert.equal(await inactiveShape().getAttribute('data-zone-state'),'inactive');
@@ -324,6 +303,6 @@ try{
  await page.getByRole('button',{name:'Tạo bản đồ tương thích dẫn đường',exact:true}).click();
  await page.getByRole('status').filter({hasText:'Chưa xác nhận được kết quả tạo bản sao'}).waitFor();
  assert.equal(writes.length,beforeUncertain+1);assert.equal(await page.getByRole('button',{name:'Tạo bản đồ tương thích dẫn đường',exact:true}).isDisabled(),true);
- assert.deepEqual(errors,[]);assert.ok(writes.every(w=>/\/api\/v1\/(maps|zones|endpoints|endpoint-groups|endpoint-group-members)/.test(w.path)));
- console.log('PASS: paginated API catalog, map scoping, group/member CRUD + 409/204, zone + endpoint payload, responsive sizes. All writes mocked; no real BE mutations.');
+ assert.deepEqual(errors,[]);assert.ok(writes.every(w=>/\/api\/v1\/(maps|zones|endpoints)/.test(w.path)));
+ console.log('PASS: paginated API catalog, map scoping, zone + endpoint payloads and responsive sizes. All writes mocked.');
 }catch(e){console.error(errors);await page.screenshot({path:'.workstation-build/facility/failure.png',fullPage:true});throw e;}finally{await browser.close();}

@@ -1,88 +1,173 @@
-import { useEffect, useRef, useState } from 'react';
-import { groupError, SELECTION_POLICIES, API_SELECTION_POLICIES, POLICY_HELP } from '../../features/facility/endpointGroups.js';
+import { useEffect, useState } from 'react';
+import { API_SELECTION_POLICIES } from '../../features/facility/endpointGroups.js';
+import { Icon, Modal } from './patrol/PatrolUi.jsx';
+import RoomEndpointPairForm from './RoomEndpointPairForm.jsx';
+import { GroupForm, MemberForm, ReasonForm } from './EndpointGroupForms.jsx';
+import './endpointGroupEditor.css';
 
-const empty = () => ({ id:'', code:'', name:'', selectionPolicy:'PRIORITY', allowFallback:false, active:true, description:'', roomId:null, fallbackRadiusM:0.75, members:[] });
-const emptyPair = () => ({roomId:'',primaryEndpointId:'',fallbackEndpointId:'',groupCode:'',groupName:'',fallbackRadiusM:0.75,setAsRoomDefault:false});
-export default function EndpointGroupEditor({groups, endpoints, rooms=[], mapId, onCreatePair, onSave, onMember, onRemove, onDelete, onDirtyChange, busy=false, remote=false}) {
-  const [form,setForm]=useState(empty),[member,setMember]=useState({endpointId:'',sequenceNo:1,active:true}),[error,setError]=useState('');
-  const [pair,setPair]=useState(emptyPair);
-  const [deleteTarget,setDeleteTarget]=useState(null),[deleting,setDeleting]=useState(false),[deleteError,setDeleteError]=useState('');
-  const deleteDialog=useRef(null);
-  useEffect(()=>{if(deleteTarget)deleteDialog.current?.showModal();},[deleteTarget]);
-  const selected=groups.find(g=>g.id===form.id);
-  const members=selected?.members||[];
-  const baseline={...empty(),...selected};
-  const formDirty=Object.keys(empty()).filter(k=>k!=='members').some(k=>form[k]!==baseline[k]);
-  const savedMember=members.find(m=>m.endpointId===member.endpointId);
-  const dirty=formDirty||!!pair.roomId||!!member.endpointId&&(!savedMember||['sequenceNo','active'].some(k=>member[k]!==savedMember[k]));
-  useEffect(()=>{onDirtyChange?.(dirty);},[dirty,onDirtyChange]);
-  useEffect(()=>()=>onDirtyChange?.(false),[onDirtyChange]);
-  const set=(key,value)=>setForm(f=>({...f,[key]:value}));
-  const run=async action=>{setError('');try{await action();}catch(e){setError(e.message||'Không lưu được thay đổi.');}};
-  const select=id=>{const g=groups.find(g=>g.id===id);setForm(g?{...empty(),...structuredClone(g)}:empty());setMember({endpointId:'',sequenceNo:Math.max(0,...(g?.members||[]).map(m=>m.sequenceNo))+1,active:true});setError('');};
-  const pairEndpoints=endpoints.filter(point=>point.roomId===pair.roomId&&point.enabled!==false&&point.accessible!==false);
-  return <section className="ls-panel" aria-label="Quản lý nhóm điểm đích"><h3>Nhóm điểm đích</h3>
-    <p>Gộp các điểm cùng chức năng để robot chọn một điểm phù hợp khi điều phối.</p>
-    {remote&&onCreatePair&&<details className="ls-panel"><summary>Tạo điểm chính và điểm dự phòng cho một phòng</summary><p>Chọn hai điểm đã gán cùng phòng trên bản đồ. Robot chỉ đổi sang điểm dự phòng khi lối tới điểm chính bị chặn và đã xác nhận dừng.</p>
-      <form onSubmit={event=>{event.preventDefault();run(async()=>{
-        if(!pair.roomId||!pair.primaryEndpointId||!pair.fallbackEndpointId||pair.primaryEndpointId===pair.fallbackEndpointId)throw Error('Chọn phòng và hai điểm khác nhau.');
-        if(![pair.primaryEndpointId,pair.fallbackEndpointId].every(id=>pairEndpoints.some(point=>point.id===id)))throw Error('Hai điểm phải hoạt động, cùng phòng và cùng bản đồ.');
-        const radius=Number(pair.fallbackRadiusM);if(!Number.isFinite(radius)||radius<0.1||radius>2)throw Error('Bán kính điểm dự phòng phải từ 0,1 đến 2 m.');
-        const result=await onCreatePair({...pair,mapId,groupCode:pair.groupCode.trim(),groupName:pair.groupName.trim(),fallbackRadiusM:radius});
-        setForm({...empty(),...result});setPair(emptyPair());setMember({endpointId:'',sequenceNo:3,active:true});
-      });}}><fieldset disabled={busy} style={{border:0,padding:0,minWidth:0}}>
-        <label className="ls-field">Phòng<select required value={pair.roomId} onChange={event=>{const room=rooms.find(item=>item.roomId===event.target.value);setPair({...emptyPair(),roomId:event.target.value,groupCode:room?('ROOM_'+room.roomCode+'_PAIR').slice(0,64):'',groupName:room?(room.roomName+' · điểm chính và dự phòng').slice(0,160):''});}}><option value="">Chọn phòng</option>{rooms.filter(room=>room.active!==false).map(room=><option key={room.roomId} value={room.roomId}>{room.roomName} · {room.roomCode}</option>)}</select></label>
-        <label className="ls-field">Điểm chính<select required value={pair.primaryEndpointId} onChange={event=>setPair({...pair,primaryEndpointId:event.target.value})}><option value="">Chọn điểm trong phòng</option>{pairEndpoints.map(point=><option key={point.id} value={point.id} disabled={point.id===pair.fallbackEndpointId}>{point.name}</option>)}</select></label>
-        <label className="ls-field">Điểm dự phòng ngoài cửa<select required value={pair.fallbackEndpointId} onChange={event=>setPair({...pair,fallbackEndpointId:event.target.value})}><option value="">Chọn điểm dự phòng</option>{pairEndpoints.map(point=><option key={point.id} value={point.id} disabled={point.id===pair.primaryEndpointId}>{point.name}</option>)}</select></label>
-        {pair.roomId&&pairEndpoints.length<2&&<p>Cần gán ít nhất hai điểm hoạt động vào phòng này trong tab Điểm đích.</p>}
-        <label className="ls-field">Tên nhóm<input required maxLength={160} value={pair.groupName} onChange={event=>setPair({...pair,groupName:event.target.value})}/></label>
-        <label className="ls-field">Mã nhóm<input required maxLength={64} value={pair.groupCode} onChange={event=>setPair({...pair,groupCode:event.target.value})}/></label>
-        <label className="ls-field">Bán kính cho phép chuyển điểm (m)<input required type="number" min="0.1" max="2" step="0.05" value={pair.fallbackRadiusM} onChange={event=>setPair({...pair,fallbackRadiusM:event.target.value})}/></label>
-        <label className="ls-field"><span><input type="checkbox" checked={pair.setAsRoomDefault} onChange={event=>setPair({...pair,setAsRoomDefault:event.target.checked})}/> Dùng làm nhóm điểm đến mặc định của phòng</span></label>
-        <button className="ls-btn primary" disabled={!pair.roomId||pairEndpoints.length<2}>Tạo nhóm hai điểm</button>
-      </fieldset></form>
-    </details>}
-    <div className="ls-group-toolbar">
-      <label className="ls-field">Nhóm đang chỉnh<select aria-label="Nhóm đang chỉnh" value={form.id} disabled={busy} onChange={e=>select(e.target.value)}><option value="">+ Tạo nhóm mới</option>{groups.map(g=><option key={g.id} value={g.id}>{g.name}{g.active?'':' · tắt'}</option>)}</select></label>
-      {!remote&&onDelete&&selected&&<button type="button" className="ls-btn danger" disabled={busy} onClick={()=>{setDeleteError('');setDeleteTarget(selected);}}>Xóa nhóm</button>}
-    </div>
-    {deleteTarget&&<dialog ref={deleteDialog} className="ls-confirm" role="alertdialog" aria-label="Xóa nhóm điểm đích" onCancel={e=>{if(deleting)e.preventDefault();else setDeleteTarget(null);}}>
-      <strong>Xóa nhóm “{deleteTarget.name}”?</strong>
-      <p>Chỉ xóa nhóm và liên kết thành viên. Các điểm đích trên bản đồ vẫn được giữ nguyên.</p>
-      {dirty&&<p>Thay đổi chưa lưu trong nhóm này sẽ bị bỏ.</p>}
-      <p>Bấm Lưu bản đồ sau khi xóa để cập nhật Điều phối.</p>
-      {deleteError&&<p className="ls-error" role="alert">{deleteError}</p>}
-      <div className="ls-actions"><button type="button" autoFocus className="ls-btn" disabled={deleting} onClick={()=>setDeleteTarget(null)}>Hủy</button><button type="button" className="ls-btn danger" disabled={busy||deleting} onClick={async()=>{
-        setDeleting(true);setDeleteError('');
-        try{await onDelete(deleteTarget);select('');setDeleteTarget(null);}catch(e){setDeleteError(e.message||'Không xóa được nhóm. Vui lòng thử lại.');}finally{setDeleting(false);}
-      }}>{deleting?'Đang xóa…':'Xóa nhóm'}</button></div>
-    </dialog>}
-    <div className="ls-group-grid">
-    <form onSubmit={e=>{e.preventDefault();run(async()=>{const candidate={...form,code:form.code.trim(),name:form.name.trim(),members};const problem=groupError(candidate,groups,endpoints);if(problem)throw Error(problem);const result=await onSave(candidate);setForm(result);});}}>
-      <fieldset disabled={busy} style={{border:0,padding:0,minWidth:0}}>
-        <label className="ls-field">Mã nhóm<input required maxLength={64} value={form.code} onChange={e=>set('code',e.target.value)}/></label>
-        <label className="ls-field">Tên nhóm<input required maxLength={160} value={form.name} onChange={e=>set('name',e.target.value)}/></label>
-        <label className="ls-field">Chính sách chọn điểm<select disabled={!!form.roomId} aria-label="Chính sách chọn điểm" value={form.selectionPolicy} onChange={e=>set('selectionPolicy',e.target.value)}>{Object.entries(remote?API_SELECTION_POLICIES:SELECTION_POLICIES).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
-        {form.roomId&&<><p>Phòng: {rooms.find(room=>room.roomId===form.roomId)?.roomName||form.roomId}. Thứ tự 1 là điểm chính, thứ tự 2 là điểm dự phòng.</p><label className="ls-field">Bán kính chuyển sang điểm dự phòng (m)<input required type="number" min="0.1" max="2" step="0.05" value={form.fallbackRadiusM} onChange={event=>set('fallbackRadiusM',event.target.value)}/></label></>}
-        <p>{POLICY_HELP[form.selectionPolicy]}</p>
-        <label className="ls-field">Mô tả công việc tương đương<input value={form.description||''} onChange={e=>set('description',e.target.value)}/></label>
-        <label className="ls-field"><span><input type="checkbox" checked={form.active} onChange={e=>set('active',e.target.checked)}/> Kích hoạt nhóm</span></label>
-        <label className="ls-field"><span><input disabled={!!form.roomId} type="checkbox" checked={form.allowFallback} onChange={e=>set('allowFallback',e.target.checked)}/> Cho phép thử điểm kế tiếp khi không có đường</span></label>
-        {remote&&<p>Chỉ chuyển điểm sau lỗi PATH_UNAVAILABLE và bằng chứng robot đã dừng.</p>}
-        <button className="ls-btn primary" type="submit">{form.id?'Lưu thông tin nhóm':'Tạo nhóm'}</button>
-      </fieldset>
-    </form>
-    {selected?<section><h4>Thành viên · {members.length}</h4><p>Chọn các điểm cùng chức năng trên bản đồ này. Một điểm có thể thuộc nhiều nhóm.</p>
-      {!members.length&&<p className="ls-error">Nhóm chưa có thành viên nên chưa dùng được trong Điều phối.</p>}
-      <div className="ls-item-list">{[...members].sort((a,b)=>a.sequenceNo-b.sequenceNo).map(m=><div className="ls-task" key={m.endpointId}><strong>{m.sequenceNo}. {endpoints.find(e=>e.id===m.endpointId)?.name||'Điểm không có trên bản đồ'}</strong><small> · {m.active?'Bật':'Tắt'}</small><div className="ls-actions"><button type="button" className="ls-btn small" disabled={busy} onClick={()=>setMember({...m})}>Chỉnh thành viên</button><button type="button" className="ls-btn small" disabled={busy||!m.active} onClick={()=>run(()=>onRemove(selected,m))}>{remote?'Tắt thành viên':'Gỡ khỏi nhóm'}</button></div></div>)}</div>
-      <form onSubmit={e=>{e.preventDefault();run(async()=>{const candidate={...selected,members:[...members.filter(m=>m.endpointId!==member.endpointId),member]};const problem=groupError(candidate,groups,endpoints);if(problem)throw Error(problem);await onMember(selected,member,members.some(m=>m.endpointId===member.endpointId));setMember({endpointId:'',sequenceNo:Math.max(member.sequenceNo,...members.map(m=>m.sequenceNo))+1,active:true});});}}>
-        <fieldset disabled={busy} style={{border:0,padding:0,minWidth:0}}><label className="ls-field">Điểm thành viên<select aria-label="Điểm thành viên" required value={member.endpointId} onChange={e=>{const found=members.find(m=>m.endpointId===e.target.value);setMember(found?{...found}:{...member,endpointId:e.target.value});}}><option value="">Chọn điểm trên bản đồ</option>{endpoints.map(e=><option key={e.id} value={e.id}>{e.name}{e.enabled===false?' · tắt':''}{e.accessible===false?' · không tiếp cận':''}</option>)}</select></label>
-          <label className="ls-field">Thứ tự ưu tiên<input required type="number" min="1" step="1" value={member.sequenceNo} onChange={e=>setMember(m=>({...m,sequenceNo:Number(e.target.value)}))}/></label>
-          <label className="ls-field"><span><input type="checkbox" checked={member.active} onChange={e=>setMember(m=>({...m,active:e.target.checked}))}/> Thành viên hoạt động</span></label>
-          <button className="ls-btn" type="submit" disabled={!member.endpointId}>Lưu thành viên</button>
-        </fieldset>
-      </form>
-    </section>:<section className="ls-empty"><h4>Thêm điểm vào nhóm</h4><p>Đặt tên và tạo nhóm ở bên cạnh, sau đó chọn điểm thành viên và thứ tự ưu tiên.</p><p>Có {endpoints.length} điểm đích trên bản đồ này.</p></section>}</div>
-    {error&&<p className="ls-error" role="alert">{error}</p>}
+const searchText = value => (value || '').toLocaleLowerCase('vi').normalize('NFD')
+  .replace(/\p{M}/gu, '').replaceAll('đ', 'd').trim();
+
+function Status({ active }) {
+  return <span className={'eg-status' + (active ? ' is-active' : '')}>
+    {active ? 'Đang bật' : 'Đã tắt'}
+  </span>;
+}
+
+function GroupDetails({ group, endpoints, rooms, busy, readOnly, onLoadDetail, onAction }) {
+  const [load, setLoad] = useState({ pending: true, error: '' });
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoad({ pending: true, error: '' });
+    onLoadDetail(group.id, { signal: controller.signal }).then(() => {
+      if (!controller.signal.aborted) setLoad({ pending: false, error: '' });
+    }).catch(error => {
+      if (!controller.signal.aborted) setLoad({ pending: false, error: error.message || 'Không tải được chi tiết nhóm.' });
+    });
+    return () => controller.abort();
+  }, [group.id, onLoadDetail, revision]);
+
+  const points = new Map(endpoints.map(point => [point.id, point]));
+  const members = group.members;
+  const room = rooms.find(item => item.roomId === group.roomId);
+  const activeMembers = members.filter(member => member.active);
+  const incompletePair = group.roomId && (activeMembers.length !== 2 || activeMembers.some((member, index) => {
+    const point = points.get(member.endpointId);
+    return member.sequenceNo !== index + 1 || point?.roomId !== group.roomId || !point?.enabled || !point?.accessible;
+  }));
+  const hasAvailablePoint = endpoints.some(point => (!group.roomId || point.roomId === group.roomId)
+    && !members.some(item => item.endpointId === point.id));
+
+  return <section className="eg-detail" aria-label="Chi tiết nhóm">
+    <header className="eg-detail-header">
+      <div className="eg-detail-identity"><span className="eg-symbol"><Icon name="route"/></span>
+        <div><span className="eg-code">{group.code}</span><h4>{group.name}</h4></div>
+      </div>
+      <Status active={group.active}/>
+    </header>
+    {load.pending ? <p role="status" className="eg-note eg-load">Đang tải chi tiết nhóm…</p>
+      : load.error ? <div className="eg-load"><p role="alert" className="eg-error">{load.error}</p>
+        <button type="button" className="eg-button" onClick={() => setRevision(value => value + 1)}>Thử lại</button></div>
+      : <>
+        <dl className="eg-facts">
+          <div><dt>Chính sách chọn điểm</dt><dd>{API_SELECTION_POLICIES[group.selectionPolicy] || group.selectionPolicy}</dd></div>
+          <div><dt>Chuyển sang điểm dự phòng</dt><dd>{group.allowFallback ? 'Cho phép' : 'Đã tắt'}</dd></div>
+          {group.roomId && <><div><dt>Phòng</dt><dd>{room?.roomName || group.roomId}{room?.defaultEndpointGroupId === group.id && ' · Nhóm mặc định'}</dd></div>
+            <div><dt>Bán kính dự phòng</dt><dd>{Number(group.fallbackRadiusM).toLocaleString('vi')} m</dd></div></>}
+        </dl>
+        {group.description && <p className="eg-description">{group.description}</p>}
+        {!readOnly && <div className="eg-detail-actions">
+          <button type="button" className="eg-button" disabled={busy} onClick={() => onAction('edit')}>Chỉnh sửa nhóm</button>
+          <button type="button" className="eg-button" disabled={busy} onClick={() => onAction('toggle')}>{group.active ? 'Tắt nhóm' : 'Bật nhóm'}</button>
+        </div>}
+        <section className="eg-members" aria-label="Thành viên nhóm">
+          <div className="eg-members-heading"><h5>Thành viên <span className="eg-count">{members.length}</span></h5>
+            {!readOnly && <button type="button" className="eg-button eg-add" disabled={busy || !hasAvailablePoint} onClick={() => onAction('member')}>
+              <Icon name="plus"/>Thêm thành viên
+            </button>}
+          </div>
+          {incompletePair && <p className="eg-pair-note">Để sử dụng cặp điểm, hãy bật hai điểm có thể tiếp cận trong cùng phòng. Điểm chính ở thứ tự 1 và điểm dự phòng ở thứ tự 2.</p>}
+          {!members.length ? <div className="eg-member-empty">
+            <strong>Nhóm chưa có thành viên</strong>
+            <p>{hasAvailablePoint ? 'Thêm điểm đích để robot có thể chọn điểm trong nhóm này.' : 'Cần tạo điểm đích trong phạm vi của nhóm trước khi thêm thành viên.'}</p>
+          </div> : <table className="eg-table" aria-label="Danh sách thành viên">
+            <thead><tr><th scope="col">Thứ tự</th><th scope="col">Điểm đích</th><th scope="col">Trạng thái</th>{!readOnly && <th scope="col">Thao tác</th>}</tr></thead>
+            <tbody>{members.map(member => {
+              const point = points.get(member.endpointId);
+              return <tr key={member.endpointId}>
+                <td><span className="eg-sequence">{member.sequenceNo}</span></td>
+                <th scope="row"><strong>{point?.name || member.endpointId}</strong>
+                  <small>{[point?.code, group.roomId && ({ 1: 'Điểm chính', 2: 'Điểm dự phòng' })[member.sequenceNo]].filter(Boolean).join(' · ')}</small>
+                  {point && (!point.enabled || !point.accessible) && <small>{!point.enabled ? 'Điểm đích đã tắt' : 'Điểm đích không thể tiếp cận'}</small>}
+                </th>
+                <td><Status active={member.active}/></td>
+                {!readOnly && <td><div className="eg-row-actions">
+                  <button type="button" className="eg-link" disabled={busy} onClick={() => onAction('member', member)}>Chỉnh sửa</button>
+                  {member.active && <button type="button" className="eg-link eg-muted" disabled={busy} onClick={() => onAction('remove', member)}>Tắt thành viên</button>}
+                </div></td>}
+              </tr>;
+            })}</tbody>
+          </table>}
+        </section>
+      </>}
+  </section>;
+}
+
+export default function EndpointGroupEditor({
+  groups, endpoints, rooms, mapId, mapName, busy, readOnly,
+  onLoadDetail, onSave, onSetActive, onCreatePair, onMember, onRemove,
+}) {
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState('all');
+  const [selectedId, setSelectedId] = useState(null);
+  const [action, setAction] = useState(null);
+  const term = searchText(query);
+  const visible = groups.filter(group => (status === 'all' || group.active === (status === 'active'))
+    && searchText(group.name + ' ' + group.code).includes(term))
+    .sort((a, b) => a.name.localeCompare(b.name, 'vi') || a.code.localeCompare(b.code, 'vi'));
+  const selected = visible.find(group => group.id === selectedId) || visible[0];
+  // Keep the user's selection if a rename or a new group changes the sort order.
+  const visibleId = selected?.id;
+  useEffect(() => { if (visibleId) setSelectedId(visibleId); }, [visibleId]);
+  const target = action?.groupId && groups.find(group => group.id === action.groupId);
+  const member = target?.members?.find(item => item.endpointId === action.endpointId);
+  const pointName = member && (endpoints.find(point => point.id === member.endpointId)?.name || member.endpointId);
+  const close = () => setAction(null);
+  const showGroup = group => {
+    setQuery('');
+    setStatus('all');
+    setSelectedId(group.id);
+    close();
+  };
+  const titles = { create: 'Tạo nhóm điểm đích', pair: 'Tạo cặp điểm cho phòng', edit: 'Chỉnh sửa nhóm',
+    member: member ? 'Chỉnh sửa thành viên' : 'Thêm thành viên', toggle: target?.active ? 'Tắt nhóm' : 'Bật nhóm', remove: 'Tắt thành viên' };
+  const locked = busy || readOnly;
+
+  return <section className="eg-workspace" aria-label="Quản lý nhóm điểm đích">
+    <header className="eg-header">
+      <div><h3>Nhóm điểm đích</h3><p className="eg-map"><Icon name="map"/>{mapName}</p></div>
+      {!readOnly && <div className="eg-toolbar">
+        <button type="button" className="eg-button" disabled={busy} onClick={() => setAction({ type: 'pair' })}><Icon name="route"/>Tạo cặp điểm cho phòng</button>
+        <button type="button" className="eg-button eg-primary" disabled={busy} onClick={() => setAction({ type: 'create' })}><Icon name="plus"/>Tạo nhóm</button>
+      </div>}
+    </header>
+    {groups.length ? <div className="eg-columns">
+      <aside className="eg-sidebar" aria-label="Danh sách nhóm">
+        <div className="eg-sidebar-heading"><h4>Danh sách nhóm</h4><span className="eg-count">{visible.length}</span></div>
+        <div className="eg-search"><Icon name="search"/><input type="search" aria-label="Tìm nhóm" placeholder="Tìm tên hoặc mã nhóm" value={query} onChange={event => setQuery(event.target.value)}/></div>
+        <select className="eg-filter" aria-label="Lọc trạng thái nhóm" value={status} onChange={event => setStatus(event.target.value)}>
+          <option value="all">Tất cả trạng thái</option><option value="active">Đang bật</option><option value="inactive">Đã tắt</option>
+        </select>
+        <div className="eg-group-list">{visible.map(group => <button type="button" key={group.id}
+          className="eg-group-item" aria-current={group.id === selected?.id ? 'true' : undefined} onClick={() => setSelectedId(group.id)}>
+          <span className="eg-item-top"><strong>{group.name}</strong><Icon name="chevron"/></span>
+          <span className="eg-code">{group.code}</span>
+          <span className="eg-item-meta"><Status active={group.active}/><span>{group.members.length} điểm</span></span>
+        </button>)}</div>
+      </aside>
+      {selected ? <GroupDetails key={selected.id} group={selected} endpoints={endpoints} rooms={rooms}
+        busy={busy} readOnly={readOnly} onLoadDetail={onLoadDetail}
+        onAction={(type, item) => setAction({ type, groupId: selected.id, endpointId: item?.endpointId })}/>
+        : <div className="eg-empty"><Icon name="search"/><h4>Không tìm thấy nhóm phù hợp</h4>
+          <button type="button" className="eg-button" onClick={() => { setQuery(''); setStatus('all'); }}>Xóa bộ lọc</button></div>}
+    </div> : <div className="eg-empty"><span className="eg-symbol"><Icon name="route"/></span>
+      <h4>Bản đồ này chưa có nhóm điểm đích</h4>
+      {!readOnly && <p>Tạo nhóm để chọn các điểm cùng chức năng, hoặc tạo cặp điểm chính và dự phòng cho một phòng.</p>}
+    </div>}
+    {action && <Modal title={titles[action.type]} subtitle={target?.name || mapName} busy={busy} onClose={close}>
+      {action.type === 'pair' && <RoomEndpointPairForm rooms={rooms} endpoints={endpoints} mapId={mapId} groups={groups}
+        busy={locked} onCreatePair={onCreatePair} onCreated={showGroup} onCancel={close}/>}
+      {(action.type === 'create' || (action.type === 'edit' && target)) && <GroupForm group={target || null} groups={groups}
+        busy={locked} onCancel={close} onSubmit={async draft => showGroup(await onSave(draft))}/>}
+      {action.type === 'member' && target && <MemberForm group={target} member={member} endpoints={endpoints}
+        busy={locked} onCancel={close} onSubmit={async draft => { await onMember(target, draft, Boolean(member)); close(); }}/>}
+      {action.type === 'toggle' && target && <ReasonForm busy={locked} onCancel={close}
+        prompt={target.active ? 'Tắt nhóm này trong điều phối.' : 'Cho phép điều phối sử dụng lại nhóm này.'}
+        onSubmit={async reason => { await onSetActive(target, !target.active, reason); close(); }}/>}
+      {action.type === 'remove' && member && <ReasonForm busy={locked} onCancel={close}
+        prompt={'Tắt điểm “' + pointName + '” trong nhóm này. Bạn có thể bật lại trong phần chỉnh sửa thành viên.'}
+        onSubmit={async reason => { await onRemove(target, member, reason); close(); }}/>}
+    </Modal>}
   </section>;
 }

@@ -39,6 +39,17 @@ test('BE group request is DTO exact and membership is separate',()=>{
  const payload=groupPayload(group,'map-a');assert.deepEqual(Object.keys(payload).sort(),['mapId','groupCode','groupName','selectionPolicy','allowFallback','description','active'].sort());
  const normalized=groupFromApi({endpointGroupId:'g1',...payload},[{endpointGroupId:'g1',endpointId:'e',sequenceNo:1,active:false},{endpointGroupId:'g2',endpointId:'wrong',sequenceNo:1,active:true}]);assert.equal(normalized.members.length,1);assert.equal(normalized.members[0].active,false);
 });
+test('editing a group preserves its fallback settings and room selection policy', () => {
+  const record = { ...groupPayload(group, 'map-a'), endpointGroupId: 'g1', fallbackRadiusM: 1.2 };
+  for (const roomId of [null, 'room-a']) {
+    const saved = groupFromApi({ ...record, roomId }, []);
+    const update = groupPayload({ ...saved, name: 'Tên mới' }, 'map-a');
+    assert.equal(update.fallbackRadiusM, 1.2);
+    assert.equal(update.allowFallback, false);
+    assert.equal(update.roomId ?? null, roomId);
+    if (roomId) assert.throws(() => groupPayload({ ...saved, selectionPolicy: 'NEAREST_REACHABLE' }, 'map-a'), /ưu tiên/);
+  }
+});
 const zone={zoneCode:'SLOW',zoneName:'Khu chậm',zoneType:'SPEED',polygonJson:'{"points":[[0,0],[2,0],[2,2]]}',speedLimitMps:'.4',capacityLimit:20,calibratedAreaM2:12,cameraSourceRef:'cam-1',cameraRoiJson:'{"roi":[0,0,1,1]}',active:true,publicVisible:false};
 test('BE zones retain category independently from local navigation rules',()=>{
  const p=zonePayload(zone,'map-a');assert.equal(p.speedLimitMps,.4);assert.equal(p.zoneType,'SPEED');assert.equal(p.capacityLimit,20);assert.deepEqual(p.polygonJson.points[1],[2,0]);

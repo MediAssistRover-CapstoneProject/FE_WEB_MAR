@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { facilityApi as api, allFacilityPages } from '../../features/facility/facilityApi.js';
 import { zonePayload,groupFromApi,groupPayload } from '../../features/facility/facilityContract.js';
 import EndpointGroupEditor from './EndpointGroupEditor.jsx';
@@ -16,11 +16,19 @@ const emptyCatalog={maps:[],zones:[],endpoints:[],groups:[],members:[],rooms:[]}
 const jsonString=value=>value==null?'':JSON.stringify(value,null,2);
 const zoneForm=value=>({...value,polygonJson:jsonString(value.polygonJson),cameraRoiJson:jsonString(value.cameraRoiJson)});
 
-export default function FacilityCatalogEditor({stage, initialMapId = '', onMapChange, onMapCopied, onOpenLibrary}) {
+function verifyGroup(group, mapId, id) {
+  if (!group?.endpointGroupId || group.mapId !== mapId || (id && group.endpointGroupId !== id)) {
+    throw Error('Dữ liệu nhóm điểm trả về không khớp với bản đồ hoặc nhóm đã chọn.');
+  }
+}
+
+export default function FacilityCatalogEditor({stage, initialMapId = '', onMapChange, onMapCopied, onOpenLibrary, endpointTab: selectedTab, onEndpointTabChange}) {
   const navigate=useNavigate();
-  const canManageZones=getSession()?.account?.role==='ADMIN';
+  const canManageCatalog=getSession()?.account?.role==='ADMIN';
   const [catalog,setCatalog]=useState(emptyCatalog),[mapId,setMapId]=useState(''),[status,setStatus]=useState(''),[busy,setBusy]=useState(false),[ready,setReady]=useState(false);
-  const [zone,setZone]=useState(zoneDefault),[endpoint,setEndpoint]=useState(endpointDefault),[endpointTab,setEndpointTab]=useState('point');
+  const [zone,setZone]=useState(zoneDefault),[endpoint,setEndpoint]=useState(endpointDefault);
+  const [localTab, setLocalTab] = useState('point');
+  const endpointTab = selectedTab ?? localTab;
   const [drawing,setDrawing]=useState(false);
   const [mapCheck,setMapCheck]=useState({mapId:'',loading:false,data:null,error:''}),[checkRevision,setCheckRevision]=useState(0),[copyState,setCopyState]=useState(null);
   const writeLock=useRef(false);
@@ -44,9 +52,13 @@ export default function FacilityCatalogEditor({stage, initialMapId = '', onMapCh
   },[mapId,checkRevision]);
   const map=catalog.maps.find(m=>m.mapId===mapId),zones=catalog.zones.filter(z=>z.mapId===mapId),endpoints=catalog.endpoints.filter(e=>e.mapId===mapId),rooms=catalog.rooms.filter(r=>r.floorId===map?.floorId);
   const groups=catalog.groups.filter(g=>g.mapId===mapId).map(g=>groupFromApi(g,catalog.members));
-  const localEndpoints=endpoints.map(e=>({id:e.endpointId,name:e.endpointName,roomId:e.roomId,mapId:e.mapId,enabled:e.active,accessible:e.accessible}));
+  const localEndpoints=endpoints.map(e=>({id:e.endpointId,name:e.endpointName,code:e.endpointCode,type:e.endpointType,roomId:e.roomId,mapId:e.mapId,enabled:e.active,accessible:e.accessible}));
   const fetchCatalog=async()=>{
-    const [maps,zones,endpoints,groups,members,rooms]=await Promise.all([api.listMaps,params=>api.listZones({...params,...(canManageZones?{includeDeleted:true}:{})}),api.listEndpoints,api.listEndpointGroups,api.listEndpointGroupMembers,params=>api.listRooms({...params,...(canManageZones?{includeDeleted:true}:{})})].map(allFacilityPages));
+    const includeInactive = list => params => list(canManageCatalog ? { ...params, includeDeleted: true } : params);
+    const [maps,zones,endpoints,groups,members,rooms]=await Promise.all([
+      api.listMaps, includeInactive(api.listZones), includeInactive(api.listEndpoints),
+      includeInactive(api.listEndpointGroups), api.listEndpointGroupMembers, includeInactive(api.listRooms),
+    ].map(allFacilityPages));
     return {maps,zones,endpoints,groups,members,rooms};
   };
   useEffect(()=>{let mounted=true;fetchCatalog().then(data=>{if(mounted){setCatalog(data);setMapId(data.maps.find(m=>m.mapId===mapSelection.current.initialMapId)?.mapId||data.maps.find(m=>m.status==='ACTIVE')?.mapId||data.maps[0]?.mapId||'');setReady(true);setStatus('');}}).catch(e=>{if(mounted)setStatus('Không tải được dữ liệu bản đồ: '+e.message);});return()=>{mounted=false;};},[]);
@@ -58,12 +70,83 @@ export default function FacilityCatalogEditor({stage, initialMapId = '', onMapCh
     finally{writeLock.current=false;setBusy(false);}
   };
   const upsert=(key,id,value)=>setCatalog(c=>({...c,[key]:[...c[key].filter(item=>item[id]!==value[id]),value]}));
+  const loadGroupDetail = useCallback(async (id, { signal } = {}) => {
+    const result = await api.getEndpointGroup(id, canManageCatalog ? { includeDeleted: true } : {}, { signal });
+    signal?.throwIfAborted();
+    verifyGroup(result, mapId, id);
+    setCatalog(current => signal?.aborted ? current : {
+      ...current, groups: current.groups.map(group => group.endpointGroupId === id ? result : group),
+    });
+  }, [mapId, canManageCatalog]);
+
+  const readOnlyGroups = !canManageCatalog || !map || map.status === 'ARCHIVED';
+  const writeGroup = (id, action, message) => write(async () => {
+    if (readOnlyGroups) throw Error('Chỉ có thể xem nhóm điểm trên bản đồ này.');
+    const saved = id && groups.find(group => group.id === id);
+    if (id && !saved) throw Error('Nhóm điểm không thuộc bản đồ đang chọn.');
+    return action(saved);
+  }, message);
+  const createRoomPair = body => writeGroup(null, async () => {
+    const result = await api.createRoomEndpointPair({ ...body, mapId });
+    verifyGroup(result, mapId);
+    if (result.roomId !== body.roomId) throw Error('Máy chủ trả về nhóm của phòng khác.');
+    // The room-pair endpoint commits the ordered memberships and optional room default in one transaction.
+    const members = [body.primaryEndpointId, body.fallbackEndpointId].map((endpointId, index) => ({
+      endpointGroupId: result.endpointGroupId, mapId, endpointId, active: true, sequenceNo: index + 1,
+    }));
+    setCatalog(current => ({
+      ...current, groups: [...current.groups, result], members: [...current.members, ...members],
+      rooms: body.setAsRoomDefault ? current.rooms.map(room => room.roomId === body.roomId
+        ? { ...room, defaultEndpointGroupId: result.endpointGroupId } : room) : current.rooms,
+    }));
+    return groupFromApi(result, members);
+  }, 'Đã tạo nhóm điểm chính và dự phòng cho phòng.');
+
+  const saveGroup = group => writeGroup(group.id, async saved => {
+    const payload = groupPayload(group, mapId);
+    if (saved) payload.active = saved.active;
+    const result = await (group.id ? api.updateEndpointGroup(group.id, payload) : api.createEndpointGroup(payload));
+    verifyGroup(result, mapId, group.id);
+    upsert('groups', 'endpointGroupId', result);
+    return groupFromApi(result, catalog.members);
+  });
+
+  const setGroupActive = (group, active, reason) => writeGroup(group.id, async () => {
+    const trimmed = reason?.trim() || '';
+    if (trimmed.length < 5 || trimmed.length > 500) throw Error('Lý do cần từ 5 đến 500 ký tự.');
+    const result = await (active ? api.activateEndpointGroup : api.deactivateEndpointGroup)(group.id, trimmed);
+    verifyGroup(result, mapId, group.id);
+    if (result.active !== active) throw Error('Máy chủ chưa xác nhận thay đổi trạng thái nhóm.');
+    upsert('groups', 'endpointGroupId', result);
+    return groupFromApi(result, catalog.members);
+  }, active ? 'Đã bật nhóm điểm đích.' : 'Đã tắt nhóm điểm đích.');
+
+  const storeMember = (groupId, endpointId, member) => {
+    if (member?.endpointGroupId !== groupId || member.endpointId !== endpointId || member.mapId !== mapId) {
+      throw Error('Máy chủ chưa xác nhận thành viên của đúng nhóm trên bản đồ.');
+    }
+    setCatalog(current => ({
+      ...current, members: [...current.members.filter(row => row.endpointGroupId !== groupId || row.endpointId !== endpointId), member],
+    }));
+  };
+  const saveMember = (group, member, existing) => writeGroup(group.id, async () => {
+    const body = { endpointGroupId: group.id, endpointId: member.endpointId, sequenceNo: member.sequenceNo, active: member.active };
+    const result = await (existing ? api.updateEndpointGroupMember(group.id, member.endpointId, body) : api.createEndpointGroupMember(body));
+    storeMember(group.id, member.endpointId, result);
+  });
+  const removeMember = (group, member, reason) => writeGroup(group.id, async () => {
+    const result = await api.removeEndpointGroupMember(group.id, member.endpointId, reason);
+    // A successful HTTP 204 has no member representation.
+    const updated = result ?? { ...member, endpointGroupId: group.id, mapId, active: false };
+    if (updated.active !== false) throw Error('Máy chủ chưa xác nhận tắt thành viên.');
+    storeMember(group.id, member.endpointId, updated);
+  }, 'Đã tắt thành viên trong nhóm.');
   const editZone=id=>{const z=zones.find(z=>z.zoneId===id);setZone(z?zoneForm(z):{...zoneDefault});};
   const savedZone=zones.find(z=>z.zoneId===zone.zoneId);
   const savedZoneForm=savedZone&&zoneForm(savedZone);
   const zoneStateDirty=!!savedZone&&Object.keys(zoneDefault).some(key=>String(zone[key]??'')!==String(savedZoneForm[key]??''));
   const toggleZoneActive=async reason=>{
-    if(!canManageZones||!savedZone||busy||writeLock.current||zoneStateDirty||map?.status==='ARCHIVED')return;
+    if(!canManageCatalog||!savedZone||busy||writeLock.current||zoneStateDirty||map?.status==='ARCHIVED')return;
     const target=savedZone,active=!target.active,trimmed=reason.trim();
     if(trimmed.length<5||trimmed.length>500){setStatus('Lý do cần từ 5 đến 500 ký tự.');return;}
     await write(async()=>{
@@ -150,19 +233,17 @@ export default function FacilityCatalogEditor({stage, initialMapId = '', onMapCh
         {mapVerified&&<p>Kiểm tra này chỉ xác nhận map có thể nạp lại. Robot vẫn cần phiên dẫn đường, vị trí đã xác minh và cấu hình đã đồng bộ trước khi chạy.</p>}
       </section>
       {stage==='scan'&&<section className="ls-panel"><h3>Bản đồ đã có trên BE</h3><p>Quét thật cần robot, phiên mapping và artifact được BE xác minh. Trang này quản lý danh mục vùng/điểm trên bản đồ đã tồn tại.</p><p>Chuyển sang Vùng hoặc Điểm đích để cấu hình trên đúng mapId.</p><p><strong>Không có nhãn phòng trong dữ liệu quét gốc.</strong> Vùng, phòng và điểm đích là các lớp cấu hình thêm sau khi có hình học.</p></section>}
-      {stage==='zone'&&<ZoneMapEditor map={map} zones={zones} endpoints={endpoints} zone={zone} setZone={setZone} drawing={drawing} setDrawing={setDrawing} busy={busy} canManage={canManageZones} hasUnsavedChanges={zoneStateDirty} onToggleActive={toggleZoneActive} onSelect={editZone} onSave={draft=>{
+      {stage==='zone'&&<ZoneMapEditor map={map} zones={zones} endpoints={endpoints} zone={zone} setZone={setZone} drawing={drawing} setDrawing={setDrawing} busy={busy} canManage={canManageCatalog} hasUnsavedChanges={zoneStateDirty} onToggleActive={toggleZoneActive} onSelect={editZone} onSave={draft=>{
         let payload;
         try{payload=zonePayload(draft,mapId);}catch(error){setStatus(error.message);return;}
         write(async()=>{const result=await(draft.zoneId?api.updateZone(draft.zoneId,payload):api.createZone(payload));upsert('zones','zoneId',result);setZone(zoneForm(result));setDrawing(false);}).catch(()=>{});
       }}/>}
-      {stage==='endpoint'&&<><WorkspaceTabs label="Quản lý điểm đích" active={endpointTab} onSelect={setEndpointTab} items={[{id:'point',label:'Điểm đích'},{id:'group',label:'Nhóm điểm đích'}]}/>
-        {endpointTab==='group'?<EndpointGroupEditor key={mapId} remote busy={busy||map.status==='ARCHIVED'} groups={groups} endpoints={localEndpoints} rooms={rooms} mapId={mapId}
-          onCreatePair={body=>write(async()=>{const result=await api.createRoomEndpointPair(body);const fresh=await fetchCatalog();setCatalog(fresh);return groupFromApi(result,fresh.members);},'Đã tạo điểm chính và điểm dự phòng cùng phòng.')}
-          onSave={g=>write(async()=>{const result=await(g.id?api.updateEndpointGroup(g.id,groupPayload(g,mapId)):api.createEndpointGroup(groupPayload(g,mapId)));upsert('groups','endpointGroupId',result);return groupFromApi(result,catalog.members);})}
-          onMember={(g,m,existing)=>write(async()=>{const body={endpointGroupId:g.id,...m};const result=await(existing?api.updateEndpointGroupMember(g.id,m.endpointId,body):api.createEndpointGroupMember(body));setCatalog(c=>({...c,members:[...c.members.filter(row=>!(row.endpointGroupId===g.id&&row.endpointId===m.endpointId)),result]}));})}
-          onRemove={(g,m)=>write(async()=>{await api.removeEndpointGroupMember(g.id,m.endpointId);setCatalog(c=>({...c,members:c.members.map(row=>row.endpointGroupId===g.id&&row.endpointId===m.endpointId?{...row,active:false}:row)}));})}/>
+      {stage==='endpoint'&&<><WorkspaceTabs label="Quản lý điểm đích" active={endpointTab} onSelect={onEndpointTabChange ?? setLocalTab} items={[{id:'point',label:'Điểm đích'},{id:'group',label:'Nhóm điểm đích'}]}/>
+        {endpointTab==='group'?<EndpointGroupEditor key={mapId} busy={busy} readOnly={readOnlyGroups}
+          groups={groups} endpoints={localEndpoints} rooms={rooms} mapId={mapId} mapName={map.mapName}
+          onLoadDetail={loadGroupDetail} onCreatePair={createRoomPair} onSave={saveGroup}
+          onSetActive={setGroupActive} onMember={saveMember} onRemove={removeMember}/>
         :<EndpointMapEditor map={map} zones={zones} rooms={rooms} endpoints={endpoints} endpoint={endpoint} setEndpoint={setEndpoint} drawing={drawing} setDrawing={setDrawing} busy={busy} hasUnsavedChanges={endpointStateDirty} onToggleActive={toggleEndpointActive} onSave={()=>write(async()=>{const result=await saveValidatedEndpoint(api,endpoint,map,zones,rooms);upsert('endpoints','endpointId',result);setEndpoint({...result});setDrawing(false);}).catch(()=>{})}/>}
-        {endpointTab==='group'&&<p className="ls-hint">Nhóm điểm giúp sắp xếp thứ tự và chọn điểm đích khi thiết lập quy trình.</p>}
       </>}
       {stage==='endpoint'&&<section className="ls-panel ep-publish" aria-label="Hoàn tất bản đồ">
         <div><h3>{map.status==='ACTIVE'?'Bản đồ đã kích hoạt':'Đưa bản đồ vào sử dụng'} <span className={'ep-mode '+(map.status==='ACTIVE'?'ep-live':'')}>{({DRAFT:'Nháp',ACTIVE:'Đang hoạt động',INACTIVE:'Không hoạt động',ARCHIVED:'Lưu trữ'})[map.status]||map.status}</span></h3><p>{usable.length} điểm có thể chọn · {usable.filter(p=>p.publicVisible).length} điểm công khai</p>
