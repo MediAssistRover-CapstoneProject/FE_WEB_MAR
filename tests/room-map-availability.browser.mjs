@@ -14,7 +14,7 @@ const endpoint = (id, roomId, mapId) => ({ endpointId: id, endpointName: id, end
 const state = {
   rooms: [room('old', 'Phòng map cũ'), room('new', 'Phòng map mới'), room('new2', 'Phòng thứ hai map mới'), room('shared', 'Phòng dùng chung'), room('disabled', 'Phòng đã tắt', false), room('unlinked', 'Phòng chưa gắn bản đồ')],
   maps: [map('a', 'ACTIVE'), map('b', 'INACTIVE')], floors: [{ floorId: 'f', floorCode: 'F1', floorName: 'Tầng 1', active: true }],
-  endpoints: [endpoint('old-point', 'old', 'a'), endpoint('new-point', 'new', 'b'), endpoint('new-point2', 'new2', 'b'), endpoint('shared-a', 'shared', 'a'), endpoint('shared-b', 'shared', 'b'), endpoint('disabled-point', 'disabled', 'b')],
+  endpoints: [endpoint('old-point', 'old', 'a'), endpoint('new-point', 'new', 'b'), endpoint('new-point2', 'new2', 'b'), endpoint('shared-a', 'shared', 'a'), endpoint('shared-b', 'shared', 'b'), endpoint('shared-b2', 'shared', 'b'), endpoint('shared-b3', 'shared', 'b'), endpoint('disabled-point', 'disabled', 'b')],
 };
 await page.route('**/api/v1/**', async route => {
   const req = route.request(), parts = new URL(req.url()).pathname.split('/').filter(Boolean), resource = parts[2];
@@ -56,6 +56,21 @@ try {
   await expect(roomMetric).toHaveText('2');
   await expect(list).toContainText('Phòng map cũ');
   await expect(list).not.toContainText('Phòng map mới');
+  const sharedRoom = list.getByRole('button', { name: /Phòng dùng chung/ });
+  const oldRoom = list.getByRole('button', { name: /Phòng map cũ/ });
+  const mapSelect = detail.getByLabel('Bản đồ của phòng');
+  const detailCount = detail.locator('.rw-points .rw-section-heading .lo-badge');
+  await sharedRoom.click();
+  await expect(mapSelect).toHaveValue('a');
+  await expect(sharedRoom.getByText('1 điểm', { exact: true })).toBeVisible();
+  await expect(detailCount).toHaveText('1 điểm trên map');
+  await mapSelect.selectOption('b');
+  await expect(sharedRoom.getByText('3 điểm', { exact: true })).toBeVisible();
+  await expect(oldRoom.getByText('0 điểm', { exact: true })).toBeVisible();
+  await expect(detailCount).toHaveText('3 điểm trên map');
+  await mapSelect.selectOption('a');
+  await expect(sharedRoom.getByText('1 điểm', { exact: true })).toBeVisible();
+  await oldRoom.click();
   await activate('b');
   await expect(list).toContainText('Phòng map mới');
   await expect(list).not.toContainText('Phòng map cũ');

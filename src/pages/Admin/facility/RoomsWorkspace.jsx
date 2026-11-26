@@ -1,5 +1,5 @@
 import { confirmAction } from '../../../components/appDialog.js';
-import { cloneElement, useEffect, useRef, useState } from 'react';
+import { cloneElement, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { allFacilityPages, facilityApi as api } from '../../../features/facility/facilityApi.js';
 import { getSession } from '../../../features/auth/session.js';
@@ -15,7 +15,8 @@ import RoomDepartmentSelect from './RoomDepartmentSelect.jsx';
 import RoomSosNotice from './RoomSosNotice.jsx';
 import './roomsWorkspace.css';
 
-const emptyCatalog = { rooms: [], endpoints: [], maps: [], floors: [], groups: [], zones: [] };
+const emptyPoints = [];
+const emptyCatalog = { rooms: [], endpoints: emptyPoints, maps: [], floors: [], groups: [], zones: [] };
 const labelType = value => roomTypeLabel(value, ROOM_TYPES);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const mapState = { ACTIVE: 'Đang hoạt động', DRAFT: 'Nháp', INACTIVE: 'Chưa kích hoạt', ARCHIVED: 'Lưu trữ' };
@@ -41,7 +42,17 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
   const room = rooms.find(room => room.roomId === selectedId);
   const map = maps.find(map => map.mapId === mapId && map.floorId === room?.floorId);
   const roomMaps = maps.filter(map => map.floorId === room?.floorId);
-  const linked = endpoints.filter(point => point.roomId === selectedId && point.mapId === mapId);
+  const pointsByRoomOnMap = useMemo(() => {
+    const byRoom = new Map();
+    if (!map) return byRoom;
+    for (const point of endpoints) {
+      if (point.mapId !== map.mapId || !point.roomId) continue;
+      if (!byRoom.has(point.roomId)) byRoom.set(point.roomId, []);
+      byRoom.get(point.roomId).push(point);
+    }
+    return byRoom;
+  }, [endpoints, map]);
+  const linked = pointsByRoomOnMap.get(selectedId) ?? emptyPoints;
   const point = linked.find(point => point.endpointId === pointId);
   const roomDirty = creating || !!room && !!form && !same(form, roomForm(room));
   const pointDirty = !!point && !!pointForm && !same(pointForm, point);
@@ -123,9 +134,8 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
     setPointId(''); setPointForm(null); setDrawing(false); setLinkMode(''); setTargetId('');
   }, [selectedId, room?.floorId, maps]);
   useEffect(() => {
-    const points = endpoints.filter(point => point.roomId === selectedId && point.mapId === mapId);
-    setPointId(current => points.some(point => point.endpointId === current) ? current : points[0]?.endpointId || '');
-  }, [endpoints, selectedId, mapId]);
+    setPointId(current => linked.some(point => point.endpointId === current) ? current : linked[0]?.endpointId || '');
+  }, [linked]);
 
   const confirmLeave = async () => !busy && (!dirty || await confirmAction('Bạn có thay đổi chưa lưu. Bỏ thay đổi và tiếp tục?'));
   const resetPoint = () => { setPointForm(null); setDrawing(false); setLinkMode(''); setTargetId(''); };
@@ -280,11 +290,11 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
         <div className="lo-job-items">
           {!filtered.length && <p className="lo-list-empty">Không có phòng phù hợp bộ lọc.</p>}
           {filtered.map(item => {
-            const count = endpoints.filter(point => point.roomId === item.roomId).length;
+            const count = pointsByRoomOnMap.get(item.roomId)?.length ?? 0;
             return <button type="button" key={item.roomId} disabled={busy} aria-pressed={selectedId === item.roomId} className={`lo-job-item ${selectedId === item.roomId ? 'is-selected' : ''}`} onClick={() => chooseRoom(item.roomId)}>
               <div className="lo-job-item-top"><span className={`lo-badge ${operational(item) ? 'lo-success' : 'lo-failed'}`}><i />{operational(item) ? 'Hoạt động' : 'Không hoạt động'}</span><span>{item.roomCode}</span></div>
               <strong>{item.roomName}</strong><span className="lo-job-target">{floors.find(floor => floor.floorId === item.floorId)?.floorName || 'Chưa xác định tầng'}</span>
-              <div className="lo-job-item-bottom"><span>{labelType(item.roomType)}</span><span className={count ? '' : 'rw-missing'}>{count ? `${count} điểm` : 'Chưa có điểm'}</span></div>
+              <div className="lo-job-item-bottom"><span>{labelType(item.roomType)}</span><span className={count ? '' : 'rw-missing'}>{count} điểm</span></div>
               {!item.publicVisible && <small className="rw-private">Chỉ dùng nội bộ</small>}
             </button>;
           })}
@@ -331,7 +341,7 @@ export default function RoomsWorkspace({ onCountChange, onDirtyChange, onBusyCha
               <div className="rw-save"><span>{pointDirty ? 'Điểm có thay đổi chưa lưu' : 'Điểm chưa thay đổi'}</span><button type="button" className="lo-button" onClick={async () => { if (!pointDirty || await confirmAction('Bỏ thay đổi của điểm?')) resetPoint(); }}>Bỏ thay đổi</button><button type="submit" className="lo-button lo-primary" disabled={!pointDirty}>{busy ? 'Đang lưu…' : 'Lưu thay đổi'}</button></div>
             </fieldset></form>
           </div>}
-          {map && <details className="rw-map-preview" open={drawing || undefined}><summary>Xem vị trí trên bản đồ</summary><FacilityGeometryPreview map={map} zones={zones} endpoints={endpoints.filter(point => point.roomId === selectedId)} endpointEdit={pointForm || point} showInactiveEndpoints drawing={drawing && !pointLocked} allowDraftMove={!!pointForm && !pointLocked} onPoint={value => { if (pointForm) setPointForm(current => ({ ...current, ...value })); }} onPlacementEnd={() => setDrawing(false)} /><Link className="lo-text-button" to={`/admin/map?mapId=${encodeURIComponent(mapId)}`}>Mở Map Studio →</Link></details>}
+          {map && <details className="rw-map-preview" open={drawing || undefined}><summary>Xem vị trí trên bản đồ</summary><FacilityGeometryPreview map={map} zones={zones} endpoints={linked} endpointEdit={pointForm || point} showInactiveEndpoints drawing={drawing && !pointLocked} allowDraftMove={!!pointForm && !pointLocked} onPoint={value => { if (pointForm) setPointForm(current => ({ ...current, ...value })); }} onPlacementEnd={() => setDrawing(false)} /><Link className="lo-text-button" to={`/admin/map?mapId=${encodeURIComponent(mapId)}`}>Mở Map Studio →</Link></details>}
         </section>}
       </article> : <article className="lo-detail"><div className="lo-empty"><h3>Chưa có phòng</h3><p>{canEdit ? 'Bấm Thêm phòng để tạo phòng mới hoặc tạo phòng trong Map Studio.' : 'Chưa có phòng trong danh mục.'}</p><Link className="lo-button lo-primary" to="/admin/map">Mở Map Studio</Link></div></article>}
     </div>}
