@@ -1,3 +1,5 @@
+import { useSearchParams } from 'react-router-dom';
+import { useStaffAlertEvents } from '../../../features/monitoring/useStaffAlertEvents.js';
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getSession } from '../../../features/auth/session.js';
@@ -10,14 +12,17 @@ import { Badge, DateFields, Empty, Facts, FeedError, FeedStatus, Field, Filters,
 const actionLabels = { acknowledge: 'Tiếp nhận', resolve: 'Xử lý xong', close: 'Đóng cảnh báo' };
 const titleFor = alert => notificationLabels[alert?.notificationType] || vi(alert?.notificationType || 'Cảnh báo hệ thống');
 export default function AlertsPage() {
+  const [params] = useSearchParams();
+  const initialType = params.get('type') === 'LOW_BATTERY' ? 'LOW_BATTERY' : undefined;
   const [status, setStatus] = useState('OPEN'), [auto, setAuto] = useState(true), [page, setPage] = useState(0);
-  const [draft, setDraft] = useState({}), [applied, setApplied] = useState({}), [filterError, setFilterError] = useState('');
+  const [draft, setDraft] = useState(() => initialType ? { type: initialType } : {}), [applied, setApplied] = useState(() => initialType ? { type: initialType } : {}), [filterError, setFilterError] = useState('');
   const [selectedId, setSelectedId] = useState(null), [intent, setIntent] = useState(null), [message, setMessage] = useState('');
   const session = getSession();
   const list = useMonitoringData('GET /api/v1/alerts', { ...applied, ...(status ? { status } : {}), page, size: 20 }, { auto });
   const openCount = useMonitoringData('GET /api/v1/alerts', { status: 'OPEN', page: 0, size: 1 }, { auto, enabled: session?.account?.role === 'ADMIN' });
   const criticalCount = useMonitoringData('GET /api/v1/alerts', { status: 'OPEN', severity: 'CRITICAL', page: 0, size: 1 }, { auto, enabled: session?.account?.role === 'ADMIN' });
   const detail = useMonitoringData('GET /api/v1/alerts/{id}', {}, { path: { id: selectedId }, enabled: !!selectedId, auto, merge: newerAlert });
+  const stream = useStaffAlertEvents(() => { list.refresh(); detail.refresh(); }, auto);
   const alert = detail.value?.alertId === selectedId ? detail.value : null;
   const incident = useMonitoringData('GET /api/v1/emergency-incidents/{id}', {}, { path: { id: alert?.incidentId }, enabled: !!alert?.incidentId, auto });
   const incidentData = incident.value?.incidentId === alert?.incidentId && !incident.stale ? incident.value : null;
@@ -42,6 +47,7 @@ export default function AlertsPage() {
       <DateFields value={draft} onChange={setDraft} />
     </Filters>
     <Tabs label="Trạng thái cảnh báo" active={status} items={[[ '', 'Tất cả' ], ...Object.entries(alertStates)]} onChange={value => { setStatus(value); setPage(0); setSelectedId(null); }} />
+    {session?.account?.role==='STAFF'&&auto&&<p className="mw-muted" role="status">{stream==='live'?'Đang nhận cảnh báo trực tiếp từ máy chủ.':'Cập nhật định kỳ đang hoạt động; đang kiểm tra kết nối thông báo trực tiếp.'}</p>}
     <FeedStatus feed={list} auto={auto} /><FeedError feed={list} />
     {message && <Notice>{message}</Notice>}
     <div className="mw-split"><section className="mw-card mw-list" aria-label="Danh sách cảnh báo">
