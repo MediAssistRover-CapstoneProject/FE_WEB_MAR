@@ -24,6 +24,7 @@ const lifecycle = object({ reason: str(500, { minLength: 5 }) }, ['reason']);
 
 // Lifecycle endpoints and query parameters added after the captured OpenAPI snapshot.
 export const operationOverrides = {
+  'GET /api/v1/jobs/{id}': { parameters: [{ name: 'includeDeleted', in: 'query', required: false, schema: bool }] },
   'GET /api/v1/admin/staff': { parameters: [{ name: 'includeDeleted', in: 'query', required: false, schema: bool }] },
   'GET /api/v1/admin/staff/{id}': { parameters: [{ name: 'includeDeleted', in: 'query', required: false, schema: bool }] },
   'POST /api/v1/admin/staff/{id}/restore': {

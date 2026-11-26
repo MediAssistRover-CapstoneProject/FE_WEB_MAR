@@ -24,7 +24,7 @@ const matchesTab = (tab, job) => jobStopPending(job) ? ['open', 'paused'].includ
 export default function PatrolQueuePanel({
   jobs = [], historyJobs = [], loading = false, error = '', historyLoading = false,
   historyError = '', updatedAt, catalog = {}, selectedId = '', detail = null,
-  detailError = '', writable = false, onSelect, onAction, onRefresh,
+  detailError = '', liveStatus = '', writable = false, onSelect, onAction, onRefresh,
 }) {
   const [tabId, setTabId] = useState('open');
   const [robotId, setRobotId] = useState('');
@@ -89,6 +89,7 @@ export default function PatrolQueuePanel({
         </div>
       </div>
       <div className="pt-job-detail">
+        {liveStatus && <p className="pt-monitor-meta" role="status">{liveStatus}</p>}
         {detailError && <div className="pt-queue-error" role="alert"><Icon name="info"/><div><strong>Chưa cập nhật được chi tiết lượt.</strong><p>{detailError}</p><Button icon="refresh" onClick={onRefresh}>Tải lại chi tiết</Button></div></div>}
         {selected ? <PatrolJobMonitor detail={selected} catalog={catalog} writable={writable && !detailError} onAction={onAction}/> : selectedId && !detailError ? <div className="pt-queue-loading" role="status"><Icon name="refresh"/><span>Đang tải chi tiết lượt tuần tra…</span></div> : <Empty title="Chọn một lượt tuần tra" icon="shield">Xem robot phụ trách, vòng tuần tra, checkpoint và các yêu cầu tạm dừng tại đây.</Empty>}
       </div>

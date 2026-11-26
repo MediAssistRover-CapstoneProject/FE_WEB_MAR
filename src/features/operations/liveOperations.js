@@ -122,7 +122,9 @@ export function mergeJobDetail(previous, incoming) {
     const before = knownSteps.get(step.jobStepId);
     if (!before || !Number.isFinite(before.rowVersion) || !Number.isFinite(step.rowVersion) || step.rowVersion > before.rowVersion) knownSteps.set(step.jobStepId, step);
   }
-  return { ...previous, ...incoming, job, steps: [...knownSteps.values()], tasks: job === previous.job && job !== incoming.job ? previous.tasks : incoming.tasks };
+  // Patrol progress, holds and tasks belong to the snapshot that supplied the job.
+  const newest = job === incoming.job ? incoming : previous;
+  return { ...previous, ...newest, job, steps: [...knownSteps.values()], tasks: newest.tasks };
 }
 
 export function dataFreshness(receivedAt, now = Date.now(), failed = false) {

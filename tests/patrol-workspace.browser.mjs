@@ -256,6 +256,37 @@ try {
   const dispatchStorageKey = await page.evaluate(() => Object.keys(sessionStorage).find(item => item.startsWith('mediassist.patrol.dispatch.v1:')));
   assert.ok(dispatchStorageKey);
 
+  // Keep the authenticated SSE response open and deliver frames independently of REST.
+  await page.evaluate(() => {
+    const fetch = window.fetch.bind(window);
+    window.patrolStreams = [];
+    window.fetch = (url, options) => {
+      const match = new URL(url, location.href).pathname.match(/^\/api\/v1\/jobs\/([^/]+)\/stream$/);
+      if (!match) return fetch(url, options);
+      const headers = new Headers(options.headers);
+      const entry = { id: match[1], closed: false, method: options.method, accept: headers.get('Accept'), authenticated: headers.get('Authorization') === 'Bearer fixture' };
+      const body = new ReadableStream({
+        start(controller) {
+          entry.controller = controller;
+          options.signal.addEventListener('abort', () => {
+            if (entry.closed) return;
+            entry.closed = true; controller.error(new DOMException('Aborted', 'AbortError'));
+          }, { once: true });
+        },
+        cancel() { entry.closed = true; },
+      });
+      window.patrolStreams.push(entry);
+      return Promise.resolve(new Response(body, { headers: { 'Content-Type': 'text/event-stream' } }));
+    };
+  });
+  const openStreams = () => page.evaluate(() => window.patrolStreams.filter(entry => !entry.closed).map(entry => entry.id));
+  const sendFrame = (detail, type = 'job-state') => page.evaluate(({ detail, type, id }) => {
+    const { controller } = window.patrolStreams.find(entry => entry.id === id && !entry.closed);
+    const bytes = new TextEncoder();
+    controller.enqueue(bytes.encode(`event: ${type}\r`));
+    controller.enqueue(bytes.encode(`\ndata: ${JSON.stringify(detail)}\r\n\r\n`));
+  }, { detail, type, id: jobId });
+
   jobs = [
     { jobId, workflowId, robotId, mapId, scheduleId: schedules[0].scheduleId, jobCode: 'PATROL-20261116-001', status: 'QUEUED', rowVersion: 1, schemaVersion: 3, beOrchestrated: true, queuedAt: new Date().toISOString() },
     { jobId: id(5), workflowId, robotId: id(90), mapId, jobCode: 'PATROL-HISTORY-002', status: 'SUCCEEDED', rowVersion: 3, queuedAt: new Date().toISOString(), startedAt: new Date().toISOString(), endedAt: new Date().toISOString(), archivedAt: new Date().toISOString() },
@@ -264,6 +295,11 @@ try {
   await navigate('Hàng đợi');
   const queue = page.getByRole('region', { name: 'Hàng đợi và hoạt động tuần tra' });
   await expect(page.locator('.pt-job-detail')).toContainText('Đang chờ');
+  await expect.poll(openStreams).toEqual([jobId]);
+  assert.deepEqual(await page.evaluate(() => {
+    const { method, accept, authenticated } = window.patrolStreams[0];
+    return { method, accept, authenticated };
+  }), { method: 'GET', accept: 'text/event-stream', authenticated: true });
   await page.getByRole('tab', { name: /^Chờ robot/ }).click();
   await expect(page.locator('.pt-job-list [data-patrol-job-id]')).toHaveCount(1);
   await expect(page.locator(`.pt-job-list [data-patrol-job-id="${jobId}"]`)).toContainText('Đang chờ');
@@ -271,18 +307,45 @@ try {
   await expect(page.locator('.pt-job-list [data-patrol-job-id]')).toHaveCount(1);
   await page.locator(`.pt-job-list [data-patrol-job-id="${id(5)}"]`).click();
   await expect(page.locator('.pt-job-detail')).toContainText('Đã hoàn thành');
+  await expect.poll(openStreams).toEqual([]);
   await expect(page.locator('.pt-job-detail .pt-action-group button')).toHaveCount(0);
   await page.getByLabel('Lọc robot trong hàng đợi', { exact: true }).selectOption(robotId);
   await expect(page.locator('.pt-job-list')).toContainText('Robot này chưa có lượt phù hợp');
   await page.getByLabel('Lọc robot trong hàng đợi', { exact: true }).selectOption('');
   await page.getByRole('tab', { name: /^Đang mở/ }).click();
   await page.locator(`.pt-job-list [data-patrol-job-id="${jobId}"]`).click();
-  jobs[0] = { ...jobs[0], status: 'RUNNING', rowVersion: 2, startedAt: new Date().toISOString() };
+  await expect.poll(openStreams).toEqual([jobId]);
+  const running = { ...jobs[0], status: 'RUNNING', rowVersion: 2, startedAt: new Date().toISOString() };
+  const live = jobDetail(running);
+  live.patrol.round = 2;
+  const beforeStream = writes.length;
+  await sendFrame(live);
+  await expect(page.locator('.pt-job-detail')).toContainText('Đang theo dõi trực tiếp');
+  await expect(page.locator('.pt-job-detail')).toContainText('Vòng 2 / 3');
+  await expect(page.locator(`.pt-job-list [data-patrol-job-id="${jobId}"]`)).toContainText('Đang tuần tra');
+  await sendFrame(jobDetail(jobs[0]));
+  await sendFrame(jobDetail({ ...running, jobId: id(5) }));
+  await sendFrame({ job: { jobId } });
+  await sendFrame(jobDetail(running), 'mapping-preview');
+  await expect(page.locator('.pt-job-detail')).toContainText('Vòng 2 / 3');
+
+  jobs[0] = running; round = 3;
   robot.status = 'BUSY';
-  await page.getByRole('button', { name: 'Làm mới', exact: true }).click();
-  await expect(page.locator('.pt-job-detail')).toContainText('Đang tuần tra');
+  await page.evaluate(() => {
+    const entry = window.patrolStreams.find(stream => !stream.closed);
+    entry.closed = true; entry.controller.close();
+  });
+  await expect(page.locator('.pt-job-detail')).toContainText('Kết nối trực tiếp gián đoạn');
+  await expect(page.locator('.pt-job-detail')).toContainText('Vòng 3 / 3');
+  await expect.poll(openStreams, { timeout: 10000 }).toEqual([jobId]);
+  await sendFrame(jobDetail(running));
+  await expect(page.locator('.pt-job-detail')).toContainText('Đang theo dõi trực tiếp');
+  assert.equal(writes.length, beforeStream, 'Streaming, fallback and reconnect issue only reads');
+  await navigate('Lịch tuần tra');
+  await expect.poll(openStreams).toEqual([]);
   await navigate('Tuyến tuần tra');
   await expect(page.locator('.pt-route-detail .pt-checkpoints li')).toHaveCount(3);
+  await expect.poll(openStreams).toEqual([jobId]);
   await expect(page.locator('.pt-map [data-patrol-leg]')).toHaveCount(2);
   await page.screenshot({ path: `${output}/desktop.png`, fullPage: true });
   for (const width of [1024, 390]) {
@@ -338,14 +401,16 @@ try {
   await expect(page.locator('.pt-job-detail').getByRole('button', { name: 'Tiếp tục', exact: true })).toHaveCount(0);
 
   jobs[0] = { ...jobs[0], status: 'CANCELLED', stopStatus: 'PENDING', endedAt: new Date().toISOString(), rowVersion: jobs[0].rowVersion + 1 };
-  await page.getByRole('button', { name: 'Làm mới', exact: true }).click();
+  await sendFrame(jobDetail(jobs[0]));
   await expect(page.locator('.pt-job-detail')).toContainText('Đang chờ kết thúc an toàn');
+  await expect.poll(openStreams).toEqual([jobId]);
   await page.getByRole('tab', { name: /^Tạm dừng/ }).click();
   await expect(page.locator(`.pt-job-list [data-patrol-job-id="${jobId}"]`)).toBeVisible();
   await page.getByRole('tab', { name: /^Đã kết thúc/ }).click();
   await expect(page.locator(`.pt-job-list [data-patrol-job-id="${jobId}"]`)).toHaveCount(0);
   jobs[0] = { ...jobs[0], stopStatus: 'CONFIRMED', stopConfirmedAt: new Date().toISOString(), rowVersion: jobs[0].rowVersion + 1 };
-  await page.getByRole('button', { name: 'Làm mới', exact: true }).click();
+  await sendFrame(jobDetail(jobs[0]));
+  await expect.poll(openStreams).toEqual([]);
   await expect(page.locator(`.pt-job-list [data-patrol-job-id="${jobId}"]`)).toContainText('Đã kết thúc');
   await expect(page.locator('.pt-job-detail')).not.toContainText('Đang chờ kết thúc an toàn');
   await expect(page.locator('.pt-job-detail .pt-action-group button')).toHaveCount(0);

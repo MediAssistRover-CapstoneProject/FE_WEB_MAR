@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { getSession } from '../../features/auth/session.js';
 import { API_BASE_URL } from '../../features/api/client.js';
+import { useJobFeed } from '../../features/operations/useJobFeed.js';
 import { allPatrolPages, loadPatrolWorkflows, patrolApi } from '../../features/patrol/patrolApi.js';
 import { OPEN_PATROL_STATUSES, isPatrolWorkflow, jobStatus, jobStopPending, patrolReadiness, patrolRoute, patrolTemplateCount } from '../../features/patrol/patrolModel.js';
 import { allFacilityPages, facilityApi } from '../../features/facility/facilityApi.js';
@@ -190,6 +191,12 @@ function PatrolOperations({ catalog, view, library, missingRoute, loading, catal
   const [review, setReview] = useState(false), [busy, setBusy] = useState(false), [actionError, setActionError] = useState('');
   const [retiredSchedules, setRetiredSchedules] = useState(false);
   const [monitoredId, setMonitoredId] = useState(''), [jobAction, setJobAction] = useState(null), [now, setNow] = useState(Date.now());
+  const [pageVisible, setPageVisible] = useState(() => !document.hidden);
+  useEffect(() => {
+    const onVisibility = () => setPageVisible(!document.hidden);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
   const actionLock = useRef(false), attemptRef = useRef(attempt);
   const workflowIds = useMemo(() => new Set(catalog.workflows.map(workflow => workflow.workflowId)), [catalog.workflows]);
@@ -221,8 +228,23 @@ function PatrolOperations({ catalog, view, library, missingRoute, loading, catal
     return rows.filter(schedule => workflowIds.has(schedule.workflowId));
   }, [workflowKey, revision, retiredSchedules], 15000, view === 'schedules');
   const map = catalog.maps.find(item => item.mapId === route.mapId);
-  const monitoredPoll = usePoll(signal => patrolApi.getJob(monitoredId, { signal }), [monitoredId, revision], 8000, !!monitoredId && view !== 'schedules');
-  const monitored = monitoredPoll.data?.job?.jobId === monitoredId ? monitoredPoll.data : null;
+  const routeJobs = view === 'routes' && workflowId
+    ? jobs.filter(job => job.workflowId === workflowId && (!robotId || job.robotId === robotId)) : [];
+  const queueJob = monitoredId && (jobs.find(job => job.jobId === monitoredId)
+    || historyPoll.data?.find(job => job.jobId === monitoredId) || { jobId: monitoredId });
+  const visibleJob = view === 'queue' ? queueJob : routeJobs.find(job => job.jobId === monitoredId) || routeJobs[0];
+  const observedJob = pageVisible ? visibleJob : null;
+  const watchLive = writable && !!observedJob && !observedJob.archivedAt
+    && (!observedJob.status || OPEN_PATROL_STATUSES.has(observedJob.status) || jobStopPending(observedJob));
+  const { detail: monitored, error: jobReadError, receivedAt, liveStatus, refresh: refreshJob } =
+    useJobFeed(observedJob, watchLive, revision, { includeDeleted: true, pollInterval: 8000 });
+  useEffect(() => {
+    if (!observedJob?.jobId) return;
+    const read = () => { if (!document.hidden) refreshJob(); };
+    window.addEventListener('focus', read);
+    window.addEventListener('online', read);
+    return () => { window.removeEventListener('focus', read); window.removeEventListener('online', read); };
+  }, [observedJob?.jobId, refreshJob]);
   const viewRobotId = robotId || monitored?.job?.robotId;
   const snapshotPoll = usePoll(signal => patrolApi.getRobotSnapshot(viewRobotId, { signal }), [viewRobotId, revision], 8000, view === 'routes' && !!workflowId && !!viewRobotId);
   const snapshot = snapshotPoll.data;
@@ -260,10 +282,9 @@ function PatrolOperations({ catalog, view, library, missingRoute, loading, catal
     } catch (cause) { setActionError(`${cause.message}${attemptRef.current ? ' Dùng “Kiểm tra lượt gửi” để kiểm tra cùng lượt.' : ''}`); setReview(false); }
     finally { actionLock.current = false; setBusy(false); }
   };
-  const listedMonitored = jobs.find(job => job.jobId === monitoredId) || historyPoll.data?.find(job => job.jobId === monitoredId);
-  const detailBehind = monitored && listedMonitored && Number(listedMonitored.rowVersion) > Number(monitored.job.rowVersion);
-  const detailError = monitoredPoll.error || (detailBehind ? 'Trạng thái lượt vừa thay đổi. Đang đồng bộ lại chi tiết mới nhất.' : '');
-  const controlFresh = writable && !jobsPoll.error && !!jobsPoll.updatedAt && now - jobsPoll.updatedAt < 20000 && !detailError && !!monitoredPoll.updatedAt && now - monitoredPoll.updatedAt < 20000;
+  const detailBehind = monitored && Number(observedJob?.rowVersion) > Number(monitored.job.rowVersion);
+  const detailError = jobReadError || (detailBehind ? 'Trạng thái lượt vừa thay đổi. Đang đồng bộ lại chi tiết mới nhất.' : '');
+  const controlFresh = writable && !jobsPoll.error && !!jobsPoll.updatedAt && now - jobsPoll.updatedAt < 20000 && !detailError && !!receivedAt && now - receivedAt < 20000;
   const targetEndpointId = monitored?.job.workflowId === workflowId && monitored.job.robotId === viewRobotId ? monitored.patrol?.targetEndpointId : undefined;
   return <>
     {view === 'routes' && <>
@@ -279,7 +300,7 @@ function PatrolOperations({ catalog, view, library, missingRoute, loading, catal
     {view === 'schedules' && <PatrolSchedules loading={loading || !schedulesPoll.updatedAt && !schedulesPoll.error} schedules={schedulesPoll.data || []} catalog={catalog} error={schedulesPoll.error} writable={writable}
       retired={retiredSchedules} onViewChange={setRetiredSchedules} onRefresh={refresh} onNotice={setNotice}/>}
     {view === 'queue' && <>
-    <PatrolQueuePanel jobs={jobs} historyJobs={historyPoll.data || []} loading={!jobsPoll.updatedAt && !jobsPoll.error} error={jobsPoll.error} historyLoading={!historyPoll.updatedAt && !historyPoll.error} historyError={historyPoll.error} updatedAt={jobsPoll.updatedAt} catalog={catalog} selectedId={monitoredId} detail={monitored} detailError={detailError} writable={controlFresh} onSelect={setMonitoredId} onAction={kind => setJobAction({ kind, detail: monitored })} onRefresh={refresh}/>
+    <PatrolQueuePanel jobs={jobs} historyJobs={historyPoll.data || []} loading={!jobsPoll.updatedAt && !jobsPoll.error} error={jobsPoll.error} historyLoading={!historyPoll.updatedAt && !historyPoll.error} historyError={historyPoll.error} updatedAt={jobsPoll.updatedAt} catalog={catalog} selectedId={monitoredId} detail={monitored} detailError={detailError} liveStatus={liveStatus} writable={controlFresh} onSelect={setMonitoredId} onAction={kind => setJobAction({ kind, detail: monitored })} onRefresh={refresh}/>
     <p className="pt-history-note">Lịch sử hiển thị tối đa 100 lượt trong 7 ngày gần nhất. <Link to="/admin/live-operations">Mở vận hành trực tiếp</Link></p>
     <MonitoringRequests writable={writable} revision={revision}/>
     </>}
