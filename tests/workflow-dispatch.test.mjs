@@ -66,3 +66,24 @@ test('retired one-time run remains complete when recovered', async () => {
   const result = await resumeDispatch(attempt, { get: async () => ({ scheduleId: 's1', status: 'RETIRED' }) }, () => {});
   assert.equal(result.status, 'RETIRED');
 });
+
+test('recovering a save-only schedule after a lost create never activates it', async () => {
+  const attempt = newDispatch(workflow, '', {}, 50, 'save-only');
+  let savedSchedule, creates = 0;
+  const api = {
+    find: async () => savedSchedule,
+    create: async () => { creates++; savedSchedule = { scheduleId: 's1', status: 'PAUSED' }; throw Error('response lost'); },
+    activate: () => assert.fail('Saving a paused schedule must leave activation to the operator'),
+  };
+  const save = () => {};
+  await assert.rejects(resumeDispatch(attempt, api, save, { activate: false }), /response lost/);
+  const result = await resumeDispatch(attempt, api, save, { activate: false });
+  assert.equal(result.status, 'PAUSED');
+  assert.equal(creates, 1);
+});
+
+test('an empty response for a known schedule ID never recreates it', async () => {
+  const attempt = { ...newDispatch(workflow, '', {}, 50, 'existing'), scheduleId: 's1' };
+  const api = { get: async () => null, create: () => assert.fail('Known schedule IDs cannot create another schedule') };
+  await assert.rejects(resumeDispatch(attempt, api, () => {}), /Chưa xác nhận/);
+});

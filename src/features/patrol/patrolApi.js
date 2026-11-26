@@ -12,7 +12,8 @@ const post = (path, body, options) => apiRequest(path, { ...options, method: 'PO
 // recovery: the operator must first inspect the server's current state.
 export const patrolApi = {
   listWorkflows: (params, options) => apiRequest(query('/api/v1/admin/workflows', params), options),
-  getWorkflow: (id, options) => apiRequest(query(`/api/v1/admin/workflows/${resource(id)}`, { includeDeleted: true }), options),
+  listPublished: (params, options) => apiRequest(query('/api/v1/workflows/published', { ...params, serviceType: 'PATROL' }), options),
+  getWorkflow: (id, options) => apiRequest(`/api/v1/workflows/published/${resource(id)}`, options),
   previewWorkflow: (body, options) => post('/api/v1/admin/patrol-workflows/preview', body, options),
   createWorkflow: (body, options) => post('/api/v1/admin/patrol-workflows', body, options),
   listTemplates: options => apiRequest('/api/v1/admin/patrol-workflows/templates', options),
@@ -34,6 +35,7 @@ export const patrolApi = {
   createSchedule: (body, options) => post('/api/v1/schedules', body, options),
   activateSchedule: (id, options) => post(`/api/v1/schedules/${resource(id)}/activate`, undefined, options),
   pauseSchedule: (id, options) => post(`/api/v1/schedules/${resource(id)}/pause`, undefined, options),
+  retireSchedule: (id, reason, options) => post(`/api/v1/schedules/${resource(id)}/retire`, { reason }, options),
   async findSchedule(code, options) {
     return (await allPatrolPages(params => patrolApi.listSchedules({ ...params, includeDeleted: true }, options))).find(item => item.scheduleCode === code) ?? null;
   },
@@ -45,6 +47,38 @@ export const patrolDispatchApi = {
   create: patrolApi.createSchedule,
   activate: patrolApi.activateSchedule,
 };
+
+export async function createPatrolJob(attempt, saveAttempt) {
+  let job;
+  try {
+    job = await patrolApi.createJob(attempt.workflowId, attempt.body, attempt.key);
+  } catch (error) {
+    // Invalid inputs or a rejected navigation session require a newly configured run.
+    if ([400, 422].includes(error.status)) saveAttempt(null);
+    throw error;
+  }
+  if (!job?.jobId) throw new Error('Chưa nhận được mã nhiệm vụ. Hãy kiểm tra lại cùng lượt gửi.');
+  return job;
+}
+
+export async function loadPatrolWorkflows(options) {
+  // Published summaries omit map/template configuration. The admin catalog also
+  // identifies historical patrol jobs and schedules after a route is archived.
+  const [summaries, definitions] = await Promise.allSettled([
+    allPatrolPages(patrolApi.listPublished, options),
+    allPatrolPages((params, config) => patrolApi.listWorkflows({ ...params, includeDeleted: true }, config), options),
+  ]);
+  if (summaries.status === 'rejected') throw summaries.reason;
+  const metadataMissing = definitions.status === 'rejected';
+  const all = metadataMissing ? [] : definitions.value;
+  const byId = new Map(all.filter(item => item.serviceType === 'PATROL').map(item => [item.workflowId, item]));
+  const published = summaries.value.filter(item => item.serviceType === 'PATROL').map(summary => {
+    const workflow = { ...byId.get(summary.workflowId), ...summary, status: 'PUBLISHED', acceptsNewJobs: true };
+    byId.set(workflow.workflowId, workflow);
+    return workflow;
+  });
+  return { workflows: [...byId.values()], published: published.sort((a, b) => a.workflowName.localeCompare(b.workflowName, 'vi')), metadataMissing };
+}
 
 // Never treat a malformed or truncated page as a complete catalog.
 export async function allPatrolPages(list, options = {}) {

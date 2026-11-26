@@ -43,13 +43,21 @@ export function newDispatch(workflow, robotId, inputs, priority, id, now = new D
   } };
 }
 
-export async function resumeDispatch(attempt, api, save) {
+export async function resumeDispatch(attempt, api, save, { activate = true, onInvalidCreate } = {}) {
   let current = attempt;
   let schedule = current.scheduleId ? await api.get(current.scheduleId) : await api.find(current.code);
-  if (!schedule) schedule = await api.create(current.body);
-  if (!schedule?.scheduleId) throw new Error('Máy chủ chưa trả mã lượt điều phối. Hãy kiểm tra lại yêu cầu.');
+  if (!schedule && !current.scheduleId) {
+    try {
+      schedule = await api.create(current.body);
+    } catch (error) {
+      if ([400, 422].includes(error.status)) onInvalidCreate?.();
+      throw error;
+    }
+  }
+  if (!schedule?.scheduleId || (current.scheduleId && schedule.scheduleId !== current.scheduleId)) throw new Error('Chưa xác nhận được lịch của lượt điều phối. Hãy kiểm tra lại yêu cầu.');
   current = { ...current, scheduleId: schedule.scheduleId, status: schedule.status };
   save(current);
+  if (!activate && schedule.status === 'PAUSED') return current;
   if (schedule.status === 'PAUSED') {
     schedule = await api.activate(schedule.scheduleId);
     current = { ...current, status: schedule.status };

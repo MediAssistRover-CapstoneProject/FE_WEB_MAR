@@ -1,25 +1,28 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { patrolApi } from '../../../features/patrol/patrolApi.js';
-import { patrolCheckpointLabel, patrolTemplateCount, SENSING_OPTIONS } from '../../../features/patrol/patrolModel.js';
+import { patrolCheckpointLabel, patrolTemplateCount, scheduleTime, SENSING_OPTIONS } from '../../../features/patrol/patrolModel.js';
 import PatrolMapPreview from './PatrolMapPreview.jsx';
 import { Button, Empty, Icon } from './PatrolUi.jsx';
+import PatrolScheduleDialog from './PatrolScheduleDialog.jsx';
 import BrandMark from '../../../components/BrandMark.jsx';
 
 export const robotName = robot => robot?.robotName || robot?.robotCode || 'Chưa phân công';
 export const roundLabel = route => route?.continuous ? 'Liên tục đến khi dừng' : `${route?.repeatCount ?? 1} vòng`;
 const robotStatuses = { IDLE: 'Sẵn sàng', BUSY: 'Đang làm nhiệm vụ', OFFLINE: 'Mất kết nối', CHARGING: 'Đang sạc', ERROR: 'Cần kiểm tra', MAINTENANCE: 'Bảo trì' };
 
-export function RouteLibrary({ catalog, loading, error, workflows, workflowId, selectRoute, mapFilter, changeMap, search, setSearch, writable, onCreate }) {
+export function RouteLibrary({ catalog, templates, templateError, loading, error, workflows, workflowId, selectRoute, mapFilter, changeMap, search, setSearch, writable, onCreate }) {
   return <section className="pt-card pt-library" aria-label="Chọn tuyến tuần tra">
     <div className="pt-library-toolbar">
       <div><span className="pt-eyebrow">KẾ HOẠCH TUẦN TRA</span><h3>Chọn bản đồ và tuyến <span className="pt-count">{workflows.length}</span></h3></div>
       <div className="pt-library-filters">
-        <label className="pt-field"><span>Lọc theo bản đồ</span><select aria-label="Lọc tuyến theo bản đồ" value={mapFilter} onChange={event => changeMap(event.target.value)}><option value="">Tất cả bản đồ</option>{catalog.maps.map(map => <option key={map.mapId} value={map.mapId}>{map.mapName}{map.status !== 'ACTIVE' ? ' · Chưa kích hoạt' : ''}</option>)}</select></label>
+        <label className="pt-field"><span>Lọc theo bản đồ</span><select aria-label="Lọc tuyến theo bản đồ" disabled={catalog.metadataMissing} value={mapFilter} onChange={event => changeMap(event.target.value)}><option value="">Tất cả bản đồ</option>{catalog.maps.map(map => <option key={map.mapId} value={map.mapId}>{map.mapName}{map.status !== 'ACTIVE' ? ' · Chưa kích hoạt' : ''}</option>)}</select></label>
         <label className="pt-search"><Icon name="search"/><input aria-label="Tìm tuyến tuần tra" placeholder="Tìm tên hoặc mã tuyến…" value={search} onChange={event => setSearch(event.target.value)}/></label>
       </div>
     </div>
-    <div className="pt-template-library"><p>Chọn số điểm, rồi chọn bản đồ và điểm đến cho từng lượt chạy.</p><div className="pt-template-choices">{(catalog.templates || []).map(template => <Button key={template.checkpointCount} onClick={() => onCreate(template.checkpointCount)} disabled={!writable || loading || !!error}><Icon name="route"/>Tuần tra {template.checkpointCount} điểm</Button>)}</div></div>
+    {catalog.metadataMissing && <p className="pt-schedules-empty" role="status">Chưa tải được bộ lọc bản đồ và lịch sử của các tuyến đã lưu trữ. Bạn vẫn có thể chọn tuyến đã phát hành.</p>}
+    {templateError && <p className="pt-schedules-empty" role="status">{templateError}</p>}
+    {templates.length > 0 && <div className="pt-template-library"><p>Chọn số điểm, rồi chọn bản đồ và điểm đến cho từng lượt chạy.</p><div className="pt-template-choices">{templates.map(template => <Button key={template.checkpointCount} onClick={() => onCreate(template.checkpointCount, template.workflowId)} disabled={!writable || loading || !!error}><Icon name="route"/>Tuần tra {template.checkpointCount} điểm</Button>)}</div></div>}
     <div className="pt-route-list">
       {loading && !catalog.workflows.length ? <p className="pt-loading" role="status">Đang tải danh sách tuyến…</p> : workflows.length ? workflows.map(workflow => {
         const published = workflow.status === 'PUBLISHED' && workflow.acceptsNewJobs;
@@ -27,12 +30,12 @@ export function RouteLibrary({ catalog, loading, error, workflows, workflowId, s
         const count = patrolTemplateCount(workflow);
         return <button type="button" className={`pt-route-card ${workflow.workflowId === workflowId ? 'is-selected' : ''}`} key={workflow.workflowId} aria-pressed={workflow.workflowId === workflowId} onClick={() => selectRoute(workflow.workflowId)}>
           <span className="pt-route-symbol"><Icon name="route"/></span>
-          <span className="pt-route-card-copy"><strong>{workflow.workflowName}</strong><span>{count ? `${count} điểm · Chọn bản đồ khi chạy` : `${map?.mapName || 'Xem bản đồ trong chi tiết tuyến'} · Tuyến cố định`}</span></span>
+          <span className="pt-route-card-copy"><strong>{workflow.workflowName}</strong><span>{count ? `${count} điểm · Chọn bản đồ khi chạy` : map ? `${map.mapName} · Tuyến cố định` : 'Chọn tuyến để xem bản đồ'}</span></span>
           <span className={`pt-badge pt-badge-${published ? 'green' : 'neutral'}`}>{published ? 'Sẵn sàng' : workflow.status === 'ARCHIVED' ? 'Lưu trữ' : workflow.status === 'PUBLISHED' ? 'Ngừng nhận việc' : 'Bản nháp'}</span>
         </button>;
       }) : <Empty title={search || mapFilter ? 'Không có tuyến phù hợp' : 'Chưa có tuyến tuần tra'}>{search || mapFilter ? 'Thử đổi bản đồ hoặc từ khóa tìm kiếm.' : 'Tạo tuyến, chọn bản đồ và các điểm robot cần kiểm tra.'}</Empty>}
     </div>
-    <div className="pt-library-footer"><span>Mẫu được dùng lại; mỗi nhiệm vụ giữ cấu hình điểm riêng.</span><Button icon="plus" onClick={() => onCreate(3)} disabled={!writable || loading || !!error}>Tạo lượt mới</Button></div>
+    {templates.length > 0 && <div className="pt-library-footer"><span>Mẫu được dùng lại; mỗi nhiệm vụ giữ cấu hình điểm riêng.</span><Button icon="plus" onClick={() => onCreate(3)} disabled={!writable || loading || !!error}>Tạo lượt mới</Button></div>}
   </section>;
 }
 
@@ -52,7 +55,7 @@ export function RouteMapPanel({ workflowId, detail, route, map, catalog, error, 
   </section>;
 }
 
-export function DispatchPanel({ catalog, route, map, robotId, onRobotChange, robot, snapshot, blocked, reasons, busy, pending, onReview, updatedAt, onConfigure, writable }) {
+export function DispatchPanel({ catalog, route, map, robotId, onRobotChange, robot, snapshot, blocked, reasons, busy, pending, onReview, updatedAt, onConfigure, onSchedule, writable }) {
   const batteryValue = robot?.batteryPercent ?? snapshot?.latestTelemetry?.batteryPercent;
   const battery = batteryValue == null ? null : Number(batteryValue);
   if (route.template) return <aside className="pt-card pt-dispatch" aria-label="Cấu hình lượt tuần tra"><div className="pt-card-heading"><div><span className="pt-eyebrow">GIAO NHIỆM VỤ</span><h3>Cấu hình lượt tuần tra</h3></div><Icon name="robot"/></div><p className="pt-muted">Chọn robot, bản đồ và {route.checkpointCount} điểm ghé. Có thể chạy ngay hoặc lập lịch một lần, theo khoảng thời gian hay cron.</p><Button icon="play" tone="primary" className="pt-dispatch-button" disabled={!writable || !route.published || pending} onClick={onConfigure}>Cấu hình & giao robot</Button><p className="pt-dispatch-note">Khi lập lịch, robot chỉ cần sẵn sàng tại thời điểm chạy. Mỗi điểm quan sát ngã 3 giây; giám sát liên tục trên robot vẫn độc lập.</p></aside>;
@@ -63,16 +66,18 @@ export function DispatchPanel({ catalog, route, map, robotId, onRobotChange, rob
     <dl className="pt-run-summary"><div><dt>Bản đồ</dt><dd>{map?.mapName || 'Chưa chọn'}</dd></div><div><dt>Điểm kiểm tra</dt><dd>{route.checkpoints.length} điểm mỗi vòng</dd></div><div><dt>Chế độ</dt><dd>{roundLabel(route)}</dd></div><div><dt>Ưu tiên</dt><dd>Nhường SOS và hỗ trợ</dd></div></dl>
     <div className={`pt-readiness ${!blocked ? 'is-ready' : ''}`} role="status"><Icon name={!blocked ? 'check' : 'info'}/><div><strong>{!blocked ? 'Sẵn sàng đưa vào hàng đợi' : 'Chưa thể bắt đầu'}</strong>{blocked ? <ul>{reasons.map(reason => <li key={reason}>{reason}</li>)}</ul> : <p>Robot đã kết nối và đúng bản đồ. Máy chủ kiểm tra lại trước khi giao nhiệm vụ.</p>}</div></div>
     <Button icon="play" tone="primary" className="pt-dispatch-button" disabled={blocked || busy || pending} onClick={onReview}>Bắt đầu tuần tra</Button>
+    {route.managed && route.published && <Button icon="clock" onClick={onSchedule} disabled={!writable || !!route.issues.length || !map || map.status !== 'ACTIVE' || busy}>Lập lịch tuyến</Button>}
     <p className="pt-dispatch-note">Lượt gửi vào hàng đợi trước. Trạng thái chạy được cập nhật khi robot thực sự nhận nhiệm vụ.</p>
     {updatedAt && <p className="pt-connection-time">Kết nối cập nhật lúc {new Date(updatedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>}
     <div className="pt-priority-note"><Icon name="shield"/><div><strong>Nhường việc khẩn cấp, giữ tiến độ</strong><p>Robot có thể tạm dừng vì SOS, cuộc gọi hoặc yêu cầu hỗ trợ. Theo dõi lý do và tiếp tục tại hàng đợi bên dưới.</p></div></div>
   </aside>;
 }
 
-export function PatrolSchedules({ schedules = [], catalog, error, writable, onRefresh }) {
+export function PatrolSchedules({ schedules = [], catalog, error, writable, retired, onViewChange, onRefresh, onNotice }) {
   const [busyId, setBusyId] = useState(''), [actionError, setActionError] = useState('');
   const locked = useRef(false);
-  const visible = schedules.filter(schedule => ['ACTIVE', 'PAUSED'].includes(schedule.status));
+  const [dialog, setDialog] = useState(null);
+  const visible = schedules.filter(schedule => retired ? schedule.status === 'RETIRED' : ['ACTIVE', 'PAUSED'].includes(schedule.status));
   const changeState = async schedule => {
     if (locked.current) return;
     locked.current = true; setBusyId(schedule.scheduleId); setActionError('');
@@ -80,15 +85,44 @@ export function PatrolSchedules({ schedules = [], catalog, error, writable, onRe
     catch (cause) { setActionError(`${cause.message} Hãy cập nhật danh sách để xác nhận trạng thái lịch trước khi thao tác tiếp.`); onRefresh(); }
     finally { locked.current = false; setBusyId(''); }
   };
-  return <section className="pt-card pt-schedules" aria-label="Lịch tuần tra"><div className="pt-card-heading"><div><span className="pt-eyebrow">LỊCH ĐÃ LƯU</span><h3>Lịch tuần tra <span className="pt-count">{visible.length}</span></h3></div><Button icon="refresh" onClick={onRefresh}>Cập nhật lịch</Button></div>
+  return <section className="pt-card pt-schedules" aria-label="Lịch tuần tra">
+    <div className="pt-card-heading">
+      <div><span className="pt-eyebrow">LỊCH ĐÃ LƯU</span><h3>Lịch tuần tra <span className="pt-count">{visible.length}</span></h3></div>
+      <div className="pt-actions">
+        <Button aria-pressed={retired} onClick={() => onViewChange(!retired)}>{retired ? 'Xem lịch đang dùng' : 'Xem lịch đã ngừng'}</Button>
+        <Button icon="refresh" onClick={onRefresh}>Cập nhật lịch</Button>
+      </div>
+    </div>
     {(error || actionError) && <p className="pt-alert" role="alert">{error || actionError}</p>}
     {visible.length ? <div className="pt-schedule-list">{visible.map(schedule => {
       const workflow = catalog.workflows.find(item => item.workflowId === schedule.workflowId);
       const inputs = schedule.inputTemplateJson || {};
       const map = catalog.maps.find(item => item.mapId === (inputs.map_id || workflow?.defaultInputsJson?.map_id));
       const robot = catalog.robots.find(item => item.robotId === schedule.robotId);
-      const time = schedule.nextRunAt || schedule.startsAt;
-      return <article key={schedule.scheduleId}><div><strong>{schedule.scheduleName}</strong><p>{map?.mapName || 'Bản đồ đã lưu'} · {robotName(robot)} · {schedule.scheduleType === 'ONCE' ? 'Một lần' : schedule.scheduleType === 'INTERVAL' ? `Mỗi ${schedule.intervalSec} giây` : `Cron ${schedule.cronExpression}`} · {schedule.status === 'ACTIVE' ? 'Đang kích hoạt' : 'Tạm dừng'}</p><p>{time ? new Date(time).toLocaleString('vi-VN') : 'Chưa có thời điểm'} · {schedule.timezone}</p>{inputs.checkpoints?.length > 0 && <details><summary>{inputs.checkpoints.length} điểm · {inputs.patrol_repeat_count === 0 ? 'Liên tục' : `${inputs.patrol_repeat_count ?? 1} vòng`} · {inputs.max_speed_mps ?? .25} m/s</summary><ol>{inputs.checkpoints.map((point, index) => <li key={index}>{patrolCheckpointLabel(point, catalog)}</li>)}</ol></details>}</div>{writable && <Button icon={schedule.status === 'ACTIVE' ? 'pause' : 'play'} disabled={!!busyId} onClick={() => changeState(schedule)}>{busyId === schedule.scheduleId ? 'Đang gửi…' : schedule.status === 'ACTIVE' ? 'Tạm dừng lịch' : 'Kích hoạt lịch'}</Button>}</article>;
-    })}</div> : <p className="pt-schedules-empty">Chưa có lịch tuần tra đang hoạt động hoặc tạm dừng. Chọn “Tạo lượt tuần tra” để lập lịch.</p>}
+      const active = schedule.status === 'ACTIVE';
+      const frequency = schedule.scheduleType === 'ONCE' ? 'Một lần' : schedule.scheduleType === 'INTERVAL' ? `Mỗi ${schedule.intervalSec} giây` : schedule.cronExpression;
+      return <article key={schedule.scheduleId}>
+        <div>
+          <strong>{schedule.scheduleName}</strong>
+          <p>{map?.mapName || 'Bản đồ đã lưu'} · {robotName(robot)} · {frequency} · {retired ? 'Đã ngừng sử dụng' : active ? 'Đang kích hoạt' : 'Tạm dừng'}</p>
+          <p>{schedule.nextRunAt ? 'Lượt tiếp theo' : 'Bắt đầu'} · {scheduleTime(schedule.nextRunAt || schedule.startsAt, schedule.timezone)}</p>
+          {inputs.checkpoints?.length > 0 && <details>
+            <summary>{inputs.checkpoints.length} điểm · {inputs.patrol_repeat_count === 0 ? 'Liên tục' : `${inputs.patrol_repeat_count ?? 1} vòng`} · {inputs.max_speed_mps ?? .25} m/s</summary>
+            <ol>{inputs.checkpoints.map((point, index) => <li key={index}>{patrolCheckpointLabel(point, catalog)}</li>)}</ol>
+          </details>}
+        </div>
+        <div className="pt-actions">
+          <Button onClick={() => setDialog({ id: schedule.scheduleId, kind: 'detail' })}>Chi tiết lịch</Button>
+          {writable && !retired && <>
+            <Button icon={active ? 'pause' : 'play'} disabled={!!busyId} onClick={() => changeState(schedule)}>
+              {busyId === schedule.scheduleId ? 'Đang gửi…' : active ? 'Tạm dừng lịch' : 'Kích hoạt lịch'}
+            </Button>
+            <Button disabled={!!busyId} onClick={() => setDialog({ id: schedule.scheduleId, kind: 'retire' })}>Ngừng sử dụng</Button>
+          </>}
+        </div>
+      </article>;
+    })}</div> : <p className="pt-schedules-empty">{retired ? 'Chưa có lịch tuần tra đã ngừng.' : 'Chưa có lịch tuần tra đang hoạt động hoặc tạm dừng. Chọn một tuyến hoặc mẫu để lập lịch.'}</p>}
+    {dialog && <PatrolScheduleDialog key={dialog.id} scheduleId={dialog.id} retiring={dialog.kind === 'retire'} writable={writable}
+      onClose={() => setDialog(null)} onRetired={() => { setDialog(null); onNotice('Đã ngừng sử dụng lịch tuần tra.'); onRefresh(); }}/>}
   </section>;
 }

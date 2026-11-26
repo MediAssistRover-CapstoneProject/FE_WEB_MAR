@@ -32,6 +32,11 @@ const published = {
 let catalogFailure = false, empty = false, jobs = [], schedules = [], holds = [], round = 1, failCreateResponse = false, createdWorkflow = null;
 let navigationState = 'READY', poseMapId = mapId, failJobDetail = false;
 let presentationStatus = 200;
+let modernBackend = false, loseJobResponse = false, loseSubmitResponse = true, loseRetireResponse = true, metadataUnavailable = false;
+const receipts = new Map();
+const request = { serviceRequestId: id(93), requestCode: 'REQ-CROWD-01', requestType: 'CROWD_MONITORING', status: 'DRAFT' };
+const templateId = id(91);
+const template = { ...workflow, workflowId: templateId, workflowName: 'Tuần tra 3 điểm', workflowCode: 'WF_PATROL_TEMPLATE_3', defaultInputsJson: {}, inputUiJson: { patrol_template: { version: 1, checkpointCount: 3 } } };
 const writes = [], reads = [], errors = [], unknownApis = [], simulationRequests = [];
 page.on('pageerror', error => errors.push(error.message));
 await page.addInitScript(() => localStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { accountId: 'patrol-test-admin', username: 'patrol-test', fullName: 'Quản trị viên', role: 'ADMIN' }, tokens: { accessToken: 'fixture' } })));
@@ -55,8 +60,30 @@ await page.route('**/*', async route => {
   const method = req.method();
   if (method !== 'GET') {
     const body = req.postDataJSON(); writes.push({ path, method, body });
-    if (path === '/api/v1/schedules') { const schedule = { ...body, scheduleId: id(70), status: 'PAUSED' }; schedules.push(schedule); if (failCreateResponse) { failCreateResponse = false; return route.abort('failed'); } return reply(schedule); }
-    if (path === `/api/v1/schedules/${id(70)}/activate`) { schedules[0].status = 'ACTIVE'; return reply(schedules[0]); }
+    if (path === '/api/v1/schedules') { const schedule = { ...body, scheduleId: id(70 + schedules.length), status: 'PAUSED' }; schedules.push(schedule); if (failCreateResponse) { failCreateResponse = false; return route.abort('failed'); } return reply(schedule); }
+    const schedule = schedules.find(item => path.startsWith(`/api/v1/schedules/${item.scheduleId}/`));
+    if (schedule && path.endsWith('/activate')) { schedule.status = 'ACTIVE'; return reply(schedule); }
+    if (schedule && path.endsWith('/pause')) { schedule.status = 'PAUSED'; return reply(schedule); }
+    if (schedule && path.endsWith('/retire') && body.reason.trim().length >= 5) {
+      schedule.status = 'RETIRED';
+      if (loseRetireResponse) { loseRetireResponse = false; return route.abort('failed'); }
+      return reply(schedule);
+    }
+    if (path === '/api/v1/admin/patrol-workflows/templates' && modernBackend) return reply({ workflowId: templateId, checkpointCount: body.checkpointCount, available: true });
+    if (modernBackend && [workflowId, templateId].some(value => path === `/api/v1/workflows/${value}/jobs`)) {
+      const key = req.headers()['idempotency-key'];
+      assert.ok(key && !receipts.has(key));
+      const job = { jobId: id(200 + receipts.size), jobCode: `PT-${receipts.size + 1}`, workflowId: path.split('/')[4], robotId, mapId, status: 'QUEUED', queuedAt: new Date().toISOString() };
+      receipts.set(key, job); jobs.push(job);
+      if (loseJobResponse) { loseJobResponse = false; return route.abort('failed'); }
+      return reply(job);
+    }
+    if (path === `/api/v1/service-requests/${request.serviceRequestId}/submit` && request.status === 'DRAFT') {
+      request.status = 'QUEUED';
+      jobs.push({ jobId: id(94), jobCode: 'MON-01', workflowId: id(95), serviceRequestId: request.serviceRequestId, robotId, status: 'QUEUED' });
+      if (loseSubmitResponse) { loseSubmitResponse = false; return route.abort('failed'); }
+      return reply(request);
+    }
     if (path === '/api/v1/admin/patrol-workflows/preview') return reply({ workflow: {}, graph: {} });
     if (path === '/api/v1/admin/patrol-workflows') { createdWorkflow = body; return reply({ workflowId, mapId, checkpointCount: body.checkpoints.length }); }
     if (path === `/api/v1/jobs/${jobId}/suspend`) { jobs[0] = { ...jobs[0], status: 'SUSPENDING', rowVersion: jobs[0].rowVersion + 1 }; holds = [{ source: 'MANUAL', sourceId: null, createdAt: new Date().toISOString() }]; return reply(jobDetail(jobs[0])); }
@@ -67,22 +94,31 @@ await page.route('**/*', async route => {
   reads.push({ path, query: Object.fromEntries(url.searchParams) });
   if (path.endsWith('/stream')) return reply({ message: 'Use mocked REST' }, 503);
   if (path === '/api/v1/auth/me') return reply({ accountId: 'patrol-test-admin', username: 'patrol-test', role: 'ADMIN' });
-  if (path === '/api/v1/admin/workflows') return catalogFailure ? reply({ message: 'Máy chủ tạm mất kết nối' }, 503) : list(empty ? [] : [workflow]);
-  if (path === `/api/v1/admin/workflows/${workflowId}`) return reply(detail);
-  if (path.startsWith('/api/v1/admin/workflows/')) return reply({ message: 'Không tìm thấy quy trình này' }, 404);
-  if (path === '/api/v1/workflows/published') return list([workflow]);
+  if (path === '/api/v1/admin/workflows') return metadataUnavailable ? reply({ message: 'Catalog unavailable' }, 503) : list(empty ? [] : [workflow, { ...workflow, workflowId: id(85), workflowName: 'Tuyến nháp', status: 'DRAFT' }, ...(modernBackend ? [template] : [])]);
+  if (path === '/api/v1/workflows/published') return catalogFailure ? reply({ message: 'Máy chủ tạm mất kết nối' }, 503) : list((empty ? [] : [workflow, ...(modernBackend ? [template] : [])]).map(({ workflowId, workflowCode, workflowName, serviceType }) => ({ workflowId, workflowCode, workflowName, serviceType })));
+  if (path === `/api/v1/workflows/published/${workflowId}`) return reply(detail);
+  if (path === `/api/v1/workflows/published/${templateId}`) return reply({ workflow: template, steps: [], transitions: [] });
+  if (path.startsWith('/api/v1/workflows/published/')) return reply({ message: 'Không tìm thấy quy trình này' }, 404);
+  if (path === '/api/v1/admin/patrol-workflows/templates') return modernBackend ? reply([{ workflowId: null, checkpointCount: 3, available: false }]) : reply({ message: 'Route not found' }, 404);
+  if (path.endsWith('/jobs/by-idempotency-key')) {
+    if (!modernBackend) return reply({ message: 'Route not found' }, 404);
+    const job = receipts.get(url.searchParams.get('key'));
+    return job ? reply(job) : route.fulfill({ status: 204 });
+  }
+  if (path === '/api/v1/service-requests') return list(url.searchParams.get('requestType') === request.requestType ? [request] : []);
+  if (path === `/api/v1/service-requests/${request.serviceRequestId}`) return reply(request);
   if (path === '/api/v1/maps') return list(empty ? [] : [map]);
   if (path === '/api/v1/endpoints') return list(empty ? [] : endpoints);
   if (path === '/api/v1/zones') return list(empty ? [] : zones);
   if (path === '/api/v1/robots') return list(empty ? [] : [robot]);
-  if (path === `/api/v1/robots/${robotId}/snapshot`) return reply({ observedAt: new Date().toISOString(), robot, mqttConnected: true, heartbeatFresh: true, dispatchReady: true, activeJobId: jobs.some(j => j.status === 'RUNNING') ? jobId : null, suspendedPatrolJobIds: jobs.some(j => j.status === 'SUSPENDED') ? [jobId] : [], navigationSession: { state: navigationState, mapId }, latestPose: { robotId, mapId: poseMapId, xM: 2.8, yM: 3, yawRad: .35, frameId: 'map', fresh: true, capturedAt: new Date().toISOString() } });
-  if (path === '/api/v1/jobs') return list(jobs.filter(job => (!url.searchParams.get('status') || job.status === url.searchParams.get('status')) && (!url.searchParams.get('workflowId') || job.workflowId === url.searchParams.get('workflowId')) && (!url.searchParams.get('robotId') || job.robotId === url.searchParams.get('robotId'))));
+  if (path === `/api/v1/robots/${robotId}/snapshot`) return reply({ observedAt: new Date().toISOString(), robot, mqttConnected: true, heartbeatFresh: true, dispatchReady: true, activeJobId: jobs.some(j => j.status === 'RUNNING') ? jobId : null, suspendedPatrolJobIds: jobs.some(j => j.status === 'SUSPENDED') ? [jobId] : [], navigationSession: { state: navigationState, sessionId: id(89), mapId }, latestPose: { robotId, mapId: poseMapId, xM: 2.8, yM: 3, yawRad: .35, frameId: 'map', fresh: true, capturedAt: new Date().toISOString() } });
+  if (path === '/api/v1/jobs') return list(jobs.filter(job => (!url.searchParams.get('status') || job.status === url.searchParams.get('status')) && (!url.searchParams.get('workflowId') || job.workflowId === url.searchParams.get('workflowId')) && (!url.searchParams.get('robotId') || job.robotId === url.searchParams.get('robotId')) && (!url.searchParams.get('requestId') || job.serviceRequestId === url.searchParams.get('requestId'))));
   if (path.startsWith('/api/v1/jobs/')) {
     const job = jobs.find(item => path === `/api/v1/jobs/${item.jobId}`);
     return failJobDetail ? reply({ message: 'Chi tiết nhiệm vụ tạm gián đoạn' }, 503) : job ? reply(jobDetail(job)) : reply({ message: 'Nhiệm vụ không tồn tại' }, 404);
   }
-  if (path === '/api/v1/schedules') return list(schedules);
-  if (path === `/api/v1/schedules/${id(70)}`) return reply(schedules[0]);
+  if (path === '/api/v1/schedules') return list(schedules.filter(item => (!url.searchParams.has('status') || item.status === url.searchParams.get('status')) && (url.searchParams.get('includeDeleted') === 'true' || item.status !== 'RETIRED')));
+  if (path.startsWith('/api/v1/schedules/')) return reply(schedules.find(item => path.endsWith('/' + item.scheduleId)));
   if (path.endsWith('/presentation/published')) return reply(presentationStatus === 200 ? published : { message: 'Chưa có bản vẽ đã áp dụng' }, presentationStatus);
   if (path.endsWith('/image-metadata')) return reply({ map_id: mapId, asset_hash: hash, width_m: 10, height_m: 6, width_px: 1000, height_px: 600, resolution_m_per_pixel: .01, origin_x_m: 0, origin_y_m: 0, origin_yaw_rad: 0, frame_id: 'map', pixel_center_to_map: [[.01, 0, .005], [0, -.01, 5.995], [0, 0, 1]] });
   if (path.endsWith('/image.png')) return route.fulfill({ contentType: 'image/png', body: png });
@@ -99,7 +135,8 @@ try {
   await expect(page.getByRole('button', { name: 'Mô phỏng', exact: true })).toHaveCount(0);
   await expect(page.locator('.gazebo-panel, .gazebo-desktop')).toHaveCount(0);
   await expect(page.locator('.pt-page')).toContainText(workflow.workflowName);
-  await expect(page.locator('.pt-map svg')).toBeVisible();
+  await expect(page.locator('.pt-map-svg')).toBeVisible();
+  await expect(page.locator('.pt-route-list')).not.toContainText('Tuyến nháp');
   await expect(page.locator('.pt-map-canvas')).toHaveAttribute('data-map-view', 'published');
   await expect(page.locator('.pt-map [data-feature-id="hospital-room"]')).toBeVisible();
   await expect(page.locator('.pt-map [data-feature-id="hospital-wall"]')).toBeVisible();
@@ -311,6 +348,99 @@ try {
   await expect(page.getByRole('button', { name: 'Bắt đầu tuần tra', exact: true })).toBeDisabled();
   assert.equal(writes.length, beforeUnknownLink, 'An unknown workflow link issues no commands');
 
+  modernBackend = true; jobs = []; schedules = []; robot.status = 'OFFLINE';
+  await page.goto(`${base}/admin/patrol?workflowId=${workflowId}`);
+  await page.getByRole('button', { name: 'Lập lịch tuyến', exact: true }).click();
+  const fixedSchedule = page.getByRole('dialog', { name: 'Lập lịch tuyến tuần tra' });
+  await fixedSchedule.getByLabel('Robot tuần tra').selectOption(robotId);
+  await fixedSchedule.getByLabel('Thời điểm thực hiện').selectOption('INTERVAL');
+  const previousActivations = writes.filter(write => write.path.endsWith('/activate')).length;
+  await fixedSchedule.getByRole('button', { name: 'Lưu lịch tạm dừng' }).click();
+  await expect(fixedSchedule).not.toBeVisible();
+  assert.equal(schedules[0].status, 'PAUSED');
+  assert.deepEqual(schedules[0].inputTemplateJson, {});
+  assert.equal(writes.filter(write => write.path.endsWith('/activate')).length, previousActivations);
+  const scheduleList = page.getByRole('region', { name: 'Lịch tuần tra', exact: true });
+  await scheduleList.getByRole('button', { name: 'Chi tiết lịch' }).click();
+  await expect(page.getByRole('dialog')).toContainText(schedules[0].scheduleCode);
+  await page.getByRole('dialog').getByRole('button', { name: 'Đóng', exact: true }).click();
+  await scheduleList.getByRole('button', { name: 'Kích hoạt lịch' }).click();
+  await scheduleList.getByRole('button', { name: 'Tạm dừng lịch' }).click();
+  await expect(scheduleList.getByRole('button', { name: 'Kích hoạt lịch' })).toBeEnabled();
+  await scheduleList.getByRole('button', { name: 'Ngừng sử dụng' }).click();
+  const retire = page.getByRole('dialog', { name: 'Ngừng sử dụng lịch' });
+  await expect(retire.getByRole('button', { name: 'Xác nhận ngừng sử dụng' })).toBeDisabled();
+  await retire.getByLabel('Lý do ngừng sử dụng', { exact: false }).fill('Kết thúc lịch kiểm thử');
+  await retire.getByRole('button', { name: 'Xác nhận ngừng sử dụng' }).click();
+  await expect(retire).not.toBeVisible();
+  await expect(scheduleList.locator('article')).toHaveCount(0);
+  assert.equal(schedules[0].status, 'RETIRED');
+  assert.deepEqual(writes.find(write => write.path.endsWith('/retire')).body, { reason: 'Kết thúc lịch kiểm thử' });
+  assert.equal(writes.filter(write => write.path.endsWith('/retire')).length, 1);
+  await scheduleList.getByRole('button', { name: 'Xem lịch đã ngừng' }).click();
+  await expect(scheduleList.locator('article')).toContainText(schedules[0].scheduleName);
+  await expect(scheduleList.locator('article').getByRole('button')).toHaveCount(1);
+  assert.ok(reads.some(read => read.path === '/api/v1/schedules' && read.query.status === 'RETIRED' && read.query.includeDeleted === 'true'));
+  await scheduleList.getByRole('button', { name: 'Xem lịch đang dùng' }).click();
+
+  const requestPanel = page.locator('.pt-monitoring-requests');
+  await requestPanel.locator('summary').click();
+  await requestPanel.getByLabel('Yêu cầu đã tạo').selectOption(request.serviceRequestId);
+  await requestPanel.getByRole('button', { name: 'Gửi yêu cầu vào hàng đợi' }).click();
+  await expect(requestPanel.getByRole('link', { name: 'MON-01' })).toHaveAttribute('href', `/admin/live-operations?jobId=${id(94)}`);
+  await expect(requestPanel.getByRole('button', { name: 'Gửi yêu cầu vào hàng đợi' })).toHaveCount(0);
+  assert.equal(writes.filter(write => write.path.endsWith('/submit')).length, 1);
+  assert.ok(reads.some(read => read.path === '/api/v1/jobs' && read.query.requestId === request.serviceRequestId));
+  await requestPanel.getByLabel('Loại yêu cầu giám sát').selectOption('RESTRICTED_AREA_MONITORING');
+  await expect(requestPanel.getByRole('link', { name: 'MON-01' })).toHaveCount(0);
+
+  robot.status = 'IDLE'; loseJobResponse = true;
+  await page.getByLabel('Robot tuần tra', { exact: true }).selectOption(robotId);
+  await page.getByRole('button', { name: 'Bắt đầu tuần tra', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Xác nhận bắt đầu' }).click();
+  await expect(page.locator('.pt-pending')).toBeVisible();
+  modernBackend = false;
+  await page.reload();
+  await page.locator('.pt-pending').getByRole('button', { name: 'Kiểm tra lượt gửi' }).click();
+  await expect(page.locator('.pt-page')).toContainText('Route not found');
+  assert.equal(schedules.length, 1, 'A missing lookup during recovery must not create a legacy schedule');
+  modernBackend = true;
+  await page.locator('.pt-pending').getByRole('button', { name: 'Kiểm tra lượt gửi' }).click();
+  await expect(page.locator('.pt-pending')).toHaveCount(0);
+  const fixedWrites = writes.filter(write => write.path === `/api/v1/workflows/${workflowId}/jobs`);
+  assert.equal(fixedWrites.length, 1);
+  assert.deepEqual(fixedWrites[0].body, { robotId, mapId, navigationSessionId: id(89), inputs: {}, priority: 0 });
+  assert.equal(schedules.length, 1, 'Recovering a direct job never switches to a schedule');
+
+  const openTemplate = async () => {
+    await page.getByRole('button', { name: 'Tuần tra 3 điểm', exact: true }).click();
+    const form = page.getByRole('dialog', { name: 'Tạo lượt tuần tra' });
+    await form.getByLabel('Robot tuần tra').selectOption(robotId);
+    for (let point = 0; point < 3; point++) await form.getByLabel(`Điểm đến ${point + 1}`).selectOption(endpoints[point].endpointId);
+    return form;
+  };
+  const templateRun = await openTemplate();
+  await expect(templateRun).toContainText('Robot sẵn sàng nhận lượt');
+  await templateRun.getByRole('button', { name: 'Tạo nhiệm vụ tuần tra' }).click();
+  await expect(templateRun).not.toBeVisible();
+  const run = writes.find(write => write.path === `/api/v1/workflows/${templateId}/jobs`);
+  assert.deepEqual(run.body.inputs.checkpoints, endpoints.slice(0, 3).map(point => ({ endpoint_id: point.endpointId })));
+  const plannedTemplate = await openTemplate();
+  await plannedTemplate.getByLabel('Thời điểm thực hiện').selectOption('ONCE');
+  await plannedTemplate.getByLabel('Kích hoạt lịch ngay sau khi lưu').check();
+  await plannedTemplate.getByRole('button', { name: 'Tạo & kích hoạt lịch' }).click();
+  await expect(plannedTemplate).not.toBeVisible();
+  assert.equal(schedules[1].status, 'ACTIVE');
+  assert.equal(schedules[1].workflowId, templateId);
+  assert.deepEqual(schedules[1].inputTemplateJson, run.body.inputs);
+
+  metadataUnavailable = true;
+  await page.goto(`${base}/admin/patrol?workflowId=${workflowId}`);
+  await expect(page.getByLabel('Lọc tuyến theo bản đồ')).toBeDisabled();
+  await expect(page.locator('.pt-route-detail')).toContainText(workflow.workflowName);
+  await expect(page.getByRole('button', { name: 'Lập lịch tuyến' })).toBeEnabled();
+  metadataUnavailable = false;
+
   empty = true; jobs = []; holds = []; schedules = [];
   await page.evaluate(() => sessionStorage.clear());
   await page.goto(`${base}/admin/patrol`);
@@ -325,10 +455,12 @@ try {
   assert.deepEqual(errors, [], 'No browser runtime errors');
   assert.deepEqual(unknownApis, [], 'Every mutation is explicitly mocked');
   assert.deepEqual(simulationRequests, [], 'The removed simulation route never contacts the simulator');
-  for (const resource of [`/api/v1/admin/workflows/${workflowId}`, `/api/v1/jobs/${id(5)}`, `/api/v1/schedules/${id(70)}`]) {
+  assert.ok(reads.some(read => read.path === '/api/v1/workflows/published' && read.query.serviceType === 'PATROL'));
+  assert.ok(reads.some(read => read.path === `/api/v1/workflows/published/${workflowId}`));
+  for (const resource of [`/api/v1/jobs/${id(5)}`, `/api/v1/schedules/${id(70)}`]) {
     assert.ok(reads.some(read => read.path === resource && read.query.includeDeleted === 'true'), `${resource} preserves archived/retired detail visibility`);
   }
-  console.log('Patrol workspace browser checks passed: map, live pose, readiness, queue/history, stop confirmation, dispatch recovery, controls and responsive UI');
+  console.log('Patrol browser checks passed: published routes, template and fixed runs, request submission and lookup, schedule lifecycle, lost responses, legacy dispatch and job monitoring.');
 } catch (error) {
   await page.screenshot({ path: `${output}/failure.png`, fullPage: true });
   console.error({ errors, unknownApis });

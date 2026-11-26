@@ -27,3 +27,10 @@
 .pt-monitor-cell dt,.pt-job-code,.pt-monitor-meta,.pt-job-list button>span:last-child{font-size:11px;color:#7d91ac}.pt-update{font-size:11px}.pt-hold-chip{font-size:11px}.pt-monitor-note{font-size:12px}
 @media(max-width:600px){.pt-checkpoints{grid-template-columns:1fr}.pt-checkpoints li{padding:12px 0}.pt-checkpoints strong{font-size:12px}.pt-checkpoints li>div>span{font-size:11px}.pt-stats .pt-stat>div>span{font-size:10px}.pt-update{font-size:10px}.pt-job-list>button{min-width:235px}.pt-job-actions .pt-btn,.pt-monitor-actions .pt-btn{min-height:40px}}
 @media(prefers-reduced-motion:reduce){.pt-page *{transition:none!important;scroll-behavior:auto!important}}
+
+.pt-activation-choice { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.pt-monitoring-requests > summary { cursor: pointer; padding: 18px 22px; font-size: 16px; font-weight: 650; }
+.pt-monitoring-requests .pt-form-body { padding: 0 22px 22px; }
+.pt-request-detail { display: grid; justify-items: start; gap: 8px; }
+.pt-request-detail ul { margin: 0; padding-left: 1.25rem; }
+.pt-schedule-list .pt-actions { flex-wrap: wrap; }

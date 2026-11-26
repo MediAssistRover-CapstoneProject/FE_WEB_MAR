@@ -120,6 +120,14 @@ export function patrolTemplateReadiness(robot, snapshot, mapId, now = Date.now()
 export const jobStopPending = job => ['PENDING', 'RECOVERY_REQUIRED'].includes(job?.stopStatus) || Boolean(job?.cancelRequestedAt && OPEN_PATROL_STATUSES.has(job.status) && !['CONFIRMED', 'NOT_REQUIRED'].includes(job.stopStatus));
 export const jobStatus = job => jobStopPending(job) ? { label: job.stopStatus === 'RECOVERY_REQUIRED' ? 'Cần xác nhận dừng' : 'Đang chờ kết thúc an toàn', tone: job.stopStatus === 'RECOVERY_REQUIRED' ? 'red' : 'amber' } : PATROL_STATUS[job?.status] ?? { label: job?.status || 'Chưa xác định', tone: 'neutral' };
 
+export function scheduleTime(value, timezone) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '—';
+  try { return date.toLocaleString('vi-VN', { timeZone: timezone, timeZoneName: 'short' }); }
+  catch { return `${date.toLocaleString('vi-VN')} (giờ trên máy)`; }
+}
+
 export function patrolRoute(detail, endpoints = [], inputs, catalog = {}) {
   const workflow = detail?.workflow ?? detail ?? null;
   const checkpointCount = patrolTemplateCount(workflow);
