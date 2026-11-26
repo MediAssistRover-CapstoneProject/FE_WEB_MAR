@@ -4,7 +4,7 @@ import { prepareBody } from '../../../features/api/contract.js';
 import { passwordError, staffActions, staffDisplayName, staffError, staffFingerprint } from '../../../features/admin/staffManagement.js';
 import { STAFF_IMAGE_ACCEPT, staffImageError, uploadStaffImage } from '../../../features/admin/staffImages.js';
 
-function Dialog({ title, description, busy, onClose, children }) {
+export function Dialog({ title, description, busy, onClose, children }) {
   const ref = useRef(null), titleId = useId();
   useEffect(() => { ref.current?.showModal(); }, []);
   return <dialog ref={ref} className="um-dialog" aria-labelledby={titleId} onCancel={e => { e.preventDefault(); if (!busy) onClose(); }}>

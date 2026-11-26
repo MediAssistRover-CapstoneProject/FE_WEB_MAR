@@ -9,6 +9,14 @@ const output = '.workstation-build/staff-management'; await mkdir(output, { recu
 const id = n => `${String(n).padStart(8, '0')}-1111-4111-8111-111111111111`;
 const imageBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=', 'base64');
 const imageFile = { name: 'staff.png', mimeType: 'image/png', buffer: imageBytes };
+const avatar = (accountId, version, status = 'PENDING', reason = null) => ({
+  accountId,
+  avatarVersion: version == null ? null : id(version),
+  avatarUrl: version == null ? null : `https://images.example.test/images/review-${version}.png`,
+  status,
+  enabled: true,
+  reason,
+});
 async function fixture(role = 'ADMIN', options = {}) {
   const account = { role, accountId: id(500), fullName: 'Quản trị kiểm thử' };
   const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
@@ -17,6 +25,9 @@ async function fixture(role = 'ADMIN', options = {}) {
   const reads = [], writes = [], errors = [], uploads = [];
   page.on('pageerror', e => errors.push(e.message));
   const state = { failList: false, failDetail: false, failWrite: false, ...options, rows: Array.from({ length: 101 }, (_, i) => ({ staffProfileId: id(i + 1), staffCode: `NV${String(i + 1).padStart(3, '0')}`, departmentCode: i % 2 ? 'NOI' : 'NGOAI', jobTitle: 'Điều dưỡng', contactExtension: '101', active: ![2, 3].includes(i), account: { accountId: id(2001 + i), accountCode: `STF-${i + 1}`, fullName: i === 0 ? 'Đặng Thị Ánh' : `Nhân viên kiểm thử ${i + 1}`, username: i === 0 ? 'staff' : `staff.${i + 1}`, email: `staff${i + 1}@example.test`, phone: '0901234567', role: 'STAFF', status: i === 1 ? 'LOCKED' : i === 2 ? 'INACTIVE' : 'ACTIVE', mustChangePassword: i === 4, lastLoginAt: null, createdAt: '2026-11-01T01:00:00Z', updatedAt: '2026-11-01T01:00:00Z' } })) };
+  state.faceStatuses = new Map();
+  state.nextFaceReview = null;
+  let faceReviewRevision = 8000;
   await page.route('https://images.example.test/**', route => route.fulfill({ contentType: 'image/png', body: imageBytes }));
   await page.route('**/api/v1/**', async route => {
     const req = route.request(), url = new URL(req.url()), path = url.pathname;
@@ -31,6 +42,27 @@ async function fixture(role = 'ADMIN', options = {}) {
       uploads.push({ url });
       if (state.failUpload) return reply({ message: 'Kho ảnh tạm thời gián đoạn' }, 503);
       return reply({ objectKey: `images/upload-${uploads.length}.png`, url, mediaType: 'IMAGE', contentType: 'image/png', sizeBytes: imageBytes.length }, 201);
+    }
+    const faceStatusPath = path.match(/^\/api\/v1\/staff\/([^/]+)\/face-status$/);
+    if (req.method() === 'GET' && faceStatusPath) {
+      const [, accountId] = faceStatusPath;
+      reads.push(path);
+      if (!state.rows.some(row => row.account.accountId === accountId)) return reply({ message: 'Unknown staff account' }, 404);
+      return reply(state.faceStatuses.get(accountId) || avatar(accountId, null, 'MISSING'));
+    }
+    const faceReviewPath = path.match(/^\/api\/v1\/admin\/staff\/([^/]+)\/face-review$/);
+    if (req.method() === 'POST' && faceReviewPath) {
+      const [, accountId] = faceReviewPath;
+      const body = req.postDataJSON();
+      writes.push({ path, method: req.method(), body });
+      const current = state.faceStatuses.get(accountId);
+      if (!current) return reply({ message: 'Unknown staff account' }, 404);
+      if (body.avatarVersion !== current.avatarVersion) return reply({ message: 'FACE_AVATAR_CHANGED' }, 422);
+      const result = state.nextFaceReview || { status: body.approve ? 'READY' : 'REJECTED', reason: null };
+      state.nextFaceReview = null;
+      const updated = { ...current, ...result, avatarVersion: id(++faceReviewRevision) };
+      state.faceStatuses.set(accountId, updated);
+      return reply(updated);
     }
     if (req.method() !== 'GET') {
       const body = req.postData() ? req.postDataJSON() : null; writes.push({ path, method: req.method(), body });
@@ -69,7 +101,91 @@ async function fixture(role = 'ADMIN', options = {}) {
   const select = async n => { await row(n).getByRole('button', { name: /^Xem hồ sơ/ }).click(); await page.locator('.um-profile').waitFor(); };
   return { context, page, reads, writes, errors, uploads, state, start, row, select };
 }
+
+async function verifyAvatarReview() {
+  const f = await fixture();
+  const accountId = id(2001);
+  const statusPath = `/api/v1/staff/${accountId}/face-status`;
+  const reviewPath = `/api/v1/admin/staff/${accountId}/face-review`;
+  const panel = f.page.getByRole('region', { name: 'Duyệt ảnh đại diện', exact: true });
+  const dialog = f.page.getByRole('dialog', { name: 'Duyệt ảnh đại diện', exact: true });
+  const approve = panel.getByRole('button', { name: 'Duyệt ảnh', exact: true });
+  const confirmApproval = dialog.getByRole('button', { name: 'Xác nhận đúng người và duyệt', exact: true });
+  const faceWrites = () => f.writes.filter(write => write.path.endsWith('/face-review'));
+  const expectReview = (index, version, decision) => assert.deepEqual(faceWrites()[index], {
+    path: reviewPath,
+    method: 'POST',
+    body: { avatarVersion: version, approve: decision },
+  });
+  const showAvatar = (version) => f.state.faceStatuses.set(accountId, avatar(accountId, version));
+  const waitForPreview = (version, container = dialog) => container.locator(
+    `img[src="${avatar(accountId, version).avatarUrl}"]`
+  ).waitFor();
+  const pending = panel.getByText('Chờ duyệt', { exact: true });
+  showAvatar(701);
+
+  try {
+    await f.start();
+    const firstStaffRequest = f.reads.find(path => path.startsWith('/api/v1/admin/staff?'));
+    assert.ok(firstStaffRequest, 'must request the staff list');
+    const params = new URL(firstStaffRequest, base).searchParams;
+    assert.equal(params.get('page'), '0');
+    assert.equal(params.get('size'), '20');
+
+    await pending.waitFor();
+    assert.ok(f.reads.includes(statusPath), 'face status requires the staff account ID');
+    assert.ok(f.reads.some(path => path.startsWith(`/api/v1/admin/staff/${id(1)}?`)));
+    assert.ok(!f.reads.includes(`/api/v1/staff/${id(1)}/face-status`));
+    await approve.click();
+    await waitForPreview(701);
+    assert.equal(faceWrites().length, 0, 'opening the confirmation must not send an approval');
+
+    showAvatar(702);
+    const refresh = f.page.waitForResponse(response => new URL(response.url()).pathname === statusPath &&
+      response.request().method() === 'GET');
+    await confirmApproval.click();
+    await refresh;
+    await f.page.getByText('Ảnh đã thay đổi. Hãy kiểm tra ảnh mới trước khi duyệt.', { exact: true }).waitFor();
+    await dialog.waitFor({ state: 'hidden' });
+    await pending.waitFor();
+    expectReview(0, id(701), true);
+    assert.equal(faceWrites().length, 1, 'a stale confirmation must not automatically review a newer version');
+
+    f.state.nextFaceReview = { status: 'INVALID', reason: 'NO_FACE' };
+    await approve.click();
+    await waitForPreview(702);
+    assert.equal(faceWrites().length, 1, 'the new image needs explicit confirmation');
+    await confirmApproval.click();
+    await panel.getByText('Ảnh không đạt', { exact: true }).waitFor();
+    await f.page.getByText('Không tìm thấy khuôn mặt trong ảnh.', { exact: true }).waitFor();
+    assert.equal(await panel.getByText('Đã duyệt', { exact: true }).count(), 0);
+    expectReview(1, id(702), true);
+
+    showAvatar(703);
+    await f.page.reload();
+    await pending.waitFor();
+    await approve.click();
+    await waitForPreview(703);
+    await confirmApproval.click();
+    await panel.getByText('Đã duyệt', { exact: true }).waitFor();
+    assert.equal(await approve.count(), 0);
+    expectReview(2, id(703), true);
+
+    const currentVersion = f.state.faceStatuses.get(accountId).avatarVersion;
+    await panel.getByRole('button', { name: 'Từ chối ảnh', exact: true }).click();
+    assert.equal(faceWrites().length, 3, 'opening rejection confirmation must not change the image status');
+    await f.page.getByRole('dialog').getByRole('button', { name: 'Xác nhận từ chối', exact: true }).click();
+    await panel.getByText('Đã từ chối', { exact: true }).waitFor();
+    expectReview(3, currentVersion, false);
+    assert.equal(faceWrites().length, 4);
+    assert.deepEqual(f.errors, []);
+  } finally {
+    await f.context.close();
+  }
+}
+
 try {
+  await verifyAvatarReview();
   const f = await fixture(); await f.start();
   const detail = f.page.locator('.um-detail');
   assert.equal(await detail.getByText('Số máy lẻ', { exact: true }).count(), 0);
@@ -209,6 +325,6 @@ try {
   assert.deepEqual(f.errors, []); await f.context.close();
 
   const staff = await fixture('STAFF'); await staff.start(); await staff.page.getByRole('heading', { name: 'Chỉ quản trị viên được quản lý nhân viên' }).waitFor();
-  assert.ok(!staff.reads.some(path => path.startsWith('/api/v1/admin/staff'))); assert.equal(staff.writes.length, 0); assert.deepEqual(staff.errors, []); await staff.context.close();
-  console.log('Staff management passed: full-list search, raw usernames, role and state guards, CRUD, reset, stale data, failures and responsive UI.');
+  assert.ok(!staff.reads.some(path => path.startsWith('/api/v1/admin/staff') || path.endsWith('/face-status'))); assert.equal(staff.writes.length, 0); assert.deepEqual(staff.errors, []); await staff.context.close();
+  console.log('Staff management passed: avatar review, full-list search, raw usernames, role and state guards, CRUD, reset, stale data, failures and responsive UI.');
 } finally { await browser.close(); }

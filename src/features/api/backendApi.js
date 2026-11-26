@@ -7,15 +7,15 @@ export async function callBackend(key, input = {}, options = {}) {
   const { url, ...request } = buildRequest(key, input);
   return apiRequest(url, { ...request, ...options, headers: { ...request.headers, ...options.headers } });
 }
-export async function readCatalog(key, { signal, query = {} } = {}) {
+export async function readCatalog(key, { signal, query = {}, pageSize = 100 } = {}) {
   if (key === 'GET /api/v1/rooms' && ![true, 'true'].includes(query.includeDeleted)) return readOperationalRooms({ signal, mapId: query.mapId });
   const rows = [];
   for (let page = 0; page < 1000; page++) {
-    const result = await callBackend(key, { query: { ...query, page, size: 100 } }, { signal });
+    const result = await callBackend(key, { query: { ...query, page, size: pageSize } }, { signal });
     if (Array.isArray(result)) return result;
     if (!Array.isArray(result?.content)) throw Error('Danh mục không đúng định dạng.');
     rows.push(...result.content);
-    if (result.last || page + 1 >= result.totalPages || result.content.length < 100) return rows;
+    if (result.last || page + 1 >= result.totalPages || result.content.length < pageSize) return rows;
   }
   throw Error('Danh mục quá lớn.');
 }

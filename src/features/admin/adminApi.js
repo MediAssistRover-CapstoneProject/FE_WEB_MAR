@@ -7,6 +7,10 @@ function query(path, params = {}) {
 
 export const adminApi = {
   listStaff: (params) => apiRequest(query('/api/v1/admin/staff', params)),
+  getStaffFaceStatus: (accountId, signal) => apiRequest(`/api/v1/staff/${encodeURIComponent(accountId)}/face-status`, { signal }),
+  reviewStaffFace: (accountId, { avatarVersion, approve }, signal) => apiRequest(`/api/v1/admin/staff/${encodeURIComponent(accountId)}/face-review`, {
+    method: 'POST', body: { avatarVersion, approve }, signal,
+  }),
   createStaff: (body) => apiRequest('/api/v1/admin/staff', { method: 'POST', body }),
   updateStaff: (id, body) => apiRequest(`/api/v1/admin/staff/${id}`, { method: 'PUT', body }),
   deactivateStaff: (id) => apiRequest(`/api/v1/admin/staff/${id}`, { method: 'DELETE' }),

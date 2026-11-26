@@ -3,6 +3,7 @@ import { getSession } from '../../features/auth/session.js';
 import { callBackend, readCatalog } from '../../features/api/backendApi.js';
 import { filterStaff, sortStaff, staffActions, staffDisplayName, staffError, staffStatus } from '../../features/admin/staffManagement.js';
 import { StaffActionDialog, StaffForm } from './usersRoles/StaffDialogs.jsx';
+import { StaffFaceReview } from './usersRoles/StaffFaceReview.jsx';
 import './usersRoles/usersRoles.css';
 
 const PAGE_SIZE = 10;
@@ -43,7 +44,7 @@ function StaffManagement({ actorId }) {
   const refresh = () => setRevision(v => v + 1);
   useEffect(() => {
     const controller = new AbortController(); setLoading(true);
-    readCatalog('GET /api/v1/admin/staff', { signal: controller.signal, query: { includeDeleted: true } }).then(rows => {
+    readCatalog('GET /api/v1/admin/staff', { signal: controller.signal, pageSize: 20, query: { includeDeleted: true } }).then(rows => {
       if (controller.signal.aborted) return;
       const sorted = sortStaff(rows); setMembers(sorted); setLoadedAt(new Date().toISOString()); setError('');
       setSelectedId(previous => sorted.some(row => row.staffProfileId === previous) ? previous : sorted[0]?.staffProfileId || null);
@@ -114,6 +115,7 @@ function StaffManagement({ actorId }) {
 function StaffDetails({ member, actorId, disabled, onEdit, onAction }) {
   const a = member.account || {}, allowed = staffActions(member, actorId);
   return <><div className="um-profile"><StaffAvatar member={member} large /><h4>{staffDisplayName(member)}</h4><p>@{a.username || '—'}</p><Badge member={member} /></div>
+    {a.accountId && a.role === 'STAFF' && <StaffFaceReview key={a.accountId} accountId={a.accountId} name={staffDisplayName(member)} staffCode={member.staffCode} disabled={disabled} />}
     <dl className="um-facts">{[['Mã nhân viên', member.staffCode], ['Email', a.email], ['Điện thoại', a.phone], ['Mã khoa', member.departmentCode], ['Chức danh', member.jobTitle]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || '—'}</dd></div>)}</dl>
     <div className="um-account-info"><h4>Thông tin đăng nhập</h4><dl><div><dt>Đăng nhập gần nhất</dt><dd>{stamp(a.lastLoginAt)}</dd></div><div><dt>Ngày tạo tài khoản</dt><dd>{stamp(a.createdAt)}</dd></div></dl>{a.mustChangePassword && <p className="um-change-password-note">Nhân viên cần đổi mật khẩu trong lần đăng nhập tiếp theo.</p>}</div>
     {staffStatus(member).key === 'INACTIVE' ? <div className="um-profile-actions"><p className="um-inactive-note">Nhân viên đã ngừng hoạt động. Hồ sơ và lịch sử vẫn được giữ lại.</p>{allowed.restore && <button disabled={disabled} className="um-primary" onClick={() => onAction('restore')}>Kích hoạt lại nhân viên</button>}{a.status === 'LOCKED' && <p>Tài khoản đang khóa. Cần mở khóa trước khi kích hoạt lại.</p>}</div> : <div className="um-profile-actions">{allowed.edit && <button disabled={disabled} className="um-primary" onClick={onEdit}>Chỉnh sửa hồ sơ</button>}<div>{allowed.lock && <button disabled={disabled} onClick={() => onAction('lock')}>Khóa tài khoản</button>}{allowed.unlock && <button disabled={disabled} className="um-unlock" onClick={() => onAction('unlock')}>Mở khóa tài khoản</button>}{allowed.reset && <button disabled={disabled} onClick={() => onAction('reset')}>Đặt lại mật khẩu</button>}</div>{allowed.deactivate && <button disabled={disabled} className="um-text-button um-danger-text" onClick={() => onAction('deactivate')}>Ngừng hoạt động nhân viên</button>}</div>}
