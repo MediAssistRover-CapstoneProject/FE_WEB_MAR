@@ -1,3 +1,5 @@
+import WorkspaceTabs from '../../../components/WorkspaceTabs.jsx';
+import BatteryPolicyPanel from '../robotOperations/BatteryPolicyPanel.jsx';
 import { confirmAction } from '../../../components/appDialog.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -41,6 +43,14 @@ const keyFor = (r, row) => unwrap(row)?.[r.idField];
 const sensitiveAction = op => op.method === 'DELETE' || /\/(cancel|archive|retire|deactivate|lock|reset-password|rotate-secret|runs)$/.test(op.path);
 
 export default function BackendWorkspace({ section }) {
+  const [batteryParams, setBatteryParams] = useSearchParams();
+  if (section === 'Robot Status') return <section className="robot-status-workspace">
+    <div className="robot-status-tabs"><WorkspaceTabs label="Quản lý robot"
+      items={[{ id: 'list', label: 'Danh sách robot' }, { id: 'battery', label: 'Pin & về sạc' }]}
+      active={batteryParams.get('tab') === 'battery' ? 'battery' : 'list'}
+      onSelect={tab => setBatteryParams(previous => { const next = new URLSearchParams(previous); if (tab === 'battery') next.set('tab', 'battery'); else next.delete('tab'); return next; })} /></div>
+    {batteryParams.get('tab') === 'battery' ? <BatteryPolicyPanel /> : <ResourceWorkspace section={section} />}
+  </section>;
   if (section === 'System Settings') return <SystemSettings />;
   if (monitoringSections.has(section)) return <MonitoringWorkspace section={section} />;
   if (section === 'Staff Shifts') return <ShiftWorkspace />;
