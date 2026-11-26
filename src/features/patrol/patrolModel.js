@@ -27,8 +27,8 @@ export const HOLD_LABELS = {
   JOB: 'Đang thực hiện nhiệm vụ ưu tiên',
 };
 
-export const isPatrolWorkflow = workflow => workflow?.serviceType === 'PATROL';
-export const isManagedPatrol = workflow => isPatrolWorkflow(workflow) && String(workflow.workflowCode ?? '').startsWith('WF_PATROL_');
+export const isPatrolWorkflow = workflow => workflow?.serviceType?.toUpperCase() === 'PATROL';
+export const isManagedPatrol = workflow => workflow?.serviceType === 'PATROL' && String(workflow.workflowCode ?? '').startsWith('WF_PATROL_');
 export function patrolTemplateCount(workflow) {
   const template = workflow?.inputUiJson?.patrol_template;
   return template?.version === 1 && Number.isInteger(template.checkpointCount) && template.checkpointCount >= 3 && template.checkpointCount <= 11 ? template.checkpointCount : null;
@@ -138,7 +138,7 @@ export function patrolRoute(detail, endpoints = [], inputs, catalog = {}) {
     const repeatCount = values.patrol_repeat_count ?? 1;
     const draft = { checkpointCount, mapId: values.map_id, checkpoints: checkpoints.map(point => ({ ...point, targetType: point.endpointGroupId ? 'group' : 'endpoint' })), repeatCount, maxSpeedMps: values.max_speed_mps ?? .25 };
     const issues = bound ? patrolTemplateErrors(draft, { ...catalog, endpoints }) : [];
-    return { workflow, mapId: values.map_id || null, repeatCount, continuous: repeatCount === 0, checkpoints, issues, checkpointCount, template: true, needsConfiguration: !bound, managed: true, published: workflow.status === 'PUBLISHED' && workflow.acceptsNewJobs === true };
+    return { workflow, mapId: values.map_id || null, repeatCount, continuous: repeatCount === 0, checkpoints, issues, checkpointCount, template: true, needsConfiguration: !bound, managed: isManagedPatrol(workflow), published: workflow.status === 'PUBLISHED' && workflow.acceptsNewJobs === true };
   }
   const { steps, issues } = detail?.steps ? orderedPatrolSteps(detail) : { steps: [], issues: [] };
   const checkpoints = steps.flatMap((step, index) => {

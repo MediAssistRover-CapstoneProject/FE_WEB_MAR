@@ -7,13 +7,13 @@ import PatrolMapPreview from './PatrolMapPreview.jsx';
 
 const newPoint = () => ({ key: crypto.randomUUID(), targetType: 'endpoint', endpointId: '', endpointGroupId: '' });
 const localTime = () => { const date = new Date(Date.now() + 3600000); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
-function readAttempt(key) {
+export function readPatrolRun(key) {
   try { const value = JSON.parse(sessionStorage.getItem(key)); return value?.draft && value.workflowId && value.body && value.key ? value : null; } catch { return null; }
 }
 
 export default function CreatePatrolRoute({ catalog, fixedRoute, templateId, initialRobotId = '', onClose, onCreated, initialCount = 3, storageKey = 'mediassist.patrol.template-run.v1' }) {
-  const [attempt, setAttempt] = useState(() => readAttempt(storageKey));
-  const [draft, setDraft] = useState(() => readAttempt(storageKey)?.draft || {
+  const [attempt, setAttempt] = useState(() => readPatrolRun(storageKey));
+  const [draft, setDraft] = useState(() => readPatrolRun(storageKey)?.draft || {
     mapId: fixedRoute?.mapId || catalog.maps.find(map => map.status === 'ACTIVE')?.mapId || '',
     robotId: initialRobotId, checkpointCount: initialCount, checkpoints: Array.from({ length: initialCount }, newPoint),
     repeatCount: 1, maxSpeedMps: .25, timing: fixedRoute ? 'ONCE' : 'NOW', startsAt: localTime(),
@@ -71,12 +71,8 @@ export default function CreatePatrolRoute({ catalog, fixedRoute, templateId, ini
     lock.current = true; setBusy(true); setError('');
     try {
       if (!current) {
-        let workflowId = fixedRoute?.workflow.workflowId || (draft.checkpointCount === initialCount ? templateId : null);
-        if (!workflowId) {
-          const template = await patrolApi.prepareTemplate(draft.checkpointCount);
-          if (!template?.workflowId || template.checkpointCount !== draft.checkpointCount || template.available !== true) throw new Error('Máy chủ chưa trả mẫu tuần tra hợp lệ.');
-          workflowId = template.workflowId;
-        }
+        const workflowId = fixedRoute?.workflow.workflowId || templateId;
+        if (!workflowId) throw new Error('Hãy chọn tuyến đã phát hành trước khi tạo lượt.');
         const key = `PATROL_${crypto.randomUUID()}`;
         const inputs = fixedRoute ? {} : patrolTemplateInputs(draft);
         const workflowName = fixedRoute?.workflow.workflowName || `Tuần tra ${draft.checkpointCount} điểm`;
@@ -119,12 +115,11 @@ export default function CreatePatrolRoute({ catalog, fixedRoute, templateId, ini
     }
     finally { lock.current = false; setBusy(false); }
   };
-  return <Modal title={fixedRoute ? 'Lập lịch tuyến tuần tra' : 'Tạo lượt tuần tra'} subtitle={fixedRoute ? fixedRoute.workflow.workflowName : 'Chọn mẫu 3–11 điểm, cấu hình điểm ghé và giao robot hoặc lập lịch.'} onClose={onClose} busy={busy} wide={!fixedRoute}>
+  return <Modal title={fixedRoute ? 'Lập lịch tuyến tuần tra' : 'Tạo lượt tuần tra'} subtitle={fixedRoute ? fixedRoute.workflow.workflowName : (attempt?.workflowName || `Mẫu tuần tra ${initialCount} điểm`)} onClose={onClose} busy={busy} wide={!fixedRoute}>
     <form onSubmit={submit} className="pt-create-form"><div className="pt-form-body">
-      <div className="pt-form-grid pt-form-grid-three">
+      <div className="pt-form-grid">
         <label className="pt-field">Bản đồ<select required value={draft.mapId} onChange={event => change({ mapId: event.target.value, checkpoints: Array.from({ length: draft.checkpointCount }, newPoint) })} disabled={frozen || !!fixedRoute}><option value="">Chọn bản đồ</option>{catalog.maps.filter(item => item.status === 'ACTIVE').map(item => <option key={item.mapId} value={item.mapId}>{item.mapName}</option>)}</select></label>
         <label className="pt-field">Robot tuần tra<select required value={draft.robotId} onChange={event => change({ robotId: event.target.value })} disabled={frozen}><option value="">Chọn robot</option>{catalog.robots.map(item => <option key={item.robotId} value={item.robotId}>{item.robotName || item.robotCode} · {item.status}</option>)}</select></label>
-        {!fixedRoute && <label className="pt-field">Mẫu tuần tra<select value={draft.checkpointCount} disabled={frozen} onChange={event => { const count = Number(event.target.value); change({ checkpointCount: count, checkpoints: Array.from({ length: count }, (_, index) => draft.checkpoints[index] || newPoint()) }); }}>{Array.from({ length: 9 }, (_, index) => index + 3).map(count => <option key={count} value={count}>Tuần tra {count} điểm</option>)}</select></label>}
       </div>
       {!fixedRoute && <><div className="pt-create-map"><PatrolMapPreview map={map} points={draft.checkpoints.map(point => endpoints.find(item => item.endpointId === point.endpointId) || (point.endpointGroupId ? patrolGroupMembers(groups.find(group => group.endpointGroupId === point.endpointGroupId), catalog)[0]?.endpoint : null)).filter(Boolean)} zones={catalog.zones} availableEndpoints={endpoints} onEndpoint={frozen ? undefined : chooseEndpoint}/><p className="pt-muted">Chọn trên bản đồ để điền điểm trống tiếp theo. Với nhóm, đường xem trước đi qua điểm chính; robot thử điểm dự phòng khi cần.</p></div>
       <div className="pt-section-label"><h4>Thứ tự ghé điểm</h4><span>{draft.checkpointCount} điểm mỗi vòng</span></div>

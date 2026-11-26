@@ -37,6 +37,11 @@ const receipts = new Map();
 const request = { serviceRequestId: id(93), requestCode: 'REQ-CROWD-01', requestType: 'CROWD_MONITORING', status: 'DRAFT' };
 const templateId = id(91);
 const template = { ...workflow, workflowId: templateId, workflowName: 'Tuần tra 3 điểm', workflowCode: 'WF_PATROL_TEMPLATE_3', defaultInputsJson: {}, inputUiJson: { patrol_template: { version: 1, checkpointCount: 3 } } };
+const draftWorkflow = { ...workflow, workflowId: id(85), workflowName: 'Tuyến nháp', serviceType: 'patrol', status: 'DRAFT', acceptsNewJobs: false };
+let savedRoutes = [], newTemplates = [], onlyDraft = false, robotCatalogFailure = false, noMaps = false, omitTemplateSummaries = false;
+const savedTemplates = () => [...(modernBackend && !empty ? [template] : []), ...newTemplates];
+const savedPublished = () => [...(empty ? [] : [workflow]), ...savedTemplates(), ...savedRoutes.map(item => item.workflow)];
+const navigate = title => page.getByRole('navigation', { name: 'Điều hướng tuần tra' }).getByRole('link', { name: title, exact: true }).click();
 const writes = [], reads = [], errors = [], unknownApis = [], simulationRequests = [];
 page.on('pageerror', error => errors.push(error.message));
 await page.addInitScript(() => localStorage.setItem('mediassist-rover.session', JSON.stringify({ account: { accountId: 'patrol-test-admin', username: 'patrol-test', fullName: 'Quản trị viên', role: 'ADMIN' }, tokens: { accessToken: 'fixture' } })));
@@ -69,7 +74,13 @@ await page.route('**/*', async route => {
       if (loseRetireResponse) { loseRetireResponse = false; return route.abort('failed'); }
       return reply(schedule);
     }
-    if (path === '/api/v1/admin/patrol-workflows/templates' && modernBackend) return reply({ workflowId: templateId, checkpointCount: body.checkpointCount, available: true });
+    if (path === '/api/v1/admin/patrol-workflows/templates' && modernBackend) {
+      const count = body.checkpointCount;
+      const saved = { ...template, workflowId: id(300 + count), workflowCode: `WF_PATROL_TEMPLATE_${count}`, workflowName: `Tuần tra ${count} điểm`, inputUiJson: { patrol_template: { version: 1, checkpointCount: count } } };
+      assert.ok(!savedTemplates().some(item => item.inputUiJson.patrol_template.checkpointCount === count), 'An existing template should be opened directly');
+      newTemplates.push(saved);
+      return reply({ workflowId: saved.workflowId, checkpointCount: count, available: true });
+    }
     if (modernBackend && [workflowId, templateId].some(value => path === `/api/v1/workflows/${value}/jobs`)) {
       const key = req.headers()['idempotency-key'];
       assert.ok(key && !receipts.has(key));
@@ -85,7 +96,16 @@ await page.route('**/*', async route => {
       return reply(request);
     }
     if (path === '/api/v1/admin/patrol-workflows/preview') return reply({ workflow: {}, graph: {} });
-    if (path === '/api/v1/admin/patrol-workflows') { createdWorkflow = body; return reply({ workflowId, mapId, checkpointCount: body.checkpoints.length }); }
+    if (path === '/api/v1/admin/patrol-workflows') {
+      createdWorkflow = body;
+      const saved = { ...workflow, workflowId: id(310 + savedRoutes.length), workflowCode: `WF_PATROL_${310 + savedRoutes.length}`, workflowName: body.name, defaultInputsJson: { map_id: body.mapId, patrol_repeat_count: body.repeatCount } };
+      const routeSteps = body.checkpoints.flatMap((point, index) => [
+        { ...steps[0], stepId: id(30 + index * 2), sequenceNo: index * 2 + 1, paramsJson: { ...steps[0].paramsJson, map_id: body.mapId, endpoint_id: point.endpointId } },
+        { ...steps[1], stepId: id(31 + index * 2), sequenceNo: index * 2 + 2, paramsJson: { ...steps[1].paramsJson, sensing_type: point.sensingType, zone_id: point.zoneId } },
+      ]);
+      savedRoutes.push({ workflow: saved, steps: routeSteps, transitions: routeSteps.map((step, index) => ({ ...transitions[0], transitionId: id(50 + index), fromStepId: step.stepId, toStepId: routeSteps[index + 1]?.stepId || null, terminalStatus: index + 1 === routeSteps.length ? 'SUCCEEDED' : null })) });
+      return reply({ workflowId: saved.workflowId, mapId: body.mapId, checkpointCount: body.checkpoints.length });
+    }
     if (path === `/api/v1/jobs/${jobId}/suspend`) { jobs[0] = { ...jobs[0], status: 'SUSPENDING', rowVersion: jobs[0].rowVersion + 1 }; holds = [{ source: 'MANUAL', sourceId: null, createdAt: new Date().toISOString() }]; return reply(jobDetail(jobs[0])); }
     if (path === `/api/v1/jobs/${jobId}/resume`) { holds = holds.filter(h => h.source !== 'MANUAL'); jobs[0] = { ...jobs[0], status: holds.length ? 'SUSPENDED' : 'RUNNING', rowVersion: jobs[0].rowVersion + 1 }; return reply(jobDetail(jobs[0])); }
     if (path === `/api/v1/jobs/${jobId}/cancel`) { jobs[0] = { ...jobs[0], cancelRequestedAt: new Date().toISOString(), rowVersion: jobs[0].rowVersion + 1 }; return reply(jobs[0]); }
@@ -94,12 +114,20 @@ await page.route('**/*', async route => {
   reads.push({ path, query: Object.fromEntries(url.searchParams) });
   if (path.endsWith('/stream')) return reply({ message: 'Use mocked REST' }, 503);
   if (path === '/api/v1/auth/me') return reply({ accountId: 'patrol-test-admin', username: 'patrol-test', role: 'ADMIN' });
-  if (path === '/api/v1/admin/workflows') return metadataUnavailable ? reply({ message: 'Catalog unavailable' }, 503) : list(empty ? [] : [workflow, { ...workflow, workflowId: id(85), workflowName: 'Tuyến nháp', status: 'DRAFT' }, ...(modernBackend ? [template] : [])]);
-  if (path === '/api/v1/workflows/published') return catalogFailure ? reply({ message: 'Máy chủ tạm mất kết nối' }, 503) : list((empty ? [] : [workflow, ...(modernBackend ? [template] : [])]).map(({ workflowId, workflowCode, workflowName, serviceType }) => ({ workflowId, workflowCode, workflowName, serviceType })));
-  if (path === `/api/v1/workflows/published/${workflowId}`) return reply(detail);
-  if (path === `/api/v1/workflows/published/${templateId}`) return reply({ workflow: template, steps: [], transitions: [] });
-  if (path.startsWith('/api/v1/workflows/published/')) return reply({ message: 'Không tìm thấy quy trình này' }, 404);
-  if (path === '/api/v1/admin/patrol-workflows/templates') return modernBackend ? reply([{ workflowId: null, checkpointCount: 3, available: false }]) : reply({ message: 'Route not found' }, 404);
+  if (path === '/api/v1/admin/workflows') return metadataUnavailable ? reply({ message: 'Catalog unavailable' }, 503) : list([...savedPublished(), ...(!empty || onlyDraft ? [draftWorkflow] : [])]);
+  if (path === '/api/v1/workflows/published') return catalogFailure ? reply({ message: 'Máy chủ tạm mất kết nối' }, 503) : list(savedPublished().filter(item => !omitTemplateSummaries || !item.inputUiJson?.patrol_template).map(({ workflowId, workflowCode, workflowName, serviceType }) => ({ workflowId, workflowCode, workflowName, serviceType })));
+  if (path === `/api/v1/workflows/published/${workflowId}` && !empty) return reply(detail);
+  if (path.startsWith('/api/v1/workflows/published/')) {
+    const selectedId = path.split('/').at(-1);
+    const saved = savedRoutes.find(item => item.workflow.workflowId === selectedId);
+    const savedTemplate = savedTemplates().find(item => item.workflowId === selectedId);
+    return saved ? reply(saved) : savedTemplate ? reply({ workflow: savedTemplate, steps: [], transitions: [] }) : reply({ message: 'Không tìm thấy quy trình này' }, 404);
+  }
+  if (path === '/api/v1/admin/patrol-workflows/templates') return modernBackend ? reply(Array.from({ length: 9 }, (_, index) => {
+    const count = index + 3;
+    const saved = savedTemplates().find(item => item.inputUiJson.patrol_template.checkpointCount === count);
+    return { workflowId: saved?.workflowId || null, checkpointCount: count, available: !!saved };
+  })) : reply({ message: 'Route not found' }, 404);
   if (path.endsWith('/jobs/by-idempotency-key')) {
     if (!modernBackend) return reply({ message: 'Route not found' }, 404);
     const job = receipts.get(url.searchParams.get('key'));
@@ -107,10 +135,10 @@ await page.route('**/*', async route => {
   }
   if (path === '/api/v1/service-requests') return list(url.searchParams.get('requestType') === request.requestType ? [request] : []);
   if (path === `/api/v1/service-requests/${request.serviceRequestId}`) return reply(request);
-  if (path === '/api/v1/maps') return list(empty ? [] : [map]);
-  if (path === '/api/v1/endpoints') return list(empty ? [] : endpoints);
-  if (path === '/api/v1/zones') return list(empty ? [] : zones);
-  if (path === '/api/v1/robots') return list(empty ? [] : [robot]);
+  if (path === '/api/v1/maps') return list(noMaps ? [] : [map, { ...map, mapId: id(81), mapName: 'Khu nội trú' }]);
+  if (path === '/api/v1/endpoints') return list(endpoints);
+  if (path === '/api/v1/zones') return list(zones);
+  if (path === '/api/v1/robots') return robotCatalogFailure ? reply({ message: 'Robot catalog unavailable' }, 503) : list([robot]);
   if (path === `/api/v1/robots/${robotId}/snapshot`) return reply({ observedAt: new Date().toISOString(), robot, mqttConnected: true, heartbeatFresh: true, dispatchReady: true, activeJobId: jobs.some(j => j.status === 'RUNNING') ? jobId : null, suspendedPatrolJobIds: jobs.some(j => j.status === 'SUSPENDED') ? [jobId] : [], navigationSession: { state: navigationState, sessionId: id(89), mapId }, latestPose: { robotId, mapId: poseMapId, xM: 2.8, yM: 3, yawRad: .35, frameId: 'map', fresh: true, capturedAt: new Date().toISOString() } });
   if (path === '/api/v1/jobs') return list(jobs.filter(job => (!url.searchParams.get('status') || job.status === url.searchParams.get('status')) && (!url.searchParams.get('workflowId') || job.workflowId === url.searchParams.get('workflowId')) && (!url.searchParams.get('robotId') || job.robotId === url.searchParams.get('robotId')) && (!url.searchParams.get('requestId') || job.serviceRequestId === url.searchParams.get('requestId'))));
   if (path.startsWith('/api/v1/jobs/')) {
@@ -166,6 +194,9 @@ try {
   assert.equal(createdWorkflow.repeatCount, 3);
   assert.equal(createdWorkflow.mapId, mapId);
   assert.ok(createdWorkflow.checkpoints.every(point => point.zoneId === zones[0].zoneId && point.sensingType === 'CROWD_DENSITY'));
+  await expect(page.locator('.pt-route-card[aria-pressed="true"]')).toContainText(createdWorkflow.name);
+  await expect(page.locator('.pt-route-detail .pt-checkpoints li')).toHaveCount(5);
+  await page.locator('.pt-route-list').getByRole('button', { name: new RegExp(workflow.workflowName) }).click();
   await page.getByLabel('Robot tuần tra').selectOption(robotId);
   await expect(page.getByRole('button', { name: 'Bắt đầu tuần tra', exact: true })).toBeEnabled();
   await expect(page.locator('.pt-map [data-patrol-robot] [data-map-robot-marker]')).toHaveAttribute('data-live', 'true');
@@ -230,6 +261,7 @@ try {
     { jobId: id(5), workflowId, robotId: id(90), mapId, jobCode: 'PATROL-HISTORY-002', status: 'SUCCEEDED', rowVersion: 3, queuedAt: new Date().toISOString(), startedAt: new Date().toISOString(), endedAt: new Date().toISOString(), archivedAt: new Date().toISOString() },
   ];
   await page.getByRole('button', { name: 'Làm mới', exact: true }).click();
+  await navigate('Hàng đợi');
   const queue = page.getByRole('region', { name: 'Hàng đợi và hoạt động tuần tra' });
   await expect(page.locator('.pt-job-detail')).toContainText('Đang chờ');
   await page.getByRole('tab', { name: /^Chờ robot/ }).click();
@@ -249,6 +281,7 @@ try {
   robot.status = 'BUSY';
   await page.getByRole('button', { name: 'Làm mới', exact: true }).click();
   await expect(page.locator('.pt-job-detail')).toContainText('Đang tuần tra');
+  await navigate('Tuyến tuần tra');
   await expect(page.locator('.pt-route-detail .pt-checkpoints li')).toHaveCount(3);
   await expect(page.locator('.pt-map [data-patrol-leg]')).toHaveCount(2);
   await page.screenshot({ path: `${output}/desktop.png`, fullPage: true });
@@ -259,6 +292,7 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 1080 });
 
+  await navigate('Hàng đợi');
   failJobDetail = true;
   await page.getByRole('button', { name: 'Làm mới', exact: true }).click();
   await expect(page.locator('.pt-job-detail')).toContainText('Chi tiết nhiệm vụ tạm gián đoạn');
@@ -328,6 +362,7 @@ try {
   await expect(page.locator('.pt-pending')).toHaveCount(0);
 
   // The drawing is optional and must match the exact raster identity.
+  await navigate('Tuyến tuần tra');
   presentationStatus = 404;
   await page.reload();
   await expect(page.locator('.pt-map-canvas')).toHaveAttribute('data-map-view', 'original');
@@ -344,8 +379,8 @@ try {
 
   const beforeUnknownLink = writes.length;
   await page.goto(`${base}/admin/patrol?workflowId=${id(99)}`);
-  await expect(page.locator('.pt-route-detail')).toContainText('Không tìm thấy quy trình này');
-  await expect(page.getByRole('button', { name: 'Bắt đầu tuần tra', exact: true })).toBeDisabled();
+  await expect(page.getByRole('alert')).toContainText('Không tìm thấy tuyến đã phát hành');
+  await expect(page.locator('.pt-dispatch')).toHaveCount(0);
   assert.equal(writes.length, beforeUnknownLink, 'An unknown workflow link issues no commands');
 
   modernBackend = true; jobs = []; schedules = []; robot.status = 'OFFLINE';
@@ -383,6 +418,7 @@ try {
   assert.ok(reads.some(read => read.path === '/api/v1/schedules' && read.query.status === 'RETIRED' && read.query.includeDeleted === 'true'));
   await scheduleList.getByRole('button', { name: 'Xem lịch đang dùng' }).click();
 
+  await navigate('Hàng đợi');
   const requestPanel = page.locator('.pt-monitoring-requests');
   await requestPanel.locator('summary').click();
   await requestPanel.getByLabel('Yêu cầu đã tạo').selectOption(request.serviceRequestId);
@@ -394,6 +430,7 @@ try {
   await requestPanel.getByLabel('Loại yêu cầu giám sát').selectOption('RESTRICTED_AREA_MONITORING');
   await expect(requestPanel.getByRole('link', { name: 'MON-01' })).toHaveCount(0);
 
+  await navigate('Tuyến tuần tra');
   robot.status = 'IDLE'; loseJobResponse = true;
   await page.getByLabel('Robot tuần tra', { exact: true }).selectOption(robotId);
   await page.getByRole('button', { name: 'Bắt đầu tuần tra', exact: true }).click();
@@ -413,7 +450,11 @@ try {
   assert.equal(schedules.length, 1, 'Recovering a direct job never switches to a schedule');
 
   const openTemplate = async () => {
-    await page.getByRole('button', { name: 'Tuần tra 3 điểm', exact: true }).click();
+    await navigate('Tuyến tuần tra');
+    const routeList = page.locator('.pt-route-list');
+    await expect(routeList.getByRole('button', { name: /Tuần tra 3 điểm/ })).toHaveCount(1);
+    await routeList.getByRole('button', { name: /Tuần tra 3 điểm/ }).click();
+    await page.getByRole('button', { name: 'Cấu hình & giao robot' }).click();
     const form = page.getByRole('dialog', { name: 'Tạo lượt tuần tra' });
     await form.getByLabel('Robot tuần tra').selectOption(robotId);
     for (let point = 0; point < 3; point++) await form.getByLabel(`Điểm đến ${point + 1}`).selectOption(endpoints[point].endpointId);
@@ -434,24 +475,127 @@ try {
   assert.equal(schedules[1].workflowId, templateId);
   assert.deepEqual(schedules[1].inputTemplateJson, run.body.inputs);
 
-  metadataUnavailable = true;
+  const interruptedRun = await openTemplate();
+  loseJobResponse = true;
+  await interruptedRun.getByRole('button', { name: 'Tạo nhiệm vụ tuần tra' }).click();
+  await expect(interruptedRun.getByRole('button', { name: 'Kiểm tra lượt gửi' })).toBeEnabled();
+  const templatePosts = writes.filter(item => item.path === `/api/v1/workflows/${templateId}/jobs`).length;
+  await interruptedRun.getByRole('button', { name: 'Đóng', exact: true }).click();
+  await page.goto(`${base}/admin/patrol?workflowId=${workflowId}`);
+  await page.getByRole('button', { name: 'Kiểm tra lượt đã gửi' }).click();
+  await interruptedRun.getByRole('button', { name: 'Kiểm tra lượt gửi' }).click();
+  await expect(interruptedRun).not.toBeVisible();
+  await expect(page).toHaveURL(/view=queue/);
+  assert.equal(writes.filter(item => item.path === `/api/v1/workflows/${templateId}/jobs`).length, templatePosts);
+
+  metadataUnavailable = true; omitTemplateSummaries = true;
   await page.goto(`${base}/admin/patrol?workflowId=${workflowId}`);
   await expect(page.getByLabel('Lọc tuyến theo bản đồ')).toBeDisabled();
   await expect(page.locator('.pt-route-detail')).toContainText(workflow.workflowName);
   await expect(page.getByRole('button', { name: 'Lập lịch tuyến' })).toBeEnabled();
-  metadataUnavailable = false;
+  await expect(page.locator('.pt-route-list').getByRole('button', { name: /Tuần tra 3 điểm/ })).toHaveCount(1);
+  metadataUnavailable = false; omitTemplateSummaries = false;
 
-  empty = true; jobs = []; holds = []; schedules = [];
+  empty = true; savedRoutes = []; jobs = []; holds = []; schedules = [];
   await page.evaluate(() => sessionStorage.clear());
   await page.goto(`${base}/admin/patrol`);
-  await expect(page.locator('.pt-page')).toContainText('Chưa có tuyến tuần tra');
-  await expect(page.getByRole('button', { name: 'Bắt đầu tuần tra', exact: true })).toBeDisabled();
-  await page.screenshot({ path: `${output}/empty.png`, fullPage: true });
-  catalogFailure = true;
+  const library = page.getByRole('region', { name: 'Tuyến đã phát hành' });
+  const newRoute = () => library.getByRole('button', { name: 'Tạo tuyến tuần tra' }).click();
+  await expect(library).toContainText('Chưa có tuyến tuần tra');
+  await expect(library.getByRole('button')).toHaveCount(1);
+  await expect(page.locator('.pt-route-detail, .pt-dispatch')).toHaveCount(0);
+  await page.screenshot({ path: `${output}/empty.png`, fullPage: false });
+  await page.setViewportSize({ width: 360, height: 800 });
+  await expect(library.getByRole('button', { name: 'Tạo tuyến tuần tra' })).toBeInViewport();
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.screenshot({ path: `${output}/empty-mobile.png` });
+  await page.setViewportSize({ width: 1440, height: 1080 });
+  const writesBeforeEmpty = writes.length;
+  onlyDraft = true;
   await page.reload();
-  await expect(page.locator('.pt-page')).toContainText('Chưa tải được dữ liệu tuần tra');
-  await expect(page.getByRole('button', { name: 'Bắt đầu tuần tra', exact: true })).toBeDisabled();
-  await page.screenshot({ path: `${output}/disconnected.png`, fullPage: true });
+  await expect(library.getByRole('link', { name: draftWorkflow.workflowName })).toHaveAttribute('href', `/workflow?workflowId=${draftWorkflow.workflowId}`);
+  await expect(library).toContainText('Chưa có tuyến đã phát hành');
+  await expect(page.locator('.pt-dispatch')).toHaveCount(0);
+  onlyDraft = false; catalogFailure = true;
+  await page.reload();
+  await expect(library.getByRole('alert')).toContainText('Chưa tải được danh sách tuyến');
+  await expect(library).not.toContainText('Chưa có tuyến tuần tra');
+  await expect(library.getByRole('button', { name: 'Tạo tuyến tuần tra' })).toHaveCount(0);
+  await page.screenshot({ path: `${output}/disconnected.png`, fullPage: false });
+  catalogFailure = false; noMaps = true;
+  await library.getByRole('button', { name: 'Thử lại' }).click();
+  await expect(library).toContainText('Chưa có tuyến tuần tra');
+  await newRoute();
+  const noMapForm = page.getByRole('dialog');
+  await expect(noMapForm.getByRole('link', { name: 'Mở trang Bản đồ' })).toHaveAttribute('href', '/admin/map');
+  await expect(noMapForm.getByRole('button', { name: 'Tạo & phát hành tuyến' })).toBeDisabled();
+  await noMapForm.getByLabel('Mẫu theo số điểm').check();
+  await expect(noMapForm.getByRole('button', { name: 'Tạo & phát hành mẫu' })).toBeEnabled();
+  noMaps = false;
+  await noMapForm.getByRole('button', { name: 'Để sau' }).click();
+  assert.equal(writes.length, writesBeforeEmpty, 'Empty, draft-only and failed reads issue no writes');
+
+  await newRoute();
+  const firstRoute = page.getByRole('dialog', { name: 'Tạo tuyến tuần tra' });
+  await firstRoute.getByLabel('Tên tuyến', { exact: true }).fill('Tuần tra sảnh chính');
+  await firstRoute.getByLabel('Điểm đến 1').selectOption(endpoints[0].endpointId);
+  await firstRoute.getByLabel('Hoạt động tại điểm 1').selectOption('PATROL_FALL');
+  await firstRoute.getByRole('button', { name: 'Tạo & phát hành tuyến' }).click();
+  await expect(library.locator('button[aria-pressed="true"]')).toContainText('Tuần tra sảnh chính');
+  await expect(page.locator('.pt-route-detail')).toContainText(endpoints[0].endpointName);
+  await expect(page).toHaveURL(new RegExp(`workflowId=${savedRoutes[0].workflow.workflowId}`));
+  assert.deepEqual(writes.slice(writesBeforeEmpty).map(write => write.path), ['/api/v1/admin/patrol-workflows']);
+
+  await library.getByLabel('Lọc tuyến theo bản đồ').selectOption(id(81));
+  await expect(library).toContainText('Không có tuyến phù hợp');
+  await expect(page.locator('.pt-route-detail, .pt-dispatch')).toHaveCount(0);
+  await library.getByRole('button', { name: 'Xóa bộ lọc' }).click();
+  await library.getByLabel('Tìm tuyến tuần tra').fill('KHÔNG KHỚP');
+  await expect(library).toContainText('Không có tuyến phù hợp');
+  await expect(page.locator('.pt-dispatch')).toHaveCount(0);
+
+  await newRoute();
+  const makeTemplate = page.getByRole('dialog', { name: 'Tạo tuyến tuần tra' });
+  await makeTemplate.getByRole('radio', { name: 'Mẫu theo số điểm' }).check();
+  await makeTemplate.getByLabel('Số điểm mỗi vòng').selectOption('5');
+  await makeTemplate.getByRole('button', { name: 'Tạo & phát hành mẫu' }).click();
+  await expect(library.locator('button[aria-pressed="true"]')).toContainText('Tuần tra 5 điểm');
+  await expect(page.locator('.pt-route-detail')).toContainText('5 điểm mỗi vòng');
+  await expect(library.getByLabel('Tìm tuyến tuần tra')).toHaveValue('');
+  await expect(library.locator('.pt-route-card')).toHaveCount(2);
+  await newRoute();
+  await makeTemplate.getByRole('radio', { name: 'Mẫu theo số điểm' }).check();
+  await makeTemplate.getByLabel('Số điểm mỗi vòng').selectOption('5');
+  await makeTemplate.getByRole('button', { name: 'Mở tuyến đã có' }).click();
+  await expect(library.locator('button[aria-pressed="true"]')).toContainText('Tuần tra 5 điểm');
+  assert.deepEqual(writes.slice(writesBeforeEmpty + 1).map(write => write.path), ['/api/v1/admin/patrol-workflows/templates'], 'Creating or reusing a route cannot start a job or schedule');
+  assert.equal(writes.filter(write => write.path === '/api/v1/admin/patrol-workflows/templates').length, 1, 'Running and scheduling existing templates never prepares another workflow');
+
+  await library.getByLabel('Tìm tuyến tuần tra').fill(savedRoutes[0].workflow.workflowCode);
+  await expect(library.locator('button[aria-pressed="true"]')).toContainText('Tuần tra sảnh chính');
+  await expect(page.locator('.pt-route-detail')).toContainText('Tuần tra sảnh chính');
+  await library.getByLabel('Tìm tuyến tuần tra').fill('');
+
+  await page.getByRole('button', { name: 'Ẩn thông báo' }).click();
+  await expect(page.locator('.pt-route-detail')).toContainText('Tuần tra sảnh chính');
+  await page.screenshot({ path: `${output}/routes-desktop.png` });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(library.getByRole('button', { name: /Tuần tra sảnh chính/ })).toBeInViewport();
+  await page.screenshot({ path: `${output}/routes-mobile.png` });
+  await page.setViewportSize({ width: 1440, height: 1080 });
+
+  robotCatalogFailure = true;
+  await page.reload();
+  await expect(page.locator('.pt-notice')).toContainText('Chưa tải được dữ liệu robot');
+  await expect(library.locator('.pt-route-card')).toHaveCount(2);
+  await expect(library).not.toContainText('Chưa có tuyến tuần tra');
+  robotCatalogFailure = false;
+  const custom = { ...workflow, workflowId: id(400), workflowCode: 'CUSTOM_PATROL', workflowName: 'Lượt kiểm tra buổi tối', serviceType: 'patrol' };
+  savedRoutes.push({ ...detail, workflow: custom });
+  await page.goto(`${base}/admin/patrol?workflowId=${custom.workflowId}`);
+  await expect(library.locator('button[aria-pressed="true"]')).toContainText(custom.workflowName);
+  await expect(page.getByRole('link', { name: 'Mở điều phối quy trình' })).toHaveAttribute('href', `/admin/workflow-dispatch?workflowId=${custom.workflowId}`);
+  await expect(page.locator('.pt-dispatch')).toHaveCount(0);
   assert.deepEqual(errors, [], 'No browser runtime errors');
   assert.deepEqual(unknownApis, [], 'Every mutation is explicitly mocked');
   assert.deepEqual(simulationRequests, [], 'The removed simulation route never contacts the simulator');
@@ -460,7 +604,7 @@ try {
   for (const resource of [`/api/v1/jobs/${id(5)}`, `/api/v1/schedules/${id(70)}`]) {
     assert.ok(reads.some(read => read.path === resource && read.query.includeDeleted === 'true'), `${resource} preserves archived/retired detail visibility`);
   }
-  console.log('Patrol browser checks passed: published routes, template and fixed runs, request submission and lookup, schedule lifecycle, lost responses, legacy dispatch and job monitoring.');
+  console.log('Patrol browser checks passed: saved and empty route libraries, publishing and reusing templates, filters, partial API failures, dispatch, schedules, monitoring, recovery and responsive layout.');
 } catch (error) {
   await page.screenshot({ path: `${output}/failure.png`, fullPage: true });
   console.error({ errors, unknownApis });

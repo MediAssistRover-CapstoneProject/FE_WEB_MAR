@@ -17,6 +17,7 @@ export function Icon({ name = 'route', className = '' }) {
     check: <path d="m5 12 4 4L19 6"/>,
     info: <><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-9v1"/></>,
     close: <path d="m6 6 12 12M6 18 18 6"/>,
+    calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-14 4h3"/></>,
     clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
     chevron: <path d="m9 5 7 7-7 7"/>,
   };

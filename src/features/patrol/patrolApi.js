@@ -1,4 +1,5 @@
 import { apiRequest } from '../api/client.js';
+import { isPatrolWorkflow, patrolTemplateCount } from './patrolModel.js';
 
 function query(path, params = {}) {
   const search = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== ''));
@@ -61,23 +62,45 @@ export async function createPatrolJob(attempt, saveAttempt) {
   return job;
 }
 
-export async function loadPatrolWorkflows(options) {
-  // Published summaries omit map/template configuration. The admin catalog also
-  // identifies historical patrol jobs and schedules after a route is archived.
-  const [summaries, definitions] = await Promise.allSettled([
+export async function loadPatrolWorkflows(options, includeTemplates = true) {
+  const [summaries, definitions, templateList] = await Promise.allSettled([
     allPatrolPages(patrolApi.listPublished, options),
     allPatrolPages((params, config) => patrolApi.listWorkflows({ ...params, includeDeleted: true }, config), options),
+    includeTemplates ? patrolApi.listTemplates(options) : [],
   ]);
   if (summaries.status === 'rejected') throw summaries.reason;
+
   const metadataMissing = definitions.status === 'rejected';
   const all = metadataMissing ? [] : definitions.value;
-  const byId = new Map(all.filter(item => item.serviceType === 'PATROL').map(item => [item.workflowId, item]));
-  const published = summaries.value.filter(item => item.serviceType === 'PATROL').map(summary => {
-    const workflow = { ...byId.get(summary.workflowId), ...summary, status: 'PUBLISHED', acceptsNewJobs: true };
-    byId.set(workflow.workflowId, workflow);
-    return workflow;
-  });
-  return { workflows: [...byId.values()], published: published.sort((a, b) => a.workflowName.localeCompare(b.workflowName, 'vi')), metadataMissing };
+  const byId = new Map(all.filter(isPatrolWorkflow).map(item => [item.workflowId, item]));
+  const ready = new Map();
+  for (const summary of summaries.value) {
+    if (isPatrolWorkflow(summary) && summary.workflowId) {
+      ready.set(summary.workflowId, { ...byId.get(summary.workflowId), ...summary, status: 'PUBLISHED', acceptsNewJobs: true });
+    }
+  }
+
+  // The template endpoint lists supported sizes even before their workflows exist.
+  const templates = Array.isArray(templateList.value) ? templateList.value.filter(item =>
+    Number.isInteger(item?.checkpointCount) && item.checkpointCount >= 3 && item.checkpointCount <= 11
+  ) : [];
+  for (const item of templates) {
+    if (!item.workflowId || item.available !== true) continue;
+    const workflow = ready.get(item.workflowId) || byId.get(item.workflowId);
+    ready.set(item.workflowId, {
+      workflowName: `Tuần tra ${item.checkpointCount} điểm`, ...workflow,
+      workflowId: item.workflowId, serviceType: 'PATROL', status: 'PUBLISHED', acceptsNewJobs: true,
+      inputUiJson: { ...workflow?.inputUiJson, patrol_template: { version: 1, checkpointCount: item.checkpointCount } },
+    });
+  }
+  for (const [id, workflow] of ready) byId.set(id, workflow);
+  const published = [...ready.values()].sort((a, b) =>
+    Number(!!patrolTemplateCount(a)) - Number(!!patrolTemplateCount(b)) || a.workflowName.localeCompare(b.workflowName, 'vi', { numeric: true })
+  );
+  const unavailable = templateList.status === 'rejected' ? ![404, 405].includes(templateList.reason.status) : !Array.isArray(templateList.value);
+  const templateError = unavailable
+    ? 'Chưa tải được danh sách mẫu theo số điểm.' : '';
+  return { workflows: [...byId.values()], published, templates, templateError, metadataMissing };
 }
 
 // Never treat a malformed or truncated page as a complete catalog.
