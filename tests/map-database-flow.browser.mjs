@@ -20,10 +20,23 @@ const page=await context.newPage(),errors=[],writes=[],images=[];
 page.on('pageerror',e=>errors.push(e.message));
 const map=(id,status)=>({mapId:id,mapName:`Map database ${id}`,floorId:'floor-1',versionNo:1,status,widthM:10,heightM:8,resolutionMPerPixel:.05,originXM:0,originYM:0,originYawRad:0});
 let maps=[map('a','ACTIVE'),map('b','DRAFT')],failMaps=false;
+const endpoints = [];
+const validatePointPath = '/api/v1/maps/b/validate-navigation-point';
 await page.route(url=>url.pathname.startsWith('/api/'),async route=>{
   const req=route.request(),url=new URL(req.url()),resource=url.pathname.split('/')[3];
   const reply=(data,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
-  if(req.method()!=='GET'){writes.push(req.url());return reply({message:'Unexpected write'},400);}
+  if (req.method() !== 'GET') {
+    writes.push(url.pathname);
+    if (req.method() === 'POST' && url.pathname === validatePointPath) return reply({ mapId: 'b', knownFree: true });
+    if (req.method() === 'POST' && url.pathname === '/api/v1/endpoints') {
+      const body = req.postDataJSON();
+      const point = { ...body, endpointId: 'saved-' + body.endpointCode };
+      endpoints.push(point);
+      return reply(point, 201);
+    }
+    return reply({ message: 'Unexpected write' }, 400);
+  }
+  if (resource === 'endpoints') return reply({ content: endpoints, last: true, totalPages: 1 });
   if(url.pathname.endsWith('/image-metadata')){
     const id=url.pathname.split('/')[4];images.push(id);
     return reply({map_id:id,width_px:200,height_px:160,resolution_m_per_pixel:.05,origin_x_m:0,origin_y_m:0,origin_yaw_rad:0});
@@ -104,6 +117,29 @@ try{
   await tab('2. Vùng').click();await expectMap('a');
   assert.equal(await page.evaluate(key=>localStorage.getItem(key),STORAGE_KEY),null);
   await page.goto(base+'/admin/map?mapId=b');await expectMap('b');
+  assert.deepEqual(writes, []);
+  const types = [['WAYPOINT', 'Điểm đường'], ['CHARGER', 'Điểm sạc'], ['PARK', 'Điểm đỗ'], ['STAGING', 'Điểm tập kết']];
+  const typeField = page.getByRole('combobox', { name: 'Loại điểm', exact: true });
+  await typeField.waitFor({ state: 'visible' });
+  assert.deepEqual(await typeField.locator('option').evaluateAll(options => options.map(option => [option.value, option.label])), types);
+  for (const [code, label] of types) {
+    await page.getByRole('button', { name: '+ Điểm mới', exact: true }).click();
+    assert.equal(await typeField.inputValue(), 'WAYPOINT');
+    await typeField.selectOption({ label });
+    await page.getByLabel('Mã điểm', { exact: true }).fill(code);
+    await page.getByLabel('Tên điểm', { exact: true }).fill(label);
+    await page.getByLabel('X (m)', { exact: true }).fill('2');
+    await page.getByLabel('Y (m)', { exact: true }).fill('3');
+    await page.getByRole('button', { name: 'Lưu điểm đích', exact: true }).click();
+    await page.getByRole('heading', { name: 'Chỉnh điểm đích', exact: true }).waitFor();
+    assert.equal(endpoints.at(-1).endpointType, code);
+    assert.equal(endpoints.at(-1).mapId, 'b');
+  }
+  await page.reload();
+  for (const [code] of types) {
+    await page.getByLabel('Điểm đã lưu', { exact: true }).selectOption('saved-' + code);
+    assert.equal(await typeField.inputValue(), code);
+  }
   await tab('2. Vùng').click();await expectMap('b');
   assert.ok(images.includes('a')&&images.includes('b'),'Images requested by selected database map ID');
 
@@ -116,6 +152,7 @@ try{
   assert.equal(await page.locator('.ls-map').count(),0);
   failMaps=true;await page.goto(base+'/admin/map');
   await page.getByRole('alert').filter({hasText:'Database unavailable'}).waitFor();
-  assert.deepEqual(writes,[]);assert.deepEqual(errors,[]);
-  console.log('PASS: database-first entry, legacy draft isolation, map selection across tabs/scan, direct mapId, empty/error states and mobile layout. All API requests mocked.');
+  assert.deepEqual(writes, types.flatMap(() => [validatePointPath, '/api/v1/endpoints']));
+  assert.deepEqual(errors,[]);
+  console.log('PASS: database map selection, endpoint types on create and reload, empty/error states and mobile layout. All API requests mocked.');
 }finally{await browser.close();}

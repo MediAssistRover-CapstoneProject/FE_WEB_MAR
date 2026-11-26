@@ -19,6 +19,11 @@ export default function EndpointFields({ endpoint, setEndpoint, mapId = endpoint
     <div className="ep-step"><b>1</b><strong>Thông tin điểm</strong></div>
     <Field label="Mã điểm" required maxLength={64} placeholder="VD: PHONG_101" value={endpoint.endpointCode} onChange={event => set('endpointCode', event.target.value)} />
     <Field label="Tên điểm" required maxLength={160} placeholder="VD: Trước cửa phòng 101" value={endpoint.endpointName} onChange={event => set('endpointName', event.target.value)} />
+    <Field label="Loại điểm">
+      <select aria-label="Loại điểm" name="endpointType" required value={endpoint.endpointType} onChange={event => set('endpointType', event.target.value)}>
+        {Object.entries(ENDPOINT_CATEGORIES).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+      </select>
+    </Field>
     <div className="ep-step"><b>2</b><strong>Vị trí và hướng đến</strong></div>
     <div className={`ep-position${placed ? ' ready' : ''}`}><span>{placed ? '● Đã chọn vị trí' : '○ Chưa chọn vị trí'}</span><small>{placed ? selected ? 'Kéo điểm để đổi vị trí; bấm “Đặt lại vị trí / hướng” để đặt cả hướng.' : 'Kéo trực tiếp điểm cam để đổi vị trí trước khi lưu.' : 'Bấm “Đặt điểm trên map”, hoặc nhập X/Y.'}</small></div>
     <div className="ep-coordinate-fields">{[['xM', 'X (m)'], ['yM', 'Y (m)']].map(([key, label]) => <Field key={key} label={label} required type="number" step="any" value={endpoint[key]} onChange={event => set(key, event.target.value)} />)}</div>
@@ -27,7 +32,6 @@ export default function EndpointFields({ endpoint, setEndpoint, mapId = endpoint
     <div className="ep-angle-presets">{[-180, -90, 0, 90, 180].map(angle => <button type="button" key={angle} className={`ls-btn ep-shared-button${Number(degrees) === angle ? ' active' : ''}`} onClick={() => setAngle(angle)}>{angle}°</button>)}</div>
     <p className="ls-hint">Khi lưu, máy chủ kiểm tra tâm điểm nằm trên ô trống. Bộ điều hướng vẫn kiểm tra kích thước robot và đường đi. Hướng này cũng dùng làm gợi ý định vị; hướng dừng cuối phụ thuộc chế độ điều hướng trên Pi.</p>
     <details className="ep-options"><summary>Cài đặt điểm và liên kết</summary>
-      <Field label="Chức năng điểm"><select aria-label="Chức năng điểm" value={endpoint.endpointType} onChange={event => set('endpointType', event.target.value)}>{Object.entries(ENDPOINT_CATEGORIES).map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></Field>
       <Field label="Vùng liên kết"><select aria-label="Vùng liên kết" value={endpoint.zoneId || ''} onChange={event => set('zoneId', event.target.value)}><option value="">Không liên kết</option>{availableZones.map(zone => <option key={zone.zoneId} value={zone.zoneId}>{zone.zoneName}{!zone.active ? ' · Ngừng hoạt động' : ''}</option>)}</select></Field>
       <Field label="Phòng liên kết"><select aria-label="Phòng liên kết" value={fixedRoom?.roomId || endpoint.roomId || ''} disabled={!!fixedRoom} onChange={event => set('roomId', event.target.value)}>{fixedRoom ? <option value={fixedRoom.roomId}>{fixedRoom.roomName}</option> : <><option value="">Không liên kết</option>{rooms.map(room => <option key={room.roomId} value={room.roomId}>{room.roomName}</option>)}</>}</select></Field>
       <Field label="Mô tả" value={endpoint.description || ''} onChange={event => set('description', event.target.value)} />

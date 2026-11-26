@@ -1,6 +1,11 @@
+import { vi } from '../../i18n/vi.js';
+import { requestSchema, schemaOf } from '../api/contract.js';
 import { insideMap } from './mapCoordinates.js';
+
 export const ZONE_CATEGORIES={KEEP_OUT:'Khu vực cấm',SPEED:'Khu vực giới hạn tốc độ',NO_STOP:'Khu vực không được dừng'};
-export const ENDPOINT_CATEGORIES={WAYPOINT:'Điểm đường',CHARGER:'Điểm sạc',PARK:'Điểm đỗ',STAGING:'Điểm tập kết'};
+const endpointTypes = schemaOf(requestSchema('POST /api/v1/endpoints').properties.endpointType).enum;
+export const ENDPOINT_CATEGORIES = Object.fromEntries(endpointTypes.map(type => [type, vi(type)]));
+
 const text=(value,name,max)=>{if(typeof value!=='string'||!value.trim()||value.length>max)throw Error(`${name} bắt buộc, tối đa ${max} ký tự.`);return value.trim();};
 const number=(value,name)=>{if(value===''||value==null||!Number.isFinite(Number(value)))throw Error(`${name} phải là số hữu hạn.`);return Number(value);};
 function optionalNumber(value,name,min=0,strict=false){if(value===''||value==null)return null;const n=number(value,name);if(strict?n<=min:n<min)throw Error(`${name} không hợp lệ.`);return n;}
@@ -33,7 +38,7 @@ export function zonePayload(form,mapId) {
 }
 export function endpointPayload(form,map,zones,rooms) {
   if(!map?.mapId)throw Error('Chọn bản đồ BE trước.');
-  if(!ENDPOINT_CATEGORIES[form.endpointType])throw Error('Loại điểm không thuộc danh mục BE.');
+  if (!Object.hasOwn(ENDPOINT_CATEGORIES, form.endpointType)) throw Error('Loại điểm không thuộc danh mục BE.');
   if(form.zoneId&&!zones.some(z=>z.zoneId===form.zoneId&&z.mapId===map.mapId))throw Error('Vùng phải thuộc cùng bản đồ.');
   if(form.roomId&&!rooms.some(r=>r.roomId===form.roomId&&r.floorId===map.floorId))throw Error('Phòng phải thuộc tầng của bản đồ.');
   const yawRad=number(form.yawRad,'Góc hướng');
